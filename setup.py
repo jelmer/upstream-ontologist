@@ -13,4 +13,5 @@ setup(
     project_urls={
         "Repository": "https://github.com/jelmer/upstream-ontologist.git",
     },
+    test_suite="upstream_ontologist.tests.test_upstream_metadata",
 )
