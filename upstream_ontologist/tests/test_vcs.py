@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # Copyright (C) 2018 Jelmer Vernooij
 #
 # This program is free software; you can redistribute it and/or modify
@@ -15,14 +15,22 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
-import unittest
+"""Tests for the vcs module."""
+
+from unittest import TestCase
+
+from lintian_brush.vcs import (
+    is_gitlab_site,
+    )
 
 
-def test_suite():
-    names = [
-        'upstream_metadata',
-        'vcs',
-        ]
-    module_names = [__name__ + '.test_' + name for name in names]
-    loader = unittest.TestLoader()
-    return loader.loadTestsFromNames(module_names)
+class TestIsGitLabSite(TestCase):
+
+    def test_not_gitlab(self):
+        self.assertFalse(is_gitlab_site('foo.example.com'))
+        self.assertFalse(is_gitlab_site('github.com'))
+        self.assertFalse(is_gitlab_site(None))
+
+    def test_gitlab(self):
+        self.assertTrue(is_gitlab_site('gitlab.somehost.com'))
+        self.assertTrue(is_gitlab_site('salsa.debian.org'))

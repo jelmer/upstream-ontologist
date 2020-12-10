@@ -69,8 +69,6 @@ from debmutate.vcs import (
     )
 
 from lintian_brush import (
-    USER_AGENT,
-    DEFAULT_URLLIB_TIMEOUT,
     SUPPORTED_CERTAINTIES,
     certainty_sufficient,
     certainty_to_confidence,
@@ -81,12 +79,19 @@ from lintian_brush.vcs import (
     plausible_url as plausible_vcs_url,
     plausible_browse_url as plausible_vcs_browse_url,
     sanitize_url as sanitize_vcs_url,
-    is_gitlab_site,
     determine_browser_url,
     )
 from urllib.request import urlopen, Request
 
+from .vcs import (
+    is_gitlab_site,
+    )
+
 version_string = '0.1'
+
+USER_AGENT = 'upstream-ontologist/' + version_string
+# Too aggressive?
+DEFAULT_URLLIB_TIMEOUT = 3
 
 # Pecl is quite slow, so up the timeout a bit.
 PECL_URLLIB_TIMEOUT = 15
