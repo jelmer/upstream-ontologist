@@ -1,11 +1,11 @@
 #!/usr/bin/python3
 
-from distutils.core import setup
+from setuptools import setup
 
 setup(
     name="upstream-ontologist",
     packages=["upstream_ontologist"],
-    version="0.1",
+    version="0.1.1",
     author="Jelmer Vernooij",
     author_email="jelmer@debian.org",
     url="https://github.com/jelmer/upstream-ontologist",
