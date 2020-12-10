@@ -3,3 +3,4 @@ __pycache__
 MANIFEST
 build
 dist
+upstream_ontologist.egg-info
