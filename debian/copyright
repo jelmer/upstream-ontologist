@@ -1,0 +1,20 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+
+Files: *
+Copyright: Unknown
+License: Unknown
+
+Files: build/* dist/* upstream_ontologist/*
+Copyright: = Copyright(f, strict=False)
+           2018-2019, Jelmer Vernooij
+           2018-2020, Jelmer Vernooij <jelmer@debian.org>
+           Unknown
+           import (
+License: GPL-2+
+
+Files: debian/*
+Copyright: Unknown
+License: Unknown
+
+License: GPL-2+
+Comment: Add the corresponding license text here
