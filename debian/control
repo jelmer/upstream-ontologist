@@ -5,3 +5,4 @@ Build-Depends: debhelper-compat (= 12), python3-all
 
 Package: upstream-ontologist
 Architecture: any
+Description: tracking of upstream project metadata
