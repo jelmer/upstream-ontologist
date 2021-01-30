@@ -1,2 +1,3 @@
 Test-Command: python3 setup.py test
-Depends: @
+Depends: @, lintian-brush, python3-setuptools
+Restrictions: allow-stderr
