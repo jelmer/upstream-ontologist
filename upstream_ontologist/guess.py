@@ -224,7 +224,7 @@ def update_from_guesses(upstream_metadata, guessed_items):
 
 
 def guess_from_debian_rules(path, trust_package):
-    from lintian_brush.rules import Makefile
+    from debmutate._rules import Makefile
     mf = Makefile.from_path(path)
     try:
         upstream_git = mf.get_variable(b'UPSTREAM_GIT')
