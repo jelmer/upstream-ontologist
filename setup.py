@@ -17,6 +17,12 @@ setup(
     project_urls={
         "Repository": "https://github.com/jelmer/upstream-ontologist.git",
     },
+    entry_points={
+        'console_scripts': [
+            ('guess-upstream-metadata='
+             'upstream_ontologist.__main__:main'),
+        ],
+    },
     requires=['debian', 'debmutate'],
     test_suite="upstream_ontologist.tests.test_suite",
 )
