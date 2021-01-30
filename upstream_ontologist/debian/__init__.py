@@ -1,5 +1,5 @@
-#!/usr/bin/python
-# Copyright (C) 2018 Jelmer Vernooij
+#!/usr/bin/python3
+# Copyright (C) 2018 Jelmer Vernooij <jelmer@debian.org>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,14 +15,19 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
-import unittest
+
+def debian_to_upstream_version(version):
+    """Drop debian-specific modifiers from an upstream version string.
+    """
+    return version.upstream_version.split("+dfsg")[0]
 
 
-def test_suite():
-    names = [
-        'upstream_ontologist',
-        'vcs',
-        ]
-    module_names = [__name__ + '.test_' + name for name in names]
-    loader = unittest.TestLoader()
-    return loader.loadTestsFromNames(module_names)
+def upstream_name_to_debian_source_name(upstream_name: str) -> str:
+    if upstream_name.startswith('GNU '):
+        upstream_name = upstream_name[len('GNU '):]
+    return upstream_name.lower()
+
+
+def upstream_version_to_debian_upstream_version(version: str) -> str:
+    # TODO(jelmer)
+    return version

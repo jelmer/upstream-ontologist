@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# Copyright (C) 2020 Jelmer Vernooij <jelmer@debian.org>
+# Copyright (C) 2018 Jelmer Vernooij <jelmer@debian.org>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,12 +18,15 @@
 """Functions for working with upstream metadata."""
 
 from . import (
-    guess_upstream_metadata,
-    guess_upstream_info,
+    version_string,
     UpstreamDatum,
     UpstreamRequirement,
     UpstreamOutput,
-    version_string,
+    BuildSystem,
+    )
+from .guess import (
+    guess_upstream_metadata,
+    guess_upstream_info,
     )
 
 
@@ -65,6 +68,8 @@ def main(argv=None):
                     entry.stage, entry.name, entry.kind))
             elif isinstance(entry, UpstreamOutput):
                 print('outputs %s (%s)' % (entry.name, entry.kind))
+            elif isinstance(entry, BuildSystem):
+                print('build system: %s' % entry.name)
             else:
                 raise TypeError(entry)
     else:

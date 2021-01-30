@@ -1,5 +1,5 @@
-upstream-ontologist (0.1.1~git20201210.d145145-1) UNRELEASED; urgency=low
+upstream-ontologist (0.1.5-1) UNRELEASED; urgency=low
 
   * Initial release. Closes: #976893
 
- -- Jelmer Vernooĳ <jelmer@debian.org>  Thu, 10 Dec 2020 02:51:21 +0000
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Sat, 30 Jan 2021 16:42:11 +0000
