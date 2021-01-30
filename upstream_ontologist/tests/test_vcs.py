@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# Copyright (C) 2018 Jelmer Vernooij
+# Copyright (C) 2018 Jelmer Vernooij <jelmer@debian.org>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,22 +15,17 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
-"""Tests for the vcs module."""
 
 from unittest import TestCase
 
-from lintian_brush.vcs import (
-    is_gitlab_site,
-    )
+from upstream_ontologist.vcs import plausible_url
 
 
-class TestIsGitLabSite(TestCase):
+class PlausibleUrlTests(TestCase):
 
-    def test_not_gitlab(self):
-        self.assertFalse(is_gitlab_site('foo.example.com'))
-        self.assertFalse(is_gitlab_site('github.com'))
-        self.assertFalse(is_gitlab_site(None))
-
-    def test_gitlab(self):
-        self.assertTrue(is_gitlab_site('gitlab.somehost.com'))
-        self.assertTrue(is_gitlab_site('salsa.debian.org'))
+    def test_url(self):
+        self.assertFalse(plausible_url('the'))
+        self.assertFalse(plausible_url('1'))
+        self.assertTrue(plausible_url('git@foo:blah'))
+        self.assertTrue(plausible_url('git+ssh://git@foo/blah'))
+        self.assertTrue(plausible_url('https://foo/blah'))
