@@ -30,6 +30,11 @@ import urllib
 from urllib.parse import urlparse, urlunparse
 from urllib.request import urlopen, Request
 
+from lintian_brush.vcs import (
+    sanitize_url,
+    )
+
+
 from . import (
     DEFAULT_URLLIB_TIMEOUT,
     USER_AGENT,
@@ -152,7 +157,3 @@ def browse_url_from_repo_url(
              None, None))
 
     return None
-
-
-def sanitize_url(url: str) -> str:
-    return url

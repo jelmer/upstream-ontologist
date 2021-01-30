@@ -19,12 +19,14 @@
 
 from . import (
     version_string,
-    guess_upstream_metadata,
-    guess_upstream_info,
     UpstreamDatum,
     UpstreamRequirement,
     UpstreamOutput,
     BuildSystem,
+    )
+from .guess import (
+    guess_upstream_metadata,
+    guess_upstream_info,
     )
 
 
