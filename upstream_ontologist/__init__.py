@@ -35,7 +35,7 @@ Supported fields:
 - Archive
 - Security-Contact
 
-Extensions for lintian-brush.
+Extensions for upstream-ontologist.
 - X-SourceForge-Project
 - X-Wiki
 - X-Summary
@@ -55,7 +55,7 @@ from typing import Optional, Sequence
 
 SUPPORTED_CERTAINTIES = ['certain', 'confident', 'likely', 'possible', None]
 
-version_string = '0.1.5'
+version_string = '0.1'
 
 USER_AGENT = 'upstream-ontologist/' + version_string
 # Too aggressive?
