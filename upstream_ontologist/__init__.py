@@ -43,7 +43,7 @@ Extensions for upstream-ontologist.
 - X-License
 - X-Copyright
 
-Supported, but unused.
+Supported, but currently not set.
 - FAQ
 - Donation
 - Documentation
@@ -55,7 +55,7 @@ from typing import Optional, Sequence
 
 SUPPORTED_CERTAINTIES = ['certain', 'confident', 'likely', 'possible', None]
 
-version_string = '0.1.6'
+version_string = '0.1.7'
 
 USER_AGENT = 'upstream-ontologist/' + version_string
 # Too aggressive?
@@ -93,14 +93,28 @@ class UpstreamDatum(object):
             self.origin)
 
 
+class UpstreamPackage(object):
+
+    def __init__(self, family, name):
+        self.family = family
+        self.name = name
+
+
 class UpstreamRequirement(object):
     """Upstream dependency."""
 
     def __init__(self, stage, kind, name, origin=None):
         self.stage = stage
-        self.kind = kind
-        self.name = name
+        self.package = UpstreamPackage(kind, name)
         self.origin = origin
+
+    @property
+    def kind(self):
+        return self.package.family
+
+    @property
+    def name(self):
+        return self.package.name
 
     def __str__(self):
         return "%s Upstream Requirement (%s): %s" % (
