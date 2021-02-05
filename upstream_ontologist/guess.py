@@ -718,6 +718,20 @@ def guess_from_meta_json(path, trust_package):
                         'Repository-Browse', repo['web'], 'certain')
 
 
+def guess_from_travis_yml(path, trust_package):
+    import ruamel.yaml
+    import ruamel.yaml.reader
+    with open(path, 'rb') as f:
+        try:
+            data = ruamel.yaml.load(f, ruamel.yaml.SafeLoader)
+        except ruamel.yaml.reader.ReaderError as e:
+            warn('Unable to parse %s: %s' % (path, e))
+            return
+        language = data.get('language')
+        if language == 'go':
+            yield BuildSystem('golang')
+
+
 def guess_from_meta_yml(path, trust_package):
     """Guess upstream metadata from a META.yml file.
 
@@ -1107,6 +1121,12 @@ def guess_from_security_md(path, trust_package=False):
     yield UpstreamDatum('X-Security-MD', path, 'certain')
 
 
+def guess_from_go(path, trust_package: bool = False):
+    # TODO(jelmer): Perhaps set golang buildsystem with lower priority,
+    # if other build systems are also present?
+    yield BuildSystem('golang')
+
+
 def _get_guessers(path, trust_package=False):
     CANDIDATES = [
         ('debian/watch', guess_from_debian_watch),
@@ -1128,6 +1148,7 @@ def _get_guessers(path, trust_package=False):
         ('SECURITY.md', guess_from_security_md),
         ('.github/SECURITY.md', guess_from_security_md),
         ('docs/SECURITY.md', guess_from_security_md),
+        ('.travis.yml', guess_from_travis_yml),
         ]
 
     # Search for something Python-y
@@ -1181,6 +1202,12 @@ def _get_guessers(path, trust_package=False):
     else:
         CANDIDATES.extend(
             [(p, guess_from_debian_patch) for p in debian_patches])
+
+    # TODO(jelmer): Don't assume go if other build systems were found?
+    for entry in os.scandir(path):
+        if entry.name.endswith('.go'):
+            CANDIDATES.append((entry.name, guess_from_go))
+            break
 
     yield 'environment', guess_from_environment()
 

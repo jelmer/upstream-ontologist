@@ -18,7 +18,13 @@
 
 from unittest import TestCase
 
-from upstream_ontologist.vcs import plausible_url
+from upstream_ontologist.vcs import (
+    plausible_url,
+    fixup_rcp_style_git_repo_url,
+    is_gitlab_site,
+    canonical_git_repo_url,
+    find_public_repo_url,
+    )
 
 
 class PlausibleUrlTests(TestCase):
@@ -29,3 +35,74 @@ class PlausibleUrlTests(TestCase):
         self.assertTrue(plausible_url('git@foo:blah'))
         self.assertTrue(plausible_url('git+ssh://git@foo/blah'))
         self.assertTrue(plausible_url('https://foo/blah'))
+
+
+class TestIsGitLabSite(TestCase):
+
+    def test_not_gitlab(self):
+        self.assertFalse(is_gitlab_site('foo.example.com'))
+        self.assertFalse(is_gitlab_site('github.com'))
+        self.assertFalse(is_gitlab_site(None))
+
+    def test_gitlab(self):
+        self.assertTrue(is_gitlab_site('gitlab.somehost.com'))
+        self.assertTrue(is_gitlab_site('salsa.debian.org'))
+
+
+class CanonicalizeVcsUrlTests(TestCase):
+
+    def test_github(self):
+        self.assertEqual(
+            'https://github.com/jelmer/example.git',
+            canonical_git_repo_url(
+                'https://github.com/jelmer/example'))
+
+    def test_salsa(self):
+        self.assertEqual(
+            'https://salsa.debian.org/jelmer/example.git',
+            canonical_git_repo_url(
+                'https://salsa.debian.org/jelmer/example'))
+        self.assertEqual(
+            'https://salsa.debian.org/jelmer/example.git',
+            canonical_git_repo_url(
+                'https://salsa.debian.org/jelmer/example.git'))
+
+
+class FindPublicVcsUrlTests(TestCase):
+
+    def test_github(self):
+        self.assertEqual(
+            'https://github.com/jelmer/example',
+            find_public_repo_url('ssh://git@github.com/jelmer/example'))
+        self.assertEqual(
+            'https://github.com/jelmer/example',
+            find_public_repo_url('https://github.com/jelmer/example'))
+
+    def test_salsa(self):
+        self.assertEqual(
+            'https://salsa.debian.org/jelmer/example',
+            find_public_repo_url('ssh://salsa.debian.org/jelmer/example'))
+        self.assertEqual(
+            'https://salsa.debian.org/jelmer/example',
+            find_public_repo_url('https://salsa.debian.org/jelmer/example'))
+
+
+class FixupRcpStyleUrlTests(TestCase):
+
+    def test_fixup(self):
+        self.assertEqual(
+            'ssh://github.com/jelmer/example',
+            fixup_rcp_style_git_repo_url('github.com:jelmer/example'))
+        self.assertEqual(
+            'ssh://git@github.com/jelmer/example',
+            fixup_rcp_style_git_repo_url('git@github.com:jelmer/example'))
+
+    def test_leave(self):
+        self.assertEqual(
+            'https://salsa.debian.org/jelmer/example',
+            fixup_rcp_style_git_repo_url(
+                'https://salsa.debian.org/jelmer/example'))
+        self.assertEqual(
+            'ssh://git@salsa.debian.org/jelmer/example',
+            fixup_rcp_style_git_repo_url(
+                'ssh://git@salsa.debian.org/jelmer/example'))
