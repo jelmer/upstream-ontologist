@@ -26,7 +26,6 @@ from unittest import (
 
 
 from upstream_ontologist import (
-    BuildSystem,
     UpstreamDatum,
     min_certainty,
     certainty_to_confidence,
@@ -100,8 +99,7 @@ class GuessFromPackageJsonTests(TestCaseInTempDir):
 }
 """)
         self.assertEqual(
-            [BuildSystem('npm'),
-             UpstreamDatum('Name', 'autosize', 'certain'),
+            [UpstreamDatum('Name', 'autosize', 'certain'),
              UpstreamDatum(
                  'Homepage', 'http://www.jacklmoore.com/autosize', 'certain'),
              UpstreamDatum('X-License', 'MIT', 'certain', None),
@@ -131,8 +129,7 @@ class GuessFromPackageJsonTests(TestCaseInTempDir):
 }
 """)
         self.assertEqual(
-            [BuildSystem('npm'),
-             UpstreamDatum('Name', 'mozillaeslintsetup', 'certain'),
+            [UpstreamDatum('Name', 'mozillaeslintsetup', 'certain'),
              UpstreamDatum(
                  'X-Summary',
                  'This package file is for setup of ESLint.', 'certain', None),

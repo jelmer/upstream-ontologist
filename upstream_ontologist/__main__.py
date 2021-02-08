@@ -20,9 +20,6 @@
 from . import (
     version_string,
     UpstreamDatum,
-    UpstreamRequirement,
-    UpstreamOutput,
-    BuildSystem,
     )
 from .guess import (
     guess_upstream_metadata,
@@ -63,13 +60,6 @@ def main(argv=None):
             if isinstance(entry, UpstreamDatum):
                 print('%s: %r - certainty %s (from %s)' % (
                     entry.field, entry.value, entry.certainty, entry.origin))
-            elif isinstance(entry, UpstreamRequirement):
-                print('%s requires %s (%s)' % (
-                    entry.stage, entry.name, entry.kind))
-            elif isinstance(entry, UpstreamOutput):
-                print('outputs %s (%s)' % (entry.name, entry.kind))
-            elif isinstance(entry, BuildSystem):
-                print('build system: %s' % entry.name)
             else:
                 raise TypeError(entry)
     else:

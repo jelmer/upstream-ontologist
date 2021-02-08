@@ -39,9 +39,6 @@ from . import (
     DEFAULT_URLLIB_TIMEOUT,
     USER_AGENT,
     UpstreamDatum,
-    UpstreamRequirement,
-    UpstreamOutput,
-    BuildSystem,
     min_certainty,
     certainty_to_confidence,
     certainty_sufficient,
@@ -321,14 +318,10 @@ def guess_from_python_metadata(pkg_info):
     if payload.strip() and pkg_info.get_content_type() in (None, 'text/plain'):
         yield UpstreamDatum(
             'X-Description', pkg_info.get_payload(), 'possible')
-    for require in pkg_info.get_all('Requires', []):
-        yield UpstreamRequirement('build', 'python-package', require)
 
 
 def guess_from_pkg_info(path, trust_package):
     """Get the metadata from a python setup.py file."""
-    if os.path.exists('setup.py'):
-        yield BuildSystem('setup.py')
     from email.parser import Parser
     try:
         with open(path, 'r') as f:
@@ -339,7 +332,6 @@ def guess_from_pkg_info(path, trust_package):
 
 
 def guess_from_setup_py(path, trust_package):
-    yield BuildSystem('setup.py')
     if not trust_package:
         return
     from distutils.core import run_setup
@@ -374,20 +366,10 @@ def guess_from_setup_py(path, trust_package):
         if url_type in ('Bug Tracker', ):
             yield UpstreamDatum(
                 'Bug-Database', url, 'certain')
-    for require in result.get_requires():
-        yield UpstreamRequirement('build', 'python-package', require)
-    for script in (result.scripts or []):
-        yield UpstreamOutput('binary', os.path.basename(script))
-    entry_points = result.entry_points or {}
-    for script in entry_points.get('console_scripts', []):
-        yield UpstreamOutput('binary', script.split('=')[0])
-    for package in result.packages or []:
-        yield UpstreamOutput('python-package', package)
 
 
 def guess_from_package_json(path, trust_package):
     import json
-    yield BuildSystem('npm')
     with open(path, 'r') as f:
         package = json.load(f)
     if 'name' in package:
@@ -422,10 +404,6 @@ def guess_from_package_json(path, trust_package):
             url = package['bugs']
         if url:
             yield UpstreamDatum('Bug-Database', url, 'certain')
-    if 'devDependencies' in package:
-        for name, unused_version in package['devDependencies'].items():
-            # TODO(jelmer): Look at version
-            yield UpstreamRequirement('dev', 'npm', name)
 
 
 def xmlparse_simplify_namespaces(path, namespaces):
@@ -466,7 +444,6 @@ def guess_from_dist_ini(path, trust_package):
         ParsingError,
         NoOptionError,
         )
-    yield BuildSystem('dist-zilla')
     parser = RawConfigParser(strict=False)
     with open(path, 'r') as f:
         try:
@@ -727,9 +704,6 @@ def guess_from_travis_yml(path, trust_package):
         except ruamel.yaml.reader.ReaderError as e:
             warn('Unable to parse %s: %s' % (path, e))
             return
-        language = data.get('language')
-        if language == 'go':
-            yield BuildSystem('golang')
 
 
 def guess_from_meta_yml(path, trust_package):
@@ -764,8 +738,6 @@ def guess_from_meta_yml(path, trust_package):
                 if url:
                     yield UpstreamDatum(
                         'Repository', url, 'certain')
-            for require in data.get('requires', []):
-                yield UpstreamRequirement('build', 'perl', require)
 
 
 def guess_from_doap(path, trust_package):
@@ -830,7 +802,6 @@ def guess_from_doap(path, trust_package):
 
 
 def guess_from_cabal(path, trust_package=False):
-    yield BuildSystem('cabal')
     # TODO(jelmer): Perhaps use a standard cabal parser in Python?
     # The current parser is not really correct, but good enough for our needs.
     # https://www.haskell.org/cabal/release/cabal-1.10.1.0/doc/users-guide/
@@ -998,7 +969,6 @@ def guess_from_cargo(path, trust_package):
     except TomlDecodeError as e:
         warn('Error parsing toml file %s: %s' % (path, e))
         return
-    yield BuildSystem('cargo')
     try:
         package = cargo['package']
     except KeyError:
@@ -1016,14 +986,9 @@ def guess_from_cargo(path, trust_package):
             yield UpstreamDatum('Repository', package['repository'], 'certain')
         if 'version' in package:
             yield UpstreamDatum('X-Version', package['version'], 'confident')
-    if 'dependencies' in cargo:
-        for name, details in cargo['dependencies'].items():
-            # TODO(jelmer): Look at details['features'], details['version']
-            yield UpstreamRequirement('build', 'cargo-crate', name)
 
 
 def guess_from_pom_xml(path, trust_package=False):
-    yield BuildSystem('maven')
     # Documentation: https://maven.apache.org/pom.html
 
     import xml.etree.ElementTree as ET
@@ -1121,12 +1086,6 @@ def guess_from_security_md(path, trust_package=False):
     yield UpstreamDatum('X-Security-MD', path, 'certain')
 
 
-def guess_from_go(path, trust_package: bool = False):
-    # TODO(jelmer): Perhaps set golang buildsystem with lower priority,
-    # if other build systems are also present?
-    yield BuildSystem('golang')
-
-
 def _get_guessers(path, trust_package=False):
     CANDIDATES = [
         ('debian/watch', guess_from_debian_watch),
@@ -1148,7 +1107,6 @@ def _get_guessers(path, trust_package=False):
         ('SECURITY.md', guess_from_security_md),
         ('.github/SECURITY.md', guess_from_security_md),
         ('docs/SECURITY.md', guess_from_security_md),
-        ('.travis.yml', guess_from_travis_yml),
         ]
 
     # Search for something Python-y
@@ -1203,12 +1161,6 @@ def _get_guessers(path, trust_package=False):
         CANDIDATES.extend(
             [(p, guess_from_debian_patch) for p in debian_patches])
 
-    # TODO(jelmer): Don't assume go if other build systems were found?
-    for entry in os.scandir(path):
-        if entry.name.endswith('.go'):
-            CANDIDATES.append((entry.name, guess_from_go))
-            break
-
     yield 'environment', guess_from_environment()
 
     for relpath, guesser in CANDIDATES:
@@ -1238,8 +1190,7 @@ def guess_upstream_metadata_items(
 
 
 def guess_upstream_info(
-        path: str, trust_package: bool = False) -> Iterable[
-            Union[UpstreamDatum, UpstreamRequirement, UpstreamOutput]]:
+        path: str, trust_package: bool = False) -> Iterable[UpstreamDatum]:
     guessers = _get_guessers(path, trust_package=trust_package)
     for name, guesser in guessers:
         for entry in guesser:
@@ -1251,20 +1202,14 @@ def guess_upstream_info(
 def get_upstream_info(path, trust_package=False, net_access=False,
                       consult_external_directory=False, check=False):
     metadata_items = []
-    requirements = []
-    buildsystem = None
     for entry in guess_upstream_info(path, trust_package=trust_package):
         if isinstance(entry, UpstreamDatum):
             metadata_items.append(entry)
-        elif isinstance(entry, BuildSystem):
-            buildsystem = entry
-        elif isinstance(entry, UpstreamRequirement):
-            requirements.append(entry)
     metadata = summarize_upstream_metadata(
         metadata_items, '.', net_access=net_access,
         consult_external_directory=consult_external_directory,
         check=check)
-    return buildsystem, requirements, metadata
+    return metadata
 
 
 def summarize_upstream_metadata(
