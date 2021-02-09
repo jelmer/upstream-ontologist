@@ -988,7 +988,7 @@ def guess_from_cargo(path, trust_package):
             yield UpstreamDatum('X-Version', package['version'], 'confident')
 
 
-def guess_from_pyproject(path, trust_package):
+def guess_from_pyproject_toml(path, trust_package):
     try:
         from toml.decoder import load, TomlDecodeError
     except ImportError:
