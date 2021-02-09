@@ -20,57 +20,73 @@
 from . import (
     version_string,
     UpstreamDatum,
-    )
+)
 from .guess import (
     guess_upstream_metadata,
     guess_upstream_info,
-    )
+)
 
 
 def main(argv=None):
     import argparse
     import sys
     import ruamel.yaml
+
     parser = argparse.ArgumentParser(sys.argv[0])
-    parser.add_argument('path', default='.', nargs='?')
+    parser.add_argument("path", default=".", nargs="?")
     parser.add_argument(
-        '--trust',
-        action='store_true',
-        help='Whether to allow running code from the package.')
+        "--trust",
+        action="store_true",
+        help="Whether to allow running code from the package.",
+    )
     parser.add_argument(
-        '--disable-net-access',
-        help='Do not probe external services.',
-        action='store_true', default=False)
+        "--disable-net-access",
+        help="Do not probe external services.",
+        action="store_true",
+        default=False,
+    )
     parser.add_argument(
-        '--check', action='store_true',
-        help='Check guessed metadata against external sources.')
+        "--check",
+        action="store_true",
+        help="Check guessed metadata against external sources.",
+    )
     parser.add_argument(
-        '--scan', action='store_true',
-        help='Scan for metadata rather than printing results.')
+        "--scan",
+        action="store_true",
+        help="Scan for metadata rather than printing results.",
+    )
     parser.add_argument(
-        '--consult-external-directory',
-        action='store_true',
-        help='Pull in external (not maintained by upstream) directory data')
+        "--consult-external-directory",
+        action="store_true",
+        help="Pull in external (not maintained by upstream) directory data",
+    )
     parser.add_argument(
-        '--version', action='version', version='%(prog)s ' + version_string)
+        "--version", action="version", version="%(prog)s " + version_string
+    )
     args = parser.parse_args(argv)
 
     if args.scan:
         for entry in guess_upstream_info(args.path, args.trust):
             if isinstance(entry, UpstreamDatum):
-                print('%s: %r - certainty %s (from %s)' % (
-                    entry.field, entry.value, entry.certainty, entry.origin))
+                print(
+                    "%s: %r - certainty %s (from %s)"
+                    % (entry.field, entry.value, entry.certainty, entry.origin)
+                )
             else:
                 raise TypeError(entry)
     else:
         metadata = guess_upstream_metadata(
-            args.path, args.trust, not args.disable_net_access,
+            args.path,
+            args.trust,
+            not args.disable_net_access,
             consult_external_directory=args.consult_external_directory,
-            check=args.check)
+            check=args.check,
+        )
 
         sys.stdout.write(ruamel.yaml.round_trip_dump(metadata))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import sys
+
     sys.exit(main())
