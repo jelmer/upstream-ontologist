@@ -988,6 +988,33 @@ def guess_from_cargo(path, trust_package):
             yield UpstreamDatum('X-Version', package['version'], 'confident')
 
 
+def guess_from_pyproject(path, trust_package):
+    try:
+        from toml.decoder import load, TomlDecodeError
+    except ImportError:
+        return
+    try:
+        with open(path, 'r') as f:
+            pyproject = load(f)
+    except FileNotFoundError:
+        return
+    except TomlDecodeError as e:
+        warn('Error parsing toml file %s: %s' % (path, e))
+        return
+    if 'poetry' in pyproject.get('tool', []):
+        poetry = pyproject['tool']['poetry']
+        if 'version' in poetry:
+            yield UpstreamDatum('X-Version', poetry['version'], 'certain')
+        if 'description' in poetry:
+            yield UpstreamDatum('X-Summary', poetry['description'], 'certain')
+        if 'license' in poetry:
+            yield UpstreamDatum('X-License', poetry['license'], 'certain')
+        if 'repository' in poetry:
+            yield UpstreamDatum('Repository', poetry['repository'], 'certain')
+        if 'name' in poetry:
+            yield UpstreamDatum('Name', poetry['name'], 'certain')
+
+
 def guess_from_pom_xml(path, trust_package=False):
     # Documentation: https://maven.apache.org/pom.html
 
@@ -1107,6 +1134,7 @@ def _get_guessers(path, trust_package=False):
         ('SECURITY.md', guess_from_security_md),
         ('.github/SECURITY.md', guess_from_security_md),
         ('docs/SECURITY.md', guess_from_security_md),
+        ('pyproject.toml', guess_from_pyproject_toml),
         ]
 
     # Search for something Python-y
