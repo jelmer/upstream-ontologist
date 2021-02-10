@@ -21,7 +21,7 @@ import os
 import re
 import socket
 import urllib.error
-from typing import Optional, Union, Iterable
+from typing import Optional, Iterable
 from urllib.parse import quote, urlparse, urlunparse, urljoin, parse_qs
 from urllib.request import urlopen, Request
 from warnings import warn
@@ -92,7 +92,7 @@ def get_repology_metadata(srcname, repo='debian_unstable'):
         raise NoSuchRepologyProject(srcname)
 
 
-def guess_repo_from_url(url, net_access=False):
+def guess_repo_from_url(url, net_access=False):  # noqa: C901
     parsed_url = urlparse(url)
     path_elements = parsed_url.path.strip('/').split('/')
     if parsed_url.netloc == 'github.com':
@@ -579,7 +579,7 @@ def url_from_fossil_clone_command(command):
     return None
 
 
-def guess_from_readme(path, trust_package):
+def guess_from_readme(path, trust_package):  # noqa: C901
     urls = []
     try:
         with open(path, 'rb') as f:
@@ -700,7 +700,7 @@ def guess_from_travis_yml(path, trust_package):
     import ruamel.yaml.reader
     with open(path, 'rb') as f:
         try:
-            data = ruamel.yaml.load(f, ruamel.yaml.SafeLoader)
+            ruamel.yaml.load(f, ruamel.yaml.SafeLoader)
         except ruamel.yaml.reader.ReaderError as e:
             warn('Unable to parse %s: %s' % (path, e))
             return
@@ -740,7 +740,7 @@ def guess_from_meta_yml(path, trust_package):
                         'Repository', url, 'certain')
 
 
-def guess_from_doap(path, trust_package):
+def guess_from_doap(path, trust_package):  # noqa: C901
     """Guess upstream metadata from a DOAP file.
     """
     from xml.etree import ElementTree
@@ -801,7 +801,7 @@ def guess_from_doap(path, trust_package):
                             'Repository-Browse', web_url, 'certain')
 
 
-def guess_from_cabal(path, trust_package=False):
+def guess_from_cabal(path, trust_package=False):  # noqa: C901
     # TODO(jelmer): Perhaps use a standard cabal parser in Python?
     # The current parser is not really correct, but good enough for our needs.
     # https://www.haskell.org/cabal/release/cabal-1.10.1.0/doc/users-guide/
@@ -1015,7 +1015,7 @@ def guess_from_pyproject_toml(path, trust_package):
             yield UpstreamDatum('Name', poetry['name'], 'certain')
 
 
-def guess_from_pom_xml(path, trust_package=False):
+def guess_from_pom_xml(path, trust_package=False):  # noqa: C901
     # Documentation: https://maven.apache.org/pom.html
 
     import xml.etree.ElementTree as ET
@@ -1828,7 +1828,8 @@ EXTRAPOLATE_FNS = [
 ]
 
 
-def extend_upstream_metadata(upstream_metadata, path, minimum_certainty=None,
+def extend_upstream_metadata(upstream_metadata,  # noqa: C901
+                             path, minimum_certainty=None,
                              net_access=False,
                              consult_external_directory=False):
     """Extend a set of upstream metadata.
@@ -2139,7 +2140,7 @@ def guess_from_aur(package: str):
             yield 'Repository', value[0]
 
 
-def guess_from_launchpad(package, distribution=None, suite=None):
+def guess_from_launchpad(package, distribution=None, suite=None):  # noqa: C901
     if distribution is None:
         # Default to Ubuntu; it's got more fields populated.
         distribution = 'ubuntu'
