@@ -13,7 +13,7 @@ are loosely based on [DEP-12](https://dep-team.pages.debian.net/deps/dep12),
 but it is meant to be distribution-agnostic.
 
 Supported Data Sources
-======================
+----------------------
 
 At the moment, the ontologist can read metadata from the following upstream
 data sources:
@@ -49,3 +49,20 @@ using their APIs:
  * Launchpad
  * PECL
  * AUR
+
+Example Usage
+-------------
+
+The easiest way to use the upstream ontologist is by invoking the
+``guess-upstream-metadata`` command in a software project:
+
+  $ guess-upstream-metadata ~/src/dulwich
+  X-Security-MD: https://github.com/dulwich/dulwich/tree/HEAD/SECURITY.md
+  Name: dulwich
+  X-Version: 0.20.15
+  Bug-Database: https://github.com/dulwich/dulwich/issues
+  Repository: https://www.dulwich.io/code/
+  X-Summary: Python Git Library
+  Bug-Submit: https://github.com/dulwich/dulwich/issues/new
+
+Alternatively, there is a Python API.
