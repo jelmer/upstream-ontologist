@@ -89,6 +89,10 @@ class FindPublicVcsUrlTests(TestCase):
 
 class FixupRcpStyleUrlTests(TestCase):
     def test_fixup(self):
+        try:
+            import breezy
+        except ModuleNotFoundError:
+            self.skipTest('breezy is not available')
         self.assertEqual(
             "ssh://github.com/jelmer/example",
             fixup_rcp_style_git_repo_url("github.com:jelmer/example"),
@@ -99,6 +103,10 @@ class FixupRcpStyleUrlTests(TestCase):
         )
 
     def test_leave(self):
+        try:
+            import breezy
+        except ModuleNotFoundError:
+            self.skipTest('breezy is not available')
         self.assertEqual(
             "https://salsa.debian.org/jelmer/example",
             fixup_rcp_style_git_repo_url("https://salsa.debian.org/jelmer/example"),
