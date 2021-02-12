@@ -21,7 +21,7 @@ import os
 import re
 import socket
 import urllib.error
-from typing import Optional, Union, Iterable
+from typing import Optional, Iterable
 from urllib.parse import quote, urlparse, urlunparse, urljoin, parse_qs
 from urllib.request import urlopen, Request
 from warnings import warn
@@ -39,9 +39,6 @@ from . import (
     DEFAULT_URLLIB_TIMEOUT,
     USER_AGENT,
     UpstreamDatum,
-    UpstreamRequirement,
-    UpstreamOutput,
-    BuildSystem,
     min_certainty,
     certainty_to_confidence,
     certainty_sufficient,
@@ -95,7 +92,7 @@ def get_repology_metadata(srcname, repo='debian_unstable'):
         raise NoSuchRepologyProject(srcname)
 
 
-def guess_repo_from_url(url, net_access=False):
+def guess_repo_from_url(url, net_access=False):  # noqa: C901
     parsed_url = urlparse(url)
     path_elements = parsed_url.path.strip('/').split('/')
     if parsed_url.netloc == 'github.com':
@@ -321,14 +318,10 @@ def guess_from_python_metadata(pkg_info):
     if payload.strip() and pkg_info.get_content_type() in (None, 'text/plain'):
         yield UpstreamDatum(
             'X-Description', pkg_info.get_payload(), 'possible')
-    for require in pkg_info.get_all('Requires', []):
-        yield UpstreamRequirement('build', 'python-package', require)
 
 
 def guess_from_pkg_info(path, trust_package):
     """Get the metadata from a python setup.py file."""
-    if os.path.exists('setup.py'):
-        yield BuildSystem('setup.py')
     from email.parser import Parser
     try:
         with open(path, 'r') as f:
@@ -339,7 +332,6 @@ def guess_from_pkg_info(path, trust_package):
 
 
 def guess_from_setup_py(path, trust_package):
-    yield BuildSystem('setup.py')
     if not trust_package:
         return
     from distutils.core import run_setup
@@ -374,20 +366,10 @@ def guess_from_setup_py(path, trust_package):
         if url_type in ('Bug Tracker', ):
             yield UpstreamDatum(
                 'Bug-Database', url, 'certain')
-    for require in result.get_requires():
-        yield UpstreamRequirement('build', 'python-package', require)
-    for script in (result.scripts or []):
-        yield UpstreamOutput('binary', os.path.basename(script))
-    entry_points = result.entry_points or {}
-    for script in entry_points.get('console_scripts', []):
-        yield UpstreamOutput('binary', script.split('=')[0])
-    for package in result.packages or []:
-        yield UpstreamOutput('python-package', package)
 
 
 def guess_from_package_json(path, trust_package):
     import json
-    yield BuildSystem('npm')
     with open(path, 'r') as f:
         package = json.load(f)
     if 'name' in package:
@@ -422,10 +404,6 @@ def guess_from_package_json(path, trust_package):
             url = package['bugs']
         if url:
             yield UpstreamDatum('Bug-Database', url, 'certain')
-    if 'devDependencies' in package:
-        for name, unused_version in package['devDependencies'].items():
-            # TODO(jelmer): Look at version
-            yield UpstreamRequirement('dev', 'npm', name)
 
 
 def xmlparse_simplify_namespaces(path, namespaces):
@@ -466,7 +444,6 @@ def guess_from_dist_ini(path, trust_package):
         ParsingError,
         NoOptionError,
         )
-    yield BuildSystem('dist-zilla')
     parser = RawConfigParser(strict=False)
     with open(path, 'r') as f:
         try:
@@ -602,7 +579,7 @@ def url_from_fossil_clone_command(command):
     return None
 
 
-def guess_from_readme(path, trust_package):
+def guess_from_readme(path, trust_package):  # noqa: C901
     urls = []
     try:
         with open(path, 'rb') as f:
@@ -723,13 +700,10 @@ def guess_from_travis_yml(path, trust_package):
     import ruamel.yaml.reader
     with open(path, 'rb') as f:
         try:
-            data = ruamel.yaml.load(f, ruamel.yaml.SafeLoader)
+            ruamel.yaml.load(f, ruamel.yaml.SafeLoader)
         except ruamel.yaml.reader.ReaderError as e:
             warn('Unable to parse %s: %s' % (path, e))
             return
-        language = data.get('language')
-        if language == 'go':
-            yield BuildSystem('golang')
 
 
 def guess_from_meta_yml(path, trust_package):
@@ -764,11 +738,9 @@ def guess_from_meta_yml(path, trust_package):
                 if url:
                     yield UpstreamDatum(
                         'Repository', url, 'certain')
-            for require in data.get('requires', []):
-                yield UpstreamRequirement('build', 'perl', require)
 
 
-def guess_from_doap(path, trust_package):
+def guess_from_doap(path, trust_package):  # noqa: C901
     """Guess upstream metadata from a DOAP file.
     """
     from xml.etree import ElementTree
@@ -829,8 +801,7 @@ def guess_from_doap(path, trust_package):
                             'Repository-Browse', web_url, 'certain')
 
 
-def guess_from_cabal(path, trust_package=False):
-    yield BuildSystem('cabal')
+def guess_from_cabal(path, trust_package=False):  # noqa: C901
     # TODO(jelmer): Perhaps use a standard cabal parser in Python?
     # The current parser is not really correct, but good enough for our needs.
     # https://www.haskell.org/cabal/release/cabal-1.10.1.0/doc/users-guide/
@@ -998,7 +969,6 @@ def guess_from_cargo(path, trust_package):
     except TomlDecodeError as e:
         warn('Error parsing toml file %s: %s' % (path, e))
         return
-    yield BuildSystem('cargo')
     try:
         package = cargo['package']
     except KeyError:
@@ -1016,14 +986,36 @@ def guess_from_cargo(path, trust_package):
             yield UpstreamDatum('Repository', package['repository'], 'certain')
         if 'version' in package:
             yield UpstreamDatum('X-Version', package['version'], 'confident')
-    if 'dependencies' in cargo:
-        for name, details in cargo['dependencies'].items():
-            # TODO(jelmer): Look at details['features'], details['version']
-            yield UpstreamRequirement('build', 'cargo-crate', name)
 
 
-def guess_from_pom_xml(path, trust_package=False):
-    yield BuildSystem('maven')
+def guess_from_pyproject_toml(path, trust_package):
+    try:
+        from toml.decoder import load, TomlDecodeError
+    except ImportError:
+        return
+    try:
+        with open(path, 'r') as f:
+            pyproject = load(f)
+    except FileNotFoundError:
+        return
+    except TomlDecodeError as e:
+        warn('Error parsing toml file %s: %s' % (path, e))
+        return
+    if 'poetry' in pyproject.get('tool', []):
+        poetry = pyproject['tool']['poetry']
+        if 'version' in poetry:
+            yield UpstreamDatum('X-Version', poetry['version'], 'certain')
+        if 'description' in poetry:
+            yield UpstreamDatum('X-Summary', poetry['description'], 'certain')
+        if 'license' in poetry:
+            yield UpstreamDatum('X-License', poetry['license'], 'certain')
+        if 'repository' in poetry:
+            yield UpstreamDatum('Repository', poetry['repository'], 'certain')
+        if 'name' in poetry:
+            yield UpstreamDatum('Name', poetry['name'], 'certain')
+
+
+def guess_from_pom_xml(path, trust_package=False):  # noqa: C901
     # Documentation: https://maven.apache.org/pom.html
 
     import xml.etree.ElementTree as ET
@@ -1121,12 +1113,6 @@ def guess_from_security_md(path, trust_package=False):
     yield UpstreamDatum('X-Security-MD', path, 'certain')
 
 
-def guess_from_go(path, trust_package: bool = False):
-    # TODO(jelmer): Perhaps set golang buildsystem with lower priority,
-    # if other build systems are also present?
-    yield BuildSystem('golang')
-
-
 def _get_guessers(path, trust_package=False):
     CANDIDATES = [
         ('debian/watch', guess_from_debian_watch),
@@ -1148,7 +1134,7 @@ def _get_guessers(path, trust_package=False):
         ('SECURITY.md', guess_from_security_md),
         ('.github/SECURITY.md', guess_from_security_md),
         ('docs/SECURITY.md', guess_from_security_md),
-        ('.travis.yml', guess_from_travis_yml),
+        ('pyproject.toml', guess_from_pyproject_toml),
         ]
 
     # Search for something Python-y
@@ -1203,12 +1189,6 @@ def _get_guessers(path, trust_package=False):
         CANDIDATES.extend(
             [(p, guess_from_debian_patch) for p in debian_patches])
 
-    # TODO(jelmer): Don't assume go if other build systems were found?
-    for entry in os.scandir(path):
-        if entry.name.endswith('.go'):
-            CANDIDATES.append((entry.name, guess_from_go))
-            break
-
     yield 'environment', guess_from_environment()
 
     for relpath, guesser in CANDIDATES:
@@ -1238,8 +1218,7 @@ def guess_upstream_metadata_items(
 
 
 def guess_upstream_info(
-        path: str, trust_package: bool = False) -> Iterable[
-            Union[UpstreamDatum, UpstreamRequirement, UpstreamOutput]]:
+        path: str, trust_package: bool = False) -> Iterable[UpstreamDatum]:
     guessers = _get_guessers(path, trust_package=trust_package)
     for name, guesser in guessers:
         for entry in guesser:
@@ -1251,20 +1230,14 @@ def guess_upstream_info(
 def get_upstream_info(path, trust_package=False, net_access=False,
                       consult_external_directory=False, check=False):
     metadata_items = []
-    requirements = []
-    buildsystem = None
     for entry in guess_upstream_info(path, trust_package=trust_package):
         if isinstance(entry, UpstreamDatum):
             metadata_items.append(entry)
-        elif isinstance(entry, BuildSystem):
-            buildsystem = entry
-        elif isinstance(entry, UpstreamRequirement):
-            requirements.append(entry)
     metadata = summarize_upstream_metadata(
         metadata_items, '.', net_access=net_access,
         consult_external_directory=consult_external_directory,
         check=check)
-    return buildsystem, requirements, metadata
+    return metadata
 
 
 def summarize_upstream_metadata(
@@ -1855,7 +1828,8 @@ EXTRAPOLATE_FNS = [
 ]
 
 
-def extend_upstream_metadata(upstream_metadata, path, minimum_certainty=None,
+def extend_upstream_metadata(upstream_metadata,  # noqa: C901
+                             path, minimum_certainty=None,
                              net_access=False,
                              consult_external_directory=False):
     """Extend a set of upstream metadata.
@@ -2166,7 +2140,7 @@ def guess_from_aur(package: str):
             yield 'Repository', value[0]
 
 
-def guess_from_launchpad(package, distribution=None, suite=None):
+def guess_from_launchpad(package, distribution=None, suite=None):  # noqa: C901
     if distribution is None:
         # Default to Ubuntu; it's got more fields populated.
         distribution = 'ubuntu'

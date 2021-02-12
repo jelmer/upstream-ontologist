@@ -22,41 +22,41 @@ from .. import UpstreamPackage
 
 
 def debian_to_upstream_version(version):
-    """Drop debian-specific modifiers from an upstream version string.
-    """
+    """Drop debian-specific modifiers from an upstream version string."""
     return version.upstream_version.split("+dfsg")[0]
 
 
 def upstream_name_to_debian_source_name(upstream_name: str) -> str:
-    if upstream_name.startswith('GNU '):
-        upstream_name = upstream_name[len('GNU '):]
+    if upstream_name.startswith("GNU "):
+        upstream_name = upstream_name[len("GNU ") :]
     return upstream_name.lower()
 
 
 def upstream_version_to_debian_upstream_version(
-        version: str, family: Optional[str] = None) -> str:
+    version: str, family: Optional[str] = None
+) -> str:
     # TODO(jelmer)
     return version
 
 
 def upstream_package_to_debian_source_name(package: UpstreamPackage) -> str:
-    if package.family == 'rust':
-        return 'rust-%s' % package.name
-    if package.family == 'perl':
-        return 'lib%s-perl' % package.name.lower().replace('::', '-')
-    if package.family == 'node':
-        return 'node-%s' % package.name
+    if package.family == "rust":
+        return "rust-%s" % package.name
+    if package.family == "perl":
+        return "lib%s-perl" % package.name.lower().replace("::", "-")
+    if package.family == "node":
+        return "node-%s" % package.name
     # TODO(jelmer):
     return package.name
 
 
 def upstream_package_to_debian_binary_name(package: UpstreamPackage) -> str:
-    if package.family == 'rust':
-        return 'rust-%s' % package.name
-    if package.family == 'perl':
-        return 'lib%s-perl' % package.name.lower().replace('::', '-')
-    if package.family == 'node':
-        return 'node-%s' % package.name
+    if package.family == "rust":
+        return "rust-%s" % package.name
+    if package.family == "perl":
+        return "lib%s-perl" % package.name.lower().replace("::", "-")
+    if package.family == "node":
+        return "node-%s" % package.name
     # TODO(jelmer):
     return package.name
 
@@ -65,7 +65,7 @@ def compare_upstream_versions(family, version1, version2):
     raise NotImplementedError
 
 
-package_name_re = re.compile('[a-z0-9][a-z0-9+-.]+')
+package_name_re = re.compile("[a-z0-9][a-z0-9+-.]+")
 
 
 def valid_debian_package_name(name):
