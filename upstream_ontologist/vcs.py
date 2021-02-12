@@ -23,7 +23,7 @@ __all__ = [
     "browse_url_from_repo_url",
 ]
 
-from typing import Optional, Union, List, Tuple, Callable
+from typing import Optional, Union, List, Tuple
 
 import socket
 import urllib
