@@ -23,7 +23,7 @@ setup(
              'upstream_ontologist.__main__:main'),
         ],
     },
-    install_requires=['debian', 'debmutate'],
+    install_requires=['python_debian', 'debmutate'],
     tests_require=['breezy'],
     test_suite="upstream_ontologist.tests.test_suite",
 )
