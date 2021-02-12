@@ -115,8 +115,11 @@ def upstream_metadata_sort_key(x):
 
 
 def min_certainty(certainties: Sequence[str]) -> str:
-    return confidence_to_certainty(
-        max([certainty_to_confidence(c) for c in certainties] + [0])
+    confidences = [
+        certainty_to_confidence(c)
+        for c in certainties]
+    return confidence_to_certainty(max([
+        c for c in confidences if c is not None] + [0])
     )
 
 

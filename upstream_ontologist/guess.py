@@ -70,7 +70,7 @@ def get_sf_metadata(project):
         return _load_json_url(
             'https://sourceforge.net/rest/p/%s' % project)
     except urllib.error.HTTPError as e:
-        if e.status != 404:
+        if e.code != 404:
             raise
         raise NoSuchSourceForgeProject(project)
 
@@ -87,7 +87,7 @@ def get_repology_metadata(srcname, repo='debian_unstable'):
     try:
         return _load_json_url(url)
     except urllib.error.HTTPError as e:
-        if e.status != 404:
+        if e.code != 404:
             raise
         raise NoSuchRepologyProject(srcname)
 
@@ -1616,9 +1616,9 @@ def verify_repository_url(url: str, version: Optional[str] = None) -> bool:
         try:
             data = _load_json_url(api_url)
         except urllib.error.HTTPError as e:
-            if e.status == 404:
+            if e.code == 404:
                 return False
-            elif e.status == 403:
+            elif e.code == 403:
                 # Probably rate-limited. Let's just hope for the best.
                 pass
             else:
@@ -1654,9 +1654,9 @@ def verify_bug_database_url(url):
         try:
             data = _load_json_url(api_url)
         except urllib.error.HTTPError as e:
-            if e.status == 404:
+            if e.code == 404:
                 return False
-            if e.status == 403:
+            if e.code == 403:
                 # Probably rate limited
                 warn('Unable to verify bug database URL %s: %s' % (
                      url, e.reason))
@@ -1672,7 +1672,7 @@ def verify_bug_database_url(url):
         try:
             data = _load_json_url(api_url)
         except urllib.error.HTTPError as e:
-            if e.status == 404:
+            if e.code == 404:
                 return False
             raise
         return len(data) > 0
@@ -1965,7 +1965,7 @@ def verify_screenshots(urls):
                 Request(url, headers=headers, method='HEAD'),
                 timeout=DEFAULT_URLLIB_TIMEOUT)
         except urllib.error.HTTPError as e:
-            if e.status == 404:
+            if e.code == 404:
                 yield url, False
             else:
                 yield url, None
@@ -2072,7 +2072,7 @@ def guess_from_pecl_url(url):
             Request(url, headers=headers),
             timeout=PECL_URLLIB_TIMEOUT)
     except urllib.error.HTTPError as e:
-        if e.status != 404:
+        if e.code != 404:
             raise
         return
     except socket.timeout:
@@ -2109,7 +2109,7 @@ def guess_from_aur(package: str):
                 Request(url, headers=headers),
                 timeout=DEFAULT_URLLIB_TIMEOUT)
         except urllib.error.HTTPError as e:
-            if e.status != 404:
+            if e.code != 404:
                 raise
             continue
         else:
@@ -2164,7 +2164,7 @@ def guess_from_launchpad(package, distribution=None, suite=None):  # noqa: C901
     try:
         sourcepackage_data = _load_json_url(sourcepackage_url)
     except urllib.error.HTTPError as e:
-        if e.status != 404:
+        if e.code != 404:
             raise
         return
     except socket.timeout:
@@ -2196,13 +2196,13 @@ def guess_from_launchpad(package, distribution=None, suite=None):  # noqa: C901
                     # Sometimes this URL is not set, e.g. for CVS repositories.
                     yield 'Repository', code_import_data['url']
             except urllib.error.HTTPError as e:
-                if e.status != 404:
+                if e.code != 404:
                     raise
                 if project_data['official_codehosting']:
                     try:
                         branch_data = _load_json_url(branch_link)
                     except urllib.error.HTTPError as e:
-                        if e.status != 404:
+                        if e.code != 404:
                             raise
                         branch_data = None
                     if branch_data:
