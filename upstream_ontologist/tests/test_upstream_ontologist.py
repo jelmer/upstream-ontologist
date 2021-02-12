@@ -22,17 +22,16 @@ import shutil
 import tempfile
 from unittest import (
     TestCase,
-    )
+)
 
 
 from upstream_ontologist import (
-    BuildSystem,
     UpstreamDatum,
     min_certainty,
     certainty_to_confidence,
     confidence_to_certainty,
     certainty_sufficient,
-    )
+)
 from upstream_ontologist.guess import (
     guess_repo_from_url,
     guess_from_package_json,
@@ -41,11 +40,10 @@ from upstream_ontologist.guess import (
     bug_database_url_from_bug_submit_url,
     url_from_git_clone_command,
     url_from_fossil_clone_command,
-    )
+)
 
 
 class TestCaseInTempDir(TestCase):
-
     def setUp(self):
         super(TestCaseInTempDir, self).setUp()
         self.testdir = tempfile.mkdtemp()
@@ -54,33 +52,38 @@ class TestCaseInTempDir(TestCase):
 
 
 class GuessFromDebianWatchTests(TestCaseInTempDir):
-
     def test_empty(self):
-        with open('watch', 'w') as f:
-            f.write("""\
+        with open("watch", "w") as f:
+            f.write(
+                """\
 # Blah
-""")
-        self.assertEqual(
-            [], list(guess_from_debian_watch('watch', False)))
+"""
+            )
+        self.assertEqual([], list(guess_from_debian_watch("watch", False)))
 
     def test_simple(self):
-        with open('watch', 'w') as f:
-            f.write("""\
+        with open("watch", "w") as f:
+            f.write(
+                """\
 version=4
 https://github.com/jelmer/dulwich/tags/dulwich-(.*).tar.gz
-""")
+"""
+            )
         self.assertEqual(
-            [UpstreamDatum(
-                'Repository', 'https://github.com/jelmer/dulwich',
-                'likely', 'watch')],
-            list(guess_from_debian_watch('watch', False)))
+            [
+                UpstreamDatum(
+                    "Repository", "https://github.com/jelmer/dulwich", "likely", "watch"
+                )
+            ],
+            list(guess_from_debian_watch("watch", False)),
+        )
 
 
 class GuessFromPackageJsonTests(TestCaseInTempDir):
-
     def test_simple(self):
-        with open('package.json', 'w') as f:
-            f.write("""\
+        with open("package.json", "w") as f:
+            f.write(
+                """\
 {
   "name": "autosize",
   "version": "4.0.2",
@@ -98,21 +101,26 @@ class GuessFromPackageJsonTests(TestCaseInTempDir):
     "url": "http://github.com/jackmoore/autosize.git"
   }
 }
-""")
+"""
+            )
         self.assertEqual(
-            [BuildSystem('npm'),
-             UpstreamDatum('Name', 'autosize', 'certain'),
-             UpstreamDatum(
-                 'Homepage', 'http://www.jacklmoore.com/autosize', 'certain'),
-             UpstreamDatum('X-License', 'MIT', 'certain', None),
-             UpstreamDatum(
-                 'Repository', 'http://github.com/jackmoore/autosize.git',
-                 'certain')],
-            list(guess_from_package_json('package.json', False)))
+            [
+                UpstreamDatum("Name", "autosize", "certain"),
+                UpstreamDatum(
+                    "Homepage", "http://www.jacklmoore.com/autosize", "certain"
+                ),
+                UpstreamDatum("X-License", "MIT", "certain", None),
+                UpstreamDatum(
+                    "Repository", "http://github.com/jackmoore/autosize.git", "certain"
+                ),
+            ],
+            list(guess_from_package_json("package.json", False)),
+        )
 
     def test_dummy(self):
-        with open('package.json', 'w') as f:
-            f.write("""\
+        with open("package.json", "w") as f:
+            f.write(
+                """\
 {
   "name": "mozillaeslintsetup",
   "description": "This package file is for setup of ESLint.",
@@ -129,24 +137,28 @@ class GuessFromPackageJsonTests(TestCaseInTempDir):
   },
   "devDependencies": {}
 }
-""")
+"""
+            )
         self.assertEqual(
-            [BuildSystem('npm'),
-             UpstreamDatum('Name', 'mozillaeslintsetup', 'certain'),
-             UpstreamDatum(
-                 'X-Summary',
-                 'This package file is for setup of ESLint.', 'certain', None),
-             UpstreamDatum(
-                 'X-License', 'MPL-2.0', 'certain', None)
-             ],
-            list(guess_from_package_json('package.json', False)))
+            [
+                UpstreamDatum("Name", "mozillaeslintsetup", "certain"),
+                UpstreamDatum(
+                    "X-Summary",
+                    "This package file is for setup of ESLint.",
+                    "certain",
+                    None,
+                ),
+                UpstreamDatum("X-License", "MPL-2.0", "certain", None),
+            ],
+            list(guess_from_package_json("package.json", False)),
+        )
 
 
 class GuessFromRDescriptionTests(TestCaseInTempDir):
-
     def test_read(self):
-        with open('DESCRIPTION', 'w') as f:
-            f.write("""\
+        with open("DESCRIPTION", "w") as f:
+            f.write(
+                """\
 Package: crul
 Title: HTTP Client
 Description: A simple HTTP client, with tools for making HTTP requests,
@@ -183,122 +195,135 @@ Author: Scott Chamberlain [aut, cre] (<https://orcid.org/0000-0003-1444-9135>)
 Maintainer: Scott Chamberlain <myrmecocystus@gmail.com>
 Repository: CRAN
 Date/Publication: 2019-08-02 20:30:02 UTC
-""")
-        ret = guess_from_r_description('DESCRIPTION', True)
-        self.assertEqual(list(ret), [
-            UpstreamDatum('Name', 'crul', 'certain'),
-            UpstreamDatum('Archive', 'CRAN', 'certain'),
-            UpstreamDatum(
-                'Bug-Database', 'https://github.com/ropensci/crul/issues',
-                'certain'),
-            UpstreamDatum(
-                'Repository', 'https://github.com/ropensci/crul', 'certain'),
-            UpstreamDatum(
-                'Homepage', 'https://www.example.com/crul', 'certain')])
+"""
+            )
+        ret = guess_from_r_description("DESCRIPTION", True)
+        self.assertEqual(
+            list(ret),
+            [
+                UpstreamDatum("Name", "crul", "certain"),
+                UpstreamDatum("Archive", "CRAN", "certain"),
+                UpstreamDatum(
+                    "Bug-Database", "https://github.com/ropensci/crul/issues", "certain"
+                ),
+                UpstreamDatum(
+                    "Repository", "https://github.com/ropensci/crul", "certain"
+                ),
+                UpstreamDatum("Homepage", "https://www.example.com/crul", "certain"),
+            ],
+        )
 
 
 class GuessRepoFromUrlTests(TestCase):
-
     def test_github(self):
         self.assertEqual(
-            'https://github.com/jelmer/blah',
-            guess_repo_from_url('https://github.com/jelmer/blah'))
+            "https://github.com/jelmer/blah",
+            guess_repo_from_url("https://github.com/jelmer/blah"),
+        )
         self.assertEqual(
-            'https://github.com/jelmer/blah',
-            guess_repo_from_url('https://github.com/jelmer/blah/blob/README'))
-        self.assertIs(
-            None,
-            guess_repo_from_url('https://github.com/jelmer'))
+            "https://github.com/jelmer/blah",
+            guess_repo_from_url("https://github.com/jelmer/blah/blob/README"),
+        )
+        self.assertIs(None, guess_repo_from_url("https://github.com/jelmer"))
 
     def test_none(self):
-        self.assertIs(None, guess_repo_from_url('https://www.jelmer.uk/'))
+        self.assertIs(None, guess_repo_from_url("https://www.jelmer.uk/"))
 
     def test_known(self):
         self.assertEqual(
-            'http://code.launchpad.net/blah',
-            guess_repo_from_url('http://code.launchpad.net/blah'))
+            "http://code.launchpad.net/blah",
+            guess_repo_from_url("http://code.launchpad.net/blah"),
+        )
 
     def test_launchpad(self):
         self.assertEqual(
-            'https://code.launchpad.net/bzr',
-            guess_repo_from_url('http://launchpad.net/bzr/+download'))
+            "https://code.launchpad.net/bzr",
+            guess_repo_from_url("http://launchpad.net/bzr/+download"),
+        )
 
     def test_savannah(self):
         self.assertEqual(
-            'https://git.savannah.gnu.org/git/auctex.git',
-            guess_repo_from_url('https://git.savannah.gnu.org/git/auctex.git'))
+            "https://git.savannah.gnu.org/git/auctex.git",
+            guess_repo_from_url("https://git.savannah.gnu.org/git/auctex.git"),
+        )
         self.assertIs(
-            None,
-            guess_repo_from_url(
-                'https://git.savannah.gnu.org/blah/auctex.git'))
+            None, guess_repo_from_url("https://git.savannah.gnu.org/blah/auctex.git")
+        )
 
     def test_bitbucket(self):
         self.assertEqual(
-            'https://bitbucket.org/fenics-project/dolfin',
+            "https://bitbucket.org/fenics-project/dolfin",
             guess_repo_from_url(
-                'https://bitbucket.org/fenics-project/dolfin/downloads/'))
+                "https://bitbucket.org/fenics-project/dolfin/downloads/"
+            ),
+        )
 
 
 class BugDbFromBugSubmitUrlTests(TestCase):
-
     def test_github(self):
         self.assertEqual(
-            'https://github.com/dulwich/dulwich/issues',
+            "https://github.com/dulwich/dulwich/issues",
             bug_database_url_from_bug_submit_url(
-                'https://github.com/dulwich/dulwich/issues/new'))
+                "https://github.com/dulwich/dulwich/issues/new"
+            ),
+        )
 
     def test_sf(self):
         self.assertEqual(
-            'https://sourceforge.net/p/dulwich/bugs',
+            "https://sourceforge.net/p/dulwich/bugs",
             bug_database_url_from_bug_submit_url(
-                'https://sourceforge.net/p/dulwich/bugs/new'))
+                "https://sourceforge.net/p/dulwich/bugs/new"
+            ),
+        )
 
 
 class UrlFromGitCloneTests(TestCase):
-
     def test_guess_simple(self):
         self.assertEqual(
-            'https://github.com/jelmer/blah',
-            url_from_git_clone_command(
-                b'git clone https://github.com/jelmer/blah'))
+            "https://github.com/jelmer/blah",
+            url_from_git_clone_command(b"git clone https://github.com/jelmer/blah"),
+        )
         self.assertEqual(
-            'https://github.com/jelmer/blah',
+            "https://github.com/jelmer/blah",
             url_from_git_clone_command(
-                b'git clone https://github.com/jelmer/blah target'))
+                b"git clone https://github.com/jelmer/blah target"
+            ),
+        )
 
     def test_args(self):
         self.assertEqual(
-            'https://github.com/jelmer/blah',
+            "https://github.com/jelmer/blah",
             url_from_git_clone_command(
-                b'git clone -b foo https://github.com/jelmer/blah target'))
+                b"git clone -b foo https://github.com/jelmer/blah target"
+            ),
+        )
 
 
 class UrlFromFossilCloneTests(TestCase):
-
     def test_guess_simple(self):
         self.assertEqual(
-            'https://example.com/repo/blah',
+            "https://example.com/repo/blah",
             url_from_fossil_clone_command(
-                b'fossil clone https://example.com/repo/blah blah.fossil'))
+                b"fossil clone https://example.com/repo/blah blah.fossil"
+            ),
+        )
 
 
 class CertaintySufficientTests(TestCase):
-
     def test_sufficient(self):
-        self.assertTrue(certainty_sufficient('certain', 'certain'))
-        self.assertTrue(certainty_sufficient('certain', 'possible'))
-        self.assertTrue(certainty_sufficient('certain', None))
-        self.assertTrue(certainty_sufficient('possible', None))
+        self.assertTrue(certainty_sufficient("certain", "certain"))
+        self.assertTrue(certainty_sufficient("certain", "possible"))
+        self.assertTrue(certainty_sufficient("certain", None))
+        self.assertTrue(certainty_sufficient("possible", None))
         # TODO(jelmer): Should we really always allow unknown certainties
         # through?
-        self.assertTrue(certainty_sufficient(None, 'certain'))
+        self.assertTrue(certainty_sufficient(None, "certain"))
 
     def test_insufficient(self):
-        self.assertFalse(certainty_sufficient('possible', 'certain'))
+        self.assertFalse(certainty_sufficient("possible", "certain"))
 
 
 class CertaintyVsConfidenceTests(TestCase):
-
     def test_confidence_to_certainty(self):
         self.assertEqual("certain", confidence_to_certainty(0))
         self.assertEqual("confident", confidence_to_certainty(1))
@@ -317,13 +342,10 @@ class CertaintyVsConfidenceTests(TestCase):
 
 
 class MinimumCertaintyTests(TestCase):
-
     def test_minimum(self):
         self.assertEqual("certain", min_certainty([]))
         self.assertEqual("certain", min_certainty(["certain"]))
         self.assertEqual("possible", min_certainty(["possible"]))
         self.assertEqual("possible", min_certainty(["possible", "certain"]))
         self.assertEqual("likely", min_certainty(["likely", "certain"]))
-        self.assertEqual(
-            "possible",
-            min_certainty(["likely", "certain", "possible"]))
+        self.assertEqual("possible", min_certainty(["likely", "certain", "possible"]))

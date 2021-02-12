@@ -1,9 +1,10 @@
+.flake8
 .gitignore
 Makefile
 README.md
 releaser.conf
 setup.py
-docs/model.md
+.github/workflows/pythonpackage.yml
 docs/vcs.md
 upstream_ontologist/__init__.py
 upstream_ontologist/__main__.py
