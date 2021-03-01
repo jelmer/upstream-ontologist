@@ -12,6 +12,31 @@ The ontologist originated in Debian and the currently reported metadata fields
 are loosely based on [DEP-12](https://dep-team.pages.debian.net/deps/dep12),
 but it is meant to be distribution-agnostic.
 
+Provided Fields
+---------------
+
+Standard fields:
+
+ * Homepage: homepage URL
+ * Name: human name of the upstream project
+ * Contact: contact address of some sort of the upstream (e-mail, mailing list URL)
+ * Repository: VCS URL
+ * Repository-Browse: Web URL for viewing the VCS
+ * Bug-Database: Bug database URL (for web viewing, generally)
+ * Bug-Submit: URL to use to submit new bugs (either on the web or an e-mail address)
+ * Screenshots: List of URLs with screenshots
+ * Archive: Archive used - e.g. SourceForge
+ * Security-Contact: e-mail or URL with instructions for reporting security issues
+
+Extensions for upstream-ontologist, not defined in DEP-12:
+
+ * X-SourceForge-Project: sourceforge project name
+ * X-Wiki: Wiki URL
+ * X-Summary: one-line description of the project
+ * X-Description: longer description of the project
+ * X-License: Single line license (e.g. "GPL 2.0")
+ * X-Copyright: List of copyright holders
+
 Supported Data Sources
 ----------------------
 
