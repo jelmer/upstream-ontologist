@@ -36,6 +36,8 @@ Extensions for upstream-ontologist, not defined in DEP-12:
  * X-Description: longer description of the project
  * X-License: Single line license (e.g. "GPL 2.0")
  * X-Copyright: List of copyright holders
+ * X-Version: Current upstream version
+ * X-Security-MD: URL to markdown file with security policy
 
 Supported Data Sources
 ----------------------
