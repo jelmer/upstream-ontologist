@@ -1809,8 +1809,19 @@ def _extrapolate_security_contact_from_security_md(
         origin=security_md_path.origin)
 
 
+def _extrapolate_homepage_from_repository_browse(
+        upstream_metadata, net_access):
+    browse_url = upstream_metadata['Repository-Browse'].value
+    parsed = urlparse(browse_url)
+    # Some hosting sites are commonly used as Homepage
+    if parsed.netloc in ('github.com', ) or is_gitlab_site(parsed.netloc):
+        return UpstreamDatum('Homepage', browse_url, 'possible')
+
+
 EXTRAPOLATE_FNS = [
     (['Homepage'], 'Repository', _extrapolate_repository_from_homepage),
+    (['Repository-Browse'], 'Homepage',
+     _extrapolate_homepage_from_repository_browse),
     (['Bugs-Database'], 'Bug-Database', _copy_bug_db_field),
     (['Bug-Database'], 'Repository', _extrapolate_repository_from_bug_db),
     (['Repository'], 'Repository-Browse',
