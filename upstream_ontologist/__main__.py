@@ -32,7 +32,6 @@ from .guess import (
 
 def main(argv=None):
     import argparse
-    import sys
     import ruamel.yaml
 
     parser = argparse.ArgumentParser(sys.argv[0])
