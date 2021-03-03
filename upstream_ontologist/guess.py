@@ -355,8 +355,9 @@ def guess_from_setup_py(path, trust_package):
         yield UpstreamDatum('Contact', contact, 'likely')
     if result.get_description() not in (None, '', 'UNKNOWN'):
         yield UpstreamDatum('X-Summary', result.get_description(), 'certain')
-    if (getattr(result.metadata, 'long_description_content_type', None)
-                in (None, 'text/plain') and
+    long_description_content_type = getattr(
+        result.metadata, 'long_description_content_type', None)
+    if (long_description_content_type in (None, 'text/plain') and
             result.metadata.long_description not in (None, '', 'UNKNOWN')):
         yield UpstreamDatum(
             'X-Description', result.metadata.long_description, 'possible')
