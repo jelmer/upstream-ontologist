@@ -2110,6 +2110,13 @@ def guess_from_pecl_url(url):
             yield 'Homepage', tag.attrs['href']
 
 
+def strip_vcs_prefixes(url):
+    for prefix in ['git', 'hg']:
+        if url.startswith(prefix+'+'):
+            return url[len(prefix)+1:]
+    return url
+
+
 def guess_from_aur(package: str):
     vcses = ['git', 'bzr', 'hg']
     for vcs in vcses:
@@ -2148,9 +2155,10 @@ def guess_from_aur(package: str):
                 url = value
             url = url.replace('#branch=', ',branch=')
             if any([url.startswith(vcs+'+') for vcs in vcses]):
-                yield 'Repository', url
+                yield 'Repository', strip_vcs_prefixes(url)
         if key == '_gitroot':
-            yield 'Repository', value[0]
+            repo_url = value[0]
+            yield 'Repository', strip_vcs_prefixes(repo_url)
 
 
 def guess_from_launchpad(package, distribution=None, suite=None):  # noqa: C901
