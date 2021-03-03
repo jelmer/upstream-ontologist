@@ -355,11 +355,12 @@ def guess_from_setup_py(path, trust_package):
         yield UpstreamDatum('Contact', contact, 'likely')
     if result.get_description() not in (None, '', 'UNKNOWN'):
         yield UpstreamDatum('X-Summary', result.get_description(), 'certain')
-    if (result.metadata.long_description_content_type in (None, 'text/plain')
-            and result.metadata.long_description not in (None, '', 'UNKNOWN')):
+    if (getattr(result.metadata, 'long_description_content_type', None)
+                in (None, 'text/plain') and
+            result.metadata.long_description not in (None, '', 'UNKNOWN')):
         yield UpstreamDatum(
             'X-Description', result.metadata.long_description, 'possible')
-    for url_type, url in result.metadata.project_urls.items():
+    for url_type, url in getattr(result.metadata, 'project_urls', {}).items():
         if url_type in ('GitHub', 'Repository', 'Source Code'):
             yield UpstreamDatum(
                 'Repository', url, 'certain')
@@ -2249,3 +2250,6 @@ def fix_upstream_metadata(upstream_metadata):
         url = repo.value
         url = sanitize_vcs_url(url)
         repo.value = url
+    if 'X-Summary' in upstream_metadata:
+        summary = upstream_metadata['X-Summary']
+        summary.value = summary.value.rstrip().rstrip('.')
