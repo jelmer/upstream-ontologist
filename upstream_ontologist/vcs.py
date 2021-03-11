@@ -23,7 +23,7 @@ __all__ = [
     "browse_url_from_repo_url",
 ]
 
-from typing import Optional, Union, List
+from typing import Optional, Union, List, Tuple
 
 import socket
 import urllib
@@ -78,7 +78,7 @@ def probe_gitlab_host(hostname: str):
             timeout=DEFAULT_URLLIB_TIMEOUT,
         )
     except urllib.error.HTTPError as e:
-        if e.status == 401:
+        if e.code == 401:
             import json
 
             if json.loads(e.read()) == {"message": "401 Unauthorized"}:
@@ -425,7 +425,7 @@ FIXERS = [
 
 def fixup_broken_git_details(
     repo_url: str, branch: Optional[str], subpath: Optional[str]
-) -> str:
+) -> Tuple[str, Optional[str], Optional[str]]:
     """Attempt to fix up broken Git URLs.
 
     A common misspelling is to add an extra ":" after the hostname
@@ -477,4 +477,4 @@ def sanitize_url(url: Union[str, List[str]]) -> str:
         url = url.strip()
     for sanitizer in SANITIZERS:
         url = sanitizer(url)
-    return url
+    return url  # type: ignore
