@@ -24,6 +24,9 @@ setup(
         ],
     },
     install_requires=['python_debian', 'debmutate'],
+    extras_require={
+        'cargo': ['tomlkit'],
+    },
     tests_require=['breezy'],
     test_suite="upstream_ontologist.tests.test_suite",
 )

@@ -960,15 +960,16 @@ def guess_from_environment():
 
 def guess_from_cargo(path, trust_package):
     try:
-        from toml.decoder import load, TomlDecodeError
+        from tomlkit import loads
+        from tomlkit.exceptions import ParseError
     except ImportError:
         return
     try:
         with open(path, 'r') as f:
-            cargo = load(f)
+            cargo = loads(f.read())
     except FileNotFoundError:
         return
-    except TomlDecodeError as e:
+    except ParseError as e:
         warn('Error parsing toml file %s: %s' % (path, e))
         return
     try:
@@ -992,15 +993,16 @@ def guess_from_cargo(path, trust_package):
 
 def guess_from_pyproject_toml(path, trust_package):
     try:
-        from toml.decoder import load, TomlDecodeError
+        from tomlkit import loads
+        from tomlkit.exceptions import ParseError
     except ImportError:
         return
     try:
         with open(path, 'r') as f:
-            pyproject = load(f)
+            pyproject = loads(f.read())
     except FileNotFoundError:
         return
-    except TomlDecodeError as e:
+    except ParseError as e:
         warn('Error parsing toml file %s: %s' % (path, e))
         return
     if 'poetry' in pyproject.get('tool', []):
