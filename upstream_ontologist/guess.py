@@ -978,17 +978,17 @@ def guess_from_cargo(path, trust_package):
         pass
     else:
         if 'name' in package:
-            yield UpstreamDatum('Name', package['name'], 'certain')
+            yield UpstreamDatum('Name', str(package['name']), 'certain')
         if 'description' in package:
-            yield UpstreamDatum('X-Summary', package['description'], 'certain')
+            yield UpstreamDatum('X-Summary', str(package['description']), 'certain')
         if 'homepage' in package:
-            yield UpstreamDatum('Homepage', package['homepage'], 'certain')
+            yield UpstreamDatum('Homepage', str(package['homepage']), 'certain')
         if 'license' in package:
-            yield UpstreamDatum('X-License', package['license'], 'certain')
+            yield UpstreamDatum('X-License', str(package['license']), 'certain')
         if 'repository' in package:
-            yield UpstreamDatum('Repository', package['repository'], 'certain')
+            yield UpstreamDatum('Repository', str(package['repository']), 'certain')
         if 'version' in package:
-            yield UpstreamDatum('X-Version', package['version'], 'confident')
+            yield UpstreamDatum('X-Version', str(package['version']), 'confident')
 
 
 def guess_from_pyproject_toml(path, trust_package):
@@ -1008,15 +1008,15 @@ def guess_from_pyproject_toml(path, trust_package):
     if 'poetry' in pyproject.get('tool', []):
         poetry = pyproject['tool']['poetry']
         if 'version' in poetry:
-            yield UpstreamDatum('X-Version', poetry['version'], 'certain')
+            yield UpstreamDatum('X-Version', str(poetry['version']), 'certain')
         if 'description' in poetry:
-            yield UpstreamDatum('X-Summary', poetry['description'], 'certain')
+            yield UpstreamDatum('X-Summary', str(poetry['description']), 'certain')
         if 'license' in poetry:
-            yield UpstreamDatum('X-License', poetry['license'], 'certain')
+            yield UpstreamDatum('X-License', str(poetry['license']), 'certain')
         if 'repository' in poetry:
-            yield UpstreamDatum('Repository', poetry['repository'], 'certain')
+            yield UpstreamDatum('Repository', str(poetry['repository']), 'certain')
         if 'name' in poetry:
-            yield UpstreamDatum('Name', poetry['name'], 'certain')
+            yield UpstreamDatum('Name', str(poetry['name']), 'certain')
 
 
 def guess_from_pom_xml(path, trust_package=False):  # noqa: C901
