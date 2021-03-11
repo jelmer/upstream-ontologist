@@ -70,7 +70,7 @@ def get_sf_metadata(project):
         return _load_json_url(
             'https://sourceforge.net/rest/p/%s' % project)
     except urllib.error.HTTPError as e:
-        if e.status != 404:
+        if e.code != 404:
             raise
         raise NoSuchSourceForgeProject(project)
 
@@ -87,7 +87,7 @@ def get_repology_metadata(srcname, repo='debian_unstable'):
     try:
         return _load_json_url(url)
     except urllib.error.HTTPError as e:
-        if e.status != 404:
+        if e.code != 404:
             raise
         raise NoSuchRepologyProject(srcname)
 
@@ -355,11 +355,13 @@ def guess_from_setup_py(path, trust_package):
         yield UpstreamDatum('Contact', contact, 'likely')
     if result.get_description() not in (None, '', 'UNKNOWN'):
         yield UpstreamDatum('X-Summary', result.get_description(), 'certain')
-    if (result.metadata.long_description_content_type in (None, 'text/plain')
-            and result.metadata.long_description not in (None, '', 'UNKNOWN')):
+    long_description_content_type = getattr(
+        result.metadata, 'long_description_content_type', None)
+    if (long_description_content_type in (None, 'text/plain') and
+            result.metadata.long_description not in (None, '', 'UNKNOWN')):
         yield UpstreamDatum(
             'X-Description', result.metadata.long_description, 'possible')
-    for url_type, url in result.metadata.project_urls.items():
+    for url_type, url in getattr(result.metadata, 'project_urls', {}).items():
         if url_type in ('GitHub', 'Repository', 'Source Code'):
             yield UpstreamDatum(
                 'Repository', url, 'certain')
@@ -1616,9 +1618,9 @@ def verify_repository_url(url: str, version: Optional[str] = None) -> bool:
         try:
             data = _load_json_url(api_url)
         except urllib.error.HTTPError as e:
-            if e.status == 404:
+            if e.code == 404:
                 return False
-            elif e.status == 403:
+            elif e.code == 403:
                 # Probably rate-limited. Let's just hope for the best.
                 pass
             else:
@@ -1654,9 +1656,9 @@ def verify_bug_database_url(url):
         try:
             data = _load_json_url(api_url)
         except urllib.error.HTTPError as e:
-            if e.status == 404:
+            if e.code == 404:
                 return False
-            if e.status == 403:
+            if e.code == 403:
                 # Probably rate limited
                 warn('Unable to verify bug database URL %s: %s' % (
                      url, e.reason))
@@ -1672,7 +1674,7 @@ def verify_bug_database_url(url):
         try:
             data = _load_json_url(api_url)
         except urllib.error.HTTPError as e:
-            if e.status == 404:
+            if e.code == 404:
                 return False
             raise
         return len(data) > 0
@@ -1809,8 +1811,19 @@ def _extrapolate_security_contact_from_security_md(
         origin=security_md_path.origin)
 
 
+def _extrapolate_homepage_from_repository_browse(
+        upstream_metadata, net_access):
+    browse_url = upstream_metadata['Repository-Browse'].value
+    parsed = urlparse(browse_url)
+    # Some hosting sites are commonly used as Homepage
+    if parsed.netloc in ('github.com', ) or is_gitlab_site(parsed.netloc):
+        return UpstreamDatum('Homepage', browse_url, 'possible')
+
+
 EXTRAPOLATE_FNS = [
     (['Homepage'], 'Repository', _extrapolate_repository_from_homepage),
+    (['Repository-Browse'], 'Homepage',
+     _extrapolate_homepage_from_repository_browse),
     (['Bugs-Database'], 'Bug-Database', _copy_bug_db_field),
     (['Bug-Database'], 'Repository', _extrapolate_repository_from_bug_db),
     (['Repository'], 'Repository-Browse',
@@ -1965,7 +1978,7 @@ def verify_screenshots(urls):
                 Request(url, headers=headers, method='HEAD'),
                 timeout=DEFAULT_URLLIB_TIMEOUT)
         except urllib.error.HTTPError as e:
-            if e.status == 404:
+            if e.code == 404:
                 yield url, False
             else:
                 yield url, None
@@ -2072,7 +2085,7 @@ def guess_from_pecl_url(url):
             Request(url, headers=headers),
             timeout=PECL_URLLIB_TIMEOUT)
     except urllib.error.HTTPError as e:
-        if e.status != 404:
+        if e.code != 404:
             raise
         return
     except socket.timeout:
@@ -2097,6 +2110,13 @@ def guess_from_pecl_url(url):
             yield 'Homepage', tag.attrs['href']
 
 
+def strip_vcs_prefixes(url):
+    for prefix in ['git', 'hg']:
+        if url.startswith(prefix+'+'):
+            return url[len(prefix)+1:]
+    return url
+
+
 def guess_from_aur(package: str):
     vcses = ['git', 'bzr', 'hg']
     for vcs in vcses:
@@ -2109,7 +2129,7 @@ def guess_from_aur(package: str):
                 Request(url, headers=headers),
                 timeout=DEFAULT_URLLIB_TIMEOUT)
         except urllib.error.HTTPError as e:
-            if e.status != 404:
+            if e.code != 404:
                 raise
             continue
         else:
@@ -2135,9 +2155,10 @@ def guess_from_aur(package: str):
                 url = value
             url = url.replace('#branch=', ',branch=')
             if any([url.startswith(vcs+'+') for vcs in vcses]):
-                yield 'Repository', url
+                yield 'Repository', strip_vcs_prefixes(url)
         if key == '_gitroot':
-            yield 'Repository', value[0]
+            repo_url = value[0]
+            yield 'Repository', strip_vcs_prefixes(repo_url)
 
 
 def guess_from_launchpad(package, distribution=None, suite=None):  # noqa: C901
@@ -2164,7 +2185,7 @@ def guess_from_launchpad(package, distribution=None, suite=None):  # noqa: C901
     try:
         sourcepackage_data = _load_json_url(sourcepackage_url)
     except urllib.error.HTTPError as e:
-        if e.status != 404:
+        if e.code != 404:
             raise
         return
     except socket.timeout:
@@ -2196,13 +2217,13 @@ def guess_from_launchpad(package, distribution=None, suite=None):  # noqa: C901
                     # Sometimes this URL is not set, e.g. for CVS repositories.
                     yield 'Repository', code_import_data['url']
             except urllib.error.HTTPError as e:
-                if e.status != 404:
+                if e.code != 404:
                     raise
                 if project_data['official_codehosting']:
                     try:
                         branch_data = _load_json_url(branch_link)
                     except urllib.error.HTTPError as e:
-                        if e.status != 404:
+                        if e.code != 404:
                             raise
                         branch_data = None
                     if branch_data:
@@ -2238,3 +2259,6 @@ def fix_upstream_metadata(upstream_metadata):
         url = repo.value
         url = sanitize_vcs_url(url)
         repo.value = url
+    if 'X-Summary' in upstream_metadata:
+        summary = upstream_metadata['X-Summary']
+        summary.value = summary.value.rstrip().rstrip('.')

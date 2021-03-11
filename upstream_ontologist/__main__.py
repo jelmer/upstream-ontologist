@@ -17,6 +17,9 @@
 
 """Functions for working with upstream metadata."""
 
+import os
+import sys
+
 from . import (
     version_string,
     UpstreamDatum,
@@ -29,7 +32,6 @@ from .guess import (
 
 def main(argv=None):
     import argparse
-    import sys
     import ruamel.yaml
 
     parser = argparse.ArgumentParser(sys.argv[0])
@@ -65,6 +67,10 @@ def main(argv=None):
     )
     args = parser.parse_args(argv)
 
+    if not os.path.isdir(args.path):
+        sys.stderr.write('%s is not a directory\n' % args.path)
+        return 1
+
     if args.scan:
         for entry in guess_upstream_info(args.path, args.trust):
             if isinstance(entry, UpstreamDatum):
@@ -84,9 +90,8 @@ def main(argv=None):
         )
 
         sys.stdout.write(ruamel.yaml.round_trip_dump(metadata))
+        return 0
 
 
 if __name__ == "__main__":
-    import sys
-
     sys.exit(main())
