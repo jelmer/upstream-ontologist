@@ -1,6 +1,7 @@
 upstream-ontologist (0.1.9-2) UNRELEASED; urgency=medium
 
   * Check upstream PGP signatures.
+  * Add missing dependencies.
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Wed, 03 Mar 2021 17:41:12 -0000
 
