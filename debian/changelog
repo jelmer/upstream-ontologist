@@ -3,6 +3,7 @@ upstream-ontologist (0.1.12-1) UNRELEASED; urgency=medium
   * Check upstream PGP signatures.
   * Add missing dependencies.
   * New upstream release.
+  * Set upstream metadata fields: Security-Contact.
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Thu, 11 Mar 2021 04:00:28 +0000
 
