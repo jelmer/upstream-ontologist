@@ -23,8 +23,8 @@ from typing import Optional, Tuple, Dict
 
 def _description_from_basic_soup(soup) -> Tuple[Optional[str], Dict[str, str]]:
     # Drop any headers
-    # TODO(jelmer): Maybe this is the project name?
     metadata = {}
+    # First, skip past the first header.
     for el in soup.children:
         if el.name == 'h1':
             metadata['Name'] = el.text
@@ -39,6 +39,11 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Dict[str, str]]:
         if isinstance(el, str):
             continue
         if el.name == 'p':
+            if el.get_text().startswith('License: '):
+                if len(paragraphs) > 0:
+                    break
+                else:
+                    continue
             paragraphs.append(el.get_text() + '\n')
         elif el.name == 'ul':
             paragraphs.append(
