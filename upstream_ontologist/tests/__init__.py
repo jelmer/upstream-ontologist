@@ -20,6 +20,7 @@ import unittest
 
 def test_suite():
     names = [
+        "readme",
         "upstream_ontologist",
         "vcs",
     ]
