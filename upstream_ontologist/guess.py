@@ -16,6 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
 import json
+import logging
 import operator
 import os
 import re
@@ -49,6 +50,9 @@ from . import (
 PECL_URLLIB_TIMEOUT = 15
 KNOWN_HOSTING_SITES = [
     'code.launchpad.net', 'github.com', 'launchpad.net', 'git.openstack.org']
+
+
+logger = logging.getLogger(__name__)
 
 
 def _load_json_url(http_url: str, timeout: int = DEFAULT_URLLIB_TIMEOUT):
@@ -638,13 +642,18 @@ def guess_from_readme(path, trust_package):  # noqa: C901
                         'Repository',
                         line.strip().rstrip(b'.').decode(), 'possible')
                 for m in re.finditer(
-                        b'https://([^/]+)/([^\\s()"#]+)', line):
+                        b'https://([^]/]+)/([^]\\s()"#]+)', line):
                     if is_gitlab_site(m.group(1).decode()):
                         url = m.group(0).rstrip(b'.').decode().rstrip()
-                        repo_url = guess_repo_from_url(url)
-                        if repo_url:
-                            yield UpstreamDatum(
-                                'Repository', repo_url, 'possible')
+                        try:
+                            repo_url = guess_repo_from_url(url)
+                        except ValueError:
+                            loger.warning(
+                                'Ignoring invalid URL %s in %s', url, path)
+                        else:
+                            if repo_url:
+                                yield UpstreamDatum(
+                                    'Repository', repo_url, 'possible')
     except IsADirectoryError:
         pass
 
