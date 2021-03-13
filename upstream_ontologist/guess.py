@@ -648,7 +648,7 @@ def guess_from_readme(path, trust_package):  # noqa: C901
                         try:
                             repo_url = guess_repo_from_url(url)
                         except ValueError:
-                            loger.warning(
+                            logger.warning(
                                 'Ignoring invalid URL %s in %s', url, path)
                         else:
                             if repo_url:
