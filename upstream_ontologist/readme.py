@@ -17,18 +17,27 @@
 
 """README parsing."""
 
+import re
+from typing import Optional, Tuple, Dict
 
-def description_from_readme_md(md_text):
-    """Description from README.md."""
-    import markdown
-    html_text = markdown.markdown(md_text)
-    from bs4 import BeautifulSoup, NavigableString
-    soup = BeautifulSoup(html_text, 'lxml')
-    first = next(iter(soup.body.children))
-    if first.name == 'h1':
-        first.decompose()
+
+def _description_from_basic_soup(soup) -> Tuple[Optional[str], Dict[str, str]]:
+    # Drop any headers
+    # TODO(jelmer): Maybe this is the project name?
+    metadata = {}
+    for el in soup.children:
+        if el.name == 'h1':
+            metadata['Name'] = el.text
+            el.decompose()
+        elif isinstance(el, str):
+            pass
+        else:
+            break
+
     paragraphs = []
-    for el in soup.body.findAll(['p', 'ul']):
+    for el in soup.children:
+        if isinstance(el, str):
+            continue
         if el.name == 'p':
             paragraphs.append(el.get_text() + '\n')
         elif el.name == 'ul':
@@ -36,4 +45,29 @@ def description_from_readme_md(md_text):
                 ''.join(
                     '* %s\n' % li.get_text()
                     for li in el.findAll('li')))
-    return '\n'.join(paragraphs)
+        elif re.match('h[0-9]', el.name):
+            break
+    if len(paragraphs) >= 1 and len(paragraphs) < 6:
+        return '\n'.join(paragraphs), metadata
+    return None, metadata
+
+
+def description_from_readme_md(md_text: str) -> [Optional[str], Dict[str, str]]:
+    """Description from README.md."""
+    import markdown
+    html_text = markdown.markdown(md_text)
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(html_text, 'lxml')
+    return _description_from_basic_soup(soup.body)
+
+
+def description_from_readme_rst(rst_text: str) -> Tuple[Optional[str], Dict[str, str]]:
+    """Description from README.rst."""
+    from docutils.core import publish_parts
+    from docutils.writers.html4css1 import Writer
+    settings = {'initial_header_level': 2, 'report_level': 0}
+    html_text = publish_parts(
+        rst_text, writer=Writer(), settings_overrides=settings).get('html_body')
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(html_text, 'lxml')
+    return _description_from_basic_soup(list(soup.body.children)[0])

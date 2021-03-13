@@ -17,65 +17,60 @@
 
 """Tests for readme parsing."""
 
-from unittest import TestCase
+import os
+from unittest import TestCase, TestSuite
 
 from upstream_ontologist.readme import (
     description_from_readme_md,
+    description_from_readme_rst,
     )
 
 
-class ReadmeTests(TestCase):
+class ReadmeTestCase(TestCase):
+
+    def __init__(self, path):
+        super(ReadmeTestCase, self).__init__()
+        self.path = path
 
     def setUp(self):
-        super(ReadmeTests, self).setUp()
+        super(ReadmeTestCase, self).setUp()
         self.maxDiff = None
 
-    def test_sfcgal(self):
-        self.assertEqual("""\
-SFCGAL is a C++ wrapper library around CGAL with the aim \
-of supporting ISO 191007:2013 and OGC Simple Features for 3D operations.
+    def runTest(self):
+        readme_md = None
+        readme_rst = None
+        for entry in os.scandir(self.path):
+            if entry.name.endswith('~'):
+                continue
+            base, ext = os.path.splitext(entry.name)
+            if entry.name == 'description':
+                with open(entry.path, 'r') as f:
+                    description = f.read()
+            elif base == "README":
+                if ext == '.md':
+                    with open(entry.path, 'r') as f:
+                        readme_md = f.read()
+                elif ext == '.rst':
+                    with open(entry.path, 'r') as f:
+                        readme_rst = f.read()
+                else:
+                    raise NotImplementedError(ext)
+            else:
+                raise NotImplementedError(ext)
 
-Please refer to the project page for an updated installation procedure.
-""", description_from_readme_md("""\
-SFCGAL
-======
+        if readme_md is not None:
+            actual_description, unused_md = description_from_readme_md(
+                readme_md)
+            self.assertEqual(actual_description, description)
 
-SFCGAL is a C++ wrapper library around \
-[CGAL](http://www.cgal.org) with the aim \
-of supporting ISO 191007:2013 and OGC Simple Features for 3D operations.
-
-Please refer to the \
-<a href="http://oslandia.github.io/SFCGAL">project page</a> \
-for an updated installation procedure."""))
-
-    def test_erbium(self):
-        self.assertEqual("""\
-Erbium[^0] provides networking services for use on small/home networks.  Erbium
-currently supports both DNS and DHCP, with other protocols hopefully coming soon.
-
-Erbium is in early development.
-
-* DNS is still in early development, and not ready for use.
-* DHCP is beta quality.  Should be ready for test use.
-* Router Advertisements are alpha quality.  Should be ready for limited testing.
-
-[^0]: Erbium is the 68th element in the periodic table, the same as the client
-port number for DHCP.
-""", description_from_readme_md("""\
-Erbium
-======
-
-Erbium[^0] provides networking services for use on small/home networks.  Erbium
-currently supports both DNS and DHCP, with other protocols hopefully coming soon.
-
-Erbium is in early development.
-
-   * DNS is still in early development, and not ready for use.
-   * DHCP is beta quality.  Should be ready for test use.
-   * Router Advertisements are alpha quality.  Should be ready for limited testing.
+        if readme_rst is not None:
+            actual_description, unused_rst = description_from_readme_rst(
+                readme_rst)
+            self.assertEqual(actual_description, description)
 
 
-
-[^0]: Erbium is the 68th element in the periodic table, the same as the client
-port number for DHCP.
-"""))
+def test_suite():
+    suite = TestSuite()
+    for entry in os.scandir(os.path.join(os.path.dirname(__file__), 'readme_data')):
+        suite.addTest(ReadmeTestCase(entry.path))
+    return suite
