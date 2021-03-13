@@ -654,20 +654,20 @@ def guess_from_readme(path, trust_package):  # noqa: C901
                             if repo_url:
                                 yield UpstreamDatum(
                                     'Repository', repo_url, 'possible')
-        if path.endswith('.md'):
+        if path.endswith('README.md'):
             with open(path, 'r') as f:
                 from .readme import description_from_readme_md
                 description, unused_md = description_from_readme_md(f.read())
                 if description is not None:
                     yield UpstreamDatum(
-                        'Description', description, 'possible')
-        if path.endswith('.rst'):
+                        'X-Description', description, 'possible')
+        if path.endswith('README.rst'):
             with open(path, 'r') as f:
                 from .readme import description_from_readme_rst
                 description, unused_md = description_from_readme_rst(f.read())
                 if description is not None:
                     yield UpstreamDatum(
-                        'Description', description, 'possible')
+                        'X-Description', description, 'possible')
     except IsADirectoryError:
         pass
 
