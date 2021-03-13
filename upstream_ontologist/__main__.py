@@ -68,7 +68,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     if not os.path.isdir(args.path):
-        sys.stderr.write('%s is not a directory\n' % args.path)
+        sys.stderr.write("%s is not a directory\n" % args.path)
         return 1
 
     if args.scan:

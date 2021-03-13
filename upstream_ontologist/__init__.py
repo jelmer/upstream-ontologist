@@ -55,7 +55,7 @@ from typing import Optional, Sequence
 
 SUPPORTED_CERTAINTIES = ["certain", "confident", "likely", "possible", None]
 
-version_string = "0.1.12"
+version_string = "0.1.13"
 
 USER_AGENT = "upstream-ontologist/" + version_string
 # Too aggressive?
@@ -115,12 +115,8 @@ def upstream_metadata_sort_key(x):
 
 
 def min_certainty(certainties: Sequence[str]) -> str:
-    confidences = [
-        certainty_to_confidence(c)
-        for c in certainties]
-    return confidence_to_certainty(max([
-        c for c in confidences if c is not None] + [0])
-    )
+    confidences = [certainty_to_confidence(c) for c in certainties]
+    return confidence_to_certainty(max([c for c in confidences if c is not None] + [0]))
 
 
 def certainty_to_confidence(certainty: Optional[str]) -> Optional[int]:

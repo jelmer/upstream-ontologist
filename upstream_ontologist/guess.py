@@ -16,6 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
 import json
+import logging
 import operator
 import os
 import re
@@ -49,6 +50,9 @@ from . import (
 PECL_URLLIB_TIMEOUT = 15
 KNOWN_HOSTING_SITES = [
     'code.launchpad.net', 'github.com', 'launchpad.net', 'git.openstack.org']
+
+
+logger = logging.getLogger(__name__)
 
 
 def _load_json_url(http_url: str, timeout: int = DEFAULT_URLLIB_TIMEOUT):
@@ -638,13 +642,32 @@ def guess_from_readme(path, trust_package):  # noqa: C901
                         'Repository',
                         line.strip().rstrip(b'.').decode(), 'possible')
                 for m in re.finditer(
-                        b'https://([^/]+)/([^\\s()"#]+)', line):
+                        b'https://([^]/]+)/([^]\\s()"#]+)', line):
                     if is_gitlab_site(m.group(1).decode()):
                         url = m.group(0).rstrip(b'.').decode().rstrip()
-                        repo_url = guess_repo_from_url(url)
-                        if repo_url:
-                            yield UpstreamDatum(
-                                'Repository', repo_url, 'possible')
+                        try:
+                            repo_url = guess_repo_from_url(url)
+                        except ValueError:
+                            logger.warning(
+                                'Ignoring invalid URL %s in %s', url, path)
+                        else:
+                            if repo_url:
+                                yield UpstreamDatum(
+                                    'Repository', repo_url, 'possible')
+        if path.endswith('README.md'):
+            with open(path, 'r') as f:
+                from .readme import description_from_readme_md
+                description, unused_md = description_from_readme_md(f.read())
+                if description is not None:
+                    yield UpstreamDatum(
+                        'X-Description', description, 'possible')
+        if path.endswith('README.rst'):
+            with open(path, 'r') as f:
+                from .readme import description_from_readme_rst
+                description, unused_md = description_from_readme_rst(f.read())
+                if description is not None:
+                    yield UpstreamDatum(
+                        'X-Description', description, 'possible')
     except IsADirectoryError:
         pass
 
@@ -960,15 +983,16 @@ def guess_from_environment():
 
 def guess_from_cargo(path, trust_package):
     try:
-        from toml.decoder import load, TomlDecodeError
+        from tomlkit import loads
+        from tomlkit.exceptions import ParseError
     except ImportError:
         return
     try:
         with open(path, 'r') as f:
-            cargo = load(f)
+            cargo = loads(f.read())
     except FileNotFoundError:
         return
-    except TomlDecodeError as e:
+    except ParseError as e:
         warn('Error parsing toml file %s: %s' % (path, e))
         return
     try:
@@ -977,44 +1001,45 @@ def guess_from_cargo(path, trust_package):
         pass
     else:
         if 'name' in package:
-            yield UpstreamDatum('Name', package['name'], 'certain')
+            yield UpstreamDatum('Name', str(package['name']), 'certain')
         if 'description' in package:
-            yield UpstreamDatum('X-Summary', package['description'], 'certain')
+            yield UpstreamDatum('X-Summary', str(package['description']), 'certain')
         if 'homepage' in package:
-            yield UpstreamDatum('Homepage', package['homepage'], 'certain')
+            yield UpstreamDatum('Homepage', str(package['homepage']), 'certain')
         if 'license' in package:
-            yield UpstreamDatum('X-License', package['license'], 'certain')
+            yield UpstreamDatum('X-License', str(package['license']), 'certain')
         if 'repository' in package:
-            yield UpstreamDatum('Repository', package['repository'], 'certain')
+            yield UpstreamDatum('Repository', str(package['repository']), 'certain')
         if 'version' in package:
-            yield UpstreamDatum('X-Version', package['version'], 'confident')
+            yield UpstreamDatum('X-Version', str(package['version']), 'confident')
 
 
 def guess_from_pyproject_toml(path, trust_package):
     try:
-        from toml.decoder import load, TomlDecodeError
+        from tomlkit import loads
+        from tomlkit.exceptions import ParseError
     except ImportError:
         return
     try:
         with open(path, 'r') as f:
-            pyproject = load(f)
+            pyproject = loads(f.read())
     except FileNotFoundError:
         return
-    except TomlDecodeError as e:
+    except ParseError as e:
         warn('Error parsing toml file %s: %s' % (path, e))
         return
     if 'poetry' in pyproject.get('tool', []):
         poetry = pyproject['tool']['poetry']
         if 'version' in poetry:
-            yield UpstreamDatum('X-Version', poetry['version'], 'certain')
+            yield UpstreamDatum('X-Version', str(poetry['version']), 'certain')
         if 'description' in poetry:
-            yield UpstreamDatum('X-Summary', poetry['description'], 'certain')
+            yield UpstreamDatum('X-Summary', str(poetry['description']), 'certain')
         if 'license' in poetry:
-            yield UpstreamDatum('X-License', poetry['license'], 'certain')
+            yield UpstreamDatum('X-License', str(poetry['license']), 'certain')
         if 'repository' in poetry:
-            yield UpstreamDatum('Repository', poetry['repository'], 'certain')
+            yield UpstreamDatum('Repository', str(poetry['repository']), 'certain')
         if 'name' in poetry:
-            yield UpstreamDatum('Name', poetry['name'], 'certain')
+            yield UpstreamDatum('Name', str(poetry['name']), 'certain')
 
 
 def guess_from_pom_xml(path, trust_package=False):  # noqa: C901
