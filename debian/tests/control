@@ -1,3 +1,3 @@
 Test-Command: python3 setup.py test
-Depends: @, python3-setuptools, python3-breezy, python3-bs4, python3-toml, python3-dulwich, python3-distro-info, python3-ruamel.yaml, python3-markdown, python3-docutils
+Depends: @, python3-setuptools, python3-breezy, python3-bs4, python3-toml, python3-dulwich, python3-distro-info, python3-ruamel.yaml, python3-markdown, python3-docutils, python3-lxml
 Restrictions: allow-stderr
