@@ -9,7 +9,7 @@ setup(
         "upstream_ontologist.debian",
         "upstream_ontologist.tests",
     ],
-    version="0.1.12",
+    version="0.1.13",
     author="Jelmer Vernooij",
     author_email="jelmer@debian.org",
     url="https://github.com/jelmer/upstream-ontologist",
@@ -24,6 +24,9 @@ setup(
         ],
     },
     install_requires=['python_debian', 'debmutate'],
+    extras_require={
+        'cargo': ['tomlkit'],
+    },
     tests_require=['breezy'],
     test_suite="upstream_ontologist.tests.test_suite",
 )

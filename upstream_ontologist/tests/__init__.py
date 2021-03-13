@@ -24,5 +24,6 @@ def test_suite():
         "vcs",
     ]
     module_names = [__name__ + ".test_" + name for name in names]
+    module_names.append(__name__ + ".test_readme.test_suite")
     loader = unittest.TestLoader()
     return loader.loadTestsFromNames(module_names)

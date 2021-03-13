@@ -1,0 +1,9 @@
+This micro library is a PyYaml wrapper with sane behaviour to read and
+write readable YAML safely, typically when used with configuration files.
+
+With saneyaml you can dump readable and clean YAML and load safely any YAML
+preserving ordering and avoiding surprises of type conversions by loading
+everything except booleans as strings.
+Optionally you can check for duplicated map keys when loading YAML.
+
+Works with Python 2 and 3. Requires PyYAML.

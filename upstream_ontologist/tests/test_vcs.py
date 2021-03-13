@@ -92,7 +92,7 @@ class FixupRcpStyleUrlTests(TestCase):
         try:
             import breezy  # noqa: F401
         except ModuleNotFoundError:
-            self.skipTest('breezy is not available')
+            self.skipTest("breezy is not available")
         self.assertEqual(
             "ssh://github.com/jelmer/example",
             fixup_rcp_style_git_repo_url("github.com:jelmer/example"),
@@ -106,7 +106,7 @@ class FixupRcpStyleUrlTests(TestCase):
         try:
             import breezy  # noqa: F401
         except ModuleNotFoundError:
-            self.skipTest('breezy is not available')
+            self.skipTest("breezy is not available")
         self.assertEqual(
             "https://salsa.debian.org/jelmer/example",
             fixup_rcp_style_git_repo_url("https://salsa.debian.org/jelmer/example"),
