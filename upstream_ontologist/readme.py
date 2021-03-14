@@ -25,6 +25,16 @@ from typing import Optional, Tuple, Dict
 logger = logging.getLogger(__name__)
 
 
+def _skip_paragraph(para):
+    if para.startswith('License: '):
+        return True
+    if re.match('See .* for more (details|information)\.', para):
+        return True
+    if re.match('Please refer .*\.', para):
+        return True
+    return False
+
+
 def _description_from_basic_soup(soup) -> Tuple[Optional[str], Dict[str, str]]:
     # Drop any headers
     metadata = {}
@@ -43,12 +53,13 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Dict[str, str]]:
         if isinstance(el, str):
             continue
         if el.name == 'p':
-            if el.get_text().startswith('License: '):
+            if _skip_paragraph(el.get_text()):
                 if len(paragraphs) > 0:
                     break
                 else:
                     continue
-            paragraphs.append(el.get_text() + '\n')
+            if el.get_text().strip():
+                paragraphs.append(el.get_text() + '\n')
         elif el.name == 'ul':
             paragraphs.append(
                 ''.join(
