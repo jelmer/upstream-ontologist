@@ -32,6 +32,10 @@ def _skip_paragraph(para):
         return True
     if re.match(r'Please refer .*\.', para):
         return True
+    if re.match(
+            r'This software is freely distributable under the (.*) license.*',
+            para):
+        return True
     return False
 
 
