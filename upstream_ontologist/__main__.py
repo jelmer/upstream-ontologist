@@ -89,7 +89,8 @@ def main(argv=None):
             check=args.check,
         )
 
-        sys.stdout.write(ruamel.yaml.round_trip_dump(metadata))
+        ruamel.yaml.scalarstring.walk_tree(metadata)
+        ruamel.yaml.round_trip_dump(metadata, sys.stdout)
         return 0
 
 
