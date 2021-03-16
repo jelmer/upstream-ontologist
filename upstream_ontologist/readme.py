@@ -101,8 +101,8 @@ def description_from_readme_md(md_text: str) -> Tuple[Optional[str], Dict[str, s
 def description_from_readme_rst(rst_text: str) -> Tuple[Optional[str], Dict[str, str]]:
     """Description from README.rst."""
     if platform.python_implementation() == "PyPy":
-        # docutils doesn't appear to work on Pypy
-        raise ModuleNotFoundError
+        logger.debug('docutils does not appear to work on PyPy, skipping README.rst.')
+        return None, {}
     try:
         from docutils.core import publish_parts
     except ModuleNotFoundError:
