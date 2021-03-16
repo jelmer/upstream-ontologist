@@ -19,7 +19,7 @@
 
 import logging
 import re
-from typing import Optional, Tuple, Dict
+from typing import Optional, Tuple, Dict, List
 
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Dict[str, str]]:
         else:
             break
 
-    paragraphs = []
+    paragraphs: List[str] = []
     for el in soup.children:
         if isinstance(el, str):
             continue
@@ -72,7 +72,7 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Dict[str, str]]:
     return None, metadata
 
 
-def description_from_readme_md(md_text: str) -> [Optional[str], Dict[str, str]]:
+def description_from_readme_md(md_text: str) -> Tuple[Optional[str], Dict[str, str]]:
     """Description from README.md."""
     try:
         import markdown
