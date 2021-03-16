@@ -18,6 +18,7 @@
 """README parsing."""
 
 import logging
+import platform
 import re
 from typing import Optional, Tuple, Dict, List
 
@@ -99,6 +100,9 @@ def description_from_readme_md(md_text: str) -> Tuple[Optional[str], Dict[str, s
 
 def description_from_readme_rst(rst_text: str) -> Tuple[Optional[str], Dict[str, str]]:
     """Description from README.rst."""
+    if platform.python_implementation() == "PyPy":
+        # docutils doesn't appear to work on Pypy
+        raise ModuleNotFoundError
     try:
         from docutils.core import publish_parts
     except ModuleNotFoundError:
