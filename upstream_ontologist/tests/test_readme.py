@@ -61,7 +61,7 @@ class ReadmeTestCase(TestCase):
 
         if readme_md is not None:
             try:
-                import markdown
+                import markdown  # noqa: F401
             except ModuleNotFoundError:
                 self.skipTest(
                     'Skipping README.md tests, markdown not available')
@@ -73,7 +73,7 @@ class ReadmeTestCase(TestCase):
             if platform.python_implementation() == "PyPy":
                 self.skipTest('Skipping README.rst tests on pypy')
             try:
-                import docutils
+                import docutils  # noqa: F401
             except ModuleNotFoundError:
                 self.skipTest(
                     'Skipping README.rst tests, docutils not available')
