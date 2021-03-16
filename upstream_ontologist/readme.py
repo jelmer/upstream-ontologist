@@ -28,9 +28,9 @@ logger = logging.getLogger(__name__)
 def _skip_paragraph(para):
     if para.startswith('License: '):
         return True
-    if re.match('See .* for more (details|information)\.', para):
+    if re.match(r'See .* for more (details|information)\.', para):
         return True
-    if re.match('Please refer .*\.', para):
+    if re.match(r'Please refer .*\.', para):
         return True
     return False
 
