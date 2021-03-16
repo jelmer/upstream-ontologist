@@ -20,7 +20,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
-        sudo apt install libxml2-dev
+        sudo apt install libxml2-dev libxslt1-dev
         python -m pip install --upgrade pip flake8 cython
         python -m pip install -e '.[readme,cargo]'
         python setup.py develop
