@@ -2286,4 +2286,5 @@ def fix_upstream_metadata(upstream_metadata):
         repo.value = url
     if 'X-Summary' in upstream_metadata:
         summary = upstream_metadata['X-Summary']
+        summary.value = summary.value.split('. ')[0]
         summary.value = summary.value.rstrip().rstrip('.')
