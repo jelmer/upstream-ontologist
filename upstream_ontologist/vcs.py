@@ -23,6 +23,7 @@ __all__ = [
     "browse_url_from_repo_url",
 ]
 
+import re
 from typing import Optional, Union, List, Tuple
 
 import socket
@@ -250,6 +251,16 @@ def canonical_git_repo_url(repo_url: str) -> str:
 
 
 def find_public_repo_url(repo_url: str) -> Optional[str]:
+    parsed = urlparse(repo_url)
+    if not parsed.scheme and not parsed.hostname and ':' in parsed.path:
+        m = re.match('^(?P<user>[^@:/]+@)?(?P<host>[^/:]+):(?P<path>.*)$',
+                     repo_url)
+        if m:
+            host = m.group('host')
+            path = m.group('path')
+            if host == 'github.com' or is_gitlab_site(host):
+                return urlunparse(("https", "github.com", path, None, None, None))
+
     parsed = urlparse(repo_url)
     revised_url = None
     if parsed.hostname == "github.com":

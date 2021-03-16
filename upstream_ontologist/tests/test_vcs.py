@@ -75,6 +75,10 @@ class FindPublicVcsUrlTests(TestCase):
             "https://github.com/jelmer/example",
             find_public_repo_url("https://github.com/jelmer/example"),
         )
+        self.assertEqual(
+            "https://github.com/jelmer/example",
+            find_public_repo_url("git@github.com:jelmer/example"),
+        )
 
     def test_salsa(self):
         self.assertEqual(
