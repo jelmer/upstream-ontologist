@@ -55,7 +55,7 @@ from typing import Optional, Sequence
 
 SUPPORTED_CERTAINTIES = ["certain", "confident", "likely", "possible", None]
 
-version_string = "0.1.13"
+version_string = "0.1.14"
 
 USER_AGENT = "upstream-ontologist/" + version_string
 # Too aggressive?
