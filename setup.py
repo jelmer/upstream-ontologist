@@ -30,4 +30,7 @@ setup(
     },
     tests_require=['breezy'],
     test_suite="upstream_ontologist.tests.test_suite",
+    data_files=[
+        ('share/man/man1', ['man/guess-upstream-metadata.1']),
+    ],
 )
