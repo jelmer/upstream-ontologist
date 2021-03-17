@@ -26,27 +26,37 @@ from typing import Optional, Tuple, Dict, List
 logger = logging.getLogger(__name__)
 
 
-def _skip_paragraph(para):
-    if para.startswith('License: '):
+def _skip_paragraph(para, metadata):
+    if re.match(r'See .* for more (details|information)\.', para.get_text()):
         return True
-    if re.match(r'See .* for more (details|information)\.', para):
+    if re.match(r'Please refer .*\.', para.get_text()):
         return True
-    if re.match(r'Please refer .*\.', para):
+    m = re.match(r'License: (.*)', para.get_text())
+    if m:
+        metadata.append(('License', m.group(1)))
         return True
-    if re.match(
+    m = re.match(
             r'This software is freely distributable under the (.*) license.*',
-            para):
+            para.get_text())
+    if m:
+        metadata.append(('License', m.group(1)))
+        return True
+    for c in para.children:
+        if c.name == 'a' or isinstance(c, str) and not c.strip():
+            continue
+        break
+    else:
         return True
     return False
 
 
 def _description_from_basic_soup(soup) -> Tuple[Optional[str], Dict[str, str]]:
     # Drop any headers
-    metadata = {}
+    metadata = []
     # First, skip past the first header.
     for el in soup.children:
         if el.name == 'h1':
-            metadata['Name'] = el.text
+            metadata.append(('Name', el.text))
             el.decompose()
         elif isinstance(el, str):
             pass
@@ -58,7 +68,7 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Dict[str, str]]:
         if isinstance(el, str):
             continue
         if el.name == 'p':
-            if _skip_paragraph(el.get_text()):
+            if _skip_paragraph(el, metadata):
                 if len(paragraphs) > 0:
                     break
                 else:
@@ -72,9 +82,10 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Dict[str, str]]:
                     for li in el.findAll('li')))
         elif re.match('h[0-9]', el.name):
             break
+
     if len(paragraphs) >= 1 and len(paragraphs) < 6:
-        return '\n'.join(paragraphs), metadata
-    return None, metadata
+        return '\n'.join(paragraphs), dict(metadata)
+    return None, dict(metadata)
 
 
 def description_from_readme_md(md_text: str) -> Tuple[Optional[str], Dict[str, str]]:
