@@ -29,7 +29,7 @@ def debian_to_upstream_version(version):
 def upstream_name_to_debian_source_name(upstream_name: str) -> str:
     if upstream_name.startswith("GNU "):
         upstream_name = upstream_name[len("GNU ") :]
-    return upstream_name.lower()
+    return upstream_name.lower().replace('_', '-')
 
 
 def upstream_version_to_debian_upstream_version(
@@ -47,7 +47,7 @@ def upstream_package_to_debian_source_name(package: UpstreamPackage) -> str:
     if package.family == "node":
         return "node-%s" % package.name.lower()
     # TODO(jelmer):
-    return package.name.lower().replace('_', '-')
+    return upstream_name_to_debian_source_name(package)
 
 
 def upstream_package_to_debian_binary_name(package: UpstreamPackage) -> str:
