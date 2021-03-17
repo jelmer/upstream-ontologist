@@ -41,24 +41,24 @@ def upstream_version_to_debian_upstream_version(
 
 def upstream_package_to_debian_source_name(package: UpstreamPackage) -> str:
     if package.family == "rust":
-        return "rust-%s" % package.name
+        return "rust-%s" % package.name.lower()
     if package.family == "perl":
         return "lib%s-perl" % package.name.lower().replace("::", "-")
     if package.family == "node":
-        return "node-%s" % package.name
+        return "node-%s" % package.name.lower()
     # TODO(jelmer):
-    return package.name
+    return package.name.lower()
 
 
 def upstream_package_to_debian_binary_name(package: UpstreamPackage) -> str:
     if package.family == "rust":
-        return "rust-%s" % package.name
+        return "rust-%s" % package.name.lower()
     if package.family == "perl":
         return "lib%s-perl" % package.name.lower().replace("::", "-")
     if package.family == "node":
-        return "node-%s" % package.name
+        return "node-%s" % package.name.lower()
     # TODO(jelmer):
-    return package.name
+    return package.name.lower()
 
 
 def compare_upstream_versions(family, version1, version2):
