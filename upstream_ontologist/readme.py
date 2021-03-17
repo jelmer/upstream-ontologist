@@ -35,6 +35,9 @@ def _skip_paragraph(para, metadata):
     if m:
         metadata.append(('License', m.group(1)))
         return True
+    m = re.match('More documentation .* at http.*', para.get_text())
+    if m:
+        return True
     m = re.match(
             r'This software is freely distributable under the (.*) license.*',
             para.get_text())
