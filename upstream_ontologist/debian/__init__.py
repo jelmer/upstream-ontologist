@@ -47,7 +47,7 @@ def upstream_package_to_debian_source_name(package: UpstreamPackage) -> str:
     if package.family == "node":
         return "node-%s" % package.name.lower()
     # TODO(jelmer):
-    return package.name.lower()
+    return package.name.lower().replace('_', '-')
 
 
 def upstream_package_to_debian_binary_name(package: UpstreamPackage) -> str:
@@ -58,7 +58,7 @@ def upstream_package_to_debian_binary_name(package: UpstreamPackage) -> str:
     if package.family == "node":
         return "node-%s" % package.name.lower()
     # TODO(jelmer):
-    return package.name.lower()
+    return package.name.lower().replace('_', '-')
 
 
 def compare_upstream_versions(family, version1, version2):
