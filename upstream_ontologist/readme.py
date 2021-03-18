@@ -56,6 +56,8 @@ def _skip_paragraph(para, metadata):
 def _description_from_basic_soup(soup) -> Tuple[Optional[str], Dict[str, str]]:
     # Drop any headers
     metadata = []
+    if soup is None:
+        return None, {}
     # First, skip past the first header.
     for el in soup.children:
         if el.name in ('h1', 'h2'):

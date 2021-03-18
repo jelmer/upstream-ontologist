@@ -40,6 +40,7 @@ class ReadmeTestCase(TestCase):
     def runTest(self):
         readme_md = None
         readme_rst = None
+        description = None
         for entry in os.scandir(self.path):
             if entry.name.endswith('~'):
                 continue
