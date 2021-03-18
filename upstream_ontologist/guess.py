@@ -1054,7 +1054,7 @@ def guess_from_pom_xml(path, trust_package=False):  # noqa: C901
         return
     assert root.tag == 'project', 'root tag is %r' % root.tag
     name_tag = root.find('name')
-    if name_tag is not None:
+    if name_tag is not None and '$' not in name_tag.text:
         yield UpstreamDatum('Name', name_tag.text, 'certain')
     description_tag = root.find('description')
     if description_tag is not None:
