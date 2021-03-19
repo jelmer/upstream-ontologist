@@ -45,7 +45,19 @@ def _skip_paragraph(para, metadata):
         metadata.append(('License', m.group(1)))
         return True
     for c in para.children:
-        if c.name == 'a' or isinstance(c, str) and not c.strip():
+        if isinstance(c, str) and not c.strip():
+            continue
+        if c.name == 'a':
+            if len(list(c.children)) != 1:
+                name = None
+            elif isinstance(list(c.children)[0], str):
+                name = list(c.children)[0].get_text()
+            elif list(c.children)[0].name == 'img':
+                name = list(c.children)[0].get('alt')
+            else:
+                name = None
+            if name == 'CRAN':
+                metadata.append(('Archive', 'CRAN'))
             continue
         break
     else:
