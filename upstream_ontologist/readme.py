@@ -86,7 +86,7 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[Upstream
                 name, summary = el.text.split(':', 1)
                 metadata.append(UpstreamDatum('Name', name, 'likely'))
                 metadata.append(UpstreamDatum('Name', summary, 'likely'))
-            else:
+            elif el.text:
                 metadata.append(UpstreamDatum('Name', el.text, 'likely'))
             el.decompose()
             break
