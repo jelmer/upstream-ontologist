@@ -104,6 +104,8 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[Upstream
                     '* %s\n' % li.get_text()
                     for li in el.findAll('li')))
         elif re.match('h[0-9]', el.name):
+            if len(paragraphs) == 0 and el.get_text() in ('About', ):
+                continue
             break
 
     if len(paragraphs) >= 1 and len(paragraphs) < 6:
