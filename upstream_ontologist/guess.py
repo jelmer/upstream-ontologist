@@ -655,21 +655,23 @@ def guess_from_readme(path, trust_package):  # noqa: C901
                                 yield UpstreamDatum(
                                     'Repository', repo_url, 'possible')
         if path.endswith('README.md'):
-            with open(path, 'r') as f:
+            with open(path, 'rb') as f:
                 from .readme import description_from_readme_md
                 contents = f.read().decode('utf-8', 'surrogateescape')
-                description, unused_md = description_from_readme_md(contents)
-                if description is not None:
-                    yield UpstreamDatum(
-                        'X-Description', description, 'possible')
-        if path.endswith('README.rst'):
+                description, extra_md = description_from_readme_md(contents)
+        elif path.endswith('README.rst'):
             with open(path, 'rb') as f:
                 from .readme import description_from_readme_rst
                 contents = f.read().decode('utf-8', 'surrogateescape')
-                description, unused_md = description_from_readme_rst(contents)
-                if description is not None:
-                    yield UpstreamDatum(
-                        'X-Description', description, 'possible')
+                description, extra_md = description_from_readme_rst(contents)
+        else:
+            description = None
+            extra_md = {}
+        if description is not None:
+            yield UpstreamDatum(
+                'X-Description', description, 'possible')
+        for name, value in extra_md.items():
+            yield UpstreamDatum(name, value, 'possible')
     except IsADirectoryError:
         pass
 
@@ -936,6 +938,7 @@ def guess_from_configure(path, trust_package=False):
 
 
 def guess_from_r_description(path, trust_package=False):
+    # https://r-pkgs.org/description.html
     with open(path, 'rb') as f:
         # TODO(jelmer): use rfc822 instead?
         from debian.deb822 import Deb822
@@ -956,7 +959,7 @@ def guess_from_r_description(path, trust_package=False):
         if 'Title' in description:
             yield UpstreamDatum('X-Summary', description['Title'], 'certain')
         if 'Description' in description:
-            yield UpstreamDatum('Description', description['Description'], 'certain')
+            yield UpstreamDatum('X-Description', description['Description'], 'certain')
         if 'URL' in description:
             entries = [entry.strip()
                        for entry in re.split('[\n,]', description['URL'])]
@@ -1202,7 +1205,9 @@ def _get_guessers(path, trust_package=False):
         if entry.is_dir():
             subpath = os.path.join(entry.path, 'DESCRIPTION')
             if os.path.exists(subpath):
-                CANDIDATES.append((entry.name, guess_from_r_description))
+                CANDIDATES.append(
+                    (os.path.join(entry.name, 'DESCRIPTION'),
+                     guess_from_r_description))
 
     doap_filenames = [
         n for n in os.listdir(path)
