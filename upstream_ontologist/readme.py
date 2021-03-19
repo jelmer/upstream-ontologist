@@ -20,7 +20,9 @@
 import logging
 import platform
 import re
-from typing import Optional, Tuple, Dict, List
+from typing import Optional, Tuple, Iterable, List
+
+from . import UpstreamDatum
 
 
 logger = logging.getLogger(__name__)
@@ -33,7 +35,7 @@ def _skip_paragraph(para, metadata):
         return True
     m = re.match(r'License: (.*)', para.get_text())
     if m:
-        metadata.append(('License', m.group(1)))
+        metadata.append(UpstreamDatum('License', m.group(1), 'likely'))
         return True
     m = re.match('More documentation .* at http.*', para.get_text())
     if m:
@@ -42,7 +44,7 @@ def _skip_paragraph(para, metadata):
             r'This software is freely distributable under the (.*) license.*',
             para.get_text())
     if m:
-        metadata.append(('License', m.group(1)))
+        metadata.append(UpstreamDatum('License', m.group(1), 'likely'))
         return True
     for c in para.children:
         if isinstance(c, str) and not c.strip():
@@ -57,7 +59,7 @@ def _skip_paragraph(para, metadata):
             else:
                 name = None
             if name == 'CRAN':
-                metadata.append(('Archive', 'CRAN'))
+                metadata.append(UpstreamDatum('Archive', 'CRAN', 'confident'))
             continue
         break
     else:
@@ -65,7 +67,7 @@ def _skip_paragraph(para, metadata):
     return False
 
 
-def _description_from_basic_soup(soup) -> Tuple[Optional[str], Dict[str, str]]:
+def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
     # Drop any headers
     metadata = []
     if soup is None:
@@ -73,7 +75,7 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Dict[str, str]]:
     # First, skip past the first header.
     for el in soup.children:
         if el.name in ('h1', 'h2', 'h3'):
-            metadata.append(('Name', el.text))
+            metadata.append(UpstreamDatum('Name', el.text, 'likely'))
             el.decompose()
             break
         elif isinstance(el, str):
@@ -102,11 +104,11 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Dict[str, str]]:
             break
 
     if len(paragraphs) >= 1 and len(paragraphs) < 6:
-        return '\n'.join(paragraphs), dict(metadata)
-    return None, dict(metadata)
+        return '\n'.join(paragraphs), metadata
+    return None, metadata
 
 
-def description_from_readme_md(md_text: str) -> Tuple[Optional[str], Dict[str, str]]:
+def description_from_readme_md(md_text: str) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
     """Description from README.md."""
     try:
         import markdown
@@ -127,7 +129,7 @@ def description_from_readme_md(md_text: str) -> Tuple[Optional[str], Dict[str, s
     return _description_from_basic_soup(soup.body)
 
 
-def description_from_readme_rst(rst_text: str) -> Tuple[Optional[str], Dict[str, str]]:
+def description_from_readme_rst(rst_text: str) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
     """Description from README.rst."""
     if platform.python_implementation() == "PyPy":
         logger.debug('docutils does not appear to work on PyPy, skipping README.rst.')
