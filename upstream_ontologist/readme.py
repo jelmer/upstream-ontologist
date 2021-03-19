@@ -72,7 +72,7 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Dict[str, str]]:
         return None, {}
     # First, skip past the first header.
     for el in soup.children:
-        if el.name in ('h1', 'h2'):
+        if el.name in ('h1', 'h2', 'h3'):
             metadata.append(('Name', el.text))
             el.decompose()
             break
