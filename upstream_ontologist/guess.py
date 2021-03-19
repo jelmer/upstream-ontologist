@@ -342,6 +342,31 @@ def guess_from_pkg_info(path, trust_package):
     yield from guess_from_python_metadata(pkg_info)
 
 
+def guess_from_setup_cfg(path, trust_package):
+    from setuptools.config import read_configuration
+    config = read_configuration(path)
+    metadata = config.get('metadata')
+    if metadata:
+        if 'name' in metadata:
+            yield UpstreamDatum('Name', metadata['name'], 'certain')
+        if 'url' in metadata:
+            yield from parse_python_url(metadata['url'])
+        long_description_content_type = metadata.get('long_description_content_type')
+        if (long_description_content_type in (None, 'text/plain') and
+                metadata.get('long_description') not in (None, '')):
+            yield UpstreamDatum(
+                'X-Description', metadata['long_description'], 'possible')
+        if 'description' in metadata:
+            yield UpstreamDatum('X-Summary', metadata['description'], 'certain')
+
+
+def parse_python_url(url):
+    repo = guess_repo_from_url(url)
+    if repo:
+        yield UpstreamDatum(
+            'Repository', repo, 'likely')
+
+
 def guess_from_setup_py(path, trust_package):
     if not trust_package:
         return
@@ -352,10 +377,7 @@ def guess_from_setup_py(path, trust_package):
     if result.get_version() not in (None, '', 'UNKNOWN'):
         yield UpstreamDatum('X-Version', result.get_version(), 'certain')
     if result.get_url() not in (None, '', 'UNKNOWN'):
-        repo = guess_repo_from_url(result.get_url())
-        if repo:
-            yield UpstreamDatum(
-                'Repository', repo, 'likely')
+        yield from parse_python_url(result.get_url())
     if result.get_download_url() not in (None, '', 'UNKNOWN'):
         yield UpstreamDatum(
             'X-Download', result.get_download_url(), 'likely')
@@ -1196,6 +1218,7 @@ def _get_guessers(path, trust_package=False):
         ('.github/SECURITY.md', guess_from_security_md),
         ('docs/SECURITY.md', guess_from_security_md),
         ('pyproject.toml', guess_from_pyproject_toml),
+        ('setup.cfg', guess_from_setup_cfg),
         ]
 
     # Search for something Python-y
