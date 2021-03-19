@@ -670,7 +670,7 @@ def guess_from_readme(path, trust_package):  # noqa: C901
         if description is not None:
             yield UpstreamDatum(
                 'X-Description', description, 'possible')
-        for datum in extra_md.items():
+        for datum in extra_md:
             yield datum
     except IsADirectoryError:
         pass
