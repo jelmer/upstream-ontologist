@@ -657,14 +657,16 @@ def guess_from_readme(path, trust_package):  # noqa: C901
         if path.endswith('README.md'):
             with open(path, 'r') as f:
                 from .readme import description_from_readme_md
-                description, unused_md = description_from_readme_md(f.read())
+                contents = f.read().decode('utf-8', 'surrogateescape')
+                description, unused_md = description_from_readme_md(contents)
                 if description is not None:
                     yield UpstreamDatum(
                         'X-Description', description, 'possible')
         if path.endswith('README.rst'):
-            with open(path, 'r') as f:
+            with open(path, 'rb') as f:
                 from .readme import description_from_readme_rst
-                description, unused_md = description_from_readme_rst(f.read())
+                contents = f.read().decode('utf-8', 'surrogateescape')
+                description, unused_md = description_from_readme_rst(contents)
                 if description is not None:
                     yield UpstreamDatum(
                         'X-Description', description, 'possible')
