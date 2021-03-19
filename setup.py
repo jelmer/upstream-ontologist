@@ -27,6 +27,7 @@ setup(
     extras_require={
         'cargo': ['tomlkit'],
         'readme': ['docutils', 'lxml', 'bs4', 'markdown'],
+        'setup.cfg': ['setuptools'],
     },
     tests_require=['breezy'],
     test_suite="upstream_ontologist.tests.test_suite",
