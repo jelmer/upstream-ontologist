@@ -82,12 +82,18 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[Upstream
     # First, skip past the first header.
     for el in soup.children:
         if el.name in ('h1', 'h2', 'h3'):
+            summary = None
+            name = None
             if ':' in el.text:
                 name, summary = el.text.split(':', 1)
-                metadata.append(UpstreamDatum('Name', name, 'likely'))
-                metadata.append(UpstreamDatum('Name', summary, 'likely'))
+            elif ' - ' in el.text:
+                name, summary = el.text.split(' - ', 1)
             elif el.text:
-                metadata.append(UpstreamDatum('Name', el.text, 'likely'))
+                name = el.text
+            if name:
+                metadata.append(UpstreamDatum('Name', name, 'likely'))
+            if summary:
+                metadata.append(UpstreamDatum('Name', summary, 'likely'))
             el.decompose()
             break
         elif isinstance(el, str):
