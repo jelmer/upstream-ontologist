@@ -296,6 +296,13 @@ def guess_from_debian_control(path, trust_package):
                 'Repository',
                 'https://' + control['XS-Go-Import-Path'],
                 'likely'))
+    if 'Description' in control:
+        yield UpstreamDatum(
+            'X-Summary', control['Description'].splitlines(False)[0], 'certain')
+        yield UpstreamDatum(
+            'X-Description',
+            ''.join(control['Description'].splitlines(True)[1:]), 'certain')
+
 
 
 def guess_from_python_metadata(pkg_info):

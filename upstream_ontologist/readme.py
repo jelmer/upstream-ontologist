@@ -56,7 +56,7 @@ def _skip_paragraph(para, metadata):
             if len(list(c.children)) != 1:
                 name = None
             elif isinstance(list(c.children)[0], str):
-                name = list(c.children)[0].get_text()
+                name = list(c.children)[0]
             elif list(c.children)[0].name == 'img':
                 name = list(c.children)[0].get('alt')
             else:
