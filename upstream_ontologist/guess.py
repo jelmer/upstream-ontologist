@@ -947,6 +947,12 @@ def guess_from_r_description(path, trust_package=False):
         if 'BugReports' in description:
             yield UpstreamDatum(
                 'Bug-Database', description['BugReports'], 'certain')
+        if 'Version' in description:
+            yield UpstreamDatum('X-Version', description['Version'], 'certain')
+        if 'License' in description:
+            yield UpstreamDatum('X-License', description['License'], 'certain')
+        if 'Title' in description:
+            yield UpstreamDatum('X-Summary', description['Title'], 'certain')
         if 'URL' in description:
             entries = [entry.strip()
                        for entry in re.split('[\n,]', description['URL'])]
@@ -1162,6 +1168,7 @@ def _get_guessers(path, trust_package=False):
         ('META.yml', guess_from_meta_yml),
         ('configure', guess_from_configure),
         ('DESCRIPTION', guess_from_r_description),
+        ('pkg/DESCRIPTION', guess_from_r_description),
         ('Cargo.toml', guess_from_cargo),
         ('pom.xml', guess_from_pom_xml),
         ('.git/config', guess_from_git_config),
