@@ -953,6 +953,8 @@ def guess_from_r_description(path, trust_package=False):
             yield UpstreamDatum('X-License', description['License'], 'certain')
         if 'Title' in description:
             yield UpstreamDatum('X-Summary', description['Title'], 'certain')
+        if 'Description' in description:
+            yield UpstreamDatum('Description', description['Description'], 'certain')
         if 'URL' in description:
             entries = [entry.strip()
                        for entry in re.split('[\n,]', description['URL'])]
