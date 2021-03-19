@@ -1172,7 +1172,6 @@ def _get_guessers(path, trust_package=False):
         ('META.yml', guess_from_meta_yml),
         ('configure', guess_from_configure),
         ('DESCRIPTION', guess_from_r_description),
-        ('pkg/DESCRIPTION', guess_from_r_description),
         ('Cargo.toml', guess_from_cargo),
         ('pom.xml', guess_from_pom_xml),
         ('.git/config', guess_from_git_config),
@@ -1196,6 +1195,14 @@ def _get_guessers(path, trust_package=False):
             found_pkg_info = True
     if not found_pkg_info and os.path.exists(os.path.join(path, 'setup.py')):
         CANDIDATES.append(('setup.py', guess_from_setup_py))
+
+    # TODO(jelmer): Perhaps scan all directories if no other primary project
+    # information file has been found?
+    for entry in os.scandir(path):
+        if entry.is_dir():
+            subpath = os.path.join(entry.path, 'DESCRIPTION')
+            if os.path.exists(subpath):
+                CANDIDATES.append((entry.name, guess_from_r_description))
 
     doap_filenames = [
         n for n in os.listdir(path)
