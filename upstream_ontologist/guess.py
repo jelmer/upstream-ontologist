@@ -938,6 +938,7 @@ def guess_from_configure(path, trust_package=False):
 
 
 def guess_from_r_description(path, trust_package=False):
+    import textwrap
     # https://r-pkgs.org/description.html
     with open(path, 'rb') as f:
         # TODO(jelmer): use rfc822 instead?
@@ -959,7 +960,9 @@ def guess_from_r_description(path, trust_package=False):
         if 'Title' in description:
             yield UpstreamDatum('X-Summary', description['Title'], 'certain')
         if 'Description' in description:
-            yield UpstreamDatum('X-Description', description['Description'], 'certain')
+            lines = description['Description'].splitlines(True)
+            reflowed = lines[0] + textwrap.dedent(''.join(lines[1:]))
+            yield UpstreamDatum('X-Description', reflowed, 'certain')
         if 'URL' in description:
             entries = [entry.strip()
                        for entry in re.split('[\n,]', description['URL'])]
