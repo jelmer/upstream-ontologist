@@ -63,6 +63,10 @@ def _skip_paragraph(para, metadata):
                 name = None
             if name == 'CRAN':
                 metadata.append(UpstreamDatum('Archive', 'CRAN', 'confident'))
+            else:
+                m = re.match('(.*) License', name)
+                if m:
+                    metadata.append(UpstreamDatum('X-License', m.group(1), 'likely'))
             continue
         break
     else:
