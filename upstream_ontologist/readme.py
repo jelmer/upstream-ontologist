@@ -88,6 +88,8 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[Upstream
                 name, summary = el.text.split(':', 1)
             elif ' - ' in el.text:
                 name, summary = el.text.split(' - ', 1)
+            elif ' -- ' in el.text:
+                name, summary = el.text.split(' -- ', 1)
             elif el.text:
                 name = el.text
             if name:
@@ -111,6 +113,8 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[Upstream
                     break
                 else:
                     continue
+            while [c.name for c in el.children if not isinstance(c, str)] in (['pre'], ['code']):
+                el = list(el.children)[0]
             if el.get_text().strip():
                 paragraphs.append(el.get_text() + '\n')
         elif el.name == 'ul':
