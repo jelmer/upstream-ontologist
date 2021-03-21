@@ -78,6 +78,23 @@ def render(el):
     return el.get_text()
 
 
+def _parse_first_header(el):
+    summary = None
+    name = None
+    if ':' in el.text:
+        name, summary = el.text.split(':', 1)
+    elif ' - ' in el.text:
+        name, summary = el.text.split(' - ', 1)
+    elif ' -- ' in el.text:
+        name, summary = el.text.split(' -- ', 1)
+    elif el.text:
+        name = el.text
+    if name:
+        yield UpstreamDatum('Name', name, 'likely')
+    if summary:
+        yield UpstreamDatum('Name', summary, 'likely')
+
+
 def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
     # Drop any headers
     metadata = []
@@ -86,20 +103,7 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[Upstream
     # First, skip past the first header.
     for el in soup.children:
         if el.name in ('h1', 'h2', 'h3'):
-            summary = None
-            name = None
-            if ':' in el.text:
-                name, summary = el.text.split(':', 1)
-            elif ' - ' in el.text:
-                name, summary = el.text.split(' - ', 1)
-            elif ' -- ' in el.text:
-                name, summary = el.text.split(' -- ', 1)
-            elif el.text:
-                name = el.text
-            if name:
-                metadata.append(UpstreamDatum('Name', name, 'likely'))
-            if summary:
-                metadata.append(UpstreamDatum('Name', summary, 'likely'))
+            metadata.extend(_parse_first_header(el))
             el.decompose()
             break
         elif isinstance(el, str):

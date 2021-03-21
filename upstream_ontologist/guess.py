@@ -303,7 +303,6 @@ def guess_from_debian_control(path, trust_package):
             ''.join(control['Description'].splitlines(True)[1:]), 'certain')
 
 
-
 def guess_from_python_metadata(pkg_info):
     if 'Name' in pkg_info:
         yield UpstreamDatum('Name', pkg_info['name'], 'certain')
@@ -1197,7 +1196,7 @@ def guess_from_pom_xml(path, trust_package=False):  # noqa: C901
             if scm != 'scm':
                 logging.warning(
                     'SCM connection does not start with scm: prefix: %s',
-                     connection)
+                    connection)
                 continue
             yield UpstreamDatum(
                 'Repository', provider_specific, 'certain')
@@ -1822,7 +1821,7 @@ def verify_bug_database_url(url):
                 # Probably rate limited
                 logging.warning(
                     'Unable to verify bug database URL %s: %s',
-                     url, e.reason)
+                    url, e.reason)
                 return None
             raise
         return data['has_issues'] and not data.get('archived', False)
