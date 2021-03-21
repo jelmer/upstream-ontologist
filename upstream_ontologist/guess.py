@@ -25,7 +25,6 @@ import urllib.error
 from typing import Optional, Iterable
 from urllib.parse import quote, urlparse, urlunparse, urljoin, parse_qs
 from urllib.request import urlopen, Request
-from warnings import warn
 
 from .vcs import (
     unsplit_vcs_url,
@@ -458,7 +457,7 @@ def guess_from_package_xml(path, trust_package):
             'http://pear.php.net/dtd/package-2.0',
             'http://pear.php.net/dtd/package-2.1'])
     except ET.ParseError as e:
-        warn('Unable to parse package.xml: %s' % e)
+        logging.warning('Unable to parse package.xml: %s', e)
         return
     assert root.tag == 'package', 'root tag is %r' % root.tag
     name_tag = root.find('name')
@@ -472,21 +471,70 @@ def guess_from_package_xml(path, trust_package):
             yield UpstreamDatum('Bug-Database', url_tag.text, 'certain')
 
 
+def guess_from_pod(contents):
+    # See https://perldoc.perl.org/perlpod
+    by_header = {}
+    inheader = None
+    for line in contents.splitlines(True):
+        if line.startswith(b'=head1 '):
+            inheader = line.rstrip(b'\n').split(b' ', 1)[1]
+            by_header[inheader.decode()] = ''
+        elif inheader:
+            by_header[inheader.decode()] += line.decode()
+
+    if 'DESCRIPTION' in by_header:
+        description = by_header['DESCRIPTION'].lstrip('\n')
+        description = re.sub(r'[FXZSCBI]\<([^>]+)>', r'\1', description)
+        description = re.sub(r'L\<([^\|]+)\|([^\>]+)\>', r'\2', description)
+        description = re.sub(r'L\<([^\>]+)\>', r'\1', description)
+        # TODO(jelmer): Support E<>
+        yield UpstreamDatum('X-Description', description, 'likely')
+
+    if 'NAME' in by_header:
+        name = by_header['NAME']
+        if ' - ' in name:
+            (name, summary) = name.split(' - ', 1)
+            yield UpstreamDatum('Name', name.strip(), 'confident')
+            yield UpstreamDatum('X-Summary', summary.strip(), 'confident')
+        elif ' ' not in name:
+            yield UpstreamDatum('Name', name.strip(), 'confident')
+
+
+def guess_from_perl_module(path):
+    import subprocess
+    try:
+        stdout = subprocess.check_output(['perldoc', '-u', path])
+    except subprocess.CalledProcessError:
+        logging.warning('Error running perldoc, skipping.')
+        return
+    yield from guess_from_pod(stdout)
+
+
 def guess_from_dist_ini(path, trust_package):
     from configparser import (
         RawConfigParser,
         NoSectionError,
-        ParsingError,
         NoOptionError,
+        ParsingError,
         )
-    parser = RawConfigParser(strict=False)
+    parser = RawConfigParser()
     with open(path, 'r') as f:
         try:
             parser.read_string('[START]\n' + f.read())
         except ParsingError as e:
-            warn('Unable to parse dist.ini: %r' % e)
+            logging.warning('Unable to parse dist.ini: %r', e)
     try:
-        yield UpstreamDatum('Name', parser['START']['name'], 'certain')
+        dist_name = parser['START']['name']
+    except (NoSectionError, NoOptionError, KeyError):
+        dist_name = None
+    else:
+        yield UpstreamDatum('Name', dist_name, 'certain')
+    try:
+        yield UpstreamDatum('X-Version', parser['START']['version'], 'certain')
+    except (NoSectionError, NoOptionError, KeyError):
+        pass
+    try:
+        yield UpstreamDatum('X-Summary', parser['START']['abstract'], 'certain')
     except (NoSectionError, NoOptionError, KeyError):
         pass
     try:
@@ -515,6 +563,12 @@ def guess_from_dist_ini(path, trust_package):
     else:
         yield UpstreamDatum('X-Copyright', copyright, 'certain')
 
+    # Wild guess:
+    mod_path = os.path.join(
+        os.path.dirname(path), 'lib', dist_name.replace('-', '/') + '.pm')
+    if os.path.exists(mod_path):
+        yield from guess_from_perl_module(mod_path)
+
 
 def guess_from_debian_copyright(path, trust_package):
     from debian.copyright import (
@@ -528,12 +582,12 @@ def guess_from_debian_copyright(path, trust_package):
         except NotMachineReadableError:
             header = None
         except MachineReadableFormatError as e:
-            warn('Error parsing copyright file: %s' % e)
+            logging.warning('Error parsing copyright file: %s', e)
             header = None
         except ValueError as e:
             # This can happen with an error message of
             # ValueError: value must not have blank lines
-            warn('Error parsing copyright file: %s' % e)
+            logging.warning('Error parsing copyright file: %s', e)
             header = None
         else:
             header = copyright.header
@@ -734,6 +788,10 @@ def guess_from_meta_json(path, trust_package):
         data = json.load(f)
         if 'name' in data:
             yield UpstreamDatum('Name', data['name'], 'certain')
+        if 'version' in data:
+            yield UpstreamDatum('X-Version', data['version'], 'certain')
+        if 'abstract' in data:
+            yield UpstreamDatum('X-Summary', data['abstract'], 'certain')
         if 'resources' in data:
             resources = data['resources']
             if 'bugtracker' in resources and 'web' in resources['bugtracker']:
@@ -760,7 +818,7 @@ def guess_from_travis_yml(path, trust_package):
         try:
             ruamel.yaml.load(f, ruamel.yaml.SafeLoader)
         except ruamel.yaml.reader.ReaderError as e:
-            warn('Unable to parse %s: %s' % (path, e))
+            logging.warning('Unable to parse %s: %s', path, e)
             return
 
 
@@ -776,7 +834,7 @@ def guess_from_meta_yml(path, trust_package):
         try:
             data = ruamel.yaml.load(f, ruamel.yaml.SafeLoader)
         except ruamel.yaml.reader.ReaderError as e:
-            warn('Unable to parse META.yml: %s' % e)
+            logging.warning('Unable to parse %s: %s', path, e)
             return
         if 'name' in data:
             yield UpstreamDatum('Name', data['name'], 'certain')
@@ -810,7 +868,7 @@ def guess_from_doap(path, trust_package):  # noqa: C901
         [root] = list(root)
 
     if root.tag != ('{%s}Project' % DOAP_NAMESPACE):
-        warn('Doap file does not have DOAP project as root')
+        logging.warning('Doap file does not have DOAP project as root')
         return
 
     def extract_url(el):
@@ -1041,7 +1099,7 @@ def guess_from_cargo(path, trust_package):
     except FileNotFoundError:
         return
     except ParseError as e:
-        warn('Error parsing toml file %s: %s' % (path, e))
+        logging.warning('Error parsing toml file %s: %s', path, e)
         return
     try:
         package = cargo['package']
@@ -1074,7 +1132,7 @@ def guess_from_pyproject_toml(path, trust_package):
     except FileNotFoundError:
         return
     except ParseError as e:
-        warn('Error parsing toml file %s: %s' % (path, e))
+        logging.warning('Error parsing toml file %s: %s', path, e)
         return
     if 'poetry' in pyproject.get('tool', []):
         poetry = pyproject['tool']['poetry']
@@ -1098,7 +1156,7 @@ def guess_from_pom_xml(path, trust_package=False):  # noqa: C901
         root = xmlparse_simplify_namespaces(path, [
             'http://maven.apache.org/POM/4.0.0'])
     except ET.ParseError as e:
-        warn('Unable to parse package.xml: %s' % e)
+        logging.warning('Unable to parse package.xml: %s', e)
         return
     assert root.tag == 'project', 'root tag is %r' % root.tag
     name_tag = root.find('name')
@@ -1133,10 +1191,12 @@ def guess_from_pom_xml(path, trust_package=False):  # noqa: C901
             try:
                 (scm, provider, provider_specific) = connection.split(':', 2)
             except ValueError:
-                warn('Invalid format for SCM connection: %s' % connection)
+                logging.warning(
+                    'Invalid format for SCM connection: %s', connection)
                 continue
             if scm != 'scm':
-                warn('SCM connection does not start with scm: prefix: %s' %
+                logging.warning(
+                    'SCM connection does not start with scm: prefix: %s',
                      connection)
                 continue
             yield UpstreamDatum(
@@ -1207,7 +1267,9 @@ def _get_guessers(path, trust_package=False):
         ('dist.ini', guess_from_dist_ini),
         ('debian/copyright', guess_from_debian_copyright),
         ('META.json', guess_from_meta_json),
+        ('MYMETA.json', guess_from_meta_json),
         ('META.yml', guess_from_meta_yml),
+        ('MYMETA.yml', guess_from_meta_yml),
         ('configure', guess_from_configure),
         ('DESCRIPTION', guess_from_r_description),
         ('Cargo.toml', guess_from_cargo),
@@ -1253,16 +1315,18 @@ def _get_guessers(path, trust_package=False):
         if len(doap_filenames) == 1:
             CANDIDATES.append((doap_filenames[0], guess_from_doap))
         else:
-            warn('More than one doap filename, ignoring all: %r' %
-                 doap_filenames)
+            logging.warning(
+                'More than one doap filename, ignoring all: %r',
+                doap_filenames)
 
     cabal_filenames = [n for n in os.listdir(path) if n.endswith('.cabal')]
     if cabal_filenames:
         if len(cabal_filenames) == 1:
             CANDIDATES.append((cabal_filenames[0], guess_from_cabal))
         else:
-            warn('More than one cabal filename, ignoring all: %r' %
-                 cabal_filenames)
+            logging.warning(
+                'More than one cabal filename, ignoring all: %r',
+                cabal_filenames)
 
     readme_filenames = [
         n for n in os.listdir(path)
@@ -1399,7 +1463,8 @@ def _sf_git_extract_url(page):
     try:
         from bs4 import BeautifulSoup
     except ModuleNotFoundError:
-        warn('Not scanning sourceforge page, since python3-bs4 is missing')
+        logging.warning(
+            'Not scanning sourceforge page, since python3-bs4 is missing')
         return None
     bs = BeautifulSoup(page, features='lxml')
     el = bs.find(id='access_url')
@@ -1418,7 +1483,9 @@ def guess_from_sf(sf_project):
     try:
         data = get_sf_metadata(sf_project)
     except socket.timeout:
-        warn('timeout contacting launchpad, ignoring: %s' % sf_project)
+        logging.warning(
+            'timeout contacting launchpad, ignoring: %s',
+            sf_project)
         return
     if data.get('name'):
         yield 'Name', data['name']
@@ -1458,7 +1525,8 @@ def guess_from_repology(repology_project):
     try:
         metadata = get_repology_metadata(repology_project)
     except socket.timeout:
-        warn('timeout contacting repology, ignoring: %s' % repology_project)
+        logging.warning(
+            'timeout contacting repology, ignoring: %s', repology_project)
         return
 
     fields = {}
@@ -1752,8 +1820,9 @@ def verify_bug_database_url(url):
                 return False
             if e.code == 403:
                 # Probably rate limited
-                warn('Unable to verify bug database URL %s: %s' % (
-                     url, e.reason))
+                logging.warning(
+                    'Unable to verify bug database URL %s: %s',
+                     url, e.reason)
                 return None
             raise
         return data['has_issues'] and not data.get('archived', False)
@@ -2181,12 +2250,13 @@ def guess_from_pecl_url(url):
             raise
         return
     except socket.timeout:
-        warn('timeout contacting pecl, ignoring: %s' % url)
+        logging.warning('timeout contacting pecl, ignoring: %s', url)
         return
     try:
         from bs4 import BeautifulSoup
     except ModuleNotFoundError:
-        warn('bs4 missing so unable to scan pecl page, ignoring %s' % url)
+        logging.warning(
+            'bs4 missing so unable to scan pecl page, ignoring %s', url)
         return
     bs = BeautifulSoup(f.read(), features='lxml')
     tag = bs.find('a', text='Browse Source')
@@ -2264,7 +2334,7 @@ def guess_from_launchpad(package, distribution=None, suite=None):  # noqa: C901
             try:
                 suite = ubuntu.devel()
             except DistroDataOutdated as e:
-                warn(str(e))
+                logging.warning('%s', str(e))
                 suite = ubuntu.all[-1]
         elif distribution == 'debian':
             suite = 'sid'
@@ -2281,7 +2351,7 @@ def guess_from_launchpad(package, distribution=None, suite=None):  # noqa: C901
             raise
         return
     except socket.timeout:
-        warn('timeout contacting launchpad, ignoring')
+        logging.warning('timeout contacting launchpad, ignoring')
         return
 
     productseries_url = sourcepackage_data.get('productseries_link')
