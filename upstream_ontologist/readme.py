@@ -121,7 +121,7 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[Upstream
                 paragraphs.append(render(el) + '\n')
         elif el.name == 'pre':
             paragraphs.append(render(el))
-        elif el.name == 'ul':
+        elif el.name == 'ul' and len(paragraphs) > 0:
             paragraphs.append(
                 ''.join(
                     '* %s\n' % li.get_text()
