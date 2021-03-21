@@ -74,6 +74,10 @@ def _skip_paragraph(para, metadata):
     return False
 
 
+def render(el):
+    return el.get_text()
+
+
 def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
     # Drop any headers
     metadata = []
@@ -113,10 +117,10 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[Upstream
                     break
                 else:
                     continue
-            while [c.name for c in el.children if not isinstance(c, str)] in (['pre'], ['code']):
-                el = list(el.children)[0]
             if el.get_text().strip():
-                paragraphs.append(el.get_text() + '\n')
+                paragraphs.append(render(el) + '\n')
+        elif el.name == 'pre':
+            paragraphs.append(render(el))
         elif el.name == 'ul':
             paragraphs.append(
                 ''.join(
