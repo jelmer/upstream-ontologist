@@ -516,7 +516,7 @@ def guess_from_dist_ini(path, trust_package):
         NoOptionError,
         ParsingError,
         )
-    parser = RawConfigParser()
+    parser = RawConfigParser(strict=False)
     with open(path, 'r') as f:
         try:
             parser.read_string('[START]\n' + f.read())
@@ -1391,7 +1391,7 @@ def get_upstream_info(path, trust_package=False, net_access=False,
         if isinstance(entry, UpstreamDatum):
             metadata_items.append(entry)
     metadata = summarize_upstream_metadata(
-        metadata_items, '.', net_access=net_access,
+        metadata_items, path, net_access=net_access,
         consult_external_directory=consult_external_directory,
         check=check)
     return metadata
