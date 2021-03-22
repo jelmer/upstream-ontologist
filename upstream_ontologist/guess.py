@@ -323,10 +323,8 @@ def guess_from_python_metadata(pkg_info):
                 'Bug-Database', url, 'certain')
     if 'Summary' in pkg_info:
         yield UpstreamDatum('X-Summary', pkg_info['Summary'], 'certain')
-    payload = pkg_info.get_payload()
-    if payload.strip() and pkg_info.get_content_type() in (None, 'text/plain'):
-        yield UpstreamDatum(
-            'X-Description', pkg_info.get_payload(), 'possible')
+    yield from parse_python_long_description(
+        pkg_info.get_payload(), pkg_info.get_content_type())
 
 
 def guess_from_pkg_info(path, trust_package):
@@ -340,6 +338,29 @@ def guess_from_pkg_info(path, trust_package):
     yield from guess_from_python_metadata(pkg_info)
 
 
+def parse_python_long_description(long_description, content_type):
+    if long_description in (None, ''):
+        return
+    if content_type in (None, 'text/plain'):
+        if len(long_description.splitlines()) > 50:
+            return
+        yield UpstreamDatum(
+            'X-Description', long_description, 'possible')
+        extra_md = []
+    elif content_type == 'text/restructured-text':
+        from .readme import description_from_readme_rst
+        description, extra_md = description_from_readme_rst(long_description)
+        if description:
+            yield UpstreamDatum('X-Description', description, 'possible')
+    elif content_type == 'text/markdown':
+        from .readme import description_from_readme_md
+        description, extra_md = description_from_readme_md(long_description)
+        if description:
+            yield UpstreamDatum('X-Description', description, 'possible')
+    for datum in extra_md:
+        yield datum
+
+
 def guess_from_setup_cfg(path, trust_package):
     from setuptools.config import read_configuration
     config = read_configuration(path)
@@ -349,11 +370,9 @@ def guess_from_setup_cfg(path, trust_package):
             yield UpstreamDatum('Name', metadata['name'], 'certain')
         if 'url' in metadata:
             yield from parse_python_url(metadata['url'])
-        long_description_content_type = metadata.get('long_description_content_type')
-        if (long_description_content_type in (None, 'text/plain') and
-                metadata.get('long_description') not in (None, '')):
-            yield UpstreamDatum(
-                'X-Description', metadata['long_description'], 'possible')
+        yield from parse_python_long_description(
+            metadata.get('long_description'),
+            metadata.get('long_description_content_type'))
         if 'description' in metadata:
             yield UpstreamDatum('X-Summary', metadata['description'], 'certain')
 
@@ -386,12 +405,9 @@ def guess_from_setup_py(path, trust_package):
         yield UpstreamDatum('Contact', contact, 'likely')
     if result.get_description() not in (None, '', 'UNKNOWN'):
         yield UpstreamDatum('X-Summary', result.get_description(), 'certain')
-    long_description_content_type = getattr(
-        result.metadata, 'long_description_content_type', None)
-    if (long_description_content_type in (None, 'text/plain') and
-            result.metadata.long_description not in (None, '', 'UNKNOWN')):
-        yield UpstreamDatum(
-            'X-Description', result.metadata.long_description, 'possible')
+    yield from parse_python_long_description(
+        result.metadata.long_description,
+        getattr(result.metadata, 'long_description_content_type', None))
     for url_type, url in getattr(result.metadata, 'project_urls', {}).items():
         if url_type in ('GitHub', 'Repository', 'Source Code'):
             yield UpstreamDatum(
