@@ -341,13 +341,15 @@ def guess_from_pkg_info(path, trust_package):
 def parse_python_long_description(long_description, content_type):
     if long_description in (None, ''):
         return
+    # Discard encoding, etc.
+    content_type = content_type.split(';')[0]
     if content_type in (None, 'text/plain'):
         if len(long_description.splitlines()) > 50:
             return
         yield UpstreamDatum(
             'X-Description', long_description, 'possible')
         extra_md = []
-    elif content_type == 'text/restructured-text':
+    elif content_type in ('text/restructured-text', 'text/x-rst'):
         from .readme import description_from_readme_rst
         description, extra_md = description_from_readme_rst(long_description)
         if description:
