@@ -124,6 +124,21 @@ def _extract_paragraphs(children, metadata):
     return paragraphs
 
 
+def _parse_field_list(tab):
+    for tr in tab.findAll('tr', {'class': 'field'}):
+        name_cell = tr.find('th', {'class': 'field-name'})
+        if not name_cell:
+            continue
+        name = name_cell.get_text().rstrip(':')
+        body = tr.find('td', {'class': 'field-body'})
+        if not body:
+            continue
+        if name == 'Homepage' and body.find('a'):
+            yield UpstreamDatum('Homepage', body.find('a').get('href'), 'confident')
+        if name == 'License':
+            yield UpstreamDatum('X-License', body.get_text(), 'confident')
+
+
 def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
     # Drop any headers
     metadata = []
@@ -139,6 +154,10 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[Upstream
             pass
         else:
             break
+
+    table = soup.find('table', {'class': 'field-list'})
+    if table:
+        metadata.extend(_parse_field_list(table))
 
     paragraphs: List[str] = []
     paragraphs.extend(_extract_paragraphs(soup.children, metadata))
