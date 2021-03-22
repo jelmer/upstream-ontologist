@@ -528,6 +528,13 @@ def guess_from_perl_module(path):
     yield from guess_from_pod(stdout)
 
 
+def guess_from_perl_dist_name(path, dist_name):
+    mod_path = os.path.join(
+        os.path.dirname(path), 'lib', dist_name.replace('-', '/') + '.pm')
+    if os.path.exists(mod_path):
+        yield from guess_from_perl_module(mod_path)
+
+
 def guess_from_dist_ini(path, trust_package):
     from configparser import (
         RawConfigParser,
@@ -582,10 +589,8 @@ def guess_from_dist_ini(path, trust_package):
         yield UpstreamDatum('X-Copyright', copyright, 'certain')
 
     # Wild guess:
-    mod_path = os.path.join(
-        os.path.dirname(path), 'lib', dist_name.replace('-', '/') + '.pm')
-    if os.path.exists(mod_path):
-        yield from guess_from_perl_module(mod_path)
+    if dist_name:
+        yield from guess_from_perl_dist_name(path, dist_name)
 
 
 def guess_from_debian_copyright(path, trust_package):
@@ -805,7 +810,10 @@ def guess_from_meta_json(path, trust_package):
     with open(path, 'r') as f:
         data = json.load(f)
         if 'name' in data:
+            dist_name = data['name']
             yield UpstreamDatum('Name', data['name'], 'certain')
+        else:
+            dist_name = None
         if 'version' in data:
             yield UpstreamDatum('X-Version', data['version'], 'certain')
         if 'abstract' in data:
@@ -827,6 +835,10 @@ def guess_from_meta_json(path, trust_package):
                 if 'web' in repo:
                     yield UpstreamDatum(
                         'Repository-Browse', repo['web'], 'certain')
+
+    # Wild guess:
+    if dist_name:
+        yield from guess_from_perl_dist_name(path, dist_name)
 
 
 def guess_from_travis_yml(path, trust_package):
@@ -855,7 +867,10 @@ def guess_from_meta_yml(path, trust_package):
             logging.warning('Unable to parse %s: %s', path, e)
             return
         if 'name' in data:
+            dist_name = data['name']
             yield UpstreamDatum('Name', data['name'], 'certain')
+        else:
+            dist_name = None
         if 'resources' in data:
             resources = data['resources']
             if 'bugtracker' in resources:
@@ -872,6 +887,9 @@ def guess_from_meta_yml(path, trust_package):
                 if url:
                     yield UpstreamDatum(
                         'Repository', url, 'certain')
+    # Wild guess:
+    if dist_name:
+        yield from guess_from_perl_dist_name(path, dist_name)
 
 
 def guess_from_doap(path, trust_package):  # noqa: C901
