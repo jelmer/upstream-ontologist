@@ -342,7 +342,8 @@ def parse_python_long_description(long_description, content_type):
     if long_description in (None, ''):
         return
     # Discard encoding, etc.
-    content_type = content_type.split(';')[0]
+    if content_type:
+        content_type = content_type.split(';')[0]
     if content_type in (None, 'text/plain'):
         if len(long_description.splitlines()) > 50:
             return
