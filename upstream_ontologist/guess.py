@@ -892,6 +892,29 @@ def guess_from_meta_yml(path, trust_package):
         yield from guess_from_perl_dist_name(path, dist_name)
 
 
+def guess_from_metainfo(path, trust_package):
+    from xml.etree import ElementTree
+    el = ElementTree.parse(path)
+    root = el.getroot()
+    for child in root:
+        if child.tag == 'id':
+            yield UpstreamDatum('Name', child.text, 'certain')
+        if child.tag == 'project_license':
+            yield UpstreamDatum('X-License', child.text, 'certain')
+        if child.tag == 'url':
+            urltype = child.attrib.get('type')
+            if urltype == 'homepage':
+                yield UpstreamDatum('Homepage', child.text, 'certain')
+            elif urltype == 'bugtracker':
+                yield UpstreamDatum('Bug-Database', child.text, 'certain')
+        if child.tag == 'description':
+            yield UpstreamDatum('X-Description', child.text, 'certain')
+        if child.tag == 'summary':
+            yield UpstreamDatum('X-Summary', child.text, 'certain')
+        if child.tag == 'name':
+            yield UpstreamDatum('Name', child.text, 'certain')
+
+
 def guess_from_doap(path, trust_package):  # noqa: C901
     """Guess upstream metadata from a DOAP file.
     """
@@ -1354,6 +1377,17 @@ def _get_guessers(path, trust_package=False):
             logging.warning(
                 'More than one doap filename, ignoring all: %r',
                 doap_filenames)
+
+    metainfo_filenames = [
+        n for n in os.listdir(path)
+        if n.endswith('.metainfo.xml')]
+    if metainfo_filenames:
+        if len(metainfo_filenames) == 1:
+            CANDIDATES.append((metainfo_filenames[0], guess_from_metainfo))
+        else:
+            logging.warning(
+                'More than one metainfo filename, ignoring all: %r',
+                metainfo_filenames)
 
     cabal_filenames = [n for n in os.listdir(path) if n.endswith('.cabal')]
     if cabal_filenames:
