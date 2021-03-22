@@ -760,12 +760,12 @@ def guess_from_readme(path, trust_package):  # noqa: C901
                             if repo_url:
                                 yield UpstreamDatum(
                                     'Repository', repo_url, 'possible')
-        if path.endswith('README.md'):
+        if path.lower().endswith('readme.md'):
             with open(path, 'rb') as f:
                 from .readme import description_from_readme_md
                 contents = f.read().decode('utf-8', 'surrogateescape')
                 description, extra_md = description_from_readme_md(contents)
-        elif path.endswith('README.rst'):
+        elif path.lower().endswith('readme.rst'):
             with open(path, 'rb') as f:
                 from .readme import description_from_readme_rst
                 contents = f.read().decode('utf-8', 'surrogateescape')
@@ -1367,7 +1367,7 @@ def _get_guessers(path, trust_package=False):
     readme_filenames = [
         n for n in os.listdir(path)
         if any([n.startswith(p)
-                for p in ['readme', 'README', 'HACKING', 'CONTRIBUTING']])
+                for p in ['readme', 'Readme', 'README', 'HACKING', 'CONTRIBUTING']])
         and os.path.splitext(n)[1] not in ('.html', '.pdf', '.xml')
         and not n.endswith('~')]
     CANDIDATES.extend([(n, guess_from_readme) for n in readme_filenames])
