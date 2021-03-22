@@ -95,26 +95,13 @@ def _parse_first_header(el):
         yield UpstreamDatum('Name', summary, 'likely')
 
 
-def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
-    # Drop any headers
-    metadata = []
-    if soup is None:
-        return None, {}
-    # First, skip past the first header.
-    for el in soup.children:
-        if el.name in ('h1', 'h2', 'h3'):
-            metadata.extend(_parse_first_header(el))
-            el.decompose()
-            break
-        elif isinstance(el, str):
-            pass
-        else:
-            break
-
-    paragraphs: List[str] = []
-    for el in soup.children:
+def _extract_paragraphs(children, metadata):
+    paragraphs = []
+    for el in children:
         if isinstance(el, str):
             continue
+        if el.name == 'div':
+            paragraphs.extend(_extract_paragraphs(el.children, metadata))
         if el.name == 'p':
             if _skip_paragraph(el, metadata):
                 if len(paragraphs) > 0:
@@ -134,6 +121,27 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[Upstream
             if len(paragraphs) == 0 and el.get_text() in ('About', ):
                 continue
             break
+    return paragraphs
+
+
+def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
+    # Drop any headers
+    metadata = []
+    if soup is None:
+        return None, {}
+    # First, skip past the first header.
+    for el in soup.children:
+        if el.name in ('h1', 'h2', 'h3'):
+            metadata.extend(_parse_first_header(el))
+            el.decompose()
+            break
+        elif isinstance(el, str):
+            pass
+        else:
+            break
+
+    paragraphs: List[str] = []
+    paragraphs.extend(_extract_paragraphs(soup.children, metadata))
 
     if len(paragraphs) >= 1 and len(paragraphs) < 6:
         return '\n'.join(paragraphs), metadata
