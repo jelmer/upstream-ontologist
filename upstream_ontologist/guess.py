@@ -201,6 +201,9 @@ def known_bad_guess(datum):
         parsed_url = urlparse(datum.value)
         if parsed_url.hostname == 'cgit.kde.org':
             return True
+    if datum.field == 'Name':
+        if datum.value.lower() == 'package':
+            return True
     if datum.value.lower() == 'unknown':
         return True
     return False
