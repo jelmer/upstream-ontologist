@@ -111,6 +111,19 @@ def browse_url_from_repo_url(url: str, subpath: Optional[str] = None) -> Optiona
         if subpath is not None:
             path += "/tree/HEAD/" + subpath
         return urlunparse(("https", "github.com", path, None, None, None))
+    if parsed_url.hostname == 'gopkg.in':
+        els = parsed_url.path.split("/")[:3]
+        if len(els) != 2:
+            return None
+        try:
+            els[-1], version = els[-1].split('.v', 1)
+        except ValueError:
+            els[-1] = els[-1]
+            version = None
+        path = "/".join(els)
+        if subpath is not None:
+            path += "/tree/HEAD/" + subpath
+        return urlunparse(("https", "github.com", path, None, None, None))
     if parsed_url.netloc in ("code.launchpad.net", "launchpad.net"):
         if subpath is not None:
             path = parsed_url.path + "/view/head:/" + subpath
