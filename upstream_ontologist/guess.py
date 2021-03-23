@@ -1150,7 +1150,7 @@ def guess_from_environment():
 
 
 def guess_from_path(path):
-    basename = os.path.basename(path)
+    basename = os.path.basename(os.path.abspath(path))
     m = re.fullmatch('(.*)-([0-9.]+)', basename)
     if m:
         yield UpstreamDatum('Name', m.group(1), 'possible')
