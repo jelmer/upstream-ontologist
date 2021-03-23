@@ -1300,7 +1300,8 @@ def guess_from_git_config(path, trust_package=False):
         pass
     else:
         url = urlb.decode('utf-8')
-        yield UpstreamDatum('Repository', url, 'likely')
+        if not url.startswith('../'):
+            yield UpstreamDatum('Repository', url, 'likely')
 
     # It's less likely that origin is correct, but let's try anyway
     # (with a lower certainty)
@@ -1310,7 +1311,8 @@ def guess_from_git_config(path, trust_package=False):
         pass
     else:
         url = urlb.decode('utf-8')
-        yield UpstreamDatum('Repository', url, 'possible')
+        if not url.startswith('../'):
+            yield UpstreamDatum('Repository', url, 'possible')
 
 
 def guess_from_get_orig_source(path, trust_package=False):
