@@ -499,9 +499,9 @@ def guess_from_pod(contents):
     for line in contents.splitlines(True):
         if line.startswith(b'=head1 '):
             inheader = line.rstrip(b'\n').split(b' ', 1)[1]
-            by_header[inheader.decode()] = ''
+            by_header[inheader.decode().upper()] = ''
         elif inheader:
-            by_header[inheader.decode()] += line.decode()
+            by_header[inheader.decode().upper()] += line.decode()
 
     if 'DESCRIPTION' in by_header:
         description = by_header['DESCRIPTION'].lstrip('\n')
@@ -512,7 +512,7 @@ def guess_from_pod(contents):
         yield UpstreamDatum('X-Description', description, 'likely')
 
     if 'NAME' in by_header:
-        name = by_header['NAME']
+        name = by_header['NAME'].strip().splitlines()[0]
         if ' - ' in name:
             (name, summary) = name.split(' - ', 1)
             yield UpstreamDatum('Name', name.strip(), 'confident')
@@ -781,6 +781,9 @@ def guess_from_readme(path, trust_package):  # noqa: C901
                 'X-Description', description, 'possible')
         for datum in extra_md:
             yield datum
+        if path.lower().endswith('readme.pod'):
+            with open(path, 'rb') as f:
+                yield from guess_from_pod(f.read())
     except IsADirectoryError:
         pass
 
@@ -1423,7 +1426,7 @@ def _get_guessers(path, trust_package=False):
     readme_filenames = [
         n for n in os.listdir(path)
         if any([n.startswith(p)
-                for p in ['readme', 'Readme', 'README', 'HACKING', 'CONTRIBUTING']])
+                for p in ['readme', 'ReadMe', 'Readme', 'README', 'HACKING', 'CONTRIBUTING']])
         and os.path.splitext(n)[1] not in ('.html', '.pdf', '.xml')
         and not n.endswith('~')]
     CANDIDATES.extend([(n, guess_from_readme) for n in readme_filenames])
