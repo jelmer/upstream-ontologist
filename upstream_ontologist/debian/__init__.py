@@ -29,7 +29,7 @@ def debian_to_upstream_version(version):
 def upstream_name_to_debian_source_name(upstream_name: str) -> str:
     if upstream_name.startswith("GNU "):
         upstream_name = upstream_name[len("GNU ") :]
-    return upstream_name.lower().replace('_', '-').replace(' ', '-')
+    return upstream_name.lower().replace('_', '-').replace(' ', '-').replace('/', '-')
 
 
 def upstream_version_to_debian_upstream_version(
