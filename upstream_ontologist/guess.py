@@ -1315,6 +1315,14 @@ def guess_from_security_md(path, trust_package=False):
     yield UpstreamDatum('X-Security-MD', path, 'certain')
 
 
+def guess_from_go_mod(path, trust_package=False):
+    with open(path, 'rb') as f:
+        for line in f:
+            if line.startswith(b'module '):
+                modname = line.strip().split(b' ', 1)[1]
+                yield UpstreamDatum('Name', modname.decode('utf-8'), 'certain')
+
+
 def _get_guessers(path, trust_package=False):
     CANDIDATES = [
         ('debian/watch', guess_from_debian_watch),
@@ -1340,6 +1348,7 @@ def _get_guessers(path, trust_package=False):
         ('docs/SECURITY.md', guess_from_security_md),
         ('pyproject.toml', guess_from_pyproject_toml),
         ('setup.cfg', guess_from_setup_cfg),
+        ('go.mod', guess_from_go_mod),
         ]
 
     # Search for something Python-y

@@ -40,7 +40,7 @@ def _skip_paragraph(para, metadata):
     m = re.match('More documentation .* at http.*', para.get_text())
     if m:
         return True
-    m = re.match('See http.*', para.get_text())
+    m = re.match('See (http.*|gopkg.in.*|github.com.*)', para.get_text())
     if m:
         return True
     m = re.match(
@@ -90,7 +90,11 @@ def _parse_first_header(el):
     elif el.text:
         name = el.text
     if name:
-        yield UpstreamDatum('Name', name, 'likely')
+        if 'installation' in name.lower():
+            certainty = 'possible'
+        else:
+            certainty = 'likely'
+        yield UpstreamDatum('Name', name, certainty)
     if summary:
         yield UpstreamDatum('Name', summary, 'likely')
 
