@@ -1146,6 +1146,16 @@ def guess_from_environment():
         pass
 
 
+def guess_from_path(path):
+    basename = os.path.basename(path)
+    m = re.fullmatch('(.*)-([0-9.]+)', basename)
+    if m:
+        yield UpstreamDatum('Name', m.group(1), 'possible')
+        yield UpstreamDatum('X-Version', m.group(2), 'possible')
+    else:
+        yield UpstreamDatum('Name', basename, 'possible')
+
+
 def guess_from_cargo(path, trust_package):
     try:
         from tomlkit import loads
@@ -1427,6 +1437,7 @@ def _get_guessers(path, trust_package=False):
             [(p, guess_from_debian_patch) for p in debian_patches])
 
     yield 'environment', guess_from_environment()
+    yield 'path', guess_from_path(path)
 
     for relpath, guesser in CANDIDATES:
         abspath = os.path.join(path, relpath)
