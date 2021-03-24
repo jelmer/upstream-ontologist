@@ -154,3 +154,13 @@ def certainty_sufficient(
     if minimum_confidence is None:
         return True
     return actual_confidence <= minimum_confidence
+
+
+def _load_json_url(http_url: str, timeout: int = DEFAULT_URLLIB_TIMEOUT):
+    from urllib.request import urlopen, Request
+    import json
+    headers = {'User-Agent': USER_AGENT, 'Accept': 'application/json'}
+    http_contents = urlopen(
+        Request(http_url, headers=headers),
+        timeout=timeout).read()
+    return json.loads(http_contents)

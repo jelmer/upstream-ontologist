@@ -21,6 +21,7 @@ import logging
 import platform
 import re
 from typing import Optional, Tuple, Iterable, List
+from urllib.parse import urlparse
 
 from . import UpstreamDatum
 
@@ -63,6 +64,13 @@ def _skip_paragraph(para, metadata):
                 name = None
             if name == 'CRAN':
                 metadata.append(UpstreamDatum('Archive', 'CRAN', 'confident'))
+            elif name == 'Build Status':
+                parsed_url = urlparse(c.get('href'))
+                if parsed_url.hostname == 'travis-ci.org':
+                    metadata.append(UpstreamDatum(
+                        'Repository',
+                        'https://github.com/%s' % '/'.join(parsed_url.path.strip('/').split('/')[:2]),
+                        'confident'))
             elif name:
                 m = re.match('(.*) License', name)
                 if m:
