@@ -108,6 +108,11 @@ def known_bad_guess(datum):
     if datum.field == 'Name':
         if datum.value.lower() == 'package':
             return True
+    if not isinstance(datum.value, str):
+        logging.warning(
+            'filtering out bad value %r for %s',
+             datum.value, datum.field)
+        return True
     if datum.value.lower() == 'unknown':
         return True
     return False
@@ -733,7 +738,7 @@ def guess_from_meta_json(path, trust_package):
         else:
             dist_name = None
         if 'version' in data:
-            yield UpstreamDatum('X-Version', data['version'], 'certain')
+            yield UpstreamDatum('X-Version', str(data['version']), 'certain')
         if 'abstract' in data:
             yield UpstreamDatum('X-Summary', data['abstract'], 'certain')
         if 'resources' in data:
