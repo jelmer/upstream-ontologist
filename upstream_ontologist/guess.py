@@ -339,6 +339,10 @@ def guess_from_package_json(path, trust_package):
         yield UpstreamDatum('X-Summary', package['description'], 'certain')
     if 'license' in package:
         yield UpstreamDatum('X-License', package['license'], 'certain')
+    if 'version' in package:
+        yield UpstreamDatum('X-Version', package['version'], 'certain')
+    if 'description' in package:
+        yield UpstreamDatum('X-Summary', package['description'], 'certain')
     if 'repository' in package:
         if isinstance(package['repository'], dict):
             repo_url = package['repository'].get('url')
@@ -351,6 +355,10 @@ def guess_from_package_json(path, trust_package):
             if parsed_url.scheme and parsed_url.netloc:
                 yield UpstreamDatum(
                     'Repository', repo_url, 'certain')
+            elif repo_url.startswith('github:'):
+                # Some people seem to default to github. :(
+                repo_url = 'https://github.com/' + repo_url.split(':', 1)[1]
+                yield UpstreamDatum('Repository', repo_url, 'likely')
             else:
                 # Some people seem to default to github. :(
                 repo_url = 'https://github.com/' + parsed_url.path
