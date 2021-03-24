@@ -119,10 +119,11 @@ def browse_url_from_repo_url(url: str, subpath: Optional[str] = None) -> Optiona
             els[-1], version = els[-1].split('.v', 1)
         except ValueError:
             els[-1] = els[-1]
-            version = None
+            version = "HEAD"
+        els.extend(['tree', version])
         path = "/".join(els)
         if subpath is not None:
-            path += "/tree/HEAD/" + subpath
+            path += "/" + subpath
         return urlunparse(("https", "github.com", path, None, None, None))
     if parsed_url.netloc in ("code.launchpad.net", "launchpad.net"):
         if subpath is not None:
