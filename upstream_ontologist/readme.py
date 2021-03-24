@@ -89,12 +89,15 @@ def render(el):
 def _parse_first_header(el):
     summary = None
     name = None
+    version = None
     if ':' in el.text:
         name, summary = el.text.split(':', 1)
     elif ' - ' in el.text:
         name, summary = el.text.split(' - ', 1)
     elif ' -- ' in el.text:
         name, summary = el.text.split(' -- ', 1)
+    elif ' version ' in el.text:
+        name, version = el.text.split(' version ', 1)
     elif el.text:
         name = el.text
     if name:
@@ -105,6 +108,8 @@ def _parse_first_header(el):
         yield UpstreamDatum('Name', name, certainty)
     if summary:
         yield UpstreamDatum('Name', summary, 'likely')
+    if version:
+        yield UpstreamDatum('X-Version', version, 'likely')
 
 
 def _extract_paragraphs(children, metadata):
