@@ -73,14 +73,17 @@ def unsplit_vcs_url(
 
 
 def probe_gitlab_host(hostname: str):
+    import json
     try:
         _load_json_url("https://%s/api/v4/version" % hostname)
     except urllib.error.HTTPError as e:
         if e.code == 401:
-            import json
 
             if json.loads(e.read()) == {"message": "401 Unauthorized"}:
                 return True
+        return False
+    except json.JSONDecodeError:
+        return False
     except (socket.timeout, urllib.error.URLError):
         # Probably not?
         return False
