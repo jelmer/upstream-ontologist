@@ -797,7 +797,10 @@ def guess_from_meta_json(path, trust_package):
         else:
             dist_name = None
         if 'version' in data:
-            yield UpstreamDatum('X-Version', str(data['version']), 'certain')
+            version = str(data['version'])
+            if version.startswith('v'):
+                version = version[1:]
+            yield UpstreamDatum('X-Version', version, 'certain')
         if 'abstract' in data:
             yield UpstreamDatum('X-Summary', data['abstract'], 'certain')
         if 'resources' in data:
