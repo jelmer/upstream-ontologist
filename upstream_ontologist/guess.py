@@ -88,7 +88,37 @@ def get_repology_metadata(srcname, repo='debian_unstable'):
         raise NoSuchRepologyProject(srcname)
 
 
+DATUM_TYPES = {
+    'Bug-Submit': str,
+    'Bug-Database': str,
+    'Repository': str,
+    'Repository-Browse': str,
+    'X-License': str,
+    'X-Summary': str,
+    'X-Description': str,
+    'X-Wiki': str,
+    'X-SourceForge-Project': str,
+    'Archive': str,
+    'Homepage': str,
+    'Name': str,
+    'X-Version': str,
+    'X-Download': str,
+    'Screenshots': list,
+    }
+
+
+
 def known_bad_guess(datum):
+    try:
+        expected_type = DATUM_TYPES[datum.field]
+    except KeyError:
+        logging.warning('Unknown field %s', datum.field)
+        return False
+    if not isinstance(datum.value, expected_type):
+        logging.warning(
+            'filtering out bad value %r for %s',
+            datum.value, datum.field)
+        return True
     if datum.field in ('Bug-Submit', 'Bug-Database'):
         parsed_url = urlparse(datum.value)
         if parsed_url.hostname == 'bugzilla.gnome.org':
@@ -108,12 +138,7 @@ def known_bad_guess(datum):
     if datum.field == 'Name':
         if datum.value.lower() == 'package':
             return True
-    if not isinstance(datum.value, str):
-        logging.warning(
-            'filtering out bad value %r for %s',
-             datum.value, datum.field)
-        return True
-    if datum.value.lower() == 'unknown':
+    if isinstance(datum.value, str) and datum.value.lower() == 'unknown':
         return True
     return False
 
@@ -346,8 +371,6 @@ def guess_from_package_json(path, trust_package):
         yield UpstreamDatum('X-License', package['license'], 'certain')
     if 'version' in package:
         yield UpstreamDatum('X-Version', package['version'], 'certain')
-    if 'description' in package:
-        yield UpstreamDatum('X-Summary', package['description'], 'certain')
     if 'repository' in package:
         if isinstance(package['repository'], dict):
             repo_url = package['repository'].get('url')

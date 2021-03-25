@@ -110,6 +110,7 @@ class GuessFromPackageJsonTests(TestCaseInTempDir):
                     "Homepage", "http://www.jacklmoore.com/autosize", "certain"
                 ),
                 UpstreamDatum("X-License", "MIT", "certain", None),
+                UpstreamDatum("X-Version", "4.0.2", "certain"),
                 UpstreamDatum(
                     "Repository", "http://github.com/jackmoore/autosize.git", "certain"
                 ),
