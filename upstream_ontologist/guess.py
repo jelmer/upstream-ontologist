@@ -142,6 +142,9 @@ def known_bad_guess(datum):
     if datum.field == 'Name':
         if datum.value.lower() == 'package':
             return True
+    if datum.field == 'X-Version':
+        if datum.value().lower() in ('devel', ):
+            return True
     if isinstance(datum.value, str) and datum.value.lower() == 'unknown':
         return True
     return False
