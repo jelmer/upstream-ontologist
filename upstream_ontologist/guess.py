@@ -361,8 +361,24 @@ def guess_from_setup_py(path, trust_package):
                 'Bug-Database', url, 'certain')
 
 
+def guess_from_composer_json(path, trust_package):
+    # https://getcomposer.org/doc/04-schema.md
+    with open(path, 'r') as f:
+        package = json.load(f)
+    if 'name' in package:
+        yield UpstreamDatum('Name', package['name'], 'certain')
+    if 'homepage' in package:
+        yield UpstreamDatum('Homepage', package['homepage'], 'certain')
+    if 'description' in package:
+        yield UpstreamDatum('X-Summary', package['description'], 'certain')
+    if 'license' in package:
+        yield UpstreamDatum('X-License', package['license'], 'certain')
+    if 'version' in package:
+        yield UpstreamDatum('X-Version', package['version'], 'certain')
+
+
 def guess_from_package_json(path, trust_package):
-    import json
+    # see https://docs.npmjs.com/cli/v7/configuring-npm/package-json
     with open(path, 'r') as f:
         package = json.load(f)
     if 'name' in package:
@@ -399,6 +415,8 @@ def guess_from_package_json(path, trust_package):
     if 'bugs' in package:
         if isinstance(package['bugs'], dict):
             url = package['bugs'].get('url')
+            if url is None and package['bugs'].get('email'):
+                url = 'mailto:' + package['bugs']['email']
         else:
             url = package['bugs']
         if url:
@@ -416,6 +434,7 @@ def xmlparse_simplify_namespaces(path, namespaces):
 
 
 def guess_from_package_xml(path, trust_package):
+    # https://pear.php.net/manual/en/guide.developers.package2.dependencies.php
     import xml.etree.ElementTree as ET
     try:
         root = xmlparse_simplify_namespaces(path, [
@@ -770,7 +789,6 @@ def guess_from_debian_patch(path, trust_package):
 
 
 def guess_from_meta_json(path, trust_package):
-    import json
     with open(path, 'r') as f:
         data = json.load(f)
         if 'name' in data:
@@ -1306,6 +1324,7 @@ def _get_guessers(path, trust_package=False):
         ('debian/rules', guess_from_debian_rules),
         ('PKG-INFO', guess_from_pkg_info),
         ('package.json', guess_from_package_json),
+        ('composer.json', guess_from_composer_json),
         ('package.xml', guess_from_package_xml),
         ('dist.ini', guess_from_dist_ini),
         ('debian/copyright', guess_from_debian_copyright),

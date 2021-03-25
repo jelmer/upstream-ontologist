@@ -47,6 +47,7 @@ data sources:
 
  * Python package metadata (PKG-INFO, setup.py, setup.cfg, pyproject.timl)
  * package.json
+ * composer.json
  * dist.ini
  * package.xml
  * dist.ini
