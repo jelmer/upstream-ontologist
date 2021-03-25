@@ -103,6 +103,7 @@ DATUM_TYPES = {
     'Name': str,
     'X-Version': str,
     'X-Download': str,
+    'X-Pecl-URL': str,
     'Screenshots': list,
     }
 
@@ -112,7 +113,10 @@ def known_bad_guess(datum):
     try:
         expected_type = DATUM_TYPES[datum.field]
     except KeyError:
-        logging.warning('Unknown field %s', datum.field)
+        if datum.field.startswith('X-'):
+            logging.debug('Unknown field %s', datum.field)
+        else:
+            logging.warning('Unknown field %s', datum.field)
         return False
     if not isinstance(datum.value, expected_type):
         logging.warning(
@@ -424,6 +428,20 @@ def guess_from_package_xml(path, trust_package):
     name_tag = root.find('name')
     if name_tag is not None:
         yield UpstreamDatum('Name', name_tag.text, 'certain')
+    summary_tag = root.find('summary')
+    if summary_tag is not None:
+        yield UpstreamDatum('X-Summary', summary_tag.text, 'certain')
+    description_tag = root.find('description')
+    if description_tag is not None:
+        yield UpstreamDatum('X-Description', description_tag.text, 'certain')
+    version_tag = root.find('version')
+    if version_tag is not None:
+        release_tag = version_tag.find('release')
+        if release_tag is not None:
+            yield UpstreamDatum('X-Version', release_tag.text, 'certain')
+    license_tag = root.find('license')
+    if license_tag is not None:
+        yield UpstreamDatum('License', license_tag.text, 'certain')
     for url_tag in root.findall('url'):
         if url_tag.get('type') == 'repository':
             yield UpstreamDatum(
