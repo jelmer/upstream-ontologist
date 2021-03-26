@@ -9,7 +9,7 @@ setup(
         "upstream_ontologist.debian",
         "upstream_ontologist.tests",
     ],
-    version="0.1.14",
+    version="0.1.16",
     author="Jelmer Vernooij",
     author_email="jelmer@debian.org",
     url="https://github.com/jelmer/upstream-ontologist",
@@ -27,7 +27,11 @@ setup(
     extras_require={
         'cargo': ['tomlkit'],
         'readme': ['docutils', 'lxml', 'bs4', 'markdown'],
+        'setup.cfg': ['setuptools'],
     },
     tests_require=['breezy'],
     test_suite="upstream_ontologist.tests.test_suite",
+    data_files=[
+        ('share/man/man1', ['man/guess-upstream-metadata.1']),
+    ],
 )
