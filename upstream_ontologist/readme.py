@@ -123,6 +123,15 @@ def _is_semi_header(el):
     return False
 
 
+def _ul_is_field_list(el):
+    names = ['Issues', 'Home', 'Documentation', 'License']
+    for li in el.findAll('li'):
+        m = re.match('([A-Za-z]+)\s*:.*', li.get_text().strip())
+        if not m or m.group(1) not in names:
+            return False
+    return True
+
+
 def _extract_paragraphs(children, metadata):
     paragraphs = []
     for el in children:
@@ -144,15 +153,40 @@ def _extract_paragraphs(children, metadata):
         elif el.name == 'pre':
             paragraphs.append(render(el))
         elif el.name == 'ul' and len(paragraphs) > 0:
-            paragraphs.append(
-                ''.join(
-                    '* %s\n' % li.get_text()
-                    for li in el.findAll('li')))
+            if _ul_is_field_list(el):
+                metadata.extend(_parse_ul_field_list(el))
+            else:
+                paragraphs.append(
+                    ''.join(
+                        '* %s\n' % li.get_text()
+                        for li in el.findAll('li')))
         elif re.match('h[0-9]', el.name):
             if len(paragraphs) == 0 and el.get_text() in ('About', 'Introduction'):
                 continue
             break
     return paragraphs
+
+
+def _parse_field(name, body):
+    if name == 'Homepage' and body.find('a'):
+        yield UpstreamDatum('Homepage', body.find('a').get('href'), 'confident')
+    if name == 'Home' and body.find('a'):
+        yield UpstreamDatum('Homepage', body.find('a').get('href'), 'confident')
+    if name == 'Issues' and body.find('a'):
+        yield UpstreamDatum('Bug-Database', body.find('a').get('href'), 'confident')
+    if name == 'Documentation' and body.find('a'):
+        yield UpstreamDatum('Documentation', body.find('a').get('href'), 'confident')
+    if name == 'License':
+        yield UpstreamDatum('X-License', body.get_text(), 'confident')
+
+
+def _parse_ul_field_list(el):
+    for li in el.findAll('li'):
+        cs = list(li.children)
+        if len(cs) == 2 and isinstance(cs[0], str):
+            name = cs[0].strip().rstrip(':')
+            body = cs[1]
+            yield from _parse_field(name, body)
 
 
 def _parse_field_list(tab):
@@ -164,10 +198,7 @@ def _parse_field_list(tab):
         body = tr.find('td', {'class': 'field-body'})
         if not body:
             continue
-        if name == 'Homepage' and body.find('a'):
-            yield UpstreamDatum('Homepage', body.find('a').get('href'), 'confident')
-        if name == 'License':
-            yield UpstreamDatum('X-License', body.get_text(), 'confident')
+        yield from _parse_field(name, body)
 
 
 def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
