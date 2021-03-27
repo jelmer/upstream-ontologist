@@ -112,6 +112,17 @@ def _parse_first_header(el):
         yield UpstreamDatum('X-Version', version, 'likely')
 
 
+def _is_semi_header(el):
+    if el.name != 'p':
+        return False
+    if el.get_text().count('\n') > 0:
+        return False
+    m = re.match('([a-z-A-Z0-9]+) - ([^\.]+)', el.get_text())
+    if m:
+        return True
+    return False
+
+
 def _extract_paragraphs(children, metadata):
     paragraphs = []
     for el in children:
@@ -120,6 +131,9 @@ def _extract_paragraphs(children, metadata):
         if el.name == 'div':
             paragraphs.extend(_extract_paragraphs(el.children, metadata))
         if el.name == 'p':
+            if len(paragraphs) == 0 and _is_semi_header(el):
+                metadata.extend(_parse_first_header(el))
+                continue
             if _skip_paragraph(el, metadata):
                 if len(paragraphs) > 0:
                     break
@@ -135,7 +149,7 @@ def _extract_paragraphs(children, metadata):
                     '* %s\n' % li.get_text()
                     for li in el.findAll('li')))
         elif re.match('h[0-9]', el.name):
-            if len(paragraphs) == 0 and el.get_text() in ('About', ):
+            if len(paragraphs) == 0 and el.get_text() in ('About', 'Introduction'):
                 continue
             break
     return paragraphs
