@@ -27,7 +27,7 @@ Standard fields:
  * Screenshots: List of URLs with screenshots
  * Archive: Archive used - e.g. SourceForge
  * Security-Contact: e-mail or URL with instructions for reporting security issues
- * Documentatin: Link to documentation on the web
+ * Documentation: Link to documentation on the web
 
 Extensions for upstream-ontologist, not defined in DEP-12:
 
