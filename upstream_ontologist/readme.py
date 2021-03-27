@@ -90,16 +90,16 @@ def _parse_first_header(el):
     summary = None
     name = None
     version = None
-    if ':' in el.text:
-        name, summary = el.text.split(':', 1)
-    elif ' - ' in el.text:
-        name, summary = el.text.split(' - ', 1)
-    elif ' -- ' in el.text:
-        name, summary = el.text.split(' -- ', 1)
-    elif ' version ' in el.text:
-        name, version = el.text.split(' version ', 1)
-    elif el.text:
-        name = el.text
+    if ':' in el.get_text():
+        name, summary = el.get_text().split(':', 1)
+    elif ' - ' in el.get_text():
+        name, summary = el.get_text().split(' - ', 1)
+    elif ' -- ' in el.get_text():
+        name, summary = el.get_text().split(' -- ', 1)
+    elif ' version ' in el.get_text():
+        name, version = el.get_text().split(' version ', 1)
+    elif el.get_text():
+        name = el.get_text()
     if name:
         if 'installation' in name.lower():
             certainty = 'possible'
@@ -107,7 +107,7 @@ def _parse_first_header(el):
             certainty = 'likely'
         yield UpstreamDatum('Name', name, certainty)
     if summary:
-        yield UpstreamDatum('Name', summary, 'likely')
+        yield UpstreamDatum('X-Summary', summary, 'likely')
     if version:
         yield UpstreamDatum('X-Version', version, 'likely')
 
