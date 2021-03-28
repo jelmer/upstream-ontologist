@@ -105,6 +105,7 @@ DATUM_TYPES = {
     'X-Download': str,
     'X-Pecl-URL': str,
     'Screenshots': list,
+    'Contact': str,
     }
 
 
