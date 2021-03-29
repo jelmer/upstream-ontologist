@@ -50,6 +50,9 @@ def _skip_paragraph(para, metadata):
     if m:
         metadata.append(UpstreamDatum('License', m.group(1), 'likely'))
         return True
+    m = re.match(r'This .* is hosted at .*', para.get_text())
+    if m:
+        return True
     for c in para.children:
         if isinstance(c, str) and not c.strip():
             continue

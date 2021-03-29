@@ -1332,6 +1332,40 @@ def guess_from_go_mod(path, trust_package=False):
                 yield UpstreamDatum('Name', modname.decode('utf-8'), 'certain')
 
 
+def guess_from_gemspec(path, trust_package=False):
+    # TODO(jelmer): use a proper ruby wrapper instead?
+    with open(path, 'r') as f:
+        for line in f:
+            if line.startswith('#'):
+                continue
+            if not line.strip():
+                continue
+            if line in ('Gem::Specification.new do |s|\n', 'end\n'):
+                continue
+            if line.startswith('  s.'):
+                (key, rawval) = line[4:].split('=', 1)
+                key = key.strip()
+                rawval = rawval.strip()
+                if rawval.startswith('"') and rawval.endswith('".freeze'):
+                    val = rawval[1:-len('".freeze')]
+                elif rawval.startswith('"') and rawval.endswith('"'):
+                    val = rawval[1:-1]
+                else:
+                    continue
+                if key == "name":
+                    yield UpstreamDatum('Name', val, 'certain')
+                elif key == 'version':
+                    yield UpstreamDatum('X-Version', val, 'certain')
+                elif key == 'homepage':
+                    yield UpstreamDatum('Homepage', val, 'certain')
+                elif key == 'summary':
+                    yield UpstreamDatum('X-Summary', val, 'certain')
+            else:
+                logging.debug(
+                    'ignoring unparseable line in %s: %r',
+                    path, line)
+
+
 def _get_guessers(path, trust_package=False):
     CANDIDATES = [
         ('debian/watch', guess_from_debian_watch),
@@ -1374,6 +1408,10 @@ def _get_guessers(path, trust_package=False):
             found_pkg_info = True
     if not found_pkg_info and os.path.exists(os.path.join(path, 'setup.py')):
         CANDIDATES.append(('setup.py', guess_from_setup_py))
+
+    for entry in os.scandir(path):
+        if entry.name.endswith('.gemspec'):
+            CANDIDATES.append((entry.name, guess_from_gemspec))
 
     # TODO(jelmer): Perhaps scan all directories if no other primary project
     # information file has been found?
