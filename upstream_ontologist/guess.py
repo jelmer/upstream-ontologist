@@ -860,6 +860,10 @@ def guess_from_meta_yml(path, trust_package):
             yield UpstreamDatum('Name', data['name'], 'certain')
         else:
             dist_name = None
+        if 'license' in data:
+            yield UpstreamDatum('X-License', data['license'], 'certain')
+        if 'version' in data:
+            yield UpstreamDatum('X-Version', data['version'], 'certain')
         if 'resources' in data:
             resources = data['resources']
             if 'bugtracker' in resources:
