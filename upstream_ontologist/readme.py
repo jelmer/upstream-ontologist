@@ -65,7 +65,7 @@ def _skip_paragraph(para, metadata):
                 name = list(c.children)[0].get('alt')
             else:
                 name = None
-            if name == 'CRAN':
+            if name in ('CRAN', 'CRAN_Status_Badge', 'CRAN_Logs_Badge'):
                 metadata.append(UpstreamDatum('Archive', 'CRAN', 'confident'))
             elif name == 'Build Status':
                 parsed_url = urlparse(c.get('href'))
@@ -78,6 +78,8 @@ def _skip_paragraph(para, metadata):
                 m = re.match('(.*) License', name)
                 if m:
                     metadata.append(UpstreamDatum('X-License', m.group(1), 'likely'))
+                else:
+                    logging.debug('Unnhandled field %r in README', name)
             continue
         break
     else:
