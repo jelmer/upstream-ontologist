@@ -118,6 +118,8 @@ def _parse_first_header(el):
 def _is_semi_header(el):
     if el.name != 'p':
         return False
+    if el.get_text().strip() == 'INSTALLATION':
+        return True
     if el.get_text().count('\n') > 0:
         return False
     m = re.match('([a-z-A-Z0-9]+) - ([^\.]+)', el.get_text())
@@ -143,9 +145,12 @@ def _extract_paragraphs(children, metadata):
         if el.name == 'div':
             paragraphs.extend(_extract_paragraphs(el.children, metadata))
         if el.name == 'p':
-            if len(paragraphs) == 0 and _is_semi_header(el):
-                metadata.extend(_parse_first_header(el))
-                continue
+            if _is_semi_header(el):
+                if len(paragraphs) == 0:
+                    metadata.extend(_parse_first_header(el))
+                    continue
+                else:
+                    break
             if _skip_paragraph(el, metadata):
                 if len(paragraphs) > 0:
                     break
