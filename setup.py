@@ -9,6 +9,9 @@ setup(
         "upstream_ontologist.debian",
         "upstream_ontologist.tests",
     ],
+    package_data={
+        'upstream_ontologist.tests': ['readme_data/*/*'],
+    },
     version="0.1.16",
     author="Jelmer Vernooij",
     author_email="jelmer@debian.org",
