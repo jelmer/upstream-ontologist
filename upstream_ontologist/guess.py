@@ -1102,6 +1102,8 @@ def guess_from_r_description(path, trust_package=False):
             lines = description['Description'].splitlines(True)
             reflowed = lines[0] + textwrap.dedent(''.join(lines[1:]))
             yield UpstreamDatum('X-Description', reflowed, 'certain')
+        if 'Maintainer' in description:
+            yield UpstreamDatum('Contact', description['Maintainer'], 'certain')
         if 'URL' in description:
             entries = [entry.strip()
                        for entry in re.split('[\n,]', description['URL'])]
