@@ -1368,6 +1368,23 @@ def guess_from_gemspec(path, trust_package=False):
                     path, line)
 
 
+def guess_from_makefile_pl(path, trust_package=False):
+    dist_name = None
+    with open(path, 'rb') as f:
+        for line in f:
+            m = re.fullmatch(br"name '([^'\"]+)';$", line.rstrip())
+            if m:
+                dist_name = m.group(1).decode()
+                yield UpstreamDatum('Name', dist_name, 'confident')
+            m = re.fullmatch(br"repository '([^'\"]+)';$", line.rstrip())
+            if m:
+                yield UpstreamDatum('Repository', m.group(1).decode(), 'confident')
+
+    if dist_name:
+        yield from guess_from_perl_dist_name(path, dist_name)
+
+
+
 def _get_guessers(path, trust_package=False):
     CANDIDATES = [
         ('debian/watch', guess_from_debian_watch),
@@ -1395,6 +1412,7 @@ def _get_guessers(path, trust_package=False):
         ('pyproject.toml', guess_from_pyproject_toml),
         ('setup.cfg', guess_from_setup_cfg),
         ('go.mod', guess_from_go_mod),
+        ('Makefile.PL', guess_from_makefile_pl),
         ]
 
     # Search for something Python-y
