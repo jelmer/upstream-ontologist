@@ -29,7 +29,6 @@ from typing import Optional, Union, List, Tuple
 import socket
 import urllib
 from urllib.parse import urlparse, urlunparse, ParseResult, parse_qs
-from urllib.request import urlopen, Request
 
 
 from . import _load_json_url
@@ -102,7 +101,7 @@ def is_gitlab_site(hostname: str, net_access: bool = False) -> bool:
     return False
 
 
-def browse_url_from_repo_url(url: str, subpath: Optional[str] = None) -> Optional[str]:
+def browse_url_from_repo_url(url: str, subpath: Optional[str] = None) -> Optional[str]:  # noqa: C901
     parsed_url = urlparse(url)
     if parsed_url.netloc == "github.com":
         path = "/".join(parsed_url.path.split("/")[:3])

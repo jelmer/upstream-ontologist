@@ -29,7 +29,7 @@ from . import UpstreamDatum
 logger = logging.getLogger(__name__)
 
 
-def _skip_paragraph(para, metadata):
+def _skip_paragraph(para, metadata):  # noqa: C901
     if re.match(r'See .* for more (details|information)\.', para.get_text()):
         return True
     if re.match(r'Please refer .*\.', para.get_text()):
@@ -124,7 +124,7 @@ def _is_semi_header(el):
         return True
     if el.get_text().count('\n') > 0:
         return False
-    m = re.match('([a-z-A-Z0-9]+) - ([^\.]+)', el.get_text())
+    m = re.match(r'([a-z-A-Z0-9]+) - ([^\.]+)', el.get_text())
     if m:
         return True
     return False
@@ -133,7 +133,7 @@ def _is_semi_header(el):
 def _ul_is_field_list(el):
     names = ['Issues', 'Home', 'Documentation', 'License']
     for li in el.findAll('li'):
-        m = re.match('([A-Za-z]+)\s*:.*', li.get_text().strip())
+        m = re.match(r'([A-Za-z]+)\s*:.*', li.get_text().strip())
         if not m or m.group(1) not in names:
             return False
     return True

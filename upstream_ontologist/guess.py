@@ -109,7 +109,6 @@ DATUM_TYPES = {
     }
 
 
-
 def known_bad_guess(datum):
     try:
         expected_type = DATUM_TYPES[datum.field]
@@ -1384,8 +1383,7 @@ def guess_from_makefile_pl(path, trust_package=False):
         yield from guess_from_perl_dist_name(path, dist_name)
 
 
-
-def _get_guessers(path, trust_package=False):
+def _get_guessers(path, trust_package=False):  # noqa: C901
     CANDIDATES = [
         ('debian/watch', guess_from_debian_watch),
         ('debian/control', guess_from_debian_control),
