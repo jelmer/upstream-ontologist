@@ -310,6 +310,11 @@ def parse_python_long_description(long_description, content_type):
 
 def guess_from_setup_cfg(path, trust_package):
     from setuptools.config import read_configuration
+    # read_configuration needs a function cwd
+    try:
+        os.getcwd()
+    except FileNotFoundError:
+        os.chdir(os.path.dirname(path))
     config = read_configuration(path)
     metadata = config.get('metadata')
     if metadata:
