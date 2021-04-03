@@ -12,7 +12,7 @@ setup(
     package_data={
         'upstream_ontologist.tests': ['readme_data/*/*'],
     },
-    version="0.1.16",
+    version="0.1.17",
     author="Jelmer Vernooij",
     author_email="jelmer@debian.org",
     url="https://github.com/jelmer/upstream-ontologist",
