@@ -44,6 +44,9 @@ def _skip_paragraph(para, metadata):  # noqa: C901
     m = re.match('See (http.*|gopkg.in.*|github.com.*)', para.get_text())
     if m:
         return True
+    m = re.match('Available on (.*)', para.get_text())
+    if m:
+        return True
     m = re.match(
             r'This software is freely distributable under the (.*) license.*',
             para.get_text())
@@ -171,7 +174,7 @@ def _extract_paragraphs(children, metadata):
                         '* %s\n' % li.get_text()
                         for li in el.findAll('li')))
         elif re.match('h[0-9]', el.name):
-            if len(paragraphs) == 0 and el.get_text() in ('About', 'Introduction'):
+            if len(paragraphs) == 0 and el.get_text() in ('About', 'Introduction', 'Overview'):
                 continue
             break
     return paragraphs
