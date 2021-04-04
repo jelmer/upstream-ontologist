@@ -34,9 +34,13 @@ def _skip_paragraph(para, metadata):  # noqa: C901
         return True
     if re.match(r'Please refer .*\.', para.get_text()):
         return True
-    m = re.match(r'License: (.*)', para.get_text())
+    m = re.match(r'License: (.*)', para.get_text(), re.I)
     if m:
         metadata.append(UpstreamDatum('License', m.group(1), 'likely'))
+        return True
+    m = re.match('homepage_url: (.*)', para.get_text(), re.I)
+    if m:
+        metadata.append(UpstreamDatum('Homepage', m.group(1), 'likely'))
         return True
     m = re.match('More documentation .* at http.*', para.get_text())
     if m:
