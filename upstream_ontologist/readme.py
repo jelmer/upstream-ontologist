@@ -45,6 +45,9 @@ def _skip_paragraph(para, metadata):  # noqa: C901
     m = re.match('More documentation .* at http.*', para.get_text())
     if m:
         return True
+    m = re.match('Documentation can be found at ', para.get_text())
+    if m:
+        return True
     m = re.match('See (http.*|gopkg.in.*|github.com.*)', para.get_text())
     if m:
         return True
@@ -59,6 +62,8 @@ def _skip_paragraph(para, metadata):  # noqa: C901
         return True
     m = re.match(r'This .* is hosted at .*', para.get_text())
     if m:
+        return True
+    if para.get_text().startswith('Download and install using:'):
         return True
     for c in para.children:
         if isinstance(c, str) and not c.strip():
