@@ -1092,7 +1092,7 @@ def guess_from_r_description(path, trust_package=False):
             yield UpstreamDatum('Name', description['Package'], 'certain')
         if 'Repository' in description:
             yield UpstreamDatum(
-                'Archive', description['Repository'].split('#')[0], 'certain')
+                'Archive', description['Repository'], 'certain')
         if 'BugReports' in description:
             yield UpstreamDatum(
                 'Bug-Database', description['BugReports'], 'certain')
@@ -1124,7 +1124,7 @@ def guess_from_r_description(path, trust_package=False):
             if len(urls) == 1:
                 yield UpstreamDatum('Homepage', urls[0][1], 'possible')
             for label, url in urls:
-                parsed_url = urlparse(url)
+                parsed_url = urlparse(url.split('#')[0])
                 if parsed_url.hostname == 'bioconductor.org':
                     yield UpstreamDatum('Archive', 'Bioconductor', 'confident')
                 if label and label.lower() in ('devel', 'repository'):
