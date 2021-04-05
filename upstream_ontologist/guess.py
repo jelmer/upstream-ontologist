@@ -1349,7 +1349,10 @@ def guess_from_gemspec(path, trust_package=False):
             if line in ('Gem::Specification.new do |s|\n', 'end\n'):
                 continue
             if line.startswith('  s.'):
-                (key, rawval) = line[4:].split('=', 1)
+                try:
+                    (key, rawval) = line[4:].split('=', 1)
+                except ValueError:
+                    continue
                 key = key.strip()
                 rawval = rawval.strip()
                 if rawval.startswith('"') and rawval.endswith('".freeze'):
@@ -1366,6 +1369,8 @@ def guess_from_gemspec(path, trust_package=False):
                     yield UpstreamDatum('Homepage', val, 'certain')
                 elif key == 'summary':
                     yield UpstreamDatum('X-Summary', val, 'certain')
+                elif key == 'description':
+                    yield UpstreamDatum('X-Description', val, 'certain')
             else:
                 logging.debug(
                     'ignoring unparseable line in %s: %r',
