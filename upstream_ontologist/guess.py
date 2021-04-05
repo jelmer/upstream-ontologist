@@ -1124,17 +1124,17 @@ def guess_from_r_description(path, trust_package=False):
             if len(urls) == 1:
                 yield UpstreamDatum('Homepage', urls[0][1], 'possible')
             for label, url in urls:
-                parsed_url = urlparse(url.split('#')[0])
+                parsed_url = urlparse(url)
                 if parsed_url.hostname == 'bioconductor.org':
                     yield UpstreamDatum('Archive', 'Bioconductor', 'confident')
                 if label and label.lower() in ('devel', 'repository'):
-                    yield UpstreamDatum('Repository', url, 'certain')
+                    yield UpstreamDatum('Repository', sanitize_vcs_url(url), 'certain')
                 elif label and label.lower() in ('homepage', ):
                     yield UpstreamDatum('Homepage', url, 'certain')
                 else:
                     repo_url = guess_repo_from_url(url)
                     if repo_url:
-                        yield UpstreamDatum('Repository', repo_url, 'certain')
+                        yield UpstreamDatum('Repository', sanitize_vcs_url(repo_url), 'certain')
 
 
 def guess_from_environment():
