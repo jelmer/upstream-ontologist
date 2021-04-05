@@ -1092,7 +1092,7 @@ def guess_from_r_description(path, trust_package=False):
             yield UpstreamDatum('Name', description['Package'], 'certain')
         if 'Repository' in description:
             yield UpstreamDatum(
-                'Archive', description['Repository'], 'certain')
+                'Archive', description['Repository'].split('#')[0], 'certain')
         if 'BugReports' in description:
             yield UpstreamDatum(
                 'Bug-Database', description['BugReports'], 'certain')
