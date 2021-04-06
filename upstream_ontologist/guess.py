@@ -468,7 +468,7 @@ def guess_from_package_xml(path, trust_package):
             yield UpstreamDatum('X-Version', release_tag.text, 'certain')
     license_tag = root.find('license')
     if license_tag is not None:
-        yield UpstreamDatum('License', license_tag.text, 'certain')
+        yield UpstreamDatum('X-License', license_tag.text, 'certain')
     for url_tag in root.findall('url'):
         if url_tag.get('type') == 'repository':
             yield UpstreamDatum(

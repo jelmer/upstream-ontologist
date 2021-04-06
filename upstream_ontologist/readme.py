@@ -36,7 +36,7 @@ def _skip_paragraph(para, metadata):  # noqa: C901
         return True
     m = re.match(r'License: (.*)', para.get_text(), re.I)
     if m:
-        metadata.append(UpstreamDatum('License', m.group(1), 'likely'))
+        metadata.append(UpstreamDatum('X-License', m.group(1), 'likely'))
         return True
     m = re.match('homepage_url: (.*)', para.get_text(), re.I)
     if m:
@@ -58,7 +58,7 @@ def _skip_paragraph(para, metadata):  # noqa: C901
             r'This software is freely distributable under the (.*) license.*',
             para.get_text())
     if m:
-        metadata.append(UpstreamDatum('License', m.group(1), 'likely'))
+        metadata.append(UpstreamDatum('X-License', m.group(1), 'likely'))
         return True
     m = re.match(r'This .* is hosted at .*', para.get_text())
     if m:
