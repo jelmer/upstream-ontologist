@@ -24,6 +24,8 @@ setup(
         'console_scripts': [
             ('guess-upstream-metadata='
              'upstream_ontologist.__main__:main'),
+            ('autodoap='
+             'upstream_ontologist.doap:main'),
         ],
     },
     install_requires=['python_debian', 'debmutate'],
