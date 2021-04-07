@@ -219,7 +219,7 @@ for HTTP, and this package is built on top of the R package 'curl', an
 interface to 'libcurl' (<https://curl.haxx.se/libcurl>).""", 'certain'),
                 UpstreamDatum('Contact', 'Scott Chamberlain <myrmecocystus@gmail.com>', 'certain'),
                 UpstreamDatum(
-                    "Repository", "https://github.com/ropensci/crul", "certain"
+                    "Repository", "https://github.com/ropensci/crul.git", "certain"
                 ),
                 UpstreamDatum("Homepage", "https://www.example.com/crul", "certain"),
             ],
