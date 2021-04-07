@@ -1,0 +1,1 @@
+SHA3 for Ruby is a native (C) binding to SHA3 (Keccak FIPS 202) cryptographic hashing algorithm.

@@ -1,0 +1,6 @@
+This library provides encoding and decoding for the Concise Binary Object Representation (CBOR)
+(RFC 7049) serialization format. Read the docs to learn more.
+
+It is implemented in pure python with an optional C backend.
+
+On PyPy, cbor2 runs with almost identical performance to the C backend.

@@ -27,6 +27,7 @@ Standard fields:
  * Screenshots: List of URLs with screenshots
  * Archive: Archive used - e.g. SourceForge
  * Security-Contact: e-mail or URL with instructions for reporting security issues
+ * Documentation: Link to documentation on the web
 
 Extensions for upstream-ontologist, not defined in DEP-12:
 
@@ -45,17 +46,20 @@ Supported Data Sources
 At the moment, the ontologist can read metadata from the following upstream
 data sources:
 
- * Python package metadata (PKG-INFO, setup.py)
+ * Python package metadata (PKG-INFO, setup.py, setup.cfg, pyproject.timl)
  * package.json
+ * composer.json
  * dist.ini
  * package.xml
  * dist.ini
+ * Perl POD files
  * META.json
  * META.yml
  * GNU configure files
  * R DESCRIPTION files
  * Rust Cargo.toml
  * Maven pom.xml
+ * metainfo.xml
  * .git/config
  * SECURITY.md
  * DOAP
