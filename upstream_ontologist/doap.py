@@ -15,14 +15,18 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
-from xml.etree.ElementTree import Element, SubElement, Comment, tostring, register_namespace, ElementTree
+from lxml import etree
+
+Element = etree.Element
+SubElement = etree.SubElement
+tostring = etree.tostring
 
 RDF_NS = "http://www.w3.org/1999/02/22-rdf-syntax-ns"
-register_namespace('rdf', RDF_NS)
+etree.register_namespace('rdf', RDF_NS)
 FOAF_NS = "http://xmlns.com/foaf/0.1/"
-register_namespace('foaf', FOAF_NS)
+etree.register_namespace('foaf', FOAF_NS)
 DOAP_NS = "http://usefulinc.com/ns/doap"
-register_namespace('doap', DOAP_NS)
+etree.register_namespace('doap', DOAP_NS)
 
 
 def doap_file_from_upstream_info(upstream_info):
@@ -70,7 +74,15 @@ def doap_file_from_upstream_info(upstream_info):
         screenshots = SubElement(project, '{%s}screenshots' % DOAP_NS)
         screenshots.set('{%s}resource' % RDF_NS, upstream_info['Screenshots'])
 
-    return ElementTree(project)
+    if 'Security-Contact' in upstream_info:
+        security_contact = SubElement(project, '{%s}security-contact' % DOAP_NS)
+        security_contact.set('{%s}resource' % RDF_NS, upstream_info['Security-Contact'])
+
+    if 'X-Wiki' in upstream_info:
+        wiki = SubElement(project, '{%s}wiki' % DOAP_NS)
+        wiki.set('{%s}resource' % RDF_NS, upstream_info['X-Wiki'])
+
+    return etree.ElementTree(project)
 
 
 def main(argv):
@@ -111,7 +123,7 @@ def main(argv):
         sys.stdout.buffer,
         xml_declaration=True,
         method="xml",
-        encoding="utf-8", default_namespace=DOAP_NS)
+        encoding="utf-8", pretty_print=True)
 
 
 if __name__ == '__main__':
