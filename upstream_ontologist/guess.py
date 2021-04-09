@@ -937,22 +937,39 @@ def guess_from_doap(path, trust_package):  # noqa: C901
         return el.attrib.get(
             '{http://www.w3.org/1999/02/22-rdf-syntax-ns#}resource')
 
+    def extract_lang(el):
+        return el.attrib.get('{http://www.w3.org/XML/1998/namespace}lang')
+
+    screenshots = []
+
     for child in root:
         if child.tag == ('{%s}name' % DOAP_NAMESPACE) and child.text:
             yield UpstreamDatum('Name', child.text, 'certain')
-        if child.tag == ('{%s}bug-database' % DOAP_NAMESPACE):
+        elif child.tag == ('{%s}short-name' % DOAP_NAMESPACE) and child.text:
+            yield UpstreamDatum('Name', child.text, 'likely')
+        elif child.tag == ('{%s}bug-database' % DOAP_NAMESPACE):
             url = extract_url(child)
             if url:
                 yield UpstreamDatum('Bug-Database', url, 'certain')
-        if child.tag == ('{%s}homepage' % DOAP_NAMESPACE):
+        elif child.tag == ('{%s}homepage' % DOAP_NAMESPACE):
             url = extract_url(child)
             if url:
                 yield UpstreamDatum('Homepage', url, 'certain')
-        if child.tag == ('{%s}download-page' % DOAP_NAMESPACE):
+        elif child.tag == ('{%s}download-page' % DOAP_NAMESPACE):
             url = extract_url(child)
             if url:
                 yield UpstreamDatum('X-Download', url, 'certain')
-        if child.tag == ('{%s}repository' % DOAP_NAMESPACE):
+        elif child.tag == ('{%s}shortdesc' % DOAP_NAMESPACE):
+            lang = extract_lang(child)
+            if lang in ('en', None):
+                yield UpstreamDatum('X-Summary', child.text, 'certain')
+        elif child.tag == ('{%s}description' % DOAP_NAMESPACE):
+            lang = extract_lang(child)
+            if lang in ('en', None):
+                yield UpstreamDatum('X-Description', child.text, 'certain')
+        elif child.tag == ('{%s}license' % DOAP_NAMESPACE):
+            pass  # TODO
+        elif child.tag == ('{%s}repository' % DOAP_NAMESPACE):
             for repo in child:
                 if repo.tag in (
                         '{%s}SVNRepository' % DOAP_NAMESPACE,
@@ -964,9 +981,7 @@ def guess_from_doap(path, trust_package):  # noqa: C901
                     else:
                         repo_url = None
                     if repo_url:
-                        yield UpstreamDatum(
-                            'Repository', repo_url,
-                            'certain')
+                        yield UpstreamDatum('Repository', repo_url, 'certain')
                     web_location = repo.find(
                         '{http://usefulinc.com/ns/doap#}browse')
                     if web_location is not None:
@@ -977,6 +992,26 @@ def guess_from_doap(path, trust_package):  # noqa: C901
                     if web_url:
                         yield UpstreamDatum(
                             'Repository-Browse', web_url, 'certain')
+        elif child.tag == '{%s}category' % DOAP_NAMESPACE:
+            pass
+        elif child.tag == '{%s}programming-language' % DOAP_NAMESPACE:
+            pass
+        elif child.tag == '{%s}os' % DOAP_NAMESPACE:
+            pass
+        elif child.tag == '{%s}implements' % DOAP_NAMESPACE:
+            pass
+        elif child.tag == '{https://schema.org/}logo':
+            pass
+        elif child.tag == '{https://schema.org/}screenshot':
+            url = extract_url(child)
+            if url:
+                screenshots.append(url)
+        elif child.tag == '{%s}wiki' % DOAP_NAMESPACE:
+            url = extract_url(child)
+            if url:
+                yield UpstreamDatum('X-Wiki', url, 'certain')
+        else:
+            logging.warning('Unknown tag %s in DOAP file', child.tag)
 
 
 def guess_from_cabal(path, trust_package=False):  # noqa: C901
