@@ -99,6 +99,8 @@ def _skip_paragraph(para, metadata):  # noqa: C901
         break
     else:
         return True
+    if para.get_text() == '':
+        return True
     return False
 
 
