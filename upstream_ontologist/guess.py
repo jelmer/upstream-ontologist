@@ -23,9 +23,8 @@ import re
 import socket
 import urllib.error
 from typing import Optional, Iterable
-from urllib.parse import quote, urlparse, urlunparse, urljoin, parse_qs
+from urllib.parse import quote, urlparse, urlunparse, urljoin
 from urllib.request import urlopen, Request
-from warnings import warn
 
 from .vcs import (
     unsplit_vcs_url,
@@ -34,6 +33,8 @@ from .vcs import (
     plausible_browse_url as plausible_vcs_browse_url,
     sanitize_url as sanitize_vcs_url,
     is_gitlab_site,
+    guess_repo_from_url,
+    verify_repository_url,
     )
 
 from . import (
@@ -43,24 +44,15 @@ from . import (
     min_certainty,
     certainty_to_confidence,
     certainty_sufficient,
+    _load_json_url,
     )
 
 
 # Pecl is quite slow, so up the timeout a bit.
 PECL_URLLIB_TIMEOUT = 15
-KNOWN_HOSTING_SITES = [
-    'code.launchpad.net', 'github.com', 'launchpad.net', 'git.openstack.org']
 
 
 logger = logging.getLogger(__name__)
-
-
-def _load_json_url(http_url: str, timeout: int = DEFAULT_URLLIB_TIMEOUT):
-    headers = {'User-Agent': USER_AGENT, 'Accept': 'application/json'}
-    http_contents = urlopen(
-        Request(http_url, headers=headers),
-        timeout=timeout).read()
-    return json.loads(http_contents)
 
 
 class NoSuchSourceForgeProject(Exception):
@@ -96,96 +88,41 @@ def get_repology_metadata(srcname, repo='debian_unstable'):
         raise NoSuchRepologyProject(srcname)
 
 
-def guess_repo_from_url(url, net_access=False):  # noqa: C901
-    parsed_url = urlparse(url)
-    path_elements = parsed_url.path.strip('/').split('/')
-    if parsed_url.netloc == 'github.com':
-        if len(path_elements) < 2:
-            return None
-        return ('https://github.com' +
-                '/'.join(parsed_url.path.split('/')[:3]))
-    if parsed_url.netloc == 'launchpad.net':
-        return 'https://code.launchpad.net/%s' % (
-            parsed_url.path.strip('/').split('/')[0])
-    if parsed_url.netloc == 'git.savannah.gnu.org':
-        if len(path_elements) != 2 or path_elements[0] != 'git':
-            return None
-        return url
-    if parsed_url.netloc in ('freedesktop.org', 'www.freedesktop.org'):
-        if len(path_elements) >= 2 and path_elements[0] == 'software':
-            return 'https://github.com/freedesktop/%s' % path_elements[1]
-        if len(path_elements) >= 3 and path_elements[:2] == [
-                'wiki', 'Software']:
-            return 'https://github.com/freedesktop/%s.git' % path_elements[2]
-    if parsed_url.netloc == 'download.gnome.org':
-        if len(path_elements) >= 2 and path_elements[0] == 'sources':
-            return 'https://gitlab.gnome.org/GNOME/%s.git' % path_elements[1]
-    if parsed_url.netloc == 'download.kde.org':
-        if len(path_elements) >= 2 and path_elements[0] in (
-                'stable', 'unstable'):
-            return 'https://anongit.kde.org/%s.git' % path_elements[1]
-    if parsed_url.netloc == 'ftp.gnome.org':
-        if (len(path_elements) >= 4 and [
-              e.lower() for e in path_elements[:3]] == [
-                  'pub', 'gnome', 'sources']):
-            return 'https://gitlab.gnome.org/GNOME/%s.git' % path_elements[3]
-    if parsed_url.netloc == 'sourceforge.net':
-        if (len(path_elements) >= 4 and path_elements[0] == 'p'
-                and path_elements[3] == 'ci'):
-            return 'https://sourceforge.net/p/%s/%s' % (
-                path_elements[1], path_elements[2])
-    if parsed_url.netloc == 'www.apache.org':
-        if len(path_elements) > 2 and path_elements[0] == 'dist':
-            return 'https://svn.apache.org/repos/asf/%s/%s' % (
-                path_elements[1], path_elements[2])
-    if parsed_url.netloc == 'bitbucket.org':
-        if len(path_elements) >= 2:
-            return 'https://bitbucket.org/%s/%s' % (
-                path_elements[0], path_elements[1])
-    if parsed_url.netloc == 'ftp.gnu.org':
-        if len(path_elements) >= 2 and path_elements[0] == 'gnu':
-            return 'https://git.savannah.gnu.org/git/%s.git' % (
-                path_elements[1])
-        return None
-    if parsed_url.netloc == 'download.savannah.gnu.org':
-        if len(path_elements) >= 2 and path_elements[0] == 'releases':
-            return 'https://git.savannah.gnu.org/git/%s.git' % (
-                path_elements[1])
-        return None
-    if is_gitlab_site(parsed_url.netloc, net_access):
-        if parsed_url.path.strip('/').count('/') < 1:
-            return None
-        parts = parsed_url.path.split('/')
-        if 'issues' in parts:
-            parts = parts[:parts.index('issues')]
-        if 'tags' in parts:
-            parts = parts[:parts.index('tags')]
-        if parts[-1] == '-':
-            parts.pop(-1)
-        return urlunparse(
-            parsed_url._replace(path='/'.join(parts), query=''))
-    if parsed_url.hostname == 'git.php.net':
-        if parsed_url.path.startswith('/repository/'):
-            return url
-        if not parsed_url.path.strip('/'):
-            qs = parse_qs(parsed_url.query)
-            if 'p' in qs:
-                return urlunparse(parsed_url._replace(
-                    path='/repository/' + qs['p'][0], query=''))
-    if parsed_url.netloc in KNOWN_HOSTING_SITES:
-        return url
-    # Maybe it's already pointing at a VCS repo?
-    if parsed_url.netloc.startswith('svn.'):
-        # 'svn' subdomains are often used for hosting SVN repositories.
-        return url
-    if net_access:
-        if verify_repository_url(url):
-            return url
-        return None
-    return None
+DATUM_TYPES = {
+    'Bug-Submit': str,
+    'Bug-Database': str,
+    'Repository': str,
+    'Repository-Browse': str,
+    'X-License': str,
+    'X-Summary': str,
+    'X-Description': str,
+    'X-Wiki': str,
+    'X-SourceForge-Project': str,
+    'Archive': str,
+    'Homepage': str,
+    'Name': str,
+    'X-Version': str,
+    'X-Download': str,
+    'X-Pecl-URL': str,
+    'Screenshots': list,
+    'Contact': str,
+    }
 
 
-def known_bad_guess(datum):
+def known_bad_guess(datum):  # noqa: C901
+    try:
+        expected_type = DATUM_TYPES[datum.field]
+    except KeyError:
+        if datum.field.startswith('X-'):
+            logging.debug('Unknown field %s', datum.field)
+        else:
+            logging.warning('Unknown field %s', datum.field)
+        return False
+    if not isinstance(datum.value, expected_type):
+        logging.warning(
+            'filtering out bad value %r for %s',
+            datum.value, datum.field)
+        return True
     if datum.field in ('Bug-Submit', 'Bug-Database'):
         parsed_url = urlparse(datum.value)
         if parsed_url.hostname == 'bugzilla.gnome.org':
@@ -198,11 +135,21 @@ def known_bad_guess(datum):
             return True
         if parsed_url.hostname == 'git.gitorious.org':
             return True
+    if datum.field == 'Homepage':
+        parsed_url = urlparse(datum.value)
+        if parsed_url.hostname in ('pypi.org', 'rubygems.org'):
+            return True
     if datum.field == 'Repository-Browse':
         parsed_url = urlparse(datum.value)
         if parsed_url.hostname == 'cgit.kde.org':
             return True
-    if datum.value.lower() == 'unknown':
+    if datum.field == 'Name':
+        if datum.value.lower() == 'package':
+            return True
+    if datum.field == 'X-Version':
+        if datum.value.lower() in ('devel', ):
+            return True
+    if isinstance(datum.value, str) and datum.value.lower() == 'unknown':
         return True
     return False
 
@@ -296,6 +243,12 @@ def guess_from_debian_control(path, trust_package):
                 'Repository',
                 'https://' + control['XS-Go-Import-Path'],
                 'likely'))
+    if 'Description' in control:
+        yield UpstreamDatum(
+            'X-Summary', control['Description'].splitlines(False)[0], 'certain')
+        yield UpstreamDatum(
+            'X-Description',
+            ''.join(control['Description'].splitlines(True)[1:]), 'certain')
 
 
 def guess_from_python_metadata(pkg_info):
@@ -318,10 +271,8 @@ def guess_from_python_metadata(pkg_info):
                 'Bug-Database', url, 'certain')
     if 'Summary' in pkg_info:
         yield UpstreamDatum('X-Summary', pkg_info['Summary'], 'certain')
-    payload = pkg_info.get_payload()
-    if payload.strip() and pkg_info.get_content_type() in (None, 'text/plain'):
-        yield UpstreamDatum(
-            'X-Description', pkg_info.get_payload(), 'possible')
+    yield from parse_python_long_description(
+        pkg_info.get_payload(), pkg_info.get_content_type())
 
 
 def guess_from_pkg_info(path, trust_package):
@@ -335,6 +286,60 @@ def guess_from_pkg_info(path, trust_package):
     yield from guess_from_python_metadata(pkg_info)
 
 
+def parse_python_long_description(long_description, content_type):
+    if long_description in (None, ''):
+        return
+    # Discard encoding, etc.
+    if content_type:
+        content_type = content_type.split(';')[0]
+    if content_type in (None, 'text/plain'):
+        if len(long_description.splitlines()) > 30:
+            return
+        yield UpstreamDatum(
+            'X-Description', long_description, 'possible')
+        extra_md = []
+    elif content_type in ('text/restructured-text', 'text/x-rst'):
+        from .readme import description_from_readme_rst
+        description, extra_md = description_from_readme_rst(long_description)
+        if description:
+            yield UpstreamDatum('X-Description', description, 'possible')
+    elif content_type == 'text/markdown':
+        from .readme import description_from_readme_md
+        description, extra_md = description_from_readme_md(long_description)
+        if description:
+            yield UpstreamDatum('X-Description', description, 'possible')
+    for datum in extra_md:
+        yield datum
+
+
+def guess_from_setup_cfg(path, trust_package):
+    from setuptools.config import read_configuration
+    # read_configuration needs a function cwd
+    try:
+        os.getcwd()
+    except FileNotFoundError:
+        os.chdir(os.path.dirname(path))
+    config = read_configuration(path)
+    metadata = config.get('metadata')
+    if metadata:
+        if 'name' in metadata:
+            yield UpstreamDatum('Name', metadata['name'], 'certain')
+        if 'url' in metadata:
+            yield from parse_python_url(metadata['url'])
+        yield from parse_python_long_description(
+            metadata.get('long_description'),
+            metadata.get('long_description_content_type'))
+        if 'description' in metadata:
+            yield UpstreamDatum('X-Summary', metadata['description'], 'certain')
+
+
+def parse_python_url(url):
+    repo = guess_repo_from_url(url)
+    if repo:
+        yield UpstreamDatum(
+            'Repository', repo, 'likely')
+
+
 def guess_from_setup_py(path, trust_package):
     if not trust_package:
         return
@@ -345,10 +350,7 @@ def guess_from_setup_py(path, trust_package):
     if result.get_version() not in (None, '', 'UNKNOWN'):
         yield UpstreamDatum('X-Version', result.get_version(), 'certain')
     if result.get_url() not in (None, '', 'UNKNOWN'):
-        repo = guess_repo_from_url(result.get_url())
-        if repo:
-            yield UpstreamDatum(
-                'Repository', repo, 'likely')
+        yield from parse_python_url(result.get_url())
     if result.get_download_url() not in (None, '', 'UNKNOWN'):
         yield UpstreamDatum(
             'X-Download', result.get_download_url(), 'likely')
@@ -359,12 +361,9 @@ def guess_from_setup_py(path, trust_package):
         yield UpstreamDatum('Contact', contact, 'likely')
     if result.get_description() not in (None, '', 'UNKNOWN'):
         yield UpstreamDatum('X-Summary', result.get_description(), 'certain')
-    long_description_content_type = getattr(
-        result.metadata, 'long_description_content_type', None)
-    if (long_description_content_type in (None, 'text/plain') and
-            result.metadata.long_description not in (None, '', 'UNKNOWN')):
-        yield UpstreamDatum(
-            'X-Description', result.metadata.long_description, 'possible')
+    yield from parse_python_long_description(
+        result.metadata.long_description,
+        getattr(result.metadata, 'long_description_content_type', None))
     for url_type, url in getattr(result.metadata, 'project_urls', {}).items():
         if url_type in ('GitHub', 'Repository', 'Source Code'):
             yield UpstreamDatum(
@@ -374,8 +373,8 @@ def guess_from_setup_py(path, trust_package):
                 'Bug-Database', url, 'certain')
 
 
-def guess_from_package_json(path, trust_package):
-    import json
+def guess_from_composer_json(path, trust_package):
+    # https://getcomposer.org/doc/04-schema.md
     with open(path, 'r') as f:
         package = json.load(f)
     if 'name' in package:
@@ -386,6 +385,24 @@ def guess_from_package_json(path, trust_package):
         yield UpstreamDatum('X-Summary', package['description'], 'certain')
     if 'license' in package:
         yield UpstreamDatum('X-License', package['license'], 'certain')
+    if 'version' in package:
+        yield UpstreamDatum('X-Version', package['version'], 'certain')
+
+
+def guess_from_package_json(path, trust_package):
+    # see https://docs.npmjs.com/cli/v7/configuring-npm/package-json
+    with open(path, 'r') as f:
+        package = json.load(f)
+    if 'name' in package:
+        yield UpstreamDatum('Name', package['name'], 'certain')
+    if 'homepage' in package:
+        yield UpstreamDatum('Homepage', package['homepage'], 'certain')
+    if 'description' in package:
+        yield UpstreamDatum('X-Summary', package['description'], 'certain')
+    if 'license' in package:
+        yield UpstreamDatum('X-License', package['license'], 'certain')
+    if 'version' in package:
+        yield UpstreamDatum('X-Version', package['version'], 'certain')
     if 'repository' in package:
         if isinstance(package['repository'], dict):
             repo_url = package['repository'].get('url')
@@ -398,6 +415,10 @@ def guess_from_package_json(path, trust_package):
             if parsed_url.scheme and parsed_url.netloc:
                 yield UpstreamDatum(
                     'Repository', repo_url, 'certain')
+            elif repo_url.startswith('github:'):
+                # Some people seem to default to github. :(
+                repo_url = 'https://github.com/' + repo_url.split(':', 1)[1]
+                yield UpstreamDatum('Repository', repo_url, 'likely')
             else:
                 # Some people seem to default to github. :(
                 repo_url = 'https://github.com/' + parsed_url.path
@@ -406,6 +427,8 @@ def guess_from_package_json(path, trust_package):
     if 'bugs' in package:
         if isinstance(package['bugs'], dict):
             url = package['bugs'].get('url')
+            if url is None and package['bugs'].get('email'):
+                url = 'mailto:' + package['bugs']['email']
         else:
             url = package['bugs']
         if url:
@@ -423,18 +446,33 @@ def xmlparse_simplify_namespaces(path, namespaces):
 
 
 def guess_from_package_xml(path, trust_package):
+    # https://pear.php.net/manual/en/guide.developers.package2.dependencies.php
     import xml.etree.ElementTree as ET
     try:
         root = xmlparse_simplify_namespaces(path, [
             'http://pear.php.net/dtd/package-2.0',
             'http://pear.php.net/dtd/package-2.1'])
     except ET.ParseError as e:
-        warn('Unable to parse package.xml: %s' % e)
+        logging.warning('Unable to parse package.xml: %s', e)
         return
     assert root.tag == 'package', 'root tag is %r' % root.tag
     name_tag = root.find('name')
     if name_tag is not None:
         yield UpstreamDatum('Name', name_tag.text, 'certain')
+    summary_tag = root.find('summary')
+    if summary_tag is not None:
+        yield UpstreamDatum('X-Summary', summary_tag.text, 'certain')
+    description_tag = root.find('description')
+    if description_tag is not None:
+        yield UpstreamDatum('X-Description', description_tag.text, 'certain')
+    version_tag = root.find('version')
+    if version_tag is not None:
+        release_tag = version_tag.find('release')
+        if release_tag is not None:
+            yield UpstreamDatum('X-Version', release_tag.text, 'certain')
+    license_tag = root.find('license')
+    if license_tag is not None:
+        yield UpstreamDatum('X-License', license_tag.text, 'certain')
     for url_tag in root.findall('url'):
         if url_tag.get('type') == 'repository':
             yield UpstreamDatum(
@@ -443,21 +481,77 @@ def guess_from_package_xml(path, trust_package):
             yield UpstreamDatum('Bug-Database', url_tag.text, 'certain')
 
 
+def guess_from_pod(contents):
+    # See https://perldoc.perl.org/perlpod
+    by_header = {}
+    inheader = None
+    for line in contents.splitlines(True):
+        if line.startswith(b'=head1 '):
+            inheader = line.rstrip(b'\n').split(b' ', 1)[1]
+            by_header[inheader.decode().upper()] = ''
+        elif inheader:
+            by_header[inheader.decode().upper()] += line.decode()
+
+    if 'DESCRIPTION' in by_header:
+        description = by_header['DESCRIPTION'].lstrip('\n')
+        description = re.sub(r'[FXZSCBI]\<([^>]+)>', r'\1', description)
+        description = re.sub(r'L\<([^\|]+)\|([^\>]+)\>', r'\2', description)
+        description = re.sub(r'L\<([^\>]+)\>', r'\1', description)
+        # TODO(jelmer): Support E<>
+        yield UpstreamDatum('X-Description', description, 'likely')
+
+    if 'NAME' in by_header:
+        name = by_header['NAME'].strip().splitlines()[0]
+        if ' - ' in name:
+            (name, summary) = name.split(' - ', 1)
+            yield UpstreamDatum('Name', name.strip(), 'confident')
+            yield UpstreamDatum('X-Summary', summary.strip(), 'confident')
+        elif ' ' not in name:
+            yield UpstreamDatum('Name', name.strip(), 'confident')
+
+
+def guess_from_perl_module(path):
+    import subprocess
+    try:
+        stdout = subprocess.check_output(['perldoc', '-u', path])
+    except subprocess.CalledProcessError:
+        logging.warning('Error running perldoc, skipping.')
+        return
+    yield from guess_from_pod(stdout)
+
+
+def guess_from_perl_dist_name(path, dist_name):
+    mod_path = os.path.join(
+        os.path.dirname(path), 'lib', dist_name.replace('-', '/') + '.pm')
+    if os.path.exists(mod_path):
+        yield from guess_from_perl_module(mod_path)
+
+
 def guess_from_dist_ini(path, trust_package):
     from configparser import (
         RawConfigParser,
         NoSectionError,
-        ParsingError,
         NoOptionError,
+        ParsingError,
         )
     parser = RawConfigParser(strict=False)
     with open(path, 'r') as f:
         try:
             parser.read_string('[START]\n' + f.read())
         except ParsingError as e:
-            warn('Unable to parse dist.ini: %r' % e)
+            logging.warning('Unable to parse dist.ini: %r', e)
     try:
-        yield UpstreamDatum('Name', parser['START']['name'], 'certain')
+        dist_name = parser['START']['name']
+    except (NoSectionError, NoOptionError, KeyError):
+        dist_name = None
+    else:
+        yield UpstreamDatum('Name', dist_name, 'certain')
+    try:
+        yield UpstreamDatum('X-Version', parser['START']['version'], 'certain')
+    except (NoSectionError, NoOptionError, KeyError):
+        pass
+    try:
+        yield UpstreamDatum('X-Summary', parser['START']['abstract'], 'certain')
     except (NoSectionError, NoOptionError, KeyError):
         pass
     try:
@@ -486,6 +580,10 @@ def guess_from_dist_ini(path, trust_package):
     else:
         yield UpstreamDatum('X-Copyright', copyright, 'certain')
 
+    # Wild guess:
+    if dist_name:
+        yield from guess_from_perl_dist_name(path, dist_name)
+
 
 def guess_from_debian_copyright(path, trust_package):
     from debian.copyright import (
@@ -499,12 +597,12 @@ def guess_from_debian_copyright(path, trust_package):
         except NotMachineReadableError:
             header = None
         except MachineReadableFormatError as e:
-            warn('Error parsing copyright file: %s' % e)
+            logging.warning('Error parsing copyright file: %s', e)
             header = None
         except ValueError as e:
             # This can happen with an error message of
             # ValueError: value must not have blank lines
-            warn('Error parsing copyright file: %s' % e)
+            logging.warning('Error parsing copyright file: %s', e)
             header = None
         else:
             header = copyright.header
@@ -654,20 +752,27 @@ def guess_from_readme(path, trust_package):  # noqa: C901
                             if repo_url:
                                 yield UpstreamDatum(
                                     'Repository', repo_url, 'possible')
-        if path.endswith('README.md'):
-            with open(path, 'r') as f:
+        if path.lower().endswith('readme.md'):
+            with open(path, 'rb') as f:
                 from .readme import description_from_readme_md
-                description, unused_md = description_from_readme_md(f.read())
-                if description is not None:
-                    yield UpstreamDatum(
-                        'X-Description', description, 'possible')
-        if path.endswith('README.rst'):
-            with open(path, 'r') as f:
+                contents = f.read().decode('utf-8', 'surrogateescape')
+                description, extra_md = description_from_readme_md(contents)
+        elif path.lower().endswith('readme.rst'):
+            with open(path, 'rb') as f:
                 from .readme import description_from_readme_rst
-                description, unused_md = description_from_readme_rst(f.read())
-                if description is not None:
-                    yield UpstreamDatum(
-                        'X-Description', description, 'possible')
+                contents = f.read().decode('utf-8', 'surrogateescape')
+                description, extra_md = description_from_readme_rst(contents)
+        else:
+            description = None
+            extra_md = []
+        if description is not None:
+            yield UpstreamDatum(
+                'X-Description', description, 'possible')
+        for datum in extra_md:
+            yield datum
+        if path.lower().endswith('readme.pod'):
+            with open(path, 'rb') as f:
+                yield from guess_from_pod(f.read())
     except IsADirectoryError:
         pass
 
@@ -696,11 +801,20 @@ def guess_from_debian_patch(path, trust_package):
 
 
 def guess_from_meta_json(path, trust_package):
-    import json
     with open(path, 'r') as f:
         data = json.load(f)
         if 'name' in data:
+            dist_name = data['name']
             yield UpstreamDatum('Name', data['name'], 'certain')
+        else:
+            dist_name = None
+        if 'version' in data:
+            version = str(data['version'])
+            if version.startswith('v'):
+                version = version[1:]
+            yield UpstreamDatum('X-Version', version, 'certain')
+        if 'abstract' in data:
+            yield UpstreamDatum('X-Summary', data['abstract'], 'certain')
         if 'resources' in data:
             resources = data['resources']
             if 'bugtracker' in resources and 'web' in resources['bugtracker']:
@@ -719,6 +833,10 @@ def guess_from_meta_json(path, trust_package):
                     yield UpstreamDatum(
                         'Repository-Browse', repo['web'], 'certain')
 
+    # Wild guess:
+    if dist_name:
+        yield from guess_from_perl_dist_name(path, dist_name)
+
 
 def guess_from_travis_yml(path, trust_package):
     import ruamel.yaml
@@ -727,7 +845,7 @@ def guess_from_travis_yml(path, trust_package):
         try:
             ruamel.yaml.load(f, ruamel.yaml.SafeLoader)
         except ruamel.yaml.reader.ReaderError as e:
-            warn('Unable to parse %s: %s' % (path, e))
+            logging.warning('Unable to parse %s: %s', path, e)
             return
 
 
@@ -743,10 +861,17 @@ def guess_from_meta_yml(path, trust_package):
         try:
             data = ruamel.yaml.load(f, ruamel.yaml.SafeLoader)
         except ruamel.yaml.reader.ReaderError as e:
-            warn('Unable to parse META.yml: %s' % e)
+            logging.warning('Unable to parse %s: %s', path, e)
             return
         if 'name' in data:
+            dist_name = data['name']
             yield UpstreamDatum('Name', data['name'], 'certain')
+        else:
+            dist_name = None
+        if 'license' in data:
+            yield UpstreamDatum('X-License', data['license'], 'certain')
+        if 'version' in data:
+            yield UpstreamDatum('X-Version', data['version'], 'certain')
         if 'resources' in data:
             resources = data['resources']
             if 'bugtracker' in resources:
@@ -763,11 +888,39 @@ def guess_from_meta_yml(path, trust_package):
                 if url:
                     yield UpstreamDatum(
                         'Repository', url, 'certain')
+    # Wild guess:
+    if dist_name:
+        yield from guess_from_perl_dist_name(path, dist_name)
+
+
+def guess_from_metainfo(path, trust_package):
+    # See https://www.freedesktop.org/software/appstream/docs/chap-Metadata.html
+    from xml.etree import ElementTree
+    el = ElementTree.parse(path)
+    root = el.getroot()
+    for child in root:
+        if child.tag == 'id':
+            yield UpstreamDatum('Name', child.text, 'certain')
+        if child.tag == 'project_license':
+            yield UpstreamDatum('X-License', child.text, 'certain')
+        if child.tag == 'url':
+            urltype = child.attrib.get('type')
+            if urltype == 'homepage':
+                yield UpstreamDatum('Homepage', child.text, 'certain')
+            elif urltype == 'bugtracker':
+                yield UpstreamDatum('Bug-Database', child.text, 'certain')
+        if child.tag == 'description':
+            yield UpstreamDatum('X-Description', child.text, 'certain')
+        if child.tag == 'summary':
+            yield UpstreamDatum('X-Summary', child.text, 'certain')
+        if child.tag == 'name':
+            yield UpstreamDatum('Name', child.text, 'certain')
 
 
 def guess_from_doap(path, trust_package):  # noqa: C901
     """Guess upstream metadata from a DOAP file.
     """
+    # See https://github.com/ewilderj/doap
     from xml.etree import ElementTree
     el = ElementTree.parse(path)
     root = el.getroot()
@@ -777,7 +930,7 @@ def guess_from_doap(path, trust_package):  # noqa: C901
         [root] = list(root)
 
     if root.tag != ('{%s}Project' % DOAP_NAMESPACE):
-        warn('Doap file does not have DOAP project as root')
+        logging.warning('Doap file does not have DOAP project as root')
         return
 
     def extract_url(el):
@@ -934,6 +1087,8 @@ def guess_from_configure(path, trust_package=False):
 
 
 def guess_from_r_description(path, trust_package=False):
+    import textwrap
+    # See https://r-pkgs.org/description.html
     with open(path, 'rb') as f:
         # TODO(jelmer): use rfc822 instead?
         from debian.deb822 import Deb822
@@ -947,6 +1102,18 @@ def guess_from_r_description(path, trust_package=False):
         if 'BugReports' in description:
             yield UpstreamDatum(
                 'Bug-Database', description['BugReports'], 'certain')
+        if 'Version' in description:
+            yield UpstreamDatum('X-Version', description['Version'], 'certain')
+        if 'License' in description:
+            yield UpstreamDatum('X-License', description['License'], 'certain')
+        if 'Title' in description:
+            yield UpstreamDatum('X-Summary', description['Title'], 'certain')
+        if 'Description' in description:
+            lines = description['Description'].splitlines(True)
+            reflowed = lines[0] + textwrap.dedent(''.join(lines[1:]))
+            yield UpstreamDatum('X-Description', reflowed, 'certain')
+        if 'Maintainer' in description:
+            yield UpstreamDatum('Contact', description['Maintainer'], 'certain')
         if 'URL' in description:
             entries = [entry.strip()
                        for entry in re.split('[\n,]', description['URL'])]
@@ -963,14 +1130,17 @@ def guess_from_r_description(path, trust_package=False):
             if len(urls) == 1:
                 yield UpstreamDatum('Homepage', urls[0][1], 'possible')
             for label, url in urls:
+                parsed_url = urlparse(url)
+                if parsed_url.hostname == 'bioconductor.org':
+                    yield UpstreamDatum('Archive', 'Bioconductor', 'confident')
                 if label and label.lower() in ('devel', 'repository'):
-                    yield UpstreamDatum('Repository', url, 'certain')
+                    yield UpstreamDatum('Repository', sanitize_vcs_url(url), 'certain')
                 elif label and label.lower() in ('homepage', ):
                     yield UpstreamDatum('Homepage', url, 'certain')
                 else:
                     repo_url = guess_repo_from_url(url)
                     if repo_url:
-                        yield UpstreamDatum('Repository', repo_url, 'certain')
+                        yield UpstreamDatum('Repository', sanitize_vcs_url(repo_url), 'certain')
 
 
 def guess_from_environment():
@@ -981,7 +1151,18 @@ def guess_from_environment():
         pass
 
 
+def guess_from_path(path):
+    basename = os.path.basename(os.path.abspath(path))
+    m = re.fullmatch('(.*)-([0-9.]+)', basename)
+    if m:
+        yield UpstreamDatum('Name', m.group(1), 'possible')
+        yield UpstreamDatum('X-Version', m.group(2), 'possible')
+    else:
+        yield UpstreamDatum('Name', basename, 'possible')
+
+
 def guess_from_cargo(path, trust_package):
+    # see https://doc.rust-lang.org/cargo/reference/manifest.html
     try:
         from tomlkit import loads
         from tomlkit.exceptions import ParseError
@@ -993,7 +1174,7 @@ def guess_from_cargo(path, trust_package):
     except FileNotFoundError:
         return
     except ParseError as e:
-        warn('Error parsing toml file %s: %s' % (path, e))
+        logging.warning('Error parsing toml file %s: %s', path, e)
         return
     try:
         package = cargo['package']
@@ -1026,7 +1207,7 @@ def guess_from_pyproject_toml(path, trust_package):
     except FileNotFoundError:
         return
     except ParseError as e:
-        warn('Error parsing toml file %s: %s' % (path, e))
+        logging.warning('Error parsing toml file %s: %s', path, e)
         return
     if 'poetry' in pyproject.get('tool', []):
         poetry = pyproject['tool']['poetry']
@@ -1050,12 +1231,16 @@ def guess_from_pom_xml(path, trust_package=False):  # noqa: C901
         root = xmlparse_simplify_namespaces(path, [
             'http://maven.apache.org/POM/4.0.0'])
     except ET.ParseError as e:
-        warn('Unable to parse package.xml: %s' % e)
+        logging.warning('Unable to parse package.xml: %s', e)
         return
     assert root.tag == 'project', 'root tag is %r' % root.tag
     name_tag = root.find('name')
-    if name_tag is not None:
+    if name_tag is not None and '$' not in name_tag.text:
         yield UpstreamDatum('Name', name_tag.text, 'certain')
+    else:
+        artifact_id_tag = root.find('artifactId')
+        if artifact_id_tag is not None:
+            yield UpstreamDatum('Name', artifact_id_tag.text, 'possible')
     description_tag = root.find('description')
     if description_tag is not None:
         yield UpstreamDatum('X-Summary', description_tag.text, 'certain')
@@ -1085,11 +1270,13 @@ def guess_from_pom_xml(path, trust_package=False):  # noqa: C901
             try:
                 (scm, provider, provider_specific) = connection.split(':', 2)
             except ValueError:
-                warn('Invalid format for SCM connection: %s' % connection)
+                logging.warning(
+                    'Invalid format for SCM connection: %s', connection)
                 continue
             if scm != 'scm':
-                warn('SCM connection does not start with scm: prefix: %s' %
-                     connection)
+                logging.warning(
+                    'SCM connection does not start with scm: prefix: %s',
+                    connection)
                 continue
             yield UpstreamDatum(
                 'Repository', provider_specific, 'certain')
@@ -1107,6 +1294,7 @@ def guess_from_pom_xml(path, trust_package=False):  # noqa: C901
 
 
 def guess_from_git_config(path, trust_package=False):
+    # See https://git-scm.com/docs/git-config
     from dulwich.config import ConfigFile
 
     cfg = ConfigFile.from_path(path)
@@ -1117,9 +1305,19 @@ def guess_from_git_config(path, trust_package=False):
         pass
     else:
         url = urlb.decode('utf-8')
-        yield UpstreamDatum('Repository', url, 'likely')
+        if not url.startswith('../'):
+            yield UpstreamDatum('Repository', url, 'likely')
 
-    # TODO(jelmer): Try origin?
+    # It's less likely that origin is correct, but let's try anyway
+    # (with a lower certainty)
+    try:
+        urlb = cfg.get((b'remote', b'origin'), b'url')
+    except KeyError:
+        pass
+    else:
+        url = urlb.decode('utf-8')
+        if not url.startswith('../'):
+            yield UpstreamDatum('Repository', url, 'possible')
 
 
 def guess_from_get_orig_source(path, trust_package=False):
@@ -1140,18 +1338,96 @@ def guess_from_security_md(path, trust_package=False):
     yield UpstreamDatum('X-Security-MD', path, 'certain')
 
 
-def _get_guessers(path, trust_package=False):
+def guess_from_go_mod(path, trust_package=False):
+    # See https://golang.org/doc/modules/gomod-ref
+    with open(path, 'rb') as f:
+        for line in f:
+            if line.startswith(b'module '):
+                modname = line.strip().split(b' ', 1)[1]
+                yield UpstreamDatum('Name', modname.decode('utf-8'), 'certain')
+
+
+def guess_from_gemspec(path, trust_package=False):
+    # TODO(jelmer): use a proper ruby wrapper instead?
+    with open(path, 'r') as f:
+        for line in f:
+            if line.startswith('#'):
+                continue
+            if not line.strip():
+                continue
+            if line in ('Gem::Specification.new do |s|\n', 'end\n'):
+                continue
+            if line.startswith('  s.'):
+                try:
+                    (key, rawval) = line[4:].split('=', 1)
+                except ValueError:
+                    continue
+                key = key.strip()
+                rawval = rawval.strip()
+                if rawval.startswith('"') and rawval.endswith('".freeze'):
+                    val = rawval[1:-len('".freeze')]
+                elif rawval.startswith('"') and rawval.endswith('"'):
+                    val = rawval[1:-1]
+                else:
+                    continue
+                if key == "name":
+                    yield UpstreamDatum('Name', val, 'certain')
+                elif key == 'version':
+                    yield UpstreamDatum('X-Version', val, 'certain')
+                elif key == 'homepage':
+                    yield UpstreamDatum('Homepage', val, 'certain')
+                elif key == 'summary':
+                    yield UpstreamDatum('X-Summary', val, 'certain')
+                elif key == 'description':
+                    yield UpstreamDatum('X-Description', val, 'certain')
+            else:
+                logging.debug(
+                    'ignoring unparseable line in %s: %r',
+                    path, line)
+
+
+def guess_from_makefile_pl(path, trust_package=False):
+    dist_name = None
+    with open(path, 'rb') as f:
+        for line in f:
+            m = re.fullmatch(br"name '([^'\"]+)';$", line.rstrip())
+            if m:
+                dist_name = m.group(1).decode()
+                yield UpstreamDatum('Name', dist_name, 'confident')
+            m = re.fullmatch(br"repository '([^'\"]+)';$", line.rstrip())
+            if m:
+                yield UpstreamDatum('Repository', m.group(1).decode(), 'confident')
+
+    if dist_name:
+        yield from guess_from_perl_dist_name(path, dist_name)
+
+
+def guess_from_wscript(path, trust_package=False):
+    with open(path, 'rb') as f:
+        for line in f:
+            m = re.fullmatch(b'APPNAME = [\'"](.*)[\'"]', line.rstrip(b'\n'))
+            if m:
+                yield UpstreamDatum('Name', m.group(1).decode(), 'confident')
+            m = re.fullmatch(b'VERSION = [\'"](.*)[\'"]', line.rstrip(b'\n'))
+            if m:
+                yield UpstreamDatum('X-Version', m.group(1).decode(), 'confident')
+
+
+def _get_guessers(path, trust_package=False):  # noqa: C901
     CANDIDATES = [
         ('debian/watch', guess_from_debian_watch),
         ('debian/control', guess_from_debian_control),
         ('debian/rules', guess_from_debian_rules),
         ('PKG-INFO', guess_from_pkg_info),
         ('package.json', guess_from_package_json),
+        ('composer.json', guess_from_composer_json),
         ('package.xml', guess_from_package_xml),
         ('dist.ini', guess_from_dist_ini),
         ('debian/copyright', guess_from_debian_copyright),
         ('META.json', guess_from_meta_json),
+        ('MYMETA.json', guess_from_meta_json),
         ('META.yml', guess_from_meta_yml),
+        ('MYMETA.yml', guess_from_meta_yml),
         ('configure', guess_from_configure),
         ('DESCRIPTION', guess_from_r_description),
         ('Cargo.toml', guess_from_cargo),
@@ -1162,6 +1438,10 @@ def _get_guessers(path, trust_package=False):
         ('.github/SECURITY.md', guess_from_security_md),
         ('docs/SECURITY.md', guess_from_security_md),
         ('pyproject.toml', guess_from_pyproject_toml),
+        ('setup.cfg', guess_from_setup_cfg),
+        ('go.mod', guess_from_go_mod),
+        ('Makefile.PL', guess_from_makefile_pl),
+        ('wscript', guess_from_wscript),
         ]
 
     # Search for something Python-y
@@ -1178,6 +1458,20 @@ def _get_guessers(path, trust_package=False):
     if not found_pkg_info and os.path.exists(os.path.join(path, 'setup.py')):
         CANDIDATES.append(('setup.py', guess_from_setup_py))
 
+    for entry in os.scandir(path):
+        if entry.name.endswith('.gemspec'):
+            CANDIDATES.append((entry.name, guess_from_gemspec))
+
+    # TODO(jelmer): Perhaps scan all directories if no other primary project
+    # information file has been found?
+    for entry in os.scandir(path):
+        if entry.is_dir():
+            subpath = os.path.join(entry.path, 'DESCRIPTION')
+            if os.path.exists(subpath):
+                CANDIDATES.append(
+                    (os.path.join(entry.name, 'DESCRIPTION'),
+                     guess_from_r_description))
+
     doap_filenames = [
         n for n in os.listdir(path)
         if n.endswith('.doap') or
@@ -1186,21 +1480,34 @@ def _get_guessers(path, trust_package=False):
         if len(doap_filenames) == 1:
             CANDIDATES.append((doap_filenames[0], guess_from_doap))
         else:
-            warn('More than one doap filename, ignoring all: %r' %
-                 doap_filenames)
+            logging.warning(
+                'More than one doap filename, ignoring all: %r',
+                doap_filenames)
+
+    metainfo_filenames = [
+        n for n in os.listdir(path)
+        if n.endswith('.metainfo.xml')]
+    if metainfo_filenames:
+        if len(metainfo_filenames) == 1:
+            CANDIDATES.append((metainfo_filenames[0], guess_from_metainfo))
+        else:
+            logging.warning(
+                'More than one metainfo filename, ignoring all: %r',
+                metainfo_filenames)
 
     cabal_filenames = [n for n in os.listdir(path) if n.endswith('.cabal')]
     if cabal_filenames:
         if len(cabal_filenames) == 1:
             CANDIDATES.append((cabal_filenames[0], guess_from_cabal))
         else:
-            warn('More than one cabal filename, ignoring all: %r' %
-                 cabal_filenames)
+            logging.warning(
+                'More than one cabal filename, ignoring all: %r',
+                cabal_filenames)
 
     readme_filenames = [
         n for n in os.listdir(path)
         if any([n.startswith(p)
-                for p in ['readme', 'README', 'HACKING', 'CONTRIBUTING']])
+                for p in ['readme', 'ReadMe', 'Readme', 'README', 'HACKING', 'CONTRIBUTING']])
         and os.path.splitext(n)[1] not in ('.html', '.pdf', '.xml')
         and not n.endswith('~')]
     CANDIDATES.extend([(n, guess_from_readme) for n in readme_filenames])
@@ -1217,6 +1524,7 @@ def _get_guessers(path, trust_package=False):
             [(p, guess_from_debian_patch) for p in debian_patches])
 
     yield 'environment', guess_from_environment()
+    yield 'path', guess_from_path(path)
 
     for relpath, guesser in CANDIDATES:
         abspath = os.path.join(path, relpath)
@@ -1261,7 +1569,7 @@ def get_upstream_info(path, trust_package=False, net_access=False,
         if isinstance(entry, UpstreamDatum):
             metadata_items.append(entry)
     metadata = summarize_upstream_metadata(
-        metadata_items, '.', net_access=net_access,
+        metadata_items, path, net_access=net_access,
         consult_external_directory=consult_external_directory,
         check=check)
     return metadata
@@ -1332,7 +1640,8 @@ def _sf_git_extract_url(page):
     try:
         from bs4 import BeautifulSoup
     except ModuleNotFoundError:
-        warn('Not scanning sourceforge page, since python3-bs4 is missing')
+        logging.warning(
+            'Not scanning sourceforge page, since python3-bs4 is missing')
         return None
     bs = BeautifulSoup(page, features='lxml')
     el = bs.find(id='access_url')
@@ -1351,7 +1660,9 @@ def guess_from_sf(sf_project):
     try:
         data = get_sf_metadata(sf_project)
     except socket.timeout:
-        warn('timeout contacting launchpad, ignoring: %s' % sf_project)
+        logging.warning(
+            'timeout contacting launchpad, ignoring: %s',
+            sf_project)
         return
     if data.get('name'):
         yield 'Name', data['name']
@@ -1391,7 +1702,8 @@ def guess_from_repology(repology_project):
     try:
         metadata = get_repology_metadata(repology_project)
     except socket.timeout:
-        warn('timeout contacting repology, ignoring: %s' % repology_project)
+        logging.warning(
+            'timeout contacting repology, ignoring: %s', repology_project)
         return
 
     fields = {}
@@ -1629,47 +1941,6 @@ def bug_submit_url_from_bug_database_url(url):
     return None
 
 
-def verify_repository_url(url: str, version: Optional[str] = None) -> bool:
-    """Verify whether a repository URL is valid."""
-    parsed_url = urlparse(url)
-    if parsed_url.netloc == 'github.com':
-        path_elements = parsed_url.path.strip('/').split('/')
-        if len(path_elements) < 2:
-            return False
-        if path_elements[1].endswith('.git'):
-            path_elements[1] = path_elements[1][:-4]
-        api_url = 'https://api.github.com/repos/%s/%s' % (
-            path_elements[0], path_elements[1])
-        try:
-            data = _load_json_url(api_url)
-        except urllib.error.HTTPError as e:
-            if e.code == 404:
-                return False
-            elif e.code == 403:
-                # Probably rate-limited. Let's just hope for the best.
-                pass
-            else:
-                raise
-        else:
-            if data.get('archived', False):
-                return False
-            if data['description']:
-                if data['description'].startswith('Moved to '):
-                    return False
-                if 'has moved' in data['description']:
-                    return False
-                if data['description'].startswith('Mirror of '):
-                    return False
-            homepage = data.get('homepage')
-            if homepage and is_gitlab_site(homepage):
-                return False
-            # TODO(jelmer): Look at the contents of the repository; if it
-            # contains just a single README file with < 10 lines, assume
-            # the worst.
-            # return data['clone_url']
-    return probe_upstream_branch_url(url, version=version)
-
-
 def verify_bug_database_url(url):
     parsed_url = urlparse(url)
     if parsed_url.netloc == 'github.com':
@@ -1685,8 +1956,9 @@ def verify_bug_database_url(url):
                 return False
             if e.code == 403:
                 # Probably rate limited
-                warn('Unable to verify bug database URL %s: %s' % (
-                     url, e.reason))
+                logging.warning(
+                    'Unable to verify bug database URL %s: %s',
+                    url, e.reason)
                 return None
             raise
         return data['has_issues'] and not data.get('archived', False)
@@ -1946,55 +2218,6 @@ def extend_upstream_metadata(upstream_metadata,  # noqa: C901
                 changed = True
 
 
-def _version_in_tags(version, tag_names):
-    if version in tag_names:
-        return True
-    if 'v%s' % version in tag_names:
-        return True
-    if 'release/%s' % version in tag_names:
-        return True
-    if version.replace('.', '_') in tag_names:
-        return True
-    for tag_name in tag_names:
-        if tag_name.endswith('_' + version):
-            return True
-        if tag_name.endswith('-' + version):
-            return True
-        if tag_name.endswith('_%s' % version.replace('.', '_')):
-            return True
-    return False
-
-
-def probe_upstream_branch_url(url: str, version=None):
-    parsed = urlparse(url)
-    if parsed.scheme in ('git+ssh', 'ssh', 'bzr+ssh'):
-        # Let's not probe anything possibly non-public.
-        return None
-    import breezy.ui
-    from breezy.branch import Branch
-    old_ui = breezy.ui.ui_factory
-    breezy.ui.ui_factory = breezy.ui.SilentUIFactory()
-    try:
-        b = Branch.open(url)
-        b.last_revision()
-        if version is not None:
-            version = version.split('+git')[0]
-            tag_names = b.tags.get_tag_dict().keys()
-            if not tag_names:
-                # Uhm, hmm
-                return True
-            if _version_in_tags(version, tag_names):
-                return True
-            return False
-        else:
-            return True
-    except Exception:
-        # TODO(jelmer): Catch more specific exceptions?
-        return False
-    finally:
-        breezy.ui.ui_factory = old_ui
-
-
 def verify_screenshots(urls):
     headers = {'User-Agent': USER_AGENT}
     for url in urls:
@@ -2114,12 +2337,13 @@ def guess_from_pecl_url(url):
             raise
         return
     except socket.timeout:
-        warn('timeout contacting pecl, ignoring: %s' % url)
+        logging.warning('timeout contacting pecl, ignoring: %s', url)
         return
     try:
         from bs4 import BeautifulSoup
     except ModuleNotFoundError:
-        warn('bs4 missing so unable to scan pecl page, ignoring %s' % url)
+        logging.warning(
+            'bs4 missing so unable to scan pecl page, ignoring %s', url)
         return
     bs = BeautifulSoup(f.read(), features='lxml')
     tag = bs.find('a', text='Browse Source')
@@ -2197,7 +2421,7 @@ def guess_from_launchpad(package, distribution=None, suite=None):  # noqa: C901
             try:
                 suite = ubuntu.devel()
             except DistroDataOutdated as e:
-                warn(str(e))
+                logging.warning('%s', str(e))
                 suite = ubuntu.all[-1]
         elif distribution == 'debian':
             suite = 'sid'
@@ -2214,7 +2438,7 @@ def guess_from_launchpad(package, distribution=None, suite=None):  # noqa: C901
             raise
         return
     except socket.timeout:
-        warn('timeout contacting launchpad, ignoring')
+        logging.warning('timeout contacting launchpad, ignoring')
         return
 
     productseries_url = sourcepackage_data.get('productseries_link')
@@ -2286,4 +2510,5 @@ def fix_upstream_metadata(upstream_metadata):
         repo.value = url
     if 'X-Summary' in upstream_metadata:
         summary = upstream_metadata['X-Summary']
+        summary.value = summary.value.split('. ')[0]
         summary.value = summary.value.rstrip().rstrip('.')

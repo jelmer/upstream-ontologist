@@ -28,20 +28,20 @@ from typing import Optional, Union, List, Tuple
 
 import socket
 import urllib
-from urllib.parse import urlparse, urlunparse, ParseResult
-from urllib.request import urlopen, Request
+from urllib.parse import urlparse, urlunparse, ParseResult, parse_qs
 
 
-from . import (
-    DEFAULT_URLLIB_TIMEOUT,
-    USER_AGENT,
-)
+from . import _load_json_url
 
 
 KNOWN_GITLAB_SITES = [
     "salsa.debian.org",
     "invent.kde.org",
 ]
+
+
+KNOWN_HOSTING_SITES = [
+    'code.launchpad.net', 'github.com', 'launchpad.net', 'git.openstack.org']
 
 
 def plausible_browse_url(url: str) -> bool:
@@ -72,18 +72,17 @@ def unsplit_vcs_url(
 
 
 def probe_gitlab_host(hostname: str):
-    headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
+    import json
     try:
-        urlopen(
-            Request("https://%s/api/v4/version" % hostname, headers=headers),
-            timeout=DEFAULT_URLLIB_TIMEOUT,
-        )
+        _load_json_url("https://%s/api/v4/version" % hostname)
     except urllib.error.HTTPError as e:
         if e.code == 401:
-            import json
 
             if json.loads(e.read()) == {"message": "401 Unauthorized"}:
                 return True
+        return False
+    except json.JSONDecodeError:
+        return False
     except (socket.timeout, urllib.error.URLError):
         # Probably not?
         return False
@@ -102,7 +101,7 @@ def is_gitlab_site(hostname: str, net_access: bool = False) -> bool:
     return False
 
 
-def browse_url_from_repo_url(url: str, subpath: Optional[str] = None) -> Optional[str]:
+def browse_url_from_repo_url(url: str, subpath: Optional[str] = None) -> Optional[str]:  # noqa: C901
     parsed_url = urlparse(url)
     if parsed_url.netloc == "github.com":
         path = "/".join(parsed_url.path.split("/")[:3])
@@ -110,6 +109,20 @@ def browse_url_from_repo_url(url: str, subpath: Optional[str] = None) -> Optiona
             path = path[:-4]
         if subpath is not None:
             path += "/tree/HEAD/" + subpath
+        return urlunparse(("https", "github.com", path, None, None, None))
+    if parsed_url.hostname == 'gopkg.in':
+        els = parsed_url.path.split("/")[:3]
+        if len(els) != 2:
+            return None
+        try:
+            els[-1], version = els[-1].split('.v', 1)
+        except ValueError:
+            els[-1] = els[-1]
+            version = "HEAD"
+        els.extend(['tree', version])
+        path = "/".join(els)
+        if subpath is not None:
+            path += "/" + subpath
         return urlunparse(("https", "github.com", path, None, None, None))
     if parsed_url.netloc in ("code.launchpad.net", "launchpad.net"):
         if subpath is not None:
@@ -489,3 +502,189 @@ def sanitize_url(url: Union[str, List[str]]) -> str:
     for sanitizer in SANITIZERS:
         url = sanitizer(url)
     return url  # type: ignore
+
+
+def guess_repo_from_url(url, net_access=False):  # noqa: C901
+    parsed_url = urlparse(url)
+    path_elements = parsed_url.path.strip('/').split('/')
+    if parsed_url.netloc == 'github.com':
+        if len(path_elements) < 2:
+            return None
+        return ('https://github.com' +
+                '/'.join(parsed_url.path.split('/')[:3]))
+    if parsed_url.netloc == 'travis-ci.org':
+        return ('https://github.com/' +
+                '/'.join(path_elements[:3]))
+    if (parsed_url.netloc == 'coveralls.io' and
+            parsed_url.path.startswith('/r/')):
+        return ('https://github.com/' +
+                '/'.join(path_elements[1:4]))
+    if parsed_url.netloc == 'launchpad.net':
+        return 'https://code.launchpad.net/%s' % (
+            parsed_url.path.strip('/').split('/')[0])
+    if parsed_url.netloc == 'git.savannah.gnu.org':
+        if len(path_elements) != 2 or path_elements[0] != 'git':
+            return None
+        return url
+    if parsed_url.netloc in ('freedesktop.org', 'www.freedesktop.org'):
+        if len(path_elements) >= 2 and path_elements[0] == 'software':
+            return 'https://github.com/freedesktop/%s' % path_elements[1]
+        if len(path_elements) >= 3 and path_elements[:2] == [
+                'wiki', 'Software']:
+            return 'https://github.com/freedesktop/%s.git' % path_elements[2]
+    if parsed_url.netloc == 'download.gnome.org':
+        if len(path_elements) >= 2 and path_elements[0] == 'sources':
+            return 'https://gitlab.gnome.org/GNOME/%s.git' % path_elements[1]
+    if parsed_url.netloc == 'download.kde.org':
+        if len(path_elements) >= 2 and path_elements[0] in (
+                'stable', 'unstable'):
+            return 'https://anongit.kde.org/%s.git' % path_elements[1]
+    if parsed_url.netloc == 'ftp.gnome.org':
+        if (len(path_elements) >= 4 and [
+              e.lower() for e in path_elements[:3]] == [
+                  'pub', 'gnome', 'sources']):
+            return 'https://gitlab.gnome.org/GNOME/%s.git' % path_elements[3]
+    if parsed_url.netloc == 'sourceforge.net':
+        if (len(path_elements) >= 4 and path_elements[0] == 'p'
+                and path_elements[3] == 'ci'):
+            return 'https://sourceforge.net/p/%s/%s' % (
+                path_elements[1], path_elements[2])
+    if parsed_url.netloc == 'www.apache.org':
+        if len(path_elements) > 2 and path_elements[0] == 'dist':
+            return 'https://svn.apache.org/repos/asf/%s/%s' % (
+                path_elements[1], path_elements[2])
+    if parsed_url.netloc == 'bitbucket.org':
+        if len(path_elements) >= 2:
+            return 'https://bitbucket.org/%s/%s' % (
+                path_elements[0], path_elements[1])
+    if parsed_url.netloc == 'ftp.gnu.org':
+        if len(path_elements) >= 2 and path_elements[0] == 'gnu':
+            return 'https://git.savannah.gnu.org/git/%s.git' % (
+                path_elements[1])
+        return None
+    if parsed_url.netloc == 'download.savannah.gnu.org':
+        if len(path_elements) >= 2 and path_elements[0] == 'releases':
+            return 'https://git.savannah.gnu.org/git/%s.git' % (
+                path_elements[1])
+        return None
+    if is_gitlab_site(parsed_url.netloc, net_access):
+        if parsed_url.path.strip('/').count('/') < 1:
+            return None
+        parts = parsed_url.path.split('/')
+        if 'issues' in parts:
+            parts = parts[:parts.index('issues')]
+        if 'tags' in parts:
+            parts = parts[:parts.index('tags')]
+        if parts[-1] == '-':
+            parts.pop(-1)
+        return urlunparse(
+            parsed_url._replace(path='/'.join(parts), query=''))
+    if parsed_url.hostname == 'git.php.net':
+        if parsed_url.path.startswith('/repository/'):
+            return url
+        if not parsed_url.path.strip('/'):
+            qs = parse_qs(parsed_url.query)
+            if 'p' in qs:
+                return urlunparse(parsed_url._replace(
+                    path='/repository/' + qs['p'][0], query=''))
+    if parsed_url.netloc in KNOWN_HOSTING_SITES:
+        return url
+    # Maybe it's already pointing at a VCS repo?
+    if parsed_url.netloc.startswith('svn.'):
+        # 'svn' subdomains are often used for hosting SVN repositories.
+        return url
+    if net_access:
+        if verify_repository_url(url):
+            return url
+        return None
+    return None
+
+
+def verify_repository_url(url: str, version: Optional[str] = None) -> bool:
+    """Verify whether a repository URL is valid."""
+    parsed_url = urlparse(url)
+    if parsed_url.netloc == 'github.com':
+        path_elements = parsed_url.path.strip('/').split('/')
+        if len(path_elements) < 2:
+            return False
+        if path_elements[1].endswith('.git'):
+            path_elements[1] = path_elements[1][:-4]
+        api_url = 'https://api.github.com/repos/%s/%s' % (
+            path_elements[0], path_elements[1])
+        try:
+            data = _load_json_url(api_url)
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return False
+            elif e.code == 403:
+                # Probably rate-limited. Let's just hope for the best.
+                pass
+            else:
+                raise
+        else:
+            if data.get('archived', False):
+                return False
+            if data['description']:
+                if data['description'].startswith('Moved to '):
+                    return False
+                if 'has moved' in data['description']:
+                    return False
+                if data['description'].startswith('Mirror of '):
+                    return False
+            homepage = data.get('homepage')
+            if homepage and is_gitlab_site(homepage):
+                return False
+            # TODO(jelmer): Look at the contents of the repository; if it
+            # contains just a single README file with < 10 lines, assume
+            # the worst.
+            # return data['clone_url']
+    return probe_upstream_branch_url(url, version=version)
+
+
+def probe_upstream_branch_url(url: str, version=None):
+    parsed = urlparse(url)
+    if parsed.scheme in ('git+ssh', 'ssh', 'bzr+ssh'):
+        # Let's not probe anything possibly non-public.
+        return None
+    import breezy.ui
+    from breezy.branch import Branch
+    old_ui = breezy.ui.ui_factory
+    breezy.ui.ui_factory = breezy.ui.SilentUIFactory()
+    try:
+        b = Branch.open(url)
+        b.last_revision()
+        if version is not None:
+            version = version.split('+git')[0]
+            tag_names = b.tags.get_tag_dict().keys()
+            if not tag_names:
+                # Uhm, hmm
+                return True
+            if _version_in_tags(version, tag_names):
+                return True
+            return False
+        else:
+            return True
+    except Exception:
+        # TODO(jelmer): Catch more specific exceptions?
+        return False
+    finally:
+        breezy.ui.ui_factory = old_ui
+
+
+def _version_in_tags(version, tag_names):
+    if version in tag_names:
+        return True
+    if 'v%s' % version in tag_names:
+        return True
+    if 'release/%s' % version in tag_names:
+        return True
+    if version.replace('.', '_') in tag_names:
+        return True
+    for tag_name in tag_names:
+        if tag_name.endswith('_' + version):
+            return True
+        if tag_name.endswith('-' + version):
+            return True
+        if tag_name.endswith('_%s' % version.replace('.', '_')):
+            return True
+    return False

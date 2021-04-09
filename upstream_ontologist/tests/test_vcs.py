@@ -24,6 +24,7 @@ from upstream_ontologist.vcs import (
     is_gitlab_site,
     canonical_git_repo_url,
     find_public_repo_url,
+    guess_repo_from_url,
 )
 
 
@@ -119,3 +120,18 @@ class FixupRcpStyleUrlTests(TestCase):
             "ssh://git@salsa.debian.org/jelmer/example",
             fixup_rcp_style_git_repo_url("ssh://git@salsa.debian.org/jelmer/example"),
         )
+
+
+class GuessRepoFromUrlTests(TestCase):
+
+    def test_travis_ci_org(self):
+        self.assertEqual(
+            'https://github.com/jelmer/dulwich',
+            guess_repo_from_url(
+                'https://travis-ci.org/jelmer/dulwich'))
+
+    def test_coveralls(self):
+        self.assertEqual(
+            'https://github.com/jelmer/dulwich',
+            guess_repo_from_url(
+                'https://coveralls.io/r/jelmer/dulwich'))

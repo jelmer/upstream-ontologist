@@ -9,7 +9,10 @@ setup(
         "upstream_ontologist.debian",
         "upstream_ontologist.tests",
     ],
-    version="0.1.14",
+    package_data={
+        'upstream_ontologist.tests': ['readme_data/*/*'],
+    },
+    version="0.1.18",
     author="Jelmer Vernooij",
     author_email="jelmer@debian.org",
     url="https://github.com/jelmer/upstream-ontologist",
@@ -21,13 +24,19 @@ setup(
         'console_scripts': [
             ('guess-upstream-metadata='
              'upstream_ontologist.__main__:main'),
+            ('autodoap='
+             'upstream_ontologist.doap:main'),
         ],
     },
     install_requires=['python_debian', 'debmutate'],
     extras_require={
         'cargo': ['tomlkit'],
         'readme': ['docutils', 'lxml', 'bs4', 'markdown'],
+        'setup.cfg': ['setuptools'],
     },
     tests_require=['breezy'],
     test_suite="upstream_ontologist.tests.test_suite",
+    data_files=[
+        ('share/man/man1', ['man/guess-upstream-metadata.1']),
+    ],
 )

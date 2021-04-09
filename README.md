@@ -27,6 +27,7 @@ Standard fields:
  * Screenshots: List of URLs with screenshots
  * Archive: Archive used - e.g. SourceForge
  * Security-Contact: e-mail or URL with instructions for reporting security issues
+ * Documentation: Link to documentation on the web
 
 Extensions for upstream-ontologist, not defined in DEP-12:
 
@@ -45,21 +46,23 @@ Supported Data Sources
 At the moment, the ontologist can read metadata from the following upstream
 data sources:
 
- * Python package metadata (PKG-INFO, setup.py)
- * package.json
- * dist.ini
- * package.xml
- * dist.ini
- * META.json
- * META.yml
+ * Python package metadata (PKG-INFO, setup.py, setup.cfg, pyproject.timl)
+ * [package.json](https://docs.npmjs.com/cli/v7/configuring-npm/package-json)
+ * [composer.json](https://getcomposer.org/doc/04-schema.md)
+ * [package.xml](https://pear.php.net/manual/en/guide.developers.package2.dependencies.php)
+ * Perl package metadata (dist.ini, META.json, META.yml, Makefile.PL)
+ * [Perl POD files](https://perldoc.perl.org/perlpod)
  * GNU configure files
- * R DESCRIPTION files
- * Rust Cargo.toml
- * Maven pom.xml
- * .git/config
+ * [R DESCRIPTION files](https://r-pkgs.org/description.html)
+ * [Rust Cargo.toml](https://doc.rust-lang.org/cargo/reference/manifest.html)
+ * [Maven pom.xml](https://maven.apache.org/pom.html)
+ * [metainfo.xml](https://www.freedesktop.org/software/appstream/docs/chap-Metadata.html)
+ * [.git/config](https://git-scm.com/docs/git-config)
  * SECURITY.md
- * DOAP
- * Haskell cabal files
+ * [DOAP](https://github.com/ewilderj/doap)
+ * [Haskell cabal files](https://cabal.readthedocs.io/en/3.4/cabal-package.html)
+ * [go.mod](https://golang.org/doc/modules/gomod-ref)
+ * [ruby gemspec files](https://guides.rubygems.org/specification-reference/)
  * Debian packaging metadata
    (debian/watch, debian/control, debian/rules, debian/get-orig-source.sh,
     debian/copyright, debian/patches)
