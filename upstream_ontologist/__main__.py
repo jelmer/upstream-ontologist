@@ -17,6 +17,7 @@
 
 """Functions for working with upstream metadata."""
 
+import logging
 import os
 import sys
 
@@ -65,7 +66,13 @@ def main(argv=None):
     parser.add_argument(
         "--version", action="version", version="%(prog)s " + version_string
     )
+    parser.add_argument('--verbose', action='store_true')
     args = parser.parse_args(argv)
+
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
 
     if not os.path.isdir(args.path):
         sys.stderr.write("%s is not a directory\n" % args.path)
@@ -89,7 +96,8 @@ def main(argv=None):
             check=args.check,
         )
 
-        sys.stdout.write(ruamel.yaml.round_trip_dump(metadata))
+        ruamel.yaml.scalarstring.walk_tree(metadata)
+        ruamel.yaml.round_trip_dump(metadata, sys.stdout)
         return 0
 
 

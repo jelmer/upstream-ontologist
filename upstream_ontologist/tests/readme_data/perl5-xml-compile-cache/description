@@ -1,0 +1,3 @@
+The XML-Compile suite is a large set of modules for various XML related
+standards.  This optional component is very useful: it manages compiled
+handlers and helps you define prefixes.

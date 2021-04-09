@@ -18,6 +18,7 @@
 """Tests for readme parsing."""
 
 import os
+import platform
 from unittest import TestCase, TestSuite
 
 from upstream_ontologist.readme import (
@@ -39,6 +40,7 @@ class ReadmeTestCase(TestCase):
     def runTest(self):
         readme_md = None
         readme_rst = None
+        description = None
         for entry in os.scandir(self.path):
             if entry.name.endswith('~'):
                 continue
@@ -59,13 +61,25 @@ class ReadmeTestCase(TestCase):
                 raise NotImplementedError(ext)
 
         if readme_md is not None:
+            try:
+                import markdown  # noqa: F401
+            except ModuleNotFoundError:
+                self.skipTest(
+                    'Skipping README.md tests, markdown not available')
             actual_description, unused_md = description_from_readme_md(
                 readme_md)
             self.assertEqual(actual_description, description)
 
         if readme_rst is not None:
+            if platform.python_implementation() == "PyPy":
+                self.skipTest('Skipping README.rst tests on pypy')
+            try:
+                import docutils  # noqa: F401
+            except ModuleNotFoundError:
+                self.skipTest(
+                    'Skipping README.rst tests, docutils not available')
             actual_description, unused_rst = description_from_readme_rst(
-                readme_rst)
+                    readme_rst)
             self.assertEqual(actual_description, description)
 
 
