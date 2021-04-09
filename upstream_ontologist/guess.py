@@ -894,6 +894,7 @@ def guess_from_meta_yml(path, trust_package):
 
 
 def guess_from_metainfo(path, trust_package):
+    # See https://www.freedesktop.org/software/appstream/docs/chap-Metadata.html
     from xml.etree import ElementTree
     el = ElementTree.parse(path)
     root = el.getroot()
@@ -919,6 +920,7 @@ def guess_from_metainfo(path, trust_package):
 def guess_from_doap(path, trust_package):  # noqa: C901
     """Guess upstream metadata from a DOAP file.
     """
+    # See https://github.com/ewilderj/doap
     from xml.etree import ElementTree
     el = ElementTree.parse(path)
     root = el.getroot()
@@ -1086,7 +1088,7 @@ def guess_from_configure(path, trust_package=False):
 
 def guess_from_r_description(path, trust_package=False):
     import textwrap
-    # https://r-pkgs.org/description.html
+    # See https://r-pkgs.org/description.html
     with open(path, 'rb') as f:
         # TODO(jelmer): use rfc822 instead?
         from debian.deb822 import Deb822
@@ -1160,6 +1162,7 @@ def guess_from_path(path):
 
 
 def guess_from_cargo(path, trust_package):
+    # see https://doc.rust-lang.org/cargo/reference/manifest.html
     try:
         from tomlkit import loads
         from tomlkit.exceptions import ParseError
@@ -1291,6 +1294,7 @@ def guess_from_pom_xml(path, trust_package=False):  # noqa: C901
 
 
 def guess_from_git_config(path, trust_package=False):
+    # See https://git-scm.com/docs/git-config
     from dulwich.config import ConfigFile
 
     cfg = ConfigFile.from_path(path)
@@ -1335,6 +1339,7 @@ def guess_from_security_md(path, trust_package=False):
 
 
 def guess_from_go_mod(path, trust_package=False):
+    # See https://golang.org/doc/modules/gomod-ref
     with open(path, 'rb') as f:
         for line in f:
             if line.startswith(b'module '):
@@ -1397,6 +1402,17 @@ def guess_from_makefile_pl(path, trust_package=False):
         yield from guess_from_perl_dist_name(path, dist_name)
 
 
+def guess_from_wscript(path, trust_package=False):
+    with open(path, 'rb') as f:
+        for line in f:
+            m = re.fullmatch(b'APPNAME = [\'"](.*)[\'"]', line.rstrip(b'\n'))
+            if m:
+                yield UpstreamDatum('Name', m.group(1).decode(), 'confident')
+            m = re.fullmatch(b'VERSION = [\'"](.*)[\'"]', line.rstrip(b'\n'))
+            if m:
+                yield UpstreamDatum('X-Version', m.group(1).decode(), 'confident')
+
+
 def _get_guessers(path, trust_package=False):  # noqa: C901
     CANDIDATES = [
         ('debian/watch', guess_from_debian_watch),
@@ -1425,6 +1441,7 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
         ('setup.cfg', guess_from_setup_cfg),
         ('go.mod', guess_from_go_mod),
         ('Makefile.PL', guess_from_makefile_pl),
+        ('wscript', guess_from_wscript),
         ]
 
     # Search for something Python-y

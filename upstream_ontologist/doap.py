@@ -85,10 +85,13 @@ def doap_file_from_upstream_info(upstream_info):
     return etree.ElementTree(project)
 
 
-def main(argv):
+def main(argv=None):
     from .guess import get_upstream_info
     import argparse
     import sys
+
+    if argv is None:
+        argv = sys.argv
 
     parser = argparse.ArgumentParser(argv)
     parser.add_argument("path", default=".", nargs="?")

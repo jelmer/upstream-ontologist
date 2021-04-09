@@ -1,11 +1,12 @@
-.TH GUESS-UPSTREAM-METADATA 1 'April 2021' 'guess-upstream-metadata 0.1.17' 'User Commands'
+.TH AUTODOAP 1 'April 2021' 'autodoap 0.1.17' 'User Commands'
 .SH NAME
-guess-upstream-metadata \- guess upstream package metadata
+autodoap \- automatically write DOAP files for upstream projects
 .SH DESCRIPTION
-guess\-upstream\-metadata [\-h] [\-\-trust] [\-\-disable\-net\-access] [\-\-check] [\-\-consult\-external\-directory] [\-\-version] [path]
+autodoap [\-h] [\-\-trust] [\-\-disable\-net\-access] [\-\-check] [\-\-consult\-external\-directory] [\-\-version] [path]
 This tool tries to guess upstream metadata (Homepage, Contact, VCS Repository)
-for an upstream project. It does this by parsing various files in the
+information for an upstream project. It does this by parsing various files in the
 package, and possibly calling out to external services (unless --disable-net-access is specified).
+Data is written to standard out in DOAP.
 .SS "positional arguments:"
 .IP
 path

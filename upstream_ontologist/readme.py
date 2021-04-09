@@ -38,9 +38,12 @@ def _skip_paragraph(para, metadata):  # noqa: C901
     if m:
         metadata.append(UpstreamDatum('X-License', m.group(1), 'likely'))
         return True
-    m = re.match('homepage_url: (.*)', para.get_text(), re.I)
+    m = re.match('(homepage_url|Main website|Website|Homepage): (.*)', para.get_text(), re.I)
     if m:
-        metadata.append(UpstreamDatum('Homepage', m.group(1), 'likely'))
+        url = m.group(2)
+        if url.startswith('<') and url.endswith('>'):
+            url = url[1:-1]
+        metadata.append(UpstreamDatum('Homepage', url, 'likely'))
         return True
     m = re.match('More documentation .* at http.*', para.get_text())
     if m:
@@ -122,6 +125,8 @@ def _parse_first_header(el):
             certainty = 'possible'
         else:
             certainty = 'likely'
+        if name.startswith('About '):
+            name = name[len('About '):]
         yield UpstreamDatum('Name', name, certainty)
     if summary:
         yield UpstreamDatum('X-Summary', summary, 'likely')
