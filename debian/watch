@@ -1,2 +1,2 @@
 version=4
-opts=pgpsigurlmangle=s/$/.asc/ https://pypi.debian.net/upstream-ontologist upstream-ontologist-(.+)\.(?:zip|tgz|tbz|txz|(?:tar\.(?:gz|bz2|xz)))
+opts=pgpsigurlmangle=s/$/.asc/ https://pypi.debian.net/upstream-ontologist .*/upstream-ontologist-(.+)\.(?:zip|tgz|tbz|txz|(?:tar\.(?:gz|bz2|xz)))
