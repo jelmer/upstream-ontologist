@@ -109,7 +109,7 @@ DATUM_TYPES = {
     }
 
 
-def known_bad_guess(datum):
+def known_bad_guess(datum):  # noqa: C901
     try:
         expected_type = DATUM_TYPES[datum.field]
     except KeyError:
