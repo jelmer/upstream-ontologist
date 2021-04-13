@@ -305,3 +305,16 @@ def description_from_readme_rst(rst_text: str) -> Tuple[Optional[str], Iterable[
         logger.debug('lxml not available, not parsing README.rst')
         return None, {}
     return _description_from_basic_soup(list(soup.body.children)[0])
+
+
+def description_from_readme_plain(text: str) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
+    lines: List[str] = []
+    for line in text.splitlines(False):
+        if line.startswith('You install '):
+            break
+        lines.append(line)
+    if len(lines) > 30:
+        return None, {}
+    while lines and not lines[-1].strip():
+        lines.pop(-1)
+    return ''.join([line + '\n' for line in lines]), {}

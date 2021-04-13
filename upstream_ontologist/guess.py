@@ -764,6 +764,11 @@ def guess_from_readme(path, trust_package):  # noqa: C901
                 from .readme import description_from_readme_rst
                 contents = f.read().decode('utf-8', 'surrogateescape')
                 description, extra_md = description_from_readme_rst(contents)
+        elif path.lower().endswith('readme'):
+            with open(path, 'rb') as f:
+                from .readme import description_from_readme_plain
+                contents = f.read().decode('utf-8', 'surrogateescape')
+                description, extra_md = description_from_readme_plain(contents)
         else:
             description = None
             extra_md = []
