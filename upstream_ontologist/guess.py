@@ -501,13 +501,15 @@ def guess_from_pod(contents):
         yield UpstreamDatum('X-Description', description, 'likely')
 
     if 'NAME' in by_header:
-        name = by_header['NAME'].strip().splitlines()[0]
-        if ' - ' in name:
-            (name, summary) = name.split(' - ', 1)
-            yield UpstreamDatum('Name', name.strip(), 'confident')
-            yield UpstreamDatum('X-Summary', summary.strip(), 'confident')
-        elif ' ' not in name:
-            yield UpstreamDatum('Name', name.strip(), 'confident')
+        lines = by_header['NAME'].strip().splitlines()
+        if lines:
+            name = lines[0]
+            if ' - ' in name:
+                (name, summary) = name.split(' - ', 1)
+                yield UpstreamDatum('Name', name.strip(), 'confident')
+                yield UpstreamDatum('X-Summary', summary.strip(), 'confident')
+            elif ' ' not in name:
+                yield UpstreamDatum('Name', name.strip(), 'confident')
 
 
 def guess_from_perl_module(path):
