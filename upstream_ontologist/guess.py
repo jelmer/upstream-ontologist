@@ -276,7 +276,7 @@ def guess_from_python_metadata(pkg_info):
 
 
 def guess_from_pkg_info(path, trust_package):
-    """Get the metadata from a python setup.py file."""
+    """Get the metadata from a PKG-INFO file."""
     from email.parser import Parser
     try:
         with open(path, 'r') as f:
@@ -336,13 +336,11 @@ def guess_from_setup_cfg(path, trust_package):
 def parse_python_url(url):
     repo = guess_repo_from_url(url)
     if repo:
-        yield UpstreamDatum(
-            'Repository', repo, 'likely')
+        yield UpstreamDatum('Repository', repo, 'likely')
+    yield UpstreamDatum('Homepage', url, 'likely')
 
 
-def guess_from_setup_py(path, trust_package):
-    if not trust_package:
-        return
+def guess_from_setup_py_executed(path):
     from distutils.core import run_setup
     result = run_setup(os.path.abspath(path), stop_after="init")
     if result.get_name() not in (None, '', 'UNKNOWN'):
@@ -364,13 +362,90 @@ def guess_from_setup_py(path, trust_package):
     yield from parse_python_long_description(
         result.metadata.long_description,
         getattr(result.metadata, 'long_description_content_type', None))
-    for url_type, url in getattr(result.metadata, 'project_urls', {}).items():
+    yield from parse_python_project_urls(getattr(result.metadata, 'project_urls', {}))
+
+
+def parse_python_project_urls(urls):
+    for url_type, url in urls.items():
         if url_type in ('GitHub', 'Repository', 'Source Code'):
             yield UpstreamDatum(
                 'Repository', url, 'certain')
         if url_type in ('Bug Tracker', ):
             yield UpstreamDatum(
                 'Bug-Database', url, 'certain')
+
+
+def guess_from_setup_py(path, trust_package):
+    if trust_package:
+        try:
+            return guess_from_setup_py_executed(path)
+        except Exception as e:
+            logging.warning('Failed to run setup.py: %r', e)
+    with open(path) as inp:
+        setup_text = inp.read()
+    import ast
+
+    # Based on pypi.py in https://github.com/nexB/scancode-toolkit/blob/develop/src/packagedcode/pypi.py
+    #
+    # Copyright (c) nexB Inc. and others. All rights reserved.
+    # ScanCode is a trademark of nexB Inc.
+    # SPDX-License-Identifier: Apache-2.0
+
+    tree = ast.parse(setup_text)
+    setup_args = {}
+
+    for statement in tree.body:
+        # We only care about function calls or assignments to functions named
+        # `setup` or `main`
+        if (isinstance(statement, (ast.Expr, ast.Call, ast.Assign))
+            and isinstance(statement.value, ast.Call)
+            and isinstance(statement.value.func, ast.Name)
+            # we also look for main as sometimes this is used instead of setup()
+            and statement.value.func.id in ('setup', 'main')
+        ):
+
+            # Process the arguments to the setup function
+            for kw in getattr(statement.value, 'keywords', []):
+                arg_name = kw.arg
+
+                if isinstance(kw.value, (ast.Str, ast.Constant)):
+                    setup_args[arg_name] = kw.value.s
+
+                elif isinstance(kw.value, (ast.List, ast.Tuple, ast.Set,)):
+                    # We collect the elements of a list if the element
+                    # and tag function calls
+                    value = [
+                        elt.s for elt in kw.value.elts
+                        if not isinstance(elt, ast.Call) and not isinstance(elt, ast.Tuple)
+                    ]
+                    setup_args[arg_name] = value
+
+                elif isinstance(kw.value, ast.Dict):
+                    setup_args[arg_name] = {}
+                    for (key, value) in zip(kw.value.keys, kw.value.values):
+                        if isinstance(value, (ast.Str, ast.Constant)):
+                            setup_args[key.s] = value.s
+
+                # TODO: what if kw.value is an expression like a call to
+                # version=get_version or version__version__
+
+    # End code from https://github.com/nexB/scancode-toolkit/blob/develop/src/packagedcode/pypi.py
+
+    if 'name' in setup_args:
+        yield UpstreamDatum('Name', setup_args['name'], 'certain')
+    if 'version' in setup_args:
+        yield UpstreamDatum('X-Version', setup_args['version'], 'certain')
+    if 'description' in setup_args:
+        yield UpstreamDatum('Description', setup_args['description'], 'certain')
+    if 'long_description' in setup_args:
+        yield from parse_python_long_description(
+            setup_args['long_description'], setup_args.get('long_description_content_type'))
+    if 'license' in setup_args:
+        yield UpstreamDatum('X-License', setup_args['license'], 'certain')
+    if 'url' in setup_args:
+        yield from parse_python_url(setup_args['url'])
+    if 'project_urls' in setup_args:
+        yield from parse_python_project_urls(setup_args['project_urls'])
 
 
 def guess_from_composer_json(path, trust_package):
