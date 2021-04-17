@@ -129,7 +129,7 @@ def _parse_first_header(el):
             certainty = 'likely'
         if name.startswith('About '):
             name = name[len('About '):]
-        yield UpstreamDatum('Name', name, certainty)
+        yield UpstreamDatum('Name', name.strip(), certainty)
     if summary:
         yield UpstreamDatum('X-Summary', summary, 'likely')
     if version:
