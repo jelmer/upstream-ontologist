@@ -436,7 +436,7 @@ def guess_from_setup_py(path, trust_package):
     if 'version' in setup_args:
         yield UpstreamDatum('X-Version', setup_args['version'], 'certain')
     if 'description' in setup_args:
-        yield UpstreamDatum('Description', setup_args['description'], 'certain')
+        yield UpstreamDatum('X-Summary', setup_args['description'], 'certain')
     if 'long_description' in setup_args:
         yield from parse_python_long_description(
             setup_args['long_description'], setup_args.get('long_description_content_type'))
