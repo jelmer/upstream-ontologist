@@ -1,0 +1,4 @@
+In showing a long lists, sometimes one would prefer to see the value
+arranged aligned in columns. Some examples include listing methods of
+an object, listing debugger commands, or showing a numeric array with data
+aligned.

@@ -416,7 +416,7 @@ def guess_from_setup_py(path, trust_package):
                     # and tag function calls
                     value = [
                         elt.s for elt in kw.value.elts
-                        if not isinstance(elt, ast.Call) and not isinstance(elt, ast.Tuple)
+                        if isinstance(elt, ast.Constant)
                     ]
                     setup_args[arg_name] = value
 

@@ -190,7 +190,9 @@ def _extract_paragraphs(children, metadata):
                         '* %s\n' % li.get_text()
                         for li in el.findAll('li')))
         elif re.match('h[0-9]', el.name):
-            if len(paragraphs) == 0 and el.get_text() in ('About', 'Introduction', 'Overview'):
+            if len(paragraphs) == 0:
+                if el.get_text() not in ('About', 'Introduction', 'Overview'):
+                    metadata.extend(_parse_first_header(el))
                 continue
             break
     return paragraphs
@@ -253,8 +255,15 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[Upstream
     paragraphs: List[str] = []
     paragraphs.extend(_extract_paragraphs(soup.children, metadata))
 
-    if len(paragraphs) >= 1 and len(paragraphs) < 6:
+    if len(paragraphs) == 0:
+        logging.debug('Empty description; no paragraphs.')
+        return None, metadata
+
+    if len(paragraphs) < 6:
         return '\n'.join(paragraphs), metadata
+    logging.debug(
+        'Not returning description, number of paragraphs too high: %d',
+        len(paragraphs))
     return None, metadata
 
 
