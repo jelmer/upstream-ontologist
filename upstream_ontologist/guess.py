@@ -308,6 +308,8 @@ def parse_python_long_description(long_description, content_type):
         description, extra_md = description_from_readme_md(long_description)
         if description:
             yield UpstreamDatum('X-Description', description, 'possible')
+    else:
+        extra_md = []
     for datum in extra_md:
         yield datum
 
@@ -391,7 +393,11 @@ def guess_from_setup_py(path, trust_package):
     # ScanCode is a trademark of nexB Inc.
     # SPDX-License-Identifier: Apache-2.0
 
-    tree = ast.parse(setup_text)
+    try:
+        tree = ast.parse(setup_text)
+    except SyntaxError as e:
+        logging.warning('Syntax error while parsing setup.py: %s', e)
+        return
     setup_args = {}
 
     for statement in tree.body:
