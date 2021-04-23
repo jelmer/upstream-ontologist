@@ -571,7 +571,7 @@ def guess_from_pod(contents):
             inheader = line.rstrip(b'\n').split(b' ', 1)[1]
             by_header[inheader.decode('utf-8', 'surrogateescape').upper()] = ''
         elif inheader:
-            by_header[inheader.decode('utf-8', 'surrogateescape').upper()] += line.decode()
+            by_header[inheader.decode('utf-8', 'surrogateescape').upper()] += line.decode('utf-8', 'surrogateescape')
 
     if 'DESCRIPTION' in by_header:
         description = by_header['DESCRIPTION'].lstrip('\n')
