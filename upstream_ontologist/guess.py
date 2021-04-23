@@ -569,9 +569,9 @@ def guess_from_pod(contents):
     for line in contents.splitlines(True):
         if line.startswith(b'=head1 '):
             inheader = line.rstrip(b'\n').split(b' ', 1)[1]
-            by_header[inheader.decode().upper()] = ''
+            by_header[inheader.decode('utf-8', 'surrogateescape').upper()] = ''
         elif inheader:
-            by_header[inheader.decode().upper()] += line.decode()
+            by_header[inheader.decode('utf-8', 'surrogateescape').upper()] += line.decode()
 
     if 'DESCRIPTION' in by_header:
         description = by_header['DESCRIPTION'].lstrip('\n')
@@ -719,7 +719,7 @@ def guess_from_debian_copyright(path, trust_package):
 
 def url_from_git_clone_command(command):
     import shlex
-    argv = shlex.split(command.decode('utf-8', 'replace'))
+    argv = shlex.split(command.decode('utf-8', 'surrogateescape'))
     args = [arg for arg in argv if arg.strip()]
     i = 0
     while i < len(args):
@@ -746,7 +746,7 @@ def url_from_git_clone_command(command):
 
 def url_from_fossil_clone_command(command):
     import shlex
-    argv = shlex.split(command.decode('utf-8', 'replace'))
+    argv = shlex.split(command.decode('utf-8', 'surrogateescape'))
     args = [arg for arg in argv if arg.strip()]
     i = 0
     while i < len(args):
