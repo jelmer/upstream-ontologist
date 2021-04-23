@@ -951,6 +951,9 @@ def guess_from_meta_yml(path, trust_package):
         except ruamel.yaml.reader.ReaderError as e:
             logging.warning('Unable to parse %s: %s', path, e)
             return
+        if data is None:
+            # Empty file?
+            return
         if 'name' in data:
             dist_name = data['name']
             yield UpstreamDatum('Name', data['name'], 'certain')
