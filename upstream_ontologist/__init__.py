@@ -36,12 +36,14 @@ Supported fields:
 - Security-Contact
 
 Extensions for upstream-ontologist.
-- X-SourceForge-Project
-- X-Wiki
-- X-Summary
-- X-Description
-- X-License
+- X-SourceForge-Project: Name of the SourceForge project
+- X-Wiki: URL to a wiki
+- X-Summary: A one-line description
+- X-Description: Multi-line description
+- X-License: Short description of the license
 - X-Copyright
+- X-Maintainer
+- X-Authors
 
 Supported, but currently not set.
 - FAQ
@@ -52,6 +54,9 @@ Supported, but currently not set.
 """
 
 from typing import Optional, Sequence
+from dataclasses import dataclass
+from email.utils import parseaddr
+
 
 SUPPORTED_CERTAINTIES = ["certain", "confident", "likely", "possible", None]
 
@@ -60,6 +65,28 @@ version_string = "0.1.18"
 USER_AGENT = "upstream-ontologist/" + version_string
 # Too aggressive?
 DEFAULT_URLLIB_TIMEOUT = 3
+
+
+@dataclass
+class Person:
+
+    name: str
+    email: Optional[str] = None
+
+    @classmethod
+    def from_string(cls, text):
+        text = text.replace(' at ', '@')
+        text = text.replace('[AT]', '@')
+        if '<' in text:
+            (name, email) = parseaddr(text)
+            return cls(name=name, email=email)
+        else:
+            return cls(name=text)
+
+    def __str__(self):
+        if self.email:
+            return '%s <%s>' % (self.name, self.email)
+        return self.name
 
 
 class UpstreamDatum(object):

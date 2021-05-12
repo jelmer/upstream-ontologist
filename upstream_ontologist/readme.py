@@ -48,8 +48,9 @@ def _skip_paragraph(para, metadata):  # noqa: C901
     m = re.match('More documentation .* at http.*', para.get_text())
     if m:
         return True
-    m = re.match('Documentation can be found at ', para.get_text())
+    m = re.match('Documentation (can be found|is hosted) (at|on) ([^ ]+)', para.get_text())
     if m:
+        metadata.append(UpstreamDatum('Documentation', m.group(3), 'likely'))
         return True
     m = re.match('See (http.*|gopkg.in.*|github.com.*)', para.get_text())
     if m:

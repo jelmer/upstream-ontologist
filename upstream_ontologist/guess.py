@@ -45,6 +45,7 @@ from . import (
     certainty_to_confidence,
     certainty_sufficient,
     _load_json_url,
+    Person,
     )
 
 
@@ -106,6 +107,7 @@ DATUM_TYPES = {
     'X-Pecl-URL': str,
     'Screenshots': list,
     'Contact': str,
+    'X-Maintainer': Person,
     }
 
 
@@ -271,6 +273,10 @@ def guess_from_python_metadata(pkg_info):
                 'Bug-Database', url, 'certain')
     if 'Summary' in pkg_info:
         yield UpstreamDatum('X-Summary', pkg_info['Summary'], 'certain')
+    if 'Author' in pkg_info:
+        author_email = pkg_info.get('Author-email')
+        author = Person(pkg_info['Author'], author_email)
+        yield UpstreamDatum('X-Authors', [author], 'certain')
     yield from parse_python_long_description(
         pkg_info.get_payload(), pkg_info.get_content_type())
 
@@ -452,6 +458,10 @@ def guess_from_setup_py(path, trust_package):
         yield from parse_python_url(setup_args['url'])
     if 'project_urls' in setup_args:
         yield from parse_python_project_urls(setup_args['project_urls'])
+    if 'maintainer' in setup_args:
+        maintainer_email = setup_args.get('maintainer_email')
+        maintainer = Person(setup_args['maintainer'], maintainer_email)
+        yield UpstreamDatum('X-Maintainer', maintainer, 'certain')
 
 
 def guess_from_composer_json(path, trust_package):
@@ -1101,6 +1111,15 @@ def guess_from_doap(path, trust_package):  # noqa: C901
             url = extract_url(child)
             if url:
                 yield UpstreamDatum('X-Wiki', url, 'certain')
+        elif child.tag == '{%s}maintainer' % DOAP_NAMESPACE:
+            for person in child:
+                if person.tag != '{http://xmlns.com/foaf/0.1/}Person':
+                    continue
+                name = person.find('{http://xmlns.com/foaf/0.1/}name').text
+                email_tag = person.find('{http://xmlns.com/foaf/0.1/}mbox')
+                maintainer = Person(
+                    name, email_tag.text if email_tag else None)
+                yield UpstreamDatum('X-Maintainer', maintainer, 'certain')
         else:
             logging.warning('Unknown tag %s in DOAP file', child.tag)
 
@@ -1138,7 +1157,8 @@ def guess_from_cabal(path, trust_package=False):  # noqa: C901
                 if field == 'name':
                     yield UpstreamDatum('Name', value, 'certain')
                 if field == 'maintainer':
-                    yield UpstreamDatum('Contact', value, 'certain')
+                    yield UpstreamDatum(
+                        'Maintainer', Person.from_string(value), 'certain')
                 if field == 'copyright':
                     yield UpstreamDatum('X-Copyright', value, 'certain')
                 if field == 'license':
@@ -1239,7 +1259,8 @@ def guess_from_r_description(path, trust_package=False):
             reflowed = lines[0] + textwrap.dedent(''.join(lines[1:]))
             yield UpstreamDatum('X-Description', reflowed, 'certain')
         if 'Maintainer' in description:
-            yield UpstreamDatum('Contact', description['Maintainer'], 'certain')
+            yield UpstreamDatum(
+                'X-Maintainer', Person.from_string(description['Maintainer']), 'certain')
         if 'URL' in description:
             entries = [entry.strip()
                        for entry in re.split('[\n,]', description['URL'])]
@@ -1539,6 +1560,24 @@ def guess_from_wscript(path, trust_package=False):
                 yield UpstreamDatum('X-Version', m.group(1).decode(), 'confident')
 
 
+def guess_from_authors(path, trust_package=False):
+    authors = []
+    with open(path, 'rb') as f:
+        for line in f:
+            m = line.strip().decode('utf-8')
+            if not m:
+                continue
+            if not m[0].isalpha():
+                continue
+            if m.startswith('*') or m.startswith('-'):
+                m = m[1:].strip()
+            if len(m) < 3:
+                continue
+            if '<' in m or m.count(' ') < 5:
+                authors.append(Person.from_string(m))
+    yield UpstreamDatum('X-Authors', authors, 'certain')
+
+
 def _get_guessers(path, trust_package=False):  # noqa: C901
     CANDIDATES = [
         ('debian/watch', guess_from_debian_watch),
@@ -1568,6 +1607,7 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
         ('go.mod', guess_from_go_mod),
         ('Makefile.PL', guess_from_makefile_pl),
         ('wscript', guess_from_wscript),
+        ('AUTHORS', guess_from_authors),
         ]
 
     # Search for something Python-y
