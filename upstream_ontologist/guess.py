@@ -2288,6 +2288,8 @@ def _extrapolate_homepage_from_repository_browse(
     browse_url = upstream_metadata['Repository-Browse'].value
     parsed = urlparse(browse_url)
     # Some hosting sites are commonly used as Homepage
+    # TODO(jelmer): Maybe check that there is a README file that
+    # can serve as index?
     if parsed.netloc in ('github.com', ) or is_gitlab_site(parsed.netloc):
         return UpstreamDatum('Homepage', browse_url, 'possible')
 
