@@ -277,6 +277,10 @@ def guess_from_python_metadata(pkg_info):
         author_email = pkg_info.get('Author-email')
         author = Person(pkg_info['Author'], author_email)
         yield UpstreamDatum('X-Authors', [author], 'certain')
+    if 'License' in pkg_info:
+        yield UpstreamDatum('X-License', pkg_info['License'], 'certain')
+    if 'Download-URL' in pkg_info:
+        yield UpstreamDatum('X-Download', pkg_info['Download-URL'], 'certain')
     yield from parse_python_long_description(
         pkg_info.get_payload(), pkg_info.get_content_type())
 
@@ -360,6 +364,9 @@ def guess_from_setup_py_executed(path):
     if result.get_download_url() not in (None, '', 'UNKNOWN'):
         yield UpstreamDatum(
             'X-Download', result.get_download_url(), 'likely')
+    if result.get_license() not in (None, '', 'UNKNOWN'):
+        yield UpstreamDatum(
+            'X-License', result.get_license(), 'likely')
     if result.get_contact() not in (None, '', 'UNKNOWN'):
         contact = result.get_contact()
         if result.get_contact_email() not in (None, '', 'UNKNOWN'):
@@ -454,6 +461,8 @@ def guess_from_setup_py(path, trust_package):
             setup_args['long_description'], setup_args.get('long_description_content_type'))
     if 'license' in setup_args:
         yield UpstreamDatum('X-License', setup_args['license'], 'certain')
+    if 'download_url' in setup_args:
+        yield UpstreamDatum('X-Download', setup_args['download_url'], 'certain')
     if 'url' in setup_args:
         yield from parse_python_url(setup_args['url'])
     if 'project_urls' in setup_args:
