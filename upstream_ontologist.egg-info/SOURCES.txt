@@ -31,8 +31,12 @@ upstream_ontologist/tests/__init__.py
 upstream_ontologist/tests/test_readme.py
 upstream_ontologist/tests/test_upstream_ontologist.py
 upstream_ontologist/tests/test_vcs.py
+upstream_ontologist/tests/readme_data/aiozipkin/README.rst
+upstream_ontologist/tests/readme_data/aiozipkin/description
 upstream_ontologist/tests/readme_data/argparse/README.rst
 upstream_ontologist/tests/readme_data/argparse/description
+upstream_ontologist/tests/readme_data/bitlbee/README.md
+upstream_ontologist/tests/readme_data/bitlbee/description
 upstream_ontologist/tests/readme_data/bup/README.md
 upstream_ontologist/tests/readme_data/bup/description
 upstream_ontologist/tests/readme_data/cbor2/README.rst
@@ -50,6 +54,8 @@ upstream_ontologist/tests/readme_data/jadx/README.md
 upstream_ontologist/tests/readme_data/jadx/description
 upstream_ontologist/tests/readme_data/jupyter-client/README.md
 upstream_ontologist/tests/readme_data/jupyter-client/description
+upstream_ontologist/tests/readme_data/perl-timedate/README
+upstream_ontologist/tests/readme_data/perl-timedate/description
 upstream_ontologist/tests/readme_data/perl5-xml-compile-cache/README.md
 upstream_ontologist/tests/readme_data/perl5-xml-compile-cache/description
 upstream_ontologist/tests/readme_data/pylint-flask/README.md
@@ -58,6 +64,8 @@ upstream_ontologist/tests/readme_data/python-icalendar/README.rst
 upstream_ontologist/tests/readme_data/python-icalendar/description
 upstream_ontologist/tests/readme_data/python-rsa/README.md
 upstream_ontologist/tests/readme_data/python-rsa/description
+upstream_ontologist/tests/readme_data/ruby-columnize/README.md
+upstream_ontologist/tests/readme_data/ruby-columnize/description
 upstream_ontologist/tests/readme_data/ruby-sha3/README.md
 upstream_ontologist/tests/readme_data/ruby-sha3/description
 upstream_ontologist/tests/readme_data/samba/README.md

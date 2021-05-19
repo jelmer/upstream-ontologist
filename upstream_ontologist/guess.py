@@ -45,6 +45,7 @@ from . import (
     certainty_to_confidence,
     certainty_sufficient,
     _load_json_url,
+    Person,
     )
 
 
@@ -106,6 +107,7 @@ DATUM_TYPES = {
     'X-Pecl-URL': str,
     'Screenshots': list,
     'Contact': str,
+    'X-Maintainer': Person,
     }
 
 
@@ -271,12 +273,20 @@ def guess_from_python_metadata(pkg_info):
                 'Bug-Database', url, 'certain')
     if 'Summary' in pkg_info:
         yield UpstreamDatum('X-Summary', pkg_info['Summary'], 'certain')
+    if 'Author' in pkg_info:
+        author_email = pkg_info.get('Author-email')
+        author = Person(pkg_info['Author'], author_email)
+        yield UpstreamDatum('X-Authors', [author], 'certain')
+    if 'License' in pkg_info:
+        yield UpstreamDatum('X-License', pkg_info['License'], 'certain')
+    if 'Download-URL' in pkg_info:
+        yield UpstreamDatum('X-Download', pkg_info['Download-URL'], 'certain')
     yield from parse_python_long_description(
         pkg_info.get_payload(), pkg_info.get_content_type())
 
 
 def guess_from_pkg_info(path, trust_package):
-    """Get the metadata from a python setup.py file."""
+    """Get the metadata from a PKG-INFO file."""
     from email.parser import Parser
     try:
         with open(path, 'r') as f:
@@ -308,6 +318,8 @@ def parse_python_long_description(long_description, content_type):
         description, extra_md = description_from_readme_md(long_description)
         if description:
             yield UpstreamDatum('X-Description', description, 'possible')
+    else:
+        extra_md = []
     for datum in extra_md:
         yield datum
 
@@ -336,13 +348,11 @@ def guess_from_setup_cfg(path, trust_package):
 def parse_python_url(url):
     repo = guess_repo_from_url(url)
     if repo:
-        yield UpstreamDatum(
-            'Repository', repo, 'likely')
+        yield UpstreamDatum('Repository', repo, 'likely')
+    yield UpstreamDatum('Homepage', url, 'likely')
 
 
-def guess_from_setup_py(path, trust_package):
-    if not trust_package:
-        return
+def guess_from_setup_py_executed(path):
     from distutils.core import run_setup
     result = run_setup(os.path.abspath(path), stop_after="init")
     if result.get_name() not in (None, '', 'UNKNOWN'):
@@ -354,6 +364,9 @@ def guess_from_setup_py(path, trust_package):
     if result.get_download_url() not in (None, '', 'UNKNOWN'):
         yield UpstreamDatum(
             'X-Download', result.get_download_url(), 'likely')
+    if result.get_license() not in (None, '', 'UNKNOWN'):
+        yield UpstreamDatum(
+            'X-License', result.get_license(), 'likely')
     if result.get_contact() not in (None, '', 'UNKNOWN'):
         contact = result.get_contact()
         if result.get_contact_email() not in (None, '', 'UNKNOWN'):
@@ -364,13 +377,100 @@ def guess_from_setup_py(path, trust_package):
     yield from parse_python_long_description(
         result.metadata.long_description,
         getattr(result.metadata, 'long_description_content_type', None))
-    for url_type, url in getattr(result.metadata, 'project_urls', {}).items():
+    yield from parse_python_project_urls(getattr(result.metadata, 'project_urls', {}))
+
+
+def parse_python_project_urls(urls):
+    for url_type, url in urls.items():
         if url_type in ('GitHub', 'Repository', 'Source Code'):
             yield UpstreamDatum(
                 'Repository', url, 'certain')
         if url_type in ('Bug Tracker', ):
             yield UpstreamDatum(
                 'Bug-Database', url, 'certain')
+
+
+def guess_from_setup_py(path, trust_package):
+    if trust_package:
+        try:
+            return guess_from_setup_py_executed(path)
+        except Exception as e:
+            logging.warning('Failed to run setup.py: %r', e)
+    with open(path) as inp:
+        setup_text = inp.read()
+    import ast
+
+    # Based on pypi.py in https://github.com/nexB/scancode-toolkit/blob/develop/src/packagedcode/pypi.py
+    #
+    # Copyright (c) nexB Inc. and others. All rights reserved.
+    # ScanCode is a trademark of nexB Inc.
+    # SPDX-License-Identifier: Apache-2.0
+
+    try:
+        tree = ast.parse(setup_text)
+    except SyntaxError as e:
+        logging.warning('Syntax error while parsing setup.py: %s', e)
+        return
+    setup_args = {}
+
+    for statement in tree.body:
+        # We only care about function calls or assignments to functions named
+        # `setup` or `main`
+        if (isinstance(statement, (ast.Expr, ast.Call, ast.Assign))
+            and isinstance(statement.value, ast.Call)
+            and isinstance(statement.value.func, ast.Name)
+            # we also look for main as sometimes this is used instead of setup()
+            and statement.value.func.id in ('setup', 'main')
+        ):
+
+            # Process the arguments to the setup function
+            for kw in getattr(statement.value, 'keywords', []):
+                arg_name = kw.arg
+
+                if isinstance(kw.value, (ast.Str, ast.Constant)):
+                    setup_args[arg_name] = kw.value.s
+
+                elif isinstance(kw.value, (ast.List, ast.Tuple, ast.Set,)):
+                    # We collect the elements of a list if the element
+                    # and tag function calls
+                    value = [
+                        elt.s for elt in kw.value.elts
+                        if isinstance(elt, ast.Constant)
+                    ]
+                    setup_args[arg_name] = value
+
+                elif isinstance(kw.value, ast.Dict):
+                    setup_args[arg_name] = {}
+                    for (key, value) in zip(kw.value.keys, kw.value.values):
+                        if isinstance(value, (ast.Str, ast.Constant)):
+                            setup_args[key.s] = value.s
+
+                # TODO: what if kw.value is an expression like a call to
+                # version=get_version or version__version__
+
+    # End code from https://github.com/nexB/scancode-toolkit/blob/develop/src/packagedcode/pypi.py
+
+    if 'name' in setup_args:
+        yield UpstreamDatum('Name', setup_args['name'], 'certain')
+    if 'version' in setup_args:
+        yield UpstreamDatum('X-Version', setup_args['version'], 'certain')
+    if 'description' in setup_args:
+        yield UpstreamDatum('X-Summary', setup_args['description'], 'certain')
+    if 'long_description' in setup_args:
+        yield from parse_python_long_description(
+            setup_args['long_description'], setup_args.get('long_description_content_type'))
+    if 'license' in setup_args:
+        yield UpstreamDatum('X-License', setup_args['license'], 'certain')
+    if 'download_url' in setup_args:
+        yield UpstreamDatum('X-Download', setup_args['download_url'], 'certain')
+    if 'url' in setup_args:
+        yield from parse_python_url(setup_args['url'])
+    if 'project_urls' in setup_args:
+        yield from parse_python_project_urls(setup_args['project_urls'])
+    if 'maintainer' in setup_args:
+        maintainer_email = setup_args.get('maintainer_email')
+        maintainer = Person(setup_args['maintainer'], maintainer_email)
+        yield UpstreamDatum('X-Maintainer', maintainer, 'certain')
 
 
 def guess_from_composer_json(path, trust_package):
@@ -488,9 +588,9 @@ def guess_from_pod(contents):
     for line in contents.splitlines(True):
         if line.startswith(b'=head1 '):
             inheader = line.rstrip(b'\n').split(b' ', 1)[1]
-            by_header[inheader.decode().upper()] = ''
+            by_header[inheader.decode('utf-8', 'surrogateescape').upper()] = ''
         elif inheader:
-            by_header[inheader.decode().upper()] += line.decode()
+            by_header[inheader.decode('utf-8', 'surrogateescape').upper()] += line.decode('utf-8', 'surrogateescape')
 
     if 'DESCRIPTION' in by_header:
         description = by_header['DESCRIPTION'].lstrip('\n')
@@ -501,13 +601,15 @@ def guess_from_pod(contents):
         yield UpstreamDatum('X-Description', description, 'likely')
 
     if 'NAME' in by_header:
-        name = by_header['NAME'].strip().splitlines()[0]
-        if ' - ' in name:
-            (name, summary) = name.split(' - ', 1)
-            yield UpstreamDatum('Name', name.strip(), 'confident')
-            yield UpstreamDatum('X-Summary', summary.strip(), 'confident')
-        elif ' ' not in name:
-            yield UpstreamDatum('Name', name.strip(), 'confident')
+        lines = by_header['NAME'].strip().splitlines()
+        if lines:
+            name = lines[0]
+            if ' - ' in name:
+                (name, summary) = name.split(' - ', 1)
+                yield UpstreamDatum('Name', name.strip(), 'confident')
+                yield UpstreamDatum('X-Summary', summary.strip(), 'confident')
+            elif ' ' not in name:
+                yield UpstreamDatum('Name', name.strip(), 'confident')
 
 
 def guess_from_perl_module(path):
@@ -636,7 +738,7 @@ def guess_from_debian_copyright(path, trust_package):
 
 def url_from_git_clone_command(command):
     import shlex
-    argv = shlex.split(command.decode('utf-8', 'replace'))
+    argv = shlex.split(command.decode('utf-8', 'surrogateescape'))
     args = [arg for arg in argv if arg.strip()]
     i = 0
     while i < len(args):
@@ -663,7 +765,7 @@ def url_from_git_clone_command(command):
 
 def url_from_fossil_clone_command(command):
     import shlex
-    argv = shlex.split(command.decode('utf-8', 'replace'))
+    argv = shlex.split(command.decode('utf-8', 'surrogateescape'))
     args = [arg for arg in argv if arg.strip()]
     i = 0
     while i < len(args):
@@ -762,6 +864,11 @@ def guess_from_readme(path, trust_package):  # noqa: C901
                 from .readme import description_from_readme_rst
                 contents = f.read().decode('utf-8', 'surrogateescape')
                 description, extra_md = description_from_readme_rst(contents)
+        elif path.lower().endswith('readme'):
+            with open(path, 'rb') as f:
+                from .readme import description_from_readme_plain
+                contents = f.read().decode('utf-8', 'surrogateescape')
+                description, extra_md = description_from_readme_plain(contents)
         else:
             description = None
             extra_md = []
@@ -863,15 +970,18 @@ def guess_from_meta_yml(path, trust_package):
         except ruamel.yaml.reader.ReaderError as e:
             logging.warning('Unable to parse %s: %s', path, e)
             return
+        if data is None:
+            # Empty file?
+            return
         if 'name' in data:
             dist_name = data['name']
             yield UpstreamDatum('Name', data['name'], 'certain')
         else:
             dist_name = None
-        if 'license' in data:
+        if data.get('license'):
             yield UpstreamDatum('X-License', data['license'], 'certain')
         if 'version' in data:
-            yield UpstreamDatum('X-Version', data['version'], 'certain')
+            yield UpstreamDatum('X-Version', str(data['version']), 'certain')
         if 'resources' in data:
             resources = data['resources']
             if 'bugtracker' in resources:
@@ -937,22 +1047,39 @@ def guess_from_doap(path, trust_package):  # noqa: C901
         return el.attrib.get(
             '{http://www.w3.org/1999/02/22-rdf-syntax-ns#}resource')
 
+    def extract_lang(el):
+        return el.attrib.get('{http://www.w3.org/XML/1998/namespace}lang')
+
+    screenshots = []
+
     for child in root:
         if child.tag == ('{%s}name' % DOAP_NAMESPACE) and child.text:
             yield UpstreamDatum('Name', child.text, 'certain')
-        if child.tag == ('{%s}bug-database' % DOAP_NAMESPACE):
+        elif child.tag == ('{%s}short-name' % DOAP_NAMESPACE) and child.text:
+            yield UpstreamDatum('Name', child.text, 'likely')
+        elif child.tag == ('{%s}bug-database' % DOAP_NAMESPACE):
             url = extract_url(child)
             if url:
                 yield UpstreamDatum('Bug-Database', url, 'certain')
-        if child.tag == ('{%s}homepage' % DOAP_NAMESPACE):
+        elif child.tag == ('{%s}homepage' % DOAP_NAMESPACE):
             url = extract_url(child)
             if url:
                 yield UpstreamDatum('Homepage', url, 'certain')
-        if child.tag == ('{%s}download-page' % DOAP_NAMESPACE):
+        elif child.tag == ('{%s}download-page' % DOAP_NAMESPACE):
             url = extract_url(child)
             if url:
                 yield UpstreamDatum('X-Download', url, 'certain')
-        if child.tag == ('{%s}repository' % DOAP_NAMESPACE):
+        elif child.tag == ('{%s}shortdesc' % DOAP_NAMESPACE):
+            lang = extract_lang(child)
+            if lang in ('en', None):
+                yield UpstreamDatum('X-Summary', child.text, 'certain')
+        elif child.tag == ('{%s}description' % DOAP_NAMESPACE):
+            lang = extract_lang(child)
+            if lang in ('en', None):
+                yield UpstreamDatum('X-Description', child.text, 'certain')
+        elif child.tag == ('{%s}license' % DOAP_NAMESPACE):
+            pass  # TODO
+        elif child.tag == ('{%s}repository' % DOAP_NAMESPACE):
             for repo in child:
                 if repo.tag in (
                         '{%s}SVNRepository' % DOAP_NAMESPACE,
@@ -964,9 +1091,7 @@ def guess_from_doap(path, trust_package):  # noqa: C901
                     else:
                         repo_url = None
                     if repo_url:
-                        yield UpstreamDatum(
-                            'Repository', repo_url,
-                            'certain')
+                        yield UpstreamDatum('Repository', repo_url, 'certain')
                     web_location = repo.find(
                         '{http://usefulinc.com/ns/doap#}browse')
                     if web_location is not None:
@@ -977,6 +1102,35 @@ def guess_from_doap(path, trust_package):  # noqa: C901
                     if web_url:
                         yield UpstreamDatum(
                             'Repository-Browse', web_url, 'certain')
+        elif child.tag == '{%s}category' % DOAP_NAMESPACE:
+            pass
+        elif child.tag == '{%s}programming-language' % DOAP_NAMESPACE:
+            pass
+        elif child.tag == '{%s}os' % DOAP_NAMESPACE:
+            pass
+        elif child.tag == '{%s}implements' % DOAP_NAMESPACE:
+            pass
+        elif child.tag == '{https://schema.org/}logo':
+            pass
+        elif child.tag == '{https://schema.org/}screenshot':
+            url = extract_url(child)
+            if url:
+                screenshots.append(url)
+        elif child.tag == '{%s}wiki' % DOAP_NAMESPACE:
+            url = extract_url(child)
+            if url:
+                yield UpstreamDatum('X-Wiki', url, 'certain')
+        elif child.tag == '{%s}maintainer' % DOAP_NAMESPACE:
+            for person in child:
+                if person.tag != '{http://xmlns.com/foaf/0.1/}Person':
+                    continue
+                name = person.find('{http://xmlns.com/foaf/0.1/}name').text
+                email_tag = person.find('{http://xmlns.com/foaf/0.1/}mbox')
+                maintainer = Person(
+                    name, email_tag.text if email_tag else None)
+                yield UpstreamDatum('X-Maintainer', maintainer, 'certain')
+        else:
+            logging.warning('Unknown tag %s in DOAP file', child.tag)
 
 
 def guess_from_cabal(path, trust_package=False):  # noqa: C901
@@ -1012,7 +1166,8 @@ def guess_from_cabal(path, trust_package=False):  # noqa: C901
                 if field == 'name':
                     yield UpstreamDatum('Name', value, 'certain')
                 if field == 'maintainer':
-                    yield UpstreamDatum('Contact', value, 'certain')
+                    yield UpstreamDatum(
+                        'Maintainer', Person.from_string(value), 'certain')
                 if field == 'copyright':
                     yield UpstreamDatum('X-Copyright', value, 'certain')
                 if field == 'license':
@@ -1113,7 +1268,8 @@ def guess_from_r_description(path, trust_package=False):
             reflowed = lines[0] + textwrap.dedent(''.join(lines[1:]))
             yield UpstreamDatum('X-Description', reflowed, 'certain')
         if 'Maintainer' in description:
-            yield UpstreamDatum('Contact', description['Maintainer'], 'certain')
+            yield UpstreamDatum(
+                'X-Maintainer', Person.from_string(description['Maintainer']), 'certain')
         if 'URL' in description:
             entries = [entry.strip()
                        for entry in re.split('[\n,]', description['URL'])]
@@ -1413,6 +1569,24 @@ def guess_from_wscript(path, trust_package=False):
                 yield UpstreamDatum('X-Version', m.group(1).decode(), 'confident')
 
 
+def guess_from_authors(path, trust_package=False):
+    authors = []
+    with open(path, 'rb') as f:
+        for line in f:
+            m = line.strip().decode('utf-8')
+            if not m:
+                continue
+            if not m[0].isalpha():
+                continue
+            if m.startswith('*') or m.startswith('-'):
+                m = m[1:].strip()
+            if len(m) < 3:
+                continue
+            if '<' in m or m.count(' ') < 5:
+                authors.append(Person.from_string(m))
+    yield UpstreamDatum('X-Authors', authors, 'certain')
+
+
 def _get_guessers(path, trust_package=False):  # noqa: C901
     CANDIDATES = [
         ('debian/watch', guess_from_debian_watch),
@@ -1442,6 +1616,7 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
         ('go.mod', guess_from_go_mod),
         ('Makefile.PL', guess_from_makefile_pl),
         ('wscript', guess_from_wscript),
+        ('AUTHORS', guess_from_authors),
         ]
 
     # Search for something Python-y
@@ -2113,6 +2288,8 @@ def _extrapolate_homepage_from_repository_browse(
     browse_url = upstream_metadata['Repository-Browse'].value
     parsed = urlparse(browse_url)
     # Some hosting sites are commonly used as Homepage
+    # TODO(jelmer): Maybe check that there is a README file that
+    # can serve as index?
     if parsed.netloc in ('github.com', ) or is_gitlab_site(parsed.netloc):
         return UpstreamDatum('Homepage', browse_url, 'possible')
 

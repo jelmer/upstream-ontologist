@@ -81,6 +81,8 @@ def probe_gitlab_host(hostname: str):
             if json.loads(e.read()) == {"message": "401 Unauthorized"}:
                 return True
         return False
+    except UnicodeDecodeError:
+        return False
     except json.JSONDecodeError:
         return False
     except (socket.timeout, urllib.error.URLError):
