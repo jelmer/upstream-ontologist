@@ -1,0 +1,13 @@
+aiozipkin is Python 3.6+ module that adds distributed tracing capabilities
+from asyncio applications with zipkin (http://zipkin.io) server instrumentation.
+
+zipkin is a distributed tracing system. It helps gather timing data needed
+to troubleshoot latency problems in microservice architectures. It manages
+both the collection and lookup of this data. Zipkin’s design is based on
+the Google Dapper paper.
+
+Applications are instrumented with  aiozipkin report timing data to zipkin.
+The Zipkin UI also presents a Dependency diagram showing how many traced
+requests went through each application. If you are troubleshooting latency
+problems or errors, you can filter or sort all traces based on the
+application, length of trace, annotation, or timestamp.

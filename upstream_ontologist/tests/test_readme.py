@@ -24,6 +24,7 @@ from unittest import TestCase, TestSuite
 from upstream_ontologist.readme import (
     description_from_readme_md,
     description_from_readme_rst,
+    description_from_readme_plain,
     )
 
 
@@ -40,6 +41,7 @@ class ReadmeTestCase(TestCase):
     def runTest(self):
         readme_md = None
         readme_rst = None
+        readme_plain = None
         description = None
         for entry in os.scandir(self.path):
             if entry.name.endswith('~'):
@@ -55,6 +57,9 @@ class ReadmeTestCase(TestCase):
                 elif ext == '.rst':
                     with open(entry.path, 'r') as f:
                         readme_rst = f.read()
+                elif ext == '':
+                    with open(entry.path, 'r') as f:
+                        readme_plain = f.read()
                 else:
                     raise NotImplementedError(ext)
             else:
@@ -80,6 +85,11 @@ class ReadmeTestCase(TestCase):
                     'Skipping README.rst tests, docutils not available')
             actual_description, unused_rst = description_from_readme_rst(
                     readme_rst)
+            self.assertEqual(actual_description, description)
+
+        if readme_plain is not None:
+            actual_description, unused_rst = description_from_readme_plain(
+                    readme_plain)
             self.assertEqual(actual_description, description)
 
 

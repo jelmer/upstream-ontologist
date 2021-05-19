@@ -48,8 +48,9 @@ def _skip_paragraph(para, metadata):  # noqa: C901
     m = re.match('More documentation .* at http.*', para.get_text())
     if m:
         return True
-    m = re.match('Documentation can be found at ', para.get_text())
+    m = re.match('Documentation (can be found|is hosted) (at|on) ([^ ]+)', para.get_text())
     if m:
+        metadata.append(UpstreamDatum('Documentation', m.group(3), 'likely'))
         return True
     m = re.match('See (http.*|gopkg.in.*|github.com.*)', para.get_text())
     if m:
@@ -99,6 +100,8 @@ def _skip_paragraph(para, metadata):  # noqa: C901
         break
     else:
         return True
+    if para.get_text() == '':
+        return True
     return False
 
 
@@ -127,7 +130,7 @@ def _parse_first_header(el):
             certainty = 'likely'
         if name.startswith('About '):
             name = name[len('About '):]
-        yield UpstreamDatum('Name', name, certainty)
+        yield UpstreamDatum('Name', name.strip(), certainty)
     if summary:
         yield UpstreamDatum('X-Summary', summary, 'likely')
     if version:
@@ -163,6 +166,8 @@ def _extract_paragraphs(children, metadata):
             continue
         if el.name == 'div':
             paragraphs.extend(_extract_paragraphs(el.children, metadata))
+            if paragraphs and 'section' in el.get('class'):
+                break
         if el.name == 'p':
             if _is_semi_header(el):
                 if len(paragraphs) == 0:
@@ -188,7 +193,9 @@ def _extract_paragraphs(children, metadata):
                         '* %s\n' % li.get_text()
                         for li in el.findAll('li')))
         elif re.match('h[0-9]', el.name):
-            if len(paragraphs) == 0 and el.get_text() in ('About', 'Introduction', 'Overview'):
+            if len(paragraphs) == 0:
+                if el.get_text() not in ('About', 'Introduction', 'Overview'):
+                    metadata.extend(_parse_first_header(el))
                 continue
             break
     return paragraphs
@@ -251,8 +258,15 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[Upstream
     paragraphs: List[str] = []
     paragraphs.extend(_extract_paragraphs(soup.children, metadata))
 
-    if len(paragraphs) >= 1 and len(paragraphs) < 6:
+    if len(paragraphs) == 0:
+        logging.debug('Empty description; no paragraphs.')
+        return None, metadata
+
+    if len(paragraphs) < 6:
         return '\n'.join(paragraphs), metadata
+    logging.debug(
+        'Not returning description, number of paragraphs too high: %d',
+        len(paragraphs))
     return None, metadata
 
 
@@ -303,3 +317,16 @@ def description_from_readme_rst(rst_text: str) -> Tuple[Optional[str], Iterable[
         logger.debug('lxml not available, not parsing README.rst')
         return None, {}
     return _description_from_basic_soup(list(soup.body.children)[0])
+
+
+def description_from_readme_plain(text: str) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
+    lines: List[str] = []
+    for line in text.splitlines(False):
+        if line.startswith('You install '):
+            break
+        lines.append(line)
+    if len(lines) > 30:
+        return None, {}
+    while lines and not lines[-1].strip():
+        lines.pop(-1)
+    return ''.join([line + '\n' for line in lines]), {}

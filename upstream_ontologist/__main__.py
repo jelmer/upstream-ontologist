@@ -24,6 +24,7 @@ import sys
 from . import (
     version_string,
     UpstreamDatum,
+    Person,
 )
 from .guess import (
     guess_upstream_metadata,
@@ -96,8 +97,10 @@ def main(argv=None):
             check=args.check,
         )
 
+        yaml = ruamel.yaml.YAML()
         ruamel.yaml.scalarstring.walk_tree(metadata)
-        ruamel.yaml.round_trip_dump(metadata, sys.stdout)
+        yaml.register_class(Person)
+        yaml.dump(metadata, sys.stdout)
         return 0
 
 
