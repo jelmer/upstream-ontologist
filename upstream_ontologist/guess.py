@@ -1398,7 +1398,7 @@ def guess_from_pom_xml(path, trust_package=False):  # noqa: C901
         if artifact_id_tag is not None:
             yield UpstreamDatum('Name', artifact_id_tag.text, 'possible')
     description_tag = root.find('description')
-    if description_tag is not None:
+    if description_tag is not None and description_tag.text:
         yield UpstreamDatum('X-Summary', description_tag.text, 'certain')
     version_tag = root.find('version')
     if version_tag is not None and '$' not in version_tag.text:
