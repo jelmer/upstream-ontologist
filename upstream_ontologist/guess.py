@@ -215,6 +215,11 @@ def guess_from_debian_watch(path, trust_package):
                     "Repository", url, "confident",
                     origin=path)
                 continue
+            if 'mode=svn' in w.options:
+                yield UpstreamDatum(
+                    "Repository", url, "confident",
+                    origin=path)
+                continue
             if url.startswith('https://') or url.startswith('http://'):
                 repo = guess_repo_from_url(url)
                 if repo:
