@@ -1573,7 +1573,7 @@ def guess_from_authors(path, trust_package=False):
     authors = []
     with open(path, 'rb') as f:
         for line in f:
-            m = line.strip().decode('utf-8')
+            m = line.strip().decode('utf-8', 'surrogateescape')
             if not m:
                 continue
             if not m[0].isalpha():
