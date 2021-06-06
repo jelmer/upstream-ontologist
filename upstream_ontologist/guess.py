@@ -236,6 +236,14 @@ def guess_from_debian_watch(path, trust_package):
                     "X-SourceForge-Project", m.group(1), "certain",
                     origin=path)
                 continue
+            m = re.match(
+                'https?://hackage.haskell.org/package/(.*)/distro-monitor',
+                url)
+            if m:
+                yield UpstreamDatum(
+                    "Archive", "Hackage", "certain", origin=path)
+                yield UpstreamDatum(
+                    "X-Hackage-Project", m.group(1), "certain", origin=path)
 
 
 def guess_from_debian_control(path, trust_package):
