@@ -243,7 +243,7 @@ def guess_from_debian_watch(path, trust_package):
                 yield UpstreamDatum(
                     "Archive", "Hackage", "certain", origin=path)
                 yield UpstreamDatum(
-                    "X-Hackage-Project", m.group(1), "certain", origin=path)
+                    "X-Hackage-Package", m.group(1), "certain", origin=path)
 
 
 def guess_from_debian_control(path, trust_package):
@@ -1146,59 +1146,63 @@ def guess_from_doap(path, trust_package):  # noqa: C901
             logging.warning('Unknown tag %s in DOAP file', child.tag)
 
 
-def guess_from_cabal(path, trust_package=False):  # noqa: C901
+def guess_from_cabal_lines(lines):
     # TODO(jelmer): Perhaps use a standard cabal parser in Python?
     # The current parser is not really correct, but good enough for our needs.
     # https://www.haskell.org/cabal/release/cabal-1.10.1.0/doc/users-guide/
     repo_url = None
     repo_branch = None
     repo_subpath = None
-    with open(path, 'r', encoding='utf-8') as f:
-        section = None
-        for line in f:
-            if line.lstrip().startswith('--'):
-                # Comment
-                continue
-            if not line.strip():
-                section = None
-                continue
-            try:
-                (field, value) = line.split(':', 1)
-            except ValueError:
-                if not line.startswith(' '):
-                    section = line.strip().lower()
-                continue
-            # The case of field names is not sigificant
-            field = field.lower()
-            value = value.strip()
-            if not field.startswith(' '):
-                if field == 'homepage':
-                    yield UpstreamDatum('Homepage', value, 'certain')
-                if field == 'bug-reports':
-                    yield UpstreamDatum('Bug-Database', value, 'certain')
-                if field == 'name':
-                    yield UpstreamDatum('Name', value, 'certain')
-                if field == 'maintainer':
-                    yield UpstreamDatum(
-                        'Maintainer', Person.from_string(value), 'certain')
-                if field == 'copyright':
-                    yield UpstreamDatum('X-Copyright', value, 'certain')
-                if field == 'license':
-                    yield UpstreamDatum('X-License', value, 'certain')
-            else:
-                field = field.strip()
-                if section == 'source-repository head':
-                    if field == 'location':
-                        repo_url = value
-                    if field == 'branch':
-                        repo_branch = value
-                    if field == 'subdir':
-                        repo_subpath = value
+
+    section = None
+    for line in lines:
+        if line.lstrip().startswith('--'):
+            # Comment
+            continue
+        if not line.strip():
+            section = None
+            continue
+        try:
+            (field, value) = line.split(':', 1)
+        except ValueError:
+            if not line.startswith(' '):
+                section = line.strip().lower()
+            continue
+        # The case of field names is not sigificant
+        field = field.lower()
+        value = value.strip()
+        if not field.startswith(' '):
+            if field == 'homepage':
+                yield ('Homepage', value)
+            if field == 'bug-reports':
+                yield ('Bug-Database', value)
+            if field == 'name':
+                yield ('Name', value)
+            if field == 'maintainer':
+                yield ('Maintainer', Person.from_string(value))
+            if field == 'copyright':
+                yield ('X-Copyright', value)
+            if field == 'license':
+                yield ('X-License', value)
+        else:
+            field = field.strip()
+            if section == 'source-repository head':
+                if field == 'location':
+                    repo_url = value
+                if field == 'branch':
+                    repo_branch = value
+                if field == 'subdir':
+                    repo_subpath = value
     if repo_url:
-        yield UpstreamDatum(
+        yield (
             'Repository',
-            unsplit_vcs_url(repo_url, repo_branch, repo_subpath),
-            'certain')
+            unsplit_vcs_url(repo_url, repo_branch, repo_subpath))
+
+
+def guess_from_cabal(path, trust_package=False):  # noqa: C901
+    with open(path, 'r', encoding='utf-8') as f:
+        for name, value in guess_from_cabal_lines(f):
+            yield UpstreamDatum(name, value, 'certain')
 
 
 def is_email_address(value: str) -> bool:
@@ -1953,6 +1957,40 @@ def extend_from_repology(upstream_metadata, minimum_certainty, source_package):
         guess_from_repology(source_package))
 
 
+class NoSuchHackagePackage(Exception):
+
+    def __init__(self, package):
+        self.package = package
+
+
+def guess_from_hackage(hackage_package):
+    http_url = 'http://hackage.haskell.org/package/%s/%s.cabal' % (
+        hackage_package, hackage_package)
+    headers = {'User-Agent': USER_AGENT}
+    try:
+        http_contents = urlopen(
+            Request(http_url, headers=headers),
+            timeout=DEFAULT_URLLIB_TIMEOUT).read()
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            raise NoSuchHackagePackage(hackage_package)
+        raise
+    return guess_from_cabal_lines(
+        http_contents.decode('utf-8', 'surrogateescape').splitlines(True))
+
+
+def extend_from_hackage(upstream_metadata, hackage_package):
+    # The set of fields that sf can possibly provide:
+    hackage_fields = [
+        'Homepage', 'Name', 'Repository', 'Maintainer', 'X-Copyright',
+        'X-License', 'Bug-Database']
+    hackage_certainty = upstream_metadata['Archive'].certainty
+
+    return extend_from_external_guesser(
+        upstream_metadata, hackage_certainty, hackage_fields,
+        guess_from_hackage(hackage_package))
+
+
 def extend_from_sf(upstream_metadata, sf_project):
     # The set of fields that sf can possibly provide:
     sf_fields = ['Homepage', 'Name', 'Repository']
@@ -2358,6 +2396,16 @@ def extend_upstream_metadata(upstream_metadata,  # noqa: C901
             extend_from_sf(upstream_metadata, sf_project)
         except NoSuchSourceForgeProject:
             del upstream_metadata['X-SourceForge-Project']
+
+    if (archive and archive.value == 'Hackage' and
+            'X-Hackage-Package' in upstream_metadata and
+            net_access):
+        hackage_package = upstream_metadata['X-Hackage-Package'].value
+        try:
+            extend_from_hackage(upstream_metadata, hackage_package)
+        except NoSuchHackagePackage:
+            del upstream_metadata['X-Hackage-Package']
+
     if net_access and consult_external_directory:
         # TODO(jelmer): Don't assume debian/control exists
         from debian.deb822 import Deb822
