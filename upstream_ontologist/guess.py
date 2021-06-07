@@ -1982,7 +1982,7 @@ def guess_from_hackage(hackage_package):
 def extend_from_hackage(upstream_metadata, hackage_package):
     # The set of fields that sf can possibly provide:
     hackage_fields = [
-        'Homepage', 'Name', 'Repository', 'Maintainer', 'X-Copyright',
+        'Homepage', 'Name', 'Repository', 'X-Maintainer', 'X-Copyright',
         'X-License', 'Bug-Database']
     hackage_certainty = upstream_metadata['Archive'].certainty
 
