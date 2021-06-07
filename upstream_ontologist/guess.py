@@ -266,6 +266,29 @@ def guess_from_debian_control(path, trust_package):
             ''.join(control['Description'].splitlines(True)[1:]), 'certain')
 
 
+def guess_from_debian_changelog(path, trust_package):
+    from debian.changelog import Changelog
+    with open(path, 'rb') as f:
+        cl = Changelog(f)
+    source = cl.package
+    if source.startswith('rust-'):
+        try:
+            from toml.decoder import load as load_toml
+            with open('debian/debcargo.toml', 'r') as f:
+                debcargo = load_toml(f)
+        except FileNotFoundError:
+            semver_suffix = False
+        else:
+            semver_suffix = debcargo.get('semver_suffix')
+        from debmutate.debcargo import parse_debcargo_source_name, cargo_translate_dashes
+        crate, crate_semver_version = parse_debcargo_source_name(
+            source, semver_suffix)
+        if '-' in crate:
+            crate = cargo_translate_dashes(crate)
+        yield UpstreamDatum('Archive', 'crates.io', 'certain')
+        yield UpstreamDatum('X-Cargo-Crate', crate, 'certain')
+
+
 def guess_from_python_metadata(pkg_info):
     if 'Name' in pkg_info:
         yield UpstreamDatum('Name', pkg_info['name'], 'certain')
@@ -1608,6 +1631,7 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
     CANDIDATES = [
         ('debian/watch', guess_from_debian_watch),
         ('debian/control', guess_from_debian_control),
+        ('debian/changelog', guess_from_debian_changelog),
         ('debian/rules', guess_from_debian_rules),
         ('PKG-INFO', guess_from_pkg_info),
         ('package.json', guess_from_package_json),
@@ -1989,6 +2013,37 @@ def extend_from_hackage(upstream_metadata, hackage_package):
     return extend_from_external_guesser(
         upstream_metadata, hackage_certainty, hackage_fields,
         guess_from_hackage(hackage_package))
+
+
+def guess_from_crates_io(crate):
+    data = _load_json_url('https://crates.io/api/v1/crates/%s' % crate)
+    crate_data = data['crate']
+    yield 'Name', crate_data['name']
+    if crate_data.get('homepage'):
+        yield 'Homepage', crate_data['homepage']
+    if crate_data.get('repository'):
+        yield 'Repository', crate_data['repository']
+    if crate_data.get('newest_version'):
+        yield 'X-Version', crate_data['newest_version']
+    if crate_data.get('description'):
+        yield 'X-Summary', crate_data['description']
+
+
+class NoSuchCrate(Exception):
+
+    def __init__(self, crate):
+        self.crate = crate
+
+
+def extend_from_crates_io(upstream_metadata, crate):
+    # The set of fields that crates.io can possibly provide:
+    crates_io_fields = [
+        'Homepage', 'Name', 'Repository']
+    crates_io_certainty = upstream_metadata['Archive'].certainty
+
+    return extend_from_external_guesser(
+        upstream_metadata, crates_io_certainty, crates_io_fields,
+        guess_from_crates_io(crate))
 
 
 def extend_from_sf(upstream_metadata, sf_project):
@@ -2405,6 +2460,15 @@ def extend_upstream_metadata(upstream_metadata,  # noqa: C901
             extend_from_hackage(upstream_metadata, hackage_package)
         except NoSuchHackagePackage:
             del upstream_metadata['X-Hackage-Package']
+
+    if (archive and archive.value == 'crates.io' and
+            'X-Cargo-Crate' in upstream_metadata and
+            net_access):
+        crate = upstream_metadata['X-Cargo-Crate'].value
+        try:
+            extend_from_crates_io(upstream_metadata, crate)
+        except NoSuchCrate:
+            del upstream_metadata['X-Cargo-Crate']
 
     if net_access and consult_external_directory:
         # TODO(jelmer): Don't assume debian/control exists
