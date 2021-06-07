@@ -1173,17 +1173,17 @@ def guess_from_cabal_lines(lines):
         value = value.strip()
         if not field.startswith(' '):
             if field == 'homepage':
-                yield ('Homepage', value)
+                yield 'Homepage', value
             if field == 'bug-reports':
-                yield ('Bug-Database', value)
+                yield 'Bug-Database', value
             if field == 'name':
-                yield ('Name', value)
+                yield 'Name', value
             if field == 'maintainer':
-                yield ('Maintainer', Person.from_string(value))
+                yield 'X-Maintainer', Person.from_string(value)
             if field == 'copyright':
-                yield ('X-Copyright', value)
+                yield 'X-Copyright', value
             if field == 'license':
-                yield ('X-License', value)
+                yield 'X-License', value
         else:
             field = field.strip()
             if section == 'source-repository head':
@@ -1202,7 +1202,7 @@ def guess_from_cabal_lines(lines):
 def guess_from_cabal(path, trust_package=False):  # noqa: C901
     with open(path, 'r', encoding='utf-8') as f:
         for name, value in guess_from_cabal_lines(f):
-            yield UpstreamDatum(name, value, 'certain')
+            yield UpstreamDatum(name, value, 'certain', origin=path)
 
 
 def is_email_address(value: str) -> bool:
