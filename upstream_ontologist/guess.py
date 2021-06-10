@@ -1506,14 +1506,18 @@ def guess_from_git_config(path, trust_package=False):
 
     # It's less likely that origin is correct, but let's try anyway
     # (with a lower certainty)
-    try:
-        urlb = cfg.get((b'remote', b'origin'), b'url')
-    except KeyError:
-        pass
-    else:
-        url = urlb.decode('utf-8')
-        if not url.startswith('../'):
-            yield UpstreamDatum('Repository', url, 'possible')
+    # Either way, it's probably incorrect if this is a packaging
+    # repository.
+    if not os.path.exists(
+            os.path.join(os.path.dirname(path), '..', 'debian')):
+        try:
+            urlb = cfg.get((b'remote', b'origin'), b'url')
+        except KeyError:
+            pass
+        else:
+            url = urlb.decode('utf-8')
+            if not url.startswith('../'):
+                yield UpstreamDatum('Repository', url, 'possible')
 
 
 def guess_from_get_orig_source(path, trust_package=False):
