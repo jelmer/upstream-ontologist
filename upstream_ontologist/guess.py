@@ -215,6 +215,11 @@ def guess_from_debian_watch(path, trust_package):
                     "Repository", url, "confident",
                     origin=path)
                 continue
+            if 'mode=svn' in w.options:
+                yield UpstreamDatum(
+                    "Repository", url, "confident",
+                    origin=path)
+                continue
             if url.startswith('https://') or url.startswith('http://'):
                 repo = guess_repo_from_url(url)
                 if repo:
@@ -231,6 +236,14 @@ def guess_from_debian_watch(path, trust_package):
                     "X-SourceForge-Project", m.group(1), "certain",
                     origin=path)
                 continue
+            m = re.match(
+                'https?://hackage.haskell.org/package/(.*)/distro-monitor',
+                url)
+            if m:
+                yield UpstreamDatum(
+                    "Archive", "Hackage", "certain", origin=path)
+                yield UpstreamDatum(
+                    "X-Hackage-Package", m.group(1), "certain", origin=path)
 
 
 def guess_from_debian_control(path, trust_package):
@@ -251,6 +264,29 @@ def guess_from_debian_control(path, trust_package):
         yield UpstreamDatum(
             'X-Description',
             ''.join(control['Description'].splitlines(True)[1:]), 'certain')
+
+
+def guess_from_debian_changelog(path, trust_package):
+    from debian.changelog import Changelog
+    with open(path, 'rb') as f:
+        cl = Changelog(f)
+    source = cl.package
+    if source.startswith('rust-'):
+        try:
+            from toml.decoder import load as load_toml
+            with open('debian/debcargo.toml', 'r') as f:
+                debcargo = load_toml(f)
+        except FileNotFoundError:
+            semver_suffix = False
+        else:
+            semver_suffix = debcargo.get('semver_suffix')
+        from debmutate.debcargo import parse_debcargo_source_name, cargo_translate_dashes
+        crate, crate_semver_version = parse_debcargo_source_name(
+            source, semver_suffix)
+        if '-' in crate:
+            crate = cargo_translate_dashes(crate)
+        yield UpstreamDatum('Archive', 'crates.io', 'certain')
+        yield UpstreamDatum('X-Cargo-Crate', crate, 'certain')
 
 
 def guess_from_python_metadata(pkg_info):
@@ -1133,59 +1169,63 @@ def guess_from_doap(path, trust_package):  # noqa: C901
             logging.warning('Unknown tag %s in DOAP file', child.tag)
 
 
-def guess_from_cabal(path, trust_package=False):  # noqa: C901
+def guess_from_cabal_lines(lines):
     # TODO(jelmer): Perhaps use a standard cabal parser in Python?
     # The current parser is not really correct, but good enough for our needs.
     # https://www.haskell.org/cabal/release/cabal-1.10.1.0/doc/users-guide/
     repo_url = None
     repo_branch = None
     repo_subpath = None
-    with open(path, 'r', encoding='utf-8') as f:
-        section = None
-        for line in f:
-            if line.lstrip().startswith('--'):
-                # Comment
-                continue
-            if not line.strip():
-                section = None
-                continue
-            try:
-                (field, value) = line.split(':', 1)
-            except ValueError:
-                if not line.startswith(' '):
-                    section = line.strip().lower()
-                continue
-            # The case of field names is not sigificant
-            field = field.lower()
-            value = value.strip()
-            if not field.startswith(' '):
-                if field == 'homepage':
-                    yield UpstreamDatum('Homepage', value, 'certain')
-                if field == 'bug-reports':
-                    yield UpstreamDatum('Bug-Database', value, 'certain')
-                if field == 'name':
-                    yield UpstreamDatum('Name', value, 'certain')
-                if field == 'maintainer':
-                    yield UpstreamDatum(
-                        'Maintainer', Person.from_string(value), 'certain')
-                if field == 'copyright':
-                    yield UpstreamDatum('X-Copyright', value, 'certain')
-                if field == 'license':
-                    yield UpstreamDatum('X-License', value, 'certain')
-            else:
-                field = field.strip()
-                if section == 'source-repository head':
-                    if field == 'location':
-                        repo_url = value
-                    if field == 'branch':
-                        repo_branch = value
-                    if field == 'subdir':
-                        repo_subpath = value
+
+    section = None
+    for line in lines:
+        if line.lstrip().startswith('--'):
+            # Comment
+            continue
+        if not line.strip():
+            section = None
+            continue
+        try:
+            (field, value) = line.split(':', 1)
+        except ValueError:
+            if not line.startswith(' '):
+                section = line.strip().lower()
+            continue
+        # The case of field names is not sigificant
+        field = field.lower()
+        value = value.strip()
+        if not field.startswith(' '):
+            if field == 'homepage':
+                yield 'Homepage', value
+            if field == 'bug-reports':
+                yield 'Bug-Database', value
+            if field == 'name':
+                yield 'Name', value
+            if field == 'maintainer':
+                yield 'X-Maintainer', Person.from_string(value)
+            if field == 'copyright':
+                yield 'X-Copyright', value
+            if field == 'license':
+                yield 'X-License', value
+        else:
+            field = field.strip()
+            if section == 'source-repository head':
+                if field == 'location':
+                    repo_url = value
+                if field == 'branch':
+                    repo_branch = value
+                if field == 'subdir':
+                    repo_subpath = value
     if repo_url:
-        yield UpstreamDatum(
+        yield (
             'Repository',
-            unsplit_vcs_url(repo_url, repo_branch, repo_subpath),
-            'certain')
+            unsplit_vcs_url(repo_url, repo_branch, repo_subpath))
+
+
+def guess_from_cabal(path, trust_package=False):  # noqa: C901
+    with open(path, 'r', encoding='utf-8') as f:
+        for name, value in guess_from_cabal_lines(f):
+            yield UpstreamDatum(name, value, 'certain', origin=path)
 
 
 def is_email_address(value: str) -> bool:
@@ -1398,7 +1438,7 @@ def guess_from_pom_xml(path, trust_package=False):  # noqa: C901
         if artifact_id_tag is not None:
             yield UpstreamDatum('Name', artifact_id_tag.text, 'possible')
     description_tag = root.find('description')
-    if description_tag is not None:
+    if description_tag is not None and description_tag.text:
         yield UpstreamDatum('X-Summary', description_tag.text, 'certain')
     version_tag = root.find('version')
     if version_tag is not None and '$' not in version_tag.text:
@@ -1573,7 +1613,7 @@ def guess_from_authors(path, trust_package=False):
     authors = []
     with open(path, 'rb') as f:
         for line in f:
-            m = line.strip().decode('utf-8')
+            m = line.strip().decode('utf-8', 'surrogateescape')
             if not m:
                 continue
             if not m[0].isalpha():
@@ -1591,6 +1631,7 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
     CANDIDATES = [
         ('debian/watch', guess_from_debian_watch),
         ('debian/control', guess_from_debian_control),
+        ('debian/changelog', guess_from_debian_changelog),
         ('debian/rules', guess_from_debian_rules),
         ('PKG-INFO', guess_from_pkg_info),
         ('package.json', guess_from_package_json),
@@ -1938,6 +1979,71 @@ def extend_from_repology(upstream_metadata, minimum_certainty, source_package):
     return extend_from_external_guesser(
         upstream_metadata, certainty, repology_fields,
         guess_from_repology(source_package))
+
+
+class NoSuchHackagePackage(Exception):
+
+    def __init__(self, package):
+        self.package = package
+
+
+def guess_from_hackage(hackage_package):
+    http_url = 'http://hackage.haskell.org/package/%s/%s.cabal' % (
+        hackage_package, hackage_package)
+    headers = {'User-Agent': USER_AGENT}
+    try:
+        http_contents = urlopen(
+            Request(http_url, headers=headers),
+            timeout=DEFAULT_URLLIB_TIMEOUT).read()
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            raise NoSuchHackagePackage(hackage_package)
+        raise
+    return guess_from_cabal_lines(
+        http_contents.decode('utf-8', 'surrogateescape').splitlines(True))
+
+
+def extend_from_hackage(upstream_metadata, hackage_package):
+    # The set of fields that sf can possibly provide:
+    hackage_fields = [
+        'Homepage', 'Name', 'Repository', 'X-Maintainer', 'X-Copyright',
+        'X-License', 'Bug-Database']
+    hackage_certainty = upstream_metadata['Archive'].certainty
+
+    return extend_from_external_guesser(
+        upstream_metadata, hackage_certainty, hackage_fields,
+        guess_from_hackage(hackage_package))
+
+
+def guess_from_crates_io(crate):
+    data = _load_json_url('https://crates.io/api/v1/crates/%s' % crate)
+    crate_data = data['crate']
+    yield 'Name', crate_data['name']
+    if crate_data.get('homepage'):
+        yield 'Homepage', crate_data['homepage']
+    if crate_data.get('repository'):
+        yield 'Repository', crate_data['repository']
+    if crate_data.get('newest_version'):
+        yield 'X-Version', crate_data['newest_version']
+    if crate_data.get('description'):
+        yield 'X-Summary', crate_data['description']
+
+
+class NoSuchCrate(Exception):
+
+    def __init__(self, crate):
+        self.crate = crate
+
+
+def extend_from_crates_io(upstream_metadata, crate):
+    # The set of fields that crates.io can possibly provide:
+    crates_io_fields = [
+        'Homepage', 'Name', 'Repository']
+    crates_io_certainty = upstream_metadata['Archive'].certainty
+
+    return extend_from_external_guesser(
+        upstream_metadata, crates_io_certainty, crates_io_fields,
+        guess_from_crates_io(crate))
 
 
 def extend_from_sf(upstream_metadata, sf_project):
@@ -2345,6 +2451,25 @@ def extend_upstream_metadata(upstream_metadata,  # noqa: C901
             extend_from_sf(upstream_metadata, sf_project)
         except NoSuchSourceForgeProject:
             del upstream_metadata['X-SourceForge-Project']
+
+    if (archive and archive.value == 'Hackage' and
+            'X-Hackage-Package' in upstream_metadata and
+            net_access):
+        hackage_package = upstream_metadata['X-Hackage-Package'].value
+        try:
+            extend_from_hackage(upstream_metadata, hackage_package)
+        except NoSuchHackagePackage:
+            del upstream_metadata['X-Hackage-Package']
+
+    if (archive and archive.value == 'crates.io' and
+            'X-Cargo-Crate' in upstream_metadata and
+            net_access):
+        crate = upstream_metadata['X-Cargo-Crate'].value
+        try:
+            extend_from_crates_io(upstream_metadata, crate)
+        except NoSuchCrate:
+            del upstream_metadata['X-Cargo-Crate']
+
     if net_access and consult_external_directory:
         # TODO(jelmer): Don't assume debian/control exists
         from debian.deb822 import Deb822
