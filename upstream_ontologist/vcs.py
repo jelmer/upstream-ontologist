@@ -77,9 +77,11 @@ def probe_gitlab_host(hostname: str):
         _load_json_url("https://%s/api/v4/version" % hostname)
     except urllib.error.HTTPError as e:
         if e.code == 401:
-
-            if json.loads(e.read()) == {"message": "401 Unauthorized"}:
-                return True
+            try:
+                if json.loads(e.read()) == {"message": "401 Unauthorized"}:
+                    return True
+            except json.JSONDecodeError:
+                return False
         return False
     except UnicodeDecodeError:
         return False
