@@ -77,9 +77,11 @@ def probe_gitlab_host(hostname: str):
         _load_json_url("https://%s/api/v4/version" % hostname)
     except urllib.error.HTTPError as e:
         if e.code == 401:
-
-            if json.loads(e.read()) == {"message": "401 Unauthorized"}:
-                return True
+            try:
+                if json.loads(e.read()) == {"message": "401 Unauthorized"}:
+                    return True
+            except json.JSONDecodeError:
+                return False
         return False
     except UnicodeDecodeError:
         return False
@@ -112,7 +114,7 @@ def browse_url_from_repo_url(url: str, subpath: Optional[str] = None) -> Optiona
         if subpath is not None:
             path += "/tree/HEAD/" + subpath
         return urlunparse(("https", "github.com", path, None, None, None))
-    if parsed_url.hostname == 'gopkg.in':
+    elif parsed_url.hostname == 'gopkg.in':
         els = parsed_url.path.split("/")[:3]
         if len(els) != 2:
             return None
@@ -126,7 +128,7 @@ def browse_url_from_repo_url(url: str, subpath: Optional[str] = None) -> Optiona
         if subpath is not None:
             path += "/" + subpath
         return urlunparse(("https", "github.com", path, None, None, None))
-    if parsed_url.netloc in ("code.launchpad.net", "launchpad.net"):
+    elif parsed_url.netloc in ("code.launchpad.net", "launchpad.net"):
         if subpath is not None:
             path = parsed_url.path + "/view/head:/" + subpath
             return urlunparse(
@@ -150,14 +152,7 @@ def browse_url_from_repo_url(url: str, subpath: Optional[str] = None) -> Optiona
                     parsed_url.fragment,
                 )
             )
-    if is_gitlab_site(parsed_url.netloc):
-        path = parsed_url.path
-        if path.endswith(".git"):
-            path = path[:-4]
-        if subpath is not None:
-            path += "/-/blob/HEAD/" + subpath
-        return urlunparse(("https", parsed_url.netloc, path, None, None, None))
-    if parsed_url.netloc == "svn.apache.org":
+    elif parsed_url.netloc == "svn.apache.org":
         path_elements = parsed_url.path.strip("/").split("/")
         if path_elements[:2] != ["repos", "asf"]:
             return None
@@ -168,7 +163,7 @@ def browse_url_from_repo_url(url: str, subpath: Optional[str] = None) -> Optiona
         return urlunparse(
             ("https", parsed_url.netloc, "/".join(path_elements), None, None, None)
         )
-    if parsed_url.hostname in ("git.savannah.gnu.org", "git.sv.gnu.org"):
+    elif parsed_url.hostname in ("git.savannah.gnu.org", "git.sv.gnu.org"):
         path_elements = parsed_url.path.strip("/").split("/")
         if parsed_url.scheme == "https" and path_elements[0] == "git":
             path_elements.pop(0)
@@ -180,6 +175,13 @@ def browse_url_from_repo_url(url: str, subpath: Optional[str] = None) -> Optiona
         return urlunparse(
             ("https", parsed_url.netloc, "/".join(path_elements), None, None, None)
         )
+    elif is_gitlab_site(parsed_url.netloc):
+        path = parsed_url.path
+        if path.endswith(".git"):
+            path = path[:-4]
+        if subpath is not None:
+            path += "/-/blob/HEAD/" + subpath
+        return urlunparse(("https", parsed_url.netloc, path, None, None, None))
 
     return None
 

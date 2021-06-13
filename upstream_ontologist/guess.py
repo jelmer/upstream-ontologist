@@ -1506,14 +1506,18 @@ def guess_from_git_config(path, trust_package=False):
 
     # It's less likely that origin is correct, but let's try anyway
     # (with a lower certainty)
-    try:
-        urlb = cfg.get((b'remote', b'origin'), b'url')
-    except KeyError:
-        pass
-    else:
-        url = urlb.decode('utf-8')
-        if not url.startswith('../'):
-            yield UpstreamDatum('Repository', url, 'possible')
+    # Either way, it's probably incorrect if this is a packaging
+    # repository.
+    if not os.path.exists(
+            os.path.join(os.path.dirname(path), '..', 'debian')):
+        try:
+            urlb = cfg.get((b'remote', b'origin'), b'url')
+        except KeyError:
+            pass
+        else:
+            url = urlb.decode('utf-8')
+            if not url.startswith('../'):
+                yield UpstreamDatum('Repository', url, 'possible')
 
 
 def guess_from_get_orig_source(path, trust_package=False):
@@ -1621,6 +1625,8 @@ def guess_from_authors(path, trust_package=False):
             if m.startswith('*') or m.startswith('-'):
                 m = m[1:].strip()
             if len(m) < 3:
+                continue
+            if m.endswith('.'):
                 continue
             if '<' in m or m.count(' ') < 5:
                 authors.append(Person.from_string(m))
@@ -2389,6 +2395,14 @@ def _extrapolate_security_contact_from_security_md(
         origin=security_md_path.origin)
 
 
+def _extrapolate_contact_from_maintainer(upstream_metadata, net_access):
+    maintainer = upstream_metadata['X-Maintainer']
+    return UpstreamDatum(
+        'Contact', str(maintainer.value),
+        certainty=min_certainty([maintainer.certainty]),
+        origin=maintainer.origin)
+
+
 def _extrapolate_homepage_from_repository_browse(
         upstream_metadata, net_access):
     browse_url = upstream_metadata['Repository-Browse'].value
@@ -2418,6 +2432,8 @@ EXTRAPOLATE_FNS = [
     (['Repository'], 'Name', _extrapolate_name_from_repository),
     (['Repository', 'X-Security-MD'],
      'Security-Contact', _extrapolate_security_contact_from_security_md),
+    (['X-Maintainer'], 'Contact',
+     _extrapolate_contact_from_maintainer),
 ]
 
 
