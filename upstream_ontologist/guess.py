@@ -429,9 +429,11 @@ def parse_python_project_urls(urls):
 def guess_from_setup_py(path, trust_package):
     if trust_package:
         try:
-            return guess_from_setup_py_executed(path)
+            yield from guess_from_setup_py_executed(path)
         except Exception as e:
             logging.warning('Failed to run setup.py: %r', e)
+        else:
+            return
     with open(path) as inp:
         setup_text = inp.read()
     import ast
