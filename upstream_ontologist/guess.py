@@ -1626,6 +1626,8 @@ def guess_from_authors(path, trust_package=False):
                 m = m[1:].strip()
             if len(m) < 3:
                 continue
+            if m.endswith('.'):
+                continue
             if '<' in m or m.count(' ') < 5:
                 authors.append(Person.from_string(m))
     yield UpstreamDatum('X-Authors', authors, 'certain')
@@ -2393,6 +2395,14 @@ def _extrapolate_security_contact_from_security_md(
         origin=security_md_path.origin)
 
 
+def _extrapolate_contact_from_maintainer(upstream_metadata, net_access):
+    maintainer = upstream_metadata['X-Maintainer']
+    return UpstreamDatum(
+        'Contact', str(maintainer.value),
+        certainty=min_certainty([maintainer.certainty]),
+        origin=maintainer.origin)
+
+
 def _extrapolate_homepage_from_repository_browse(
         upstream_metadata, net_access):
     browse_url = upstream_metadata['Repository-Browse'].value
@@ -2422,6 +2432,8 @@ EXTRAPOLATE_FNS = [
     (['Repository'], 'Name', _extrapolate_name_from_repository),
     (['Repository', 'X-Security-MD'],
      'Security-Contact', _extrapolate_security_contact_from_security_md),
+    (['X-Maintainer'], 'Contact',
+     _extrapolate_contact_from_maintainer),
 ]
 
 
