@@ -1,3 +1,9 @@
+upstream-ontologist (0.1.22-1) UNRELEASED; urgency=low
+
+  * New upstream release.
+
+ -- Debian Janitor <janitor@jelmer.uk>  Mon, 14 Jun 2021 16:35:32 -0000
+
 upstream-ontologist (0.1.20-1) unstable; urgency=low
 
   * New upstream release.
