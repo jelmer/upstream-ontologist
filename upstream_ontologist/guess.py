@@ -426,7 +426,7 @@ def parse_python_project_urls(urls):
                 'Bug-Database', url, 'certain')
 
 
-def guess_from_setup_py(path, trust_package):
+def guess_from_setup_py(path, trust_package):  # noqa: C901
     if trust_package:
         try:
             yield from guess_from_setup_py_executed(path)
@@ -457,9 +457,9 @@ def guess_from_setup_py(path, trust_package):
         if (isinstance(statement, (ast.Expr, ast.Call, ast.Assign))
             and isinstance(statement.value, ast.Call)
             and isinstance(statement.value.func, ast.Name)
-            # we also look for main as sometimes this is used instead of setup()
-            and statement.value.func.id in ('setup', 'main')
-        ):
+            # we also look for main as sometimes this is used instead of
+            # setup()
+                and statement.value.func.id in ('setup', 'main')):
 
             # Process the arguments to the setup function
             for kw in getattr(statement.value, 'keywords', []):
@@ -1171,7 +1171,7 @@ def guess_from_doap(path, trust_package):  # noqa: C901
             logging.warning('Unknown tag %s in DOAP file', child.tag)
 
 
-def guess_from_cabal_lines(lines):
+def guess_from_cabal_lines(lines):  # noqa: C901
     # TODO(jelmer): Perhaps use a standard cabal parser in Python?
     # The current parser is not really correct, but good enough for our needs.
     # https://www.haskell.org/cabal/release/cabal-1.10.1.0/doc/users-guide/
