@@ -42,7 +42,6 @@ jobs:
       - name: Typing checks
         run: |
           pip install -U mypy
-          python -m mypy --install-types
           python -m mypy upstream_ontologist/
         if: "matrix.python-version != 'pypy3'"
       - name: Test suite run
