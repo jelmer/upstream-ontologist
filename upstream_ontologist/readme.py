@@ -63,6 +63,8 @@ def _skip_paragraph(para, metadata):
         metadata.append(UpstreamDatum('Name', m.group(1), 'possible'))
         metadata.append(UpstreamDatum('Documentation', m.group(4), 'likely'))
         return True
+    if re.match(r'Documentation[, ].*found.*(at|on).*\.', para, re.S):
+        return True
     m = re.match('See (http.*|gopkg.in.*|github.com.*)', para)
     if m:
         return True
@@ -102,6 +104,14 @@ def _skip_paragraph(para, metadata):
         return True
     lines = para.splitlines(False)
     if lines and lines[0].strip() in ('perl Makefile.PL', 'make', './configure'):
+        return True
+    if re.match('For further information, .*', para):
+        return True
+    if re.match('Further information .*', para):
+        return True
+    m = re.match(r'A detailed Changelog can be found.*:\s+(http.*)', para, re.I)
+    if m:
+        metadata.append(UpstreamDatum('Changelog', m.group(1), 'possible'))
         return True
 
 

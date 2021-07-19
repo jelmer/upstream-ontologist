@@ -1,0 +1,11 @@
+This directory contains source code for libtrace, a userspace library for
+processing of network traffic capture from live interfaces or from offline
+traces.
+
+libtrace was primarily designed for use with the real-time interface to the
+Waikato DAG Capture Point software running at The University of Waikato,
+and has been since extended to a range of other trace and interface formats.
+
+In version 4.0, we have introduced an API for processing packets in parallel
+using multiple threads. See libtrace_parallel.h for a detailed description
+of the API.

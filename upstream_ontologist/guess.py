@@ -94,6 +94,7 @@ DATUM_TYPES = {
     'Bug-Database': str,
     'Repository': str,
     'Repository-Browse': str,
+    'Documentation': str,
     'X-License': str,
     'X-Summary': str,
     'X-Description': str,
