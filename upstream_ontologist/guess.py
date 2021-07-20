@@ -1623,17 +1623,19 @@ def guess_from_authors(path, trust_package=False):
             m = line.strip().decode('utf-8', 'surrogateescape')
             if not m:
                 continue
-            if not m[0].isalpha():
-                continue
             if m.startswith('*') or m.startswith('-'):
                 m = m[1:].strip()
             if len(m) < 3:
                 continue
             if m.endswith('.'):
                 continue
+            if ' for ' in m:
+                m = m.split(' for ')[0]
+            if not m[0].isalpha():
+                continue
             if '<' in m or m.count(' ') < 5:
                 authors.append(Person.from_string(m))
-    yield UpstreamDatum('X-Authors', authors, 'certain')
+    yield UpstreamDatum('X-Authors', authors, 'likely')
 
 
 def _get_guessers(path, trust_package=False):  # noqa: C901

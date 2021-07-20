@@ -29,7 +29,7 @@ from . import UpstreamDatum
 logger = logging.getLogger(__name__)
 
 
-def _skip_paragraph(para, metadata):
+def _skip_paragraph(para, metadata):  # noqa: C901
     if re.match(r'See .* for more (details|information)\.', para):
         return True
     if re.match(r'See .* for instructions', para):
@@ -58,7 +58,7 @@ def _skip_paragraph(para, metadata):
     if m:
         metadata.append(UpstreamDatum('Documentation', m.group(3), 'likely'))
         return True
-    m = re.match('Documentation for (.*)\s+(can\s+be\s+found|is\s+hosted)\s+(at|on)\s+([^ ]+)', para)
+    m = re.match(r'Documentation for (.*)\s+(can\s+be\s+found|is\s+hosted)\s+(at|on)\s+([^ ]+)', para)
     if m:
         metadata.append(UpstreamDatum('Name', m.group(1), 'possible'))
         metadata.append(UpstreamDatum('Documentation', m.group(4), 'likely'))
