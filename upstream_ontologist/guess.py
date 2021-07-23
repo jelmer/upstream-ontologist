@@ -2026,7 +2026,7 @@ def extend_from_hackage(upstream_metadata, hackage_package):
         guess_from_hackage(hackage_package))
 
 
-def guess_from_crates_io(crate):
+def guess_from_crates_io(crate: str):
     data = _load_json_url('https://crates.io/api/v1/crates/%s' % crate)
     crate_data = data['crate']
     yield 'Name', crate_data['name']

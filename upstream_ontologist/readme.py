@@ -371,6 +371,8 @@ def description_from_readme_rst(rst_text: str) -> Tuple[Optional[str], Iterable[
 def description_from_readme_plain(text: str) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
     lines = list(text.splitlines(False))
     metadata = []
+    if not lines:
+        return None, {}
     m = re.match('([A-Za-z]+) ([0-9.]+)', lines[0])
     if m:
         metadata.append(UpstreamDatum('Name', m.group(1), 'likely'))
