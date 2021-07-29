@@ -1623,6 +1623,12 @@ def guess_from_authors(path, trust_package=False):
             m = line.strip().decode('utf-8', 'surrogateescape')
             if not m:
                 continue
+            if m.startswith('arch-tag: '):
+                continue
+            if m.endswith(':') and m.split(':')[0].lower() in ('developers', 'authors', 'contributors'):
+                continue
+            if m.startswith('$Id'):
+                continue
             if m.startswith('*') or m.startswith('-'):
                 m = m[1:].strip()
             if len(m) < 3:
@@ -1906,6 +1912,10 @@ def guess_from_sf(sf_project):
     vcs_tools = [
         (tool['name'], tool['url'])
         for tool in data.get('tools', []) if tool['name'] in VCS_NAMES]
+    if len(vcs_tools) > 1:
+        # Try to filter out some irrelevant stuff
+        vcs_tools = [tool for tool in vcs_tools
+                     if tool[1].strip('/').rsplit('/')[-1] not in ['www', 'homepage']]
     if len(vcs_tools) == 1:
         (kind, url) = vcs_tools[0]
         if kind == 'git':
