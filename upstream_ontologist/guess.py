@@ -1210,6 +1210,8 @@ def guess_from_cabal_lines(lines):  # noqa: C901
                 yield 'X-Copyright', value
             if field == 'license':
                 yield 'X-License', value
+            if field == 'author':
+                yield 'X-Author', Person.from_string(value)
         else:
             field = field.strip()
             if section == 'source-repository head':
@@ -1889,7 +1891,7 @@ def _sf_git_extract_url(page):
     return access_command[2]
 
 
-def guess_from_sf(sf_project):
+def guess_from_sf(sf_project, subproject=None):
     try:
         data = get_sf_metadata(sf_project)
     except socket.timeout:
@@ -1910,14 +1912,20 @@ def guess_from_sf(sf_project):
     # TODO(jelmer): What about cvs and bzr?
     VCS_NAMES = ['hg', 'git', 'svn']
     vcs_tools = [
-        (tool['name'], tool['url'])
+        (tool['name'], tool.get('mount_label'), tool['url'])
         for tool in data.get('tools', []) if tool['name'] in VCS_NAMES]
     if len(vcs_tools) > 1:
         # Try to filter out some irrelevant stuff
         vcs_tools = [tool for tool in vcs_tools
-                     if tool[1].strip('/').rsplit('/')[-1] not in ['www', 'homepage']]
+                     if tool[2].strip('/').rsplit('/')[-1] not in ['www', 'homepage']]
+    if len(vcs_tools) > 1 and subproject:
+        new_vcs_tools = [
+            tool for tool in vcs_tools
+            if tool[1] == subproject]
+        if len(new_vcs_tools) > 0:
+            vcs_tools = new_vcs_tools
     if len(vcs_tools) == 1:
-        (kind, url) = vcs_tools[0]
+        (kind, label, url) = vcs_tools[0]
         if kind == 'git':
             url = urljoin('https://sourceforge.net/', url)
             headers = {'User-Agent': USER_AGENT, 'Accept': 'text/html'}
@@ -1933,6 +1941,8 @@ def guess_from_sf(sf_project):
             raise KeyError(kind)
         if url is not None:
             yield 'Repository', url
+    elif len(vcs_tools) > 1:
+        logging.warning('multiple possible VCS URLs found: %r', vcs_tools)
 
 
 def guess_from_repology(repology_project):
@@ -2069,12 +2079,17 @@ def extend_from_crates_io(upstream_metadata, crate):
 
 def extend_from_sf(upstream_metadata, sf_project):
     # The set of fields that sf can possibly provide:
-    sf_fields = ['Homepage', 'Name', 'Repository']
+    sf_fields = ['Homepage', 'Name', 'Repository', 'Bug-Database']
     sf_certainty = upstream_metadata['Archive'].certainty
+
+    if 'Name' in upstream_metadata:
+        subproject = upstream_metadata['Name'].value
+    else:
+        subproject = None
 
     return extend_from_external_guesser(
         upstream_metadata, sf_certainty, sf_fields,
-        guess_from_sf(sf_project))
+        guess_from_sf(sf_project, subproject=subproject))
 
 
 def extend_from_pecl(upstream_metadata, pecl_url, certainty):
@@ -2117,7 +2132,7 @@ def extend_from_aur(upstream_metadata, minimum_certainty, package):
 def extract_sf_project_name(url):
     if isinstance(url, list):
         return None
-    m = re.fullmatch('https?://(.*).(sf|sourceforge).net/?', url)
+    m = re.fullmatch('https?://(.*).(sf|sourceforge).(net|io)/?', url)
     if m:
         return m.group(1)
     m = re.match('https://sourceforge.net/(projects|p)/([^/]+)', url)
