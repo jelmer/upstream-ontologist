@@ -69,7 +69,7 @@ data sources:
    (debian/watch, debian/control, debian/rules, debian/get-orig-source.sh,
     debian/copyright, debian/patches)
 
-It will also scan README for possible upstream repository URLs
+It will also scan README and INSTALL for possible upstream repository URLs
 (and will attempt to verify that those match the local repository).
 
 In addition to local files, it can also consult external directories

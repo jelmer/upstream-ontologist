@@ -839,6 +839,66 @@ def url_from_fossil_clone_command(command):
     return None
 
 
+def guess_from_install(path, trust_package):  # noqa: C901
+    urls = []
+    try:
+        with open(path, 'rb') as f:
+            lines = list(f.readlines())
+            for i, line in enumerate(lines):
+                line = line.strip()
+                cmdline = line.strip().lstrip(b'$').strip()
+                if (cmdline.startswith(b'git clone ') or
+                        cmdline.startswith(b'fossil clone ')):
+                    while cmdline.endswith(b'\\'):
+                        cmdline += lines[i+1]
+                        cmdline = cmdline.strip()
+                        i += 1
+                    if cmdline.startswith(b'git clone '):
+                        url = url_from_git_clone_command(cmdline)
+                    elif cmdline.startswith(b'fossil clone '):
+                        url = url_from_fossil_clone_command(cmdline)
+                    if url:
+                        urls.append(url)
+                for m in re.findall(b"[\"'`](git clone.*)[\"`']", line):
+                    url = url_from_git_clone_command(m)
+                    if url:
+                        urls.append(url)
+                project_re = b'([^/]+)/([^/?.()"#>\\s]*[^-/?.()"#>\\s])'
+                for m in re.finditer(
+                        b'https://github.com/' + project_re + b'(.git)?',
+                        line):
+                    yield UpstreamDatum(
+                        'Repository',
+                        m.group(0).rstrip(b'.').decode().rstrip(),
+                        'possible')
+                m = re.fullmatch(
+                    b'https://github.com/' + project_re, line)
+                if m:
+                    yield UpstreamDatum(
+                        'Repository',
+                        line.strip().rstrip(b'.').decode(), 'possible')
+                m = re.fullmatch(b'git://([^ ]+)', line)
+                if m:
+                    yield UpstreamDatum(
+                        'Repository',
+                        line.strip().rstrip(b'.').decode(), 'possible')
+                for m in re.finditer(
+                        b'https://([^]/]+)/([^]\\s()"#]+)', line):
+                    if is_gitlab_site(m.group(1).decode()):
+                        url = m.group(0).rstrip(b'.').decode().rstrip()
+                        try:
+                            repo_url = guess_repo_from_url(url)
+                        except ValueError:
+                            logger.warning(
+                                'Ignoring invalid URL %s in %s', url, path)
+                        else:
+                            if repo_url:
+                                yield UpstreamDatum(
+                                    'Repository', repo_url, 'possible')
+    except IsADirectoryError:
+        pass
+
+
 def guess_from_readme(path, trust_package):  # noqa: C901
     urls = []
     try:
@@ -1696,6 +1756,7 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
         ('Makefile.PL', guess_from_makefile_pl),
         ('wscript', guess_from_wscript),
         ('AUTHORS', guess_from_authors),
+        ('INSTALL', guess_from_install),
         ]
 
     # Search for something Python-y
