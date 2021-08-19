@@ -732,6 +732,7 @@ def guess_from_debian_copyright(path, trust_package):
         NotMachineReadableError,
         MachineReadableFormatError,
         )
+    from_urls = []
     with open(path, 'r') as f:
         try:
             copyright = Copyright(f, strict=False)
@@ -755,17 +756,9 @@ def guess_from_debian_copyright(path, trust_package):
                 "Contact", ','.join(header.upstream_contact), 'certain')
         if header.source:
             if ' ' in header.source:
-                from_urls = [u for u in re.split('[ ,\n]', header.source) if u]
+                from_urls.extend([u for u in re.split('[ ,\n]', header.source) if u])
             else:
-                from_urls = [header.source]
-            for from_url in from_urls:
-                repo_url = guess_repo_from_url(from_url)
-                if repo_url:
-                    yield UpstreamDatum(
-                        'Repository', repo_url, 'likely')
-                if (from_url.startswith('https://pecl.php.net/package/') or
-                        from_url.startswith('http://pecl.php.net/package/')):
-                    yield UpstreamDatum('X-Pecl-URL', from_url, 'certain')
+                from_urls.append(header.source)
         if "X-Upstream-Bugs" in header:
             yield UpstreamDatum(
                 "Bug-Database", header["X-Upstream-Bugs"], 'certain')
@@ -773,6 +766,21 @@ def guess_from_debian_copyright(path, trust_package):
             url = guess_repo_from_url(header["X-Source-Downloaded-From"])
             if url is not None:
                 yield UpstreamDatum("Repository", url, 'certain')
+    else:
+        with open(path, 'r') as f:
+            for line in f:
+                m = re.match('.* was downloaded from ([^\s]+)', line)
+                if m:
+                    from_urls.append(m.group(1))
+
+    for from_url in from_urls:
+        repo_url = guess_repo_from_url(from_url)
+        if repo_url:
+            yield UpstreamDatum(
+                'Repository', repo_url, 'likely')
+        if (from_url.startswith('https://pecl.php.net/package/') or
+                from_url.startswith('http://pecl.php.net/package/')):
+            yield UpstreamDatum('X-Pecl-URL', from_url, 'certain')
 
 
 def url_from_git_clone_command(command):
