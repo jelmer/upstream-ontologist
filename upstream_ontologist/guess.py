@@ -1896,7 +1896,7 @@ def guess_from_sf(sf_project, subproject=None):
         data = get_sf_metadata(sf_project)
     except socket.timeout:
         logging.warning(
-            'timeout contacting launchpad, ignoring: %s',
+            'timeout contacting sourceforge, ignoring: %s',
             sf_project)
         return
     if data.get('name'):
@@ -1910,7 +1910,7 @@ def guess_from_sf(sf_project, subproject=None):
     # we can use, but if there are multiple "subprojects" then it will be
     # unclear which one they belong to.
     # TODO(jelmer): What about cvs and bzr?
-    VCS_NAMES = ['hg', 'git', 'svn']
+    VCS_NAMES = ['hg', 'git', 'svn', 'cvs', 'bzr']
     vcs_tools = [
         (tool['name'], tool.get('mount_label'), tool['url'])
         for tool in data.get('tools', []) if tool['name'] in VCS_NAMES]
@@ -1924,6 +1924,9 @@ def guess_from_sf(sf_project, subproject=None):
             if tool[1] == subproject]
         if len(new_vcs_tools) > 0:
             vcs_tools = new_vcs_tools
+    # if both vcs and another tool appear, then assume cvs is old.
+    if len(vcs_tools) > 1 and 'cvs' in [t[0] for t in vcs_tools]:
+        vcs_tools = [v for v in vcs_tools if v[0] != 'cvs']
     if len(vcs_tools) == 1:
         (kind, label, url) = vcs_tools[0]
         if kind == 'git':
