@@ -844,6 +844,10 @@ def guess_from_readme(path, trust_package):  # noqa: C901
                         url = url_from_fossil_clone_command(cmdline)
                     if url:
                         urls.append(url)
+                for m in re.findall(b"[\"'`](git clone.*)[\"`']", line):
+                    url = url_from_git_clone_command(m)
+                    if url:
+                        urls.append(url)
                 project_re = b'([^/]+)/([^/?.()"#>\\s]*[^-/?.()"#>\\s])'
                 for m in re.finditer(
                         b'https://travis-ci.org/' + project_re, line):

@@ -88,6 +88,10 @@ def _skip_paragraph(para, metadata):  # noqa: C901
     m = re.match('Bugs should be reported by .*', para)
     if m:
         return True
+    m = re.match(r'The bug tracker can be found at (http[^ ]+[^.])', para)
+    if m:
+        metadata.append(UpstreamDatum('Bug-Database', m.group(1), 'likely'))
+        return True
     m = re.match(r'Copyright (\(c\) |)(.*)', para)
     if m:
         metadata.append(UpstreamDatum('X-Copyright', m.group(2), 'possible'))
