@@ -162,19 +162,32 @@ def render(el):
     return el.get_text()
 
 
+def _parse_first_header_text(text):
+    m = re.fullmatch('([A-Za-z]+) ([0-9.]+)', text)
+    if m:
+        return m.group(1), None, m.group(2)
+    if ':' in text:
+        name, summary = text.split(':', 1)
+        version = None
+    elif ' - ' in text:
+        name, summary = text.split(' - ', 1)
+        version = None
+    elif ' -- ' in text:
+        name, summary = text.split(' -- ', 1)
+        version = None
+    elif ' version ' in text:
+        name, version = text.split(' version ', 1)
+        summary = None
+    else:
+        name = None
+        summary = None
+        version = None
+    return name, summary, version
+
+
 def _parse_first_header(el):
-    summary = None
-    name = None
-    version = None
-    if ':' in el.get_text():
-        name, summary = el.get_text().split(':', 1)
-    elif ' - ' in el.get_text():
-        name, summary = el.get_text().split(' - ', 1)
-    elif ' -- ' in el.get_text():
-        name, summary = el.get_text().split(' -- ', 1)
-    elif ' version ' in el.get_text():
-        name, version = el.get_text().split(' version ', 1)
-    elif el.get_text():
+    name, summary, version = _parse_first_header_text(el.get_text())
+    if not name and el.get_text():
         name = el.get_text()
     if name:
         if 'installation' in name.lower():
@@ -377,11 +390,18 @@ def description_from_readme_plain(text: str) -> Tuple[Optional[str], Iterable[Up
     metadata = []
     if not lines:
         return None, {}
-    m = re.match('([A-Za-z]+) ([0-9.]+)', lines[0])
-    if m:
-        metadata.append(UpstreamDatum('Name', m.group(1), 'likely'))
-        metadata.append(UpstreamDatum('X-Version', m.group(2), 'likely'))
-        lines.pop(0)
+    if lines[0].strip() and len(lines) > 1 and (not lines[1] or not lines[1][0].isalnum()):
+        name, summary, version = _parse_first_header_text(lines[0])
+        if name:
+            metadata.append(UpstreamDatum('Name', name, 'likely'))
+        if version:
+            metadata.append(UpstreamDatum('X-Version', version, 'likely'))
+        if summary:
+            metadata.append(UpstreamDatum('X-Summary', summary, 'likely'))
+        if name or version or summary:
+            lines.pop(0)
+    else:
+        name = version = summary = None
     while lines and not lines[0].strip('-').strip():
         lines.pop(0)
 
