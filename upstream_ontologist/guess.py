@@ -192,6 +192,23 @@ def guess_from_debian_rules(path, trust_package):
         yield UpstreamDatum("X-Download", upstream_url.decode(), "likely")
 
 
+def _metadata_from_url(url, origin=None):
+    m = re.match('https?://(sf|sourceforge).net/([^/]+)', url)
+    if not m:
+        m = re.match('https?://(.*).(sf|sourceforge).net/', url)
+    if m:
+        yield UpstreamDatum(
+            "Archive", "SourceForge", "certain",
+            origin=origin)
+        yield UpstreamDatum(
+            "X-SourceForge-Project", m.group(1), "certain",
+            origin=origin)
+        return
+    if (url.startswith('https://pecl.php.net/package/') or
+            url.startswith('http://pecl.php.net/package/')):
+        yield UpstreamDatum('X-Pecl-URL', url, 'certain', origin=origin)
+
+
 def guess_from_debian_watch(path, trust_package):
     from debmutate.watch import (
         parse_watch_file,
@@ -228,15 +245,7 @@ def guess_from_debian_watch(path, trust_package):
                         "Repository", repo, "likely",
                         origin=path)
                     continue
-            m = re.match('https?://sf.net/([^/]+)', url)
-            if m:
-                yield UpstreamDatum(
-                    "Archive", "SourceForge", "certain",
-                    origin=path)
-                yield UpstreamDatum(
-                    "X-SourceForge-Project", m.group(1), "certain",
-                    origin=path)
-                continue
+            yield from _metadata_from_url(url, origin=path)
             m = re.match(
                 'https?://hackage.haskell.org/package/(.*)/distro-monitor',
                 url)
@@ -774,13 +783,11 @@ def guess_from_debian_copyright(path, trust_package):
                     from_urls.append(m.group(1))
 
     for from_url in from_urls:
+        yield from _metadata_from_url(from_url, origin=path)
         repo_url = guess_repo_from_url(from_url)
         if repo_url:
             yield UpstreamDatum(
                 'Repository', repo_url, 'likely')
-        if (from_url.startswith('https://pecl.php.net/package/') or
-                from_url.startswith('http://pecl.php.net/package/')):
-            yield UpstreamDatum('X-Pecl-URL', from_url, 'certain')
 
 
 def url_from_git_clone_command(command):
@@ -1952,6 +1959,11 @@ def guess_from_sf(sf_project, subproject=None):
             url = urljoin('https://svn.code.sf.net/', url)
         elif kind == 'hg':
             url = urljoin('https://hg.code.sf.net/', url)
+        elif kind == 'cvs':
+            url = 'cvs+pserver://anonymous@atlc.cvs.sourceforge.net/cvsroot/%s' % url.strip('/').rsplit('/')[-2]
+        elif kind == 'bzr':
+            # TODO(jelmer)
+            url = None
         else:
             raise KeyError(kind)
         if url is not None:
