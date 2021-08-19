@@ -37,6 +37,7 @@ from . import _load_json_url
 KNOWN_GITLAB_SITES = [
     "salsa.debian.org",
     "invent.kde.org",
+    "0xacab.org",
 ]
 
 
