@@ -136,6 +136,12 @@ def _skip_paragraph_block(para, metadata):  # noqa: C901
                 name = None
             if name in ('CRAN', 'CRAN_Status_Badge', 'CRAN_Logs_Badge'):
                 metadata.append(UpstreamDatum('Archive', 'CRAN', 'confident'))
+            elif name == 'Gitter':
+                parsed_url = urlparse(c.get('href'))
+                metadata.append(UpstreamDatum(
+                    'Repository',
+                    'https://github.com/%s' % '/'.join(parsed_url.path.strip('/').split('/')[:2]),
+                    'confident'))
             elif name == 'Build Status':
                 parsed_url = urlparse(c.get('href'))
                 if parsed_url.hostname == 'travis-ci.org':
