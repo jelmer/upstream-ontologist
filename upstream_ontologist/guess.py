@@ -208,8 +208,16 @@ def _metadata_from_url(url: str, origin=None):
             "X-SourceForge-Project", m.group(2), "certain",
             origin=origin)
     m = re.match('https?://(sf|sourceforge).net/([^/]+)', url)
-    if not m:
-        m = re.match('https?://(.*).(sf|sourceforge).net/', url)
+    if m:
+        yield UpstreamDatum(
+            "Archive", "SourceForge", "certain",
+            origin=origin)
+        if m.group(1) != "www":
+            yield UpstreamDatum(
+                "X-SourceForge-Project", m.group(2), "certain",
+                origin=origin)
+        return
+    m = re.match('https?://(.*).(sf|sourceforge).net/', url)
     if m:
         yield UpstreamDatum(
             "Archive", "SourceForge", "certain",
