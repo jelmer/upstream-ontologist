@@ -794,11 +794,11 @@ def guess_from_debian_copyright(path, trust_package):
             from_urls.extend(
                 [m.group(0)
                  for m in
-                 re.finditer('((http|https):\/\/([^ ]+))', header.source)])
+                 re.finditer(r'((http|https):\/\/([^ ]+))', header.source)])
     else:
         with open(path, 'r') as f:
             for line in f:
-                m = re.match('.* was downloaded from ([^\s]+)', line)
+                m = re.match(r'.* was downloaded from ([^\s]+)', line)
                 if m:
                     from_urls.append(m.group(1))
 
@@ -1991,7 +1991,7 @@ def _sf_git_extract_url(page):
     return access_command[2]
 
 
-def guess_from_sf(sf_project, subproject=None):
+def guess_from_sf(sf_project: str, subproject: Optional[str] = None):  # noqa: C901
     try:
         data = get_sf_metadata(sf_project)
     except socket.timeout:
