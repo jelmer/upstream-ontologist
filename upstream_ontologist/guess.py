@@ -192,7 +192,21 @@ def guess_from_debian_rules(path, trust_package):
         yield UpstreamDatum("X-Download", upstream_url.decode(), "likely")
 
 
-def _metadata_from_url(url, origin=None):
+def _metadata_from_url(url: str, origin=None):
+    """Obtain metadata from a URL related to the project.
+
+    Args:
+      url: The URL to inspect
+      origin: Origin to report for metadata
+    """
+    m = re.match('https?://www.(sf|sourceforge).net/projects/([^/]+)', url)
+    if m:
+        yield UpstreamDatum(
+            "Archive", "SourceForge", "certain",
+            origin=origin)
+        yield UpstreamDatum(
+            "X-SourceForge-Project", m.group(2), "certain",
+            origin=origin)
     m = re.match('https?://(sf|sourceforge).net/([^/]+)', url)
     if not m:
         m = re.match('https?://(.*).(sf|sourceforge).net/', url)
@@ -200,9 +214,10 @@ def _metadata_from_url(url, origin=None):
         yield UpstreamDatum(
             "Archive", "SourceForge", "certain",
             origin=origin)
-        yield UpstreamDatum(
-            "X-SourceForge-Project", m.group(1), "certain",
-            origin=origin)
+        if m.group(1) != "www":
+            yield UpstreamDatum(
+                "X-SourceForge-Project", m.group(1), "certain",
+                origin=origin)
         return
     if (url.startswith('https://pecl.php.net/package/') or
             url.startswith('http://pecl.php.net/package/')):
@@ -775,6 +790,11 @@ def guess_from_debian_copyright(path, trust_package):
             url = guess_repo_from_url(header["X-Source-Downloaded-From"])
             if url is not None:
                 yield UpstreamDatum("Repository", url, 'certain')
+        if header.source:
+            from_urls.extend(
+                [m.group(0)
+                 for m in
+                 re.finditer('((http|https):\/\/([^ ]+))', header.source)])
     else:
         with open(path, 'r') as f:
             for line in f:
