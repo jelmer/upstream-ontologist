@@ -65,6 +65,7 @@ data sources:
  * [Haskell cabal files](https://cabal.readthedocs.io/en/3.4/cabal-package.html)
  * [go.mod](https://golang.org/doc/modules/gomod-ref)
  * [ruby gemspec files](https://guides.rubygems.org/specification-reference/)
+ * [nuspec files](https://docs.microsoft.com/en-us/nuget/reference/nuspec)
  * Debian packaging metadata
    (debian/watch, debian/control, debian/rules, debian/get-orig-source.sh,
     debian/copyright, debian/patches)
