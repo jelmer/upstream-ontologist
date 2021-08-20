@@ -44,7 +44,7 @@ def _skip_paragraph(para, metadata):  # noqa: C901
     if m:
         metadata.append(UpstreamDatum('X-License', m.group(1), 'likely'))
         return True
-    m = re.match('(homepage_url|Main website|Website|Homepage): (.*)', para, re.I)
+    m = re.match('(Home page|homepage_url|Main website|Website|Homepage): (.*)', para, re.I)
     if m:
         url = m.group(2)
         if url.startswith('<') and url.endswith('>'):
