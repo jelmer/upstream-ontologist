@@ -828,6 +828,7 @@ def url_from_cvs_co_command(command):
     cvsroot = None
     module = None
     command_seen = False
+    del args[0]
     while i < len(args):
         if args[i] == '-d':
             del args[i]
@@ -848,6 +849,17 @@ def url_from_cvs_co_command(command):
         if module is not None:
             return urlutils.join(url, module)
         return url
+    return None
+
+
+def url_from_svn_co_command(command):
+    import shlex
+    argv = shlex.split(command.decode('utf-8', 'surrogateescape'))
+    args = [arg for arg in argv if arg.strip()]
+    URL_SCHEMES = ['svn+ssh', 'http', 'https', 'svn']
+    for arg in args:
+        if any([arg.startswith('%s://' % scheme) for scheme in URL_SCHEMES]):
+            return arg
     return None
 
 
@@ -987,6 +999,11 @@ def guess_from_readme(path, trust_package):  # noqa: C901
                 m = re.fullmatch(b'cvs.*-d\s*:pserver:.*', line)
                 if m:
                     url = url_from_cvs_co_command(m.group(0))
+                    if url:
+                        urls.append(url)
+                m = re.fullmatch(b'svn co *', line)
+                if m:
+                    url = url_from_svn_co_command(m.group(0))
                     if url:
                         urls.append(url)
                 project_re = b'([^/]+)/([^/?.()"#>\\s]*[^-/?.()"#>\\s])'
@@ -1884,7 +1901,7 @@ def guess_from_authors(path, trust_package=False):
                 continue
             if m.startswith('arch-tag: '):
                 continue
-            if m.endswith(':') and m.split(':')[0].lower() in ('developers', 'authors', 'contributors'):
+            if m.endswith(':'):
                 continue
             if m.startswith('$Id'):
                 continue
@@ -2217,7 +2234,8 @@ def guess_from_sf(sf_project: str, subproject: Optional[str] = None):  # noqa: C
         elif kind == 'hg':
             url = urljoin('https://hg.code.sf.net/', url)
         elif kind == 'cvs':
-            url = 'cvs+pserver://anonymous@atlc.cvs.sourceforge.net/cvsroot/%s' % url.strip('/').rsplit('/')[-2]
+            url = 'cvs+pserver://anonymous@%s.cvs.sourceforge.net/cvsroot/%s' % (
+                sf_project, url.strip('/').rsplit('/')[-2])
         elif kind == 'bzr':
             # TODO(jelmer)
             url = None
