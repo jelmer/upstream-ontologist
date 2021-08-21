@@ -1001,9 +1001,8 @@ def guess_from_readme(path, trust_package):  # noqa: C901
                     url = url_from_cvs_co_command(m.group(0))
                     if url:
                         urls.append(url)
-                m = re.fullmatch(b'svn co *', line)
-                if m:
-                    url = url_from_svn_co_command(m.group(0))
+                for m in re.finditer(b'($ )?(svn co .*)', line):
+                    url = url_from_svn_co_command(m.group(2))
                     if url:
                         urls.append(url)
                 project_re = b'([^/]+)/([^/?.()"#>\\s]*[^-/?.()"#>\\s])'
