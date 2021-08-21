@@ -1364,6 +1364,13 @@ def _yield_opam_fields(f):
         elif val.startswith('"'):
             yield field, val[1:-1]
             in_field = None
+        elif val.startswith('['):
+            val = val[1:]
+            if val.endswith(']'):
+                yield field, val[-1]
+                in_field = None
+            else:
+                in_field = ']'
 
 
 def guess_from_opam(path, trust_package=False):
@@ -1390,8 +1397,12 @@ def guess_from_opam(path, trust_package=False):
             elif key == 'version':
                 yield UpstreamDatum('X-Version', value, 'confident')
             elif key == 'authors':
-                yield UpstreamDatum(
-                    'X-Author', [Person.from_string(p) for p in value], 'confident')
+                if isinstance(value, str):
+                    yield UpstreamDatum(
+                        'X-Author', [Person.from_string(value)], 'confident')
+                elif isinstance(value, list):
+                    yield UpstreamDatum(
+                        'X-Author', [Person.from_string(p) for p in value], 'confident')
 
 
 def guess_from_nuspec(path, trust_package=False):
