@@ -23,6 +23,7 @@ __all__ = [
     "browse_url_from_repo_url",
 ]
 
+import http.client
 import re
 from typing import Optional, Union, List, Tuple
 
@@ -90,6 +91,8 @@ def probe_gitlab_host(hostname: str):
         return False
     except (socket.timeout, urllib.error.URLError):
         # Probably not?
+        return False
+    except http.client.RemoteDisconnected:
         return False
     return False
 
