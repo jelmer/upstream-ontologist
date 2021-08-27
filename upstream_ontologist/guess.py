@@ -540,8 +540,12 @@ def guess_from_setup_py(path, trust_package):  # noqa: C901
         yield from parse_python_project_urls(setup_args['project_urls'])
     if 'maintainer' in setup_args:
         maintainer_email = setup_args.get('maintainer_email')
-        maintainer = Person(setup_args['maintainer'], maintainer_email)
-        yield UpstreamDatum('X-Maintainer', maintainer, 'certain')
+        maintainer = setup_args['maintainer']
+        if isinstance(maintainer, list) and len(maintainer) == 1:
+            maintainer = maintainer[0]
+        if isinstance(maintainer, str):
+            maintainer = Person(maintainer, maintainer_email)
+            yield UpstreamDatum('X-Maintainer', maintainer, 'certain')
 
 
 def guess_from_composer_json(path, trust_package):
