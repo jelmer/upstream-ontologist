@@ -63,9 +63,9 @@ class NoSuchSourceForgeProject(Exception):
 
 
 def get_sf_metadata(project):
+    url = 'https://sourceforge.net/rest/p/%s' % project
     try:
-        return _load_json_url(
-            'https://sourceforge.net/rest/p/%s' % project)
+        return _load_json_url(url)
     except urllib.error.HTTPError as e:
         if e.code != 404:
             raise
@@ -152,7 +152,7 @@ def known_bad_guess(datum):  # noqa: C901
     if datum.field == 'X-Version':
         if datum.value.lower() in ('devel', ):
             return True
-    if isinstance(datum.value, str) and datum.value.lower() == 'unknown':
+    if isinstance(datum.value, str) and datum.value.strip().lower() == 'unknown':
         return True
     return False
 
@@ -443,9 +443,10 @@ def guess_from_setup_py_executed(path):
         yield UpstreamDatum('Contact', contact, 'likely')
     if result.get_description() not in (None, '', 'UNKNOWN'):
         yield UpstreamDatum('X-Summary', result.get_description(), 'certain')
-    yield from parse_python_long_description(
-        result.metadata.long_description,
-        getattr(result.metadata, 'long_description_content_type', None))
+    if result.metadata.long_description not in (None, '', 'UNKNOWN'):
+        yield from parse_python_long_description(
+            result.metadata.long_description,
+            getattr(result.metadata, 'long_description_content_type', None))
     yield from parse_python_project_urls(getattr(result.metadata, 'project_urls', {}))
 
 
@@ -2206,6 +2207,12 @@ def guess_from_sf(sf_project: str, subproject: Optional[str] = None):  # noqa: C
             'timeout contacting sourceforge, ignoring: %s',
             sf_project)
         return
+    except urllib.error.URLError as e:
+        logging.warning(
+            'Unable to retrieve sourceforge project metadata: %s: %s',
+            sf_project, e)
+        return
+
     if data.get('name'):
         yield 'Name', data['name']
     if data.get('external_homepage'):
@@ -2385,7 +2392,7 @@ class NoSuchCrate(Exception):
 def extend_from_crates_io(upstream_metadata, crate):
     # The set of fields that crates.io can possibly provide:
     crates_io_fields = [
-        'Homepage', 'Name', 'Repository']
+        'Homepage', 'Name', 'Repository', 'X-Version', 'X-Summary']
     crates_io_certainty = upstream_metadata['Archive'].certainty
 
     return extend_from_external_guesser(
