@@ -2631,7 +2631,7 @@ def _extrapolate_repository_from_homepage(upstream_metadata, net_access):
     repo = guess_repo_from_url(
             upstream_metadata['Homepage'].value, net_access=net_access)
     if repo:
-        return UpstreamDatum(
+        yield UpstreamDatum(
             'Repository', repo,
             min_certainty(['likely', upstream_metadata['Homepage'].certainty]))
 
@@ -2640,7 +2640,7 @@ def _extrapolate_repository_from_download(upstream_metadata, net_access):
     repo = guess_repo_from_url(
             upstream_metadata['X-Download'].value, net_access=net_access)
     if repo:
-        return UpstreamDatum(
+        yield UpstreamDatum(
             'Repository', repo,
             min_certainty(
                 ['likely', upstream_metadata['X-Download'].certainty]))
@@ -2650,7 +2650,7 @@ def _extrapolate_repository_from_bug_db(upstream_metadata, net_access):
     repo = guess_repo_from_url(
         upstream_metadata['Bug-Database'].value, net_access=net_access)
     if repo:
-        return UpstreamDatum(
+        yield UpstreamDatum(
             'Repository', repo,
             min_certainty(
                 ['likely', upstream_metadata['Bug-Database'].certainty]))
@@ -2665,8 +2665,9 @@ def _extrapolate_name_from_repository(upstream_metadata, net_access):
         if name.endswith('.git'):
             name = name[:-4]
         if name:
-            return UpstreamDatum('Name', name, min_certainty(
-                    ['likely', upstream_metadata['Repository'].certainty]))
+            yield UpstreamDatum(
+                'Name', name, min_certainty(
+                ['likely', upstream_metadata['Repository'].certainty]))
 
 
 def _extrapolate_repository_browse_from_repository(
@@ -2674,7 +2675,7 @@ def _extrapolate_repository_browse_from_repository(
     browse_url = browse_url_from_repo_url(
             upstream_metadata['Repository'].value)
     if browse_url:
-        return UpstreamDatum(
+        yield UpstreamDatum(
             'Repository-Browse', browse_url,
             upstream_metadata['Repository'].certainty)
 
@@ -2685,7 +2686,7 @@ def _extrapolate_repository_from_repository_browse(
         upstream_metadata['Repository-Browse'].value,
         net_access=net_access)
     if repo:
-        return UpstreamDatum(
+        yield UpstreamDatum(
             'Repository', repo,
             upstream_metadata['Repository-Browse'].certainty)
 
@@ -2697,7 +2698,7 @@ def _extrapolate_bug_database_from_repository(
         return
     bug_db_url = guess_bug_database_url_from_repo_url(repo_url)
     if bug_db_url:
-        return UpstreamDatum(
+        yield UpstreamDatum(
             'Bug-Database', bug_db_url,
             min_certainty(
                 ['likely', upstream_metadata['Repository'].certainty]))
@@ -2708,7 +2709,7 @@ def _extrapolate_bug_submit_from_bug_db(
     bug_submit_url = bug_submit_url_from_bug_database_url(
         upstream_metadata['Bug-Database'].value)
     if bug_submit_url:
-        return UpstreamDatum(
+        yield UpstreamDatum(
             'Bug-Submit', bug_submit_url,
             upstream_metadata['Bug-Database'].certainty)
 
@@ -2718,7 +2719,7 @@ def _extrapolate_bug_db_from_bug_submit(
     bug_db_url = bug_database_url_from_bug_submit_url(
         upstream_metadata['Bug-Submit'].value)
     if bug_db_url:
-        return UpstreamDatum(
+        yield UpstreamDatum(
             'Bug-Database', bug_db_url,
             upstream_metadata['Bug-Submit'].certainty)
 
@@ -2741,7 +2742,7 @@ def _extrapolate_security_contact_from_security_md(
         repository_url.value, security_md_path.value)
     if security_url is None:
         return None
-    return UpstreamDatum(
+    yield UpstreamDatum(
         'Security-Contact', security_url,
         certainty=min_certainty(
             [repository_url.certainty, security_md_path.certainty]),
@@ -2750,7 +2751,7 @@ def _extrapolate_security_contact_from_security_md(
 
 def _extrapolate_contact_from_maintainer(upstream_metadata, net_access):
     maintainer = upstream_metadata['X-Maintainer']
-    return UpstreamDatum(
+    yield UpstreamDatum(
         'Contact', str(maintainer.value),
         certainty=min_certainty([maintainer.certainty]),
         origin=maintainer.origin)
@@ -2764,29 +2765,41 @@ def _extrapolate_homepage_from_repository_browse(
     # TODO(jelmer): Maybe check that there is a README file that
     # can serve as index?
     if parsed.netloc in ('github.com', ) or is_gitlab_site(parsed.netloc):
-        return UpstreamDatum('Homepage', browse_url, 'possible')
+        yield UpstreamDatum('Homepage', browse_url, 'possible')
+
+
+def _consult_homepage(upstream_metadata, net_access):
+    if not net_access:
+        return
+    from .homepage import guess_from_homepage
+    for entry in guess_from_homepage(upstream_metadata['Homepage'].value):
+        entry.certainty = min_certainty([
+            upstream_metadata['Homepage'].certainty,
+            entry.certainty])
+        yield entry
 
 
 EXTRAPOLATE_FNS = [
-    (['Homepage'], 'Repository', _extrapolate_repository_from_homepage),
-    (['Repository-Browse'], 'Homepage',
+    (['Homepage'], ['Repository'], _extrapolate_repository_from_homepage),
+    (['Repository-Browse'], ['Homepage'],
      _extrapolate_homepage_from_repository_browse),
-    (['Bugs-Database'], 'Bug-Database', _copy_bug_db_field),
-    (['Bug-Database'], 'Repository', _extrapolate_repository_from_bug_db),
-    (['Repository'], 'Repository-Browse',
+    (['Bugs-Database'], ['Bug-Database'], _copy_bug_db_field),
+    (['Bug-Database'], ['Repository'], _extrapolate_repository_from_bug_db),
+    (['Repository'], ['Repository-Browse'],
      _extrapolate_repository_browse_from_repository),
-    (['Repository-Browse'], 'Repository',
+    (['Repository-Browse'], ['Repository'],
      _extrapolate_repository_from_repository_browse),
-    (['Repository'], 'Bug-Database',
+    (['Repository'], ['Bug-Database'],
      _extrapolate_bug_database_from_repository),
-    (['Bug-Database'], 'Bug-Submit', _extrapolate_bug_submit_from_bug_db),
-    (['Bug-Submit'], 'Bug-Database', _extrapolate_bug_db_from_bug_submit),
-    (['X-Download'], 'Repository', _extrapolate_repository_from_download),
-    (['Repository'], 'Name', _extrapolate_name_from_repository),
+    (['Bug-Database'], ['Bug-Submit'], _extrapolate_bug_submit_from_bug_db),
+    (['Bug-Submit'], ['Bug-Database'], _extrapolate_bug_db_from_bug_submit),
+    (['X-Download'], ['Repository'], _extrapolate_repository_from_download),
+    (['Repository'], ['Name'], _extrapolate_name_from_repository),
     (['Repository', 'X-Security-MD'],
      'Security-Contact', _extrapolate_security_contact_from_security_md),
-    (['X-Maintainer'], 'Contact',
+    (['X-Maintainer'], ['Contact'],
      _extrapolate_contact_from_maintainer),
+    (['Homepage'], ['Bug-Database', 'Repository'], _consult_homepage),
 ]
 
 
@@ -2856,10 +2869,17 @@ def extend_upstream_metadata(upstream_metadata,  # noqa: C901
     pecl_url = upstream_metadata.get('X-Pecl-URL')
     if net_access and pecl_url:
         extend_from_pecl(upstream_metadata, pecl_url.value, pecl_url.certainty)
+
+    _extrapolate_fields(
+        upstream_metadata, net_access=net_access,
+        minimum_certainty=minimum_certainty)
+
+
+def _extrapolate_fields(upstream_metadata, net_access=False, minimum_certainty=None):
     changed = True
     while changed:
         changed = False
-        for from_fields, to_field, fn in EXTRAPOLATE_FNS:
+        for from_fields, to_fields, fn in EXTRAPOLATE_FNS:
             from_certainties = []
             for from_field in from_fields:
                 try:
@@ -2872,21 +2892,22 @@ def extend_upstream_metadata(upstream_metadata,  # noqa: C901
                 # Nope
                 continue
             from_certainty = min_certainty(from_certainties)
-            old_to_value = upstream_metadata.get(to_field)
-            if old_to_value is not None and (
-                    certainty_to_confidence(from_certainty) >=
-                    certainty_to_confidence(old_to_value.certainty)):
+            old_to_values = {
+                to_field: upstream_metadata.get(to_field)
+                for to_field in to_fields}
+            if all([old_value is not None and
+                    certainty_to_confidence(from_certainty) < certainty_to_confidence(old_value.certainty)
+                    for old_value in old_to_values.values()]):
                 continue
-            result = fn(upstream_metadata, net_access)
-            if not result:
-                continue
-            if not certainty_sufficient(result.certainty, minimum_certainty):
-                continue
-            if old_to_value is None or (
-                    certainty_to_confidence(result.certainty) <
-                    certainty_to_confidence(old_to_value.certainty)):
-                upstream_metadata[to_field] = result
-                changed = True
+            for result in fn(upstream_metadata, net_access):
+                if not certainty_sufficient(result.certainty, minimum_certainty):
+                    continue
+                old_to_value = old_to_values.get(result.field)
+                if old_to_value is None or (
+                        certainty_to_confidence(result.certainty) <
+                        certainty_to_confidence(old_to_value.certainty)):
+                    upstream_metadata[result.field] = result
+                    changed = True
 
 
 def verify_screenshots(urls):
