@@ -533,7 +533,7 @@ def guess_from_setup_py(path, trust_package):  # noqa: C901
             setup_args['long_description'], setup_args.get('long_description_content_type'))
     if 'license' in setup_args:
         yield UpstreamDatum('X-License', setup_args['license'], 'certain')
-    if 'download_url' in setup_args:
+    if 'download_url' in setup_args and setup_args.get('download_url'):
         yield UpstreamDatum('X-Download', setup_args['download_url'], 'certain')
     if 'url' in setup_args:
         yield from parse_python_url(setup_args['url'])
