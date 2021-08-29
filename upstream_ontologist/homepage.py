@@ -19,13 +19,13 @@ from urllib.request import Request, urlopen
 
 import logging
 
-from . import UpstreamDatum
+from . import UpstreamDatum, USER_AGENT
 
 logger = logging.getLogger(__name__)
 
 
 def guess_from_homepage(url: str):
-    req = Request(url)
+    req = Request(url, headers={'User-Agent': USER_AGENT})
     f = urlopen(req)
     for entry in _guess_from_page(f.read()):
         entry.origin = url
@@ -48,5 +48,6 @@ def _guess_from_page(text: bytes):
 
 def _guess_from_soup(soup):
     for a in soup.findAll('a'):
+        href = a.get('href')
         if a.get('aria-label') in ('github', 'git', 'repository'):
-            yield UpstreamDatum('Repository', a.get('href'), certainty='confident')
+            yield UpstreamDatum('Repository', href, certainty='confident')
