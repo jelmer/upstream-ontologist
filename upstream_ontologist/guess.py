@@ -1001,7 +1001,7 @@ def guess_from_readme(path, trust_package):  # noqa: C901
                     url = url_from_git_clone_command(m)
                     if url:
                         urls.append(url)
-                m = re.fullmatch(b'cvs.*-d\s*:pserver:.*', line)
+                m = re.fullmatch(rb'cvs.*-d\s*:pserver:.*', line)
                 if m:
                     url = url_from_cvs_co_command(m.group(0))
                     if url:
@@ -2667,7 +2667,7 @@ def _extrapolate_name_from_repository(upstream_metadata, net_access):
         if name:
             yield UpstreamDatum(
                 'Name', name, min_certainty(
-                ['likely', upstream_metadata['Repository'].certainty]))
+                    ['likely', upstream_metadata['Repository'].certainty]))
 
 
 def _extrapolate_repository_browse_from_repository(
