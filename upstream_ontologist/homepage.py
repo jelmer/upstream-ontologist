@@ -15,6 +15,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
+import urllib.error
 from urllib.request import Request, urlopen
 
 import logging
@@ -26,7 +27,12 @@ logger = logging.getLogger(__name__)
 
 def guess_from_homepage(url: str):
     req = Request(url, headers={'User-Agent': USER_AGENT})
-    f = urlopen(req)
+    try:
+        f = urlopen(req)
+    except urllib.error.HTTPError as e:
+        logger.warning(
+            'unable to access homepage %r: %s', url, e)
+        return
     for entry in _guess_from_page(f.read()):
         entry.origin = url
         yield entry
