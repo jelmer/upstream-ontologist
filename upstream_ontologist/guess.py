@@ -2875,10 +2875,20 @@ def extend_upstream_metadata(upstream_metadata,  # noqa: C901
         minimum_certainty=minimum_certainty)
 
 
-def _extrapolate_fields(upstream_metadata, net_access=False, minimum_certainty=None):
+DEFAULT_ITERATION_LIMIT = 100
+
+
+def _extrapolate_fields(
+        upstream_metadata, net_access: bool = False,
+        minimum_certainty: Optional[str] = None,
+        iteration_limit: int = DEFAULT_ITERATION_LIMIT):
     changed = True
+    iterations = 0
     while changed:
         changed = False
+        iterations += 1
+        if iterations > iteration_limit:
+            raise Exception('hit iteration limit %d' % iteration_limit)
         for from_fields, to_fields, fn in EXTRAPOLATE_FNS:
             from_certainties = []
             for from_field in from_fields:
@@ -2896,18 +2906,11 @@ def _extrapolate_fields(upstream_metadata, net_access=False, minimum_certainty=N
                 to_field: upstream_metadata.get(to_field)
                 for to_field in to_fields}
             if all([old_value is not None and
-                    certainty_to_confidence(from_certainty) < certainty_to_confidence(old_value.certainty)
+                    certainty_to_confidence(from_certainty) > certainty_to_confidence(old_value.certainty)
                     for old_value in old_to_values.values()]):
                 continue
-            for result in fn(upstream_metadata, net_access):
-                if not certainty_sufficient(result.certainty, minimum_certainty):
-                    continue
-                old_to_value = old_to_values.get(result.field)
-                if old_to_value is None or (
-                        certainty_to_confidence(result.certainty) <
-                        certainty_to_confidence(old_to_value.certainty)):
-                    upstream_metadata[result.field] = result
-                    changed = True
+            changed = update_from_guesses(
+                upstream_metadata, fn(upstream_metadata, net_access))
 
 
 def verify_screenshots(urls):

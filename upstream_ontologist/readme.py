@@ -172,23 +172,21 @@ def _parse_first_header_text(text):
     m = re.fullmatch('([A-Za-z]+) ([0-9.]+)', text)
     if m:
         return m.group(1), None, m.group(2)
-    if ':' in text:
-        name, summary = text.split(':', 1)
-        version = None
-    elif ' - ' in text:
-        name, summary = text.split(' - ', 1)
-        version = None
-    elif ' -- ' in text:
-        name, summary = text.split(' -- ', 1)
-        version = None
-    elif ' version ' in text:
+    m = re.fullmatch('([A-Za-z]+): (.+)', text)
+    if m:
+        return m.group(1), m.group(2), None
+    m = re.fullmatch('([A-Za-z]+) - (.+)', text)
+    if m:
+        return m.group(1), m.group(2), None
+    m = re.fullmatch('([A-Za-z]+) -- (.+)', text)
+    if m:
+        return m.group(1), m.group(2), None
+    m = re.fullmatch('([A-Za-z]+) version ([^ ]+)', text)
+    if m:
         name, version = text.split(' version ', 1)
         summary = None
-    else:
-        name = None
-        summary = None
-        version = None
-    return name, summary, version
+        return name, summary, version
+    return None, None, None
 
 
 def _parse_first_header(el):

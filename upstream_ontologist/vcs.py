@@ -110,6 +110,8 @@ def is_gitlab_site(hostname: str, net_access: bool = False) -> bool:
 
 
 def browse_url_from_repo_url(url: str, subpath: Optional[str] = None) -> Optional[str]:  # noqa: C901
+    if isinstance(url, list):
+        return None
     parsed_url = urlparse(url)
     if parsed_url.netloc == "github.com":
         path = "/".join(parsed_url.path.split("/")[:3])
@@ -513,6 +515,8 @@ def sanitize_url(url: Union[str, List[str]]) -> str:
 
 
 def guess_repo_from_url(url, net_access=False):  # noqa: C901
+    if isinstance(url, list):
+        return None
     parsed_url = urlparse(url)
     path_elements = parsed_url.path.strip('/').split('/')
     if parsed_url.netloc == 'github.com':
