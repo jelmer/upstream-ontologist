@@ -33,6 +33,10 @@ def guess_from_homepage(url: str):
         logger.warning(
             'unable to access homepage %r: %s', url, e)
         return
+    except urllib.error.URLError as e:
+        logger.warning(
+            'unable to access homepage %r: %s', url, e)
+        return
     for entry in _guess_from_page(f.read()):
         entry.origin = url
         yield entry
