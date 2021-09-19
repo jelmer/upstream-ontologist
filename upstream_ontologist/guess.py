@@ -1175,6 +1175,9 @@ def guess_from_meta_yml(path, trust_package):
         except ruamel.yaml.reader.ReaderError as e:
             logging.warning('Unable to parse %s: %s', path, e)
             return
+        except ruamel.yaml.parser.ParserError as e:
+            logging.warning('Unable to parse %s: %s', path, e)
+            return
         if data is None:
             # Empty file?
             return
