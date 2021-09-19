@@ -1591,7 +1591,7 @@ def guess_from_r_description(path, trust_package=False):
         if 'BugReports' in description:
             yield UpstreamDatum(
                 'Bug-Database', description['BugReports'], 'certain')
-        if 'Version' in description:
+        if description.get('Version'):
             yield UpstreamDatum('X-Version', description['Version'], 'certain')
         if 'License' in description:
             yield UpstreamDatum('X-License', description['License'], 'certain')
@@ -1599,8 +1599,9 @@ def guess_from_r_description(path, trust_package=False):
             yield UpstreamDatum('X-Summary', description['Title'], 'certain')
         if 'Description' in description:
             lines = description['Description'].splitlines(True)
-            reflowed = lines[0] + textwrap.dedent(''.join(lines[1:]))
-            yield UpstreamDatum('X-Description', reflowed, 'certain')
+            if lines:
+                reflowed = lines[0] + textwrap.dedent(''.join(lines[1:]))
+                yield UpstreamDatum('X-Description', reflowed, 'certain')
         if 'Maintainer' in description:
             yield UpstreamDatum(
                 'X-Maintainer', Person.from_string(description['Maintainer']), 'certain')
