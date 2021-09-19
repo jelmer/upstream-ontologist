@@ -1010,7 +1010,7 @@ def guess_from_readme(path, trust_package):  # noqa: C901
                     url = url_from_svn_co_command(m.group(2))
                     if url:
                         urls.append(url)
-                project_re = b'([^/]+)/([^/?.()"#>\\s]*[^-/?.()"#>\\s])'
+                project_re = b'([^/]+)/([^/?.()"#>\\s]*[^-,/?.()"#>\\s])'
                 for m in re.finditer(
                         b'https://travis-ci.org/' + project_re, line):
                     yield UpstreamDatum(
