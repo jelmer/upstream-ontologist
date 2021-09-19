@@ -133,6 +133,8 @@ def known_bad_guess(datum):  # noqa: C901
         if parsed_url.hostname == 'bugs.freedesktop.org':
             return True
     if datum.field == 'Repository':
+        if '${' in datum.value:
+            return True
         parsed_url = urlparse(datum.value)
         if parsed_url.hostname == 'anongit.kde.org':
             return True
@@ -143,6 +145,8 @@ def known_bad_guess(datum):  # noqa: C901
         if parsed_url.hostname in ('pypi.org', 'rubygems.org'):
             return True
     if datum.field == 'Repository-Browse':
+        if '${' in datum.value:
+            return True
         parsed_url = urlparse(datum.value)
         if parsed_url.hostname == 'cgit.kde.org':
             return True
