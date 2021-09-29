@@ -72,6 +72,7 @@ class Person:
 
     name: str
     email: Optional[str] = None
+    url: Optional[str] = None
 
     @classmethod
     def from_string(cls, text):
@@ -80,6 +81,13 @@ class Person:
         if '<' in text:
             (name, email) = parseaddr(text)
             return cls(name=name, email=email)
+        elif '(' in text and text.endswith(')'):
+            (p1, p2) = text[:-1].split('(', 1)
+            if p2.startswith('https://'):
+                return cls(name=p1, url=p2)
+            elif '@' in p2:
+                return cls(name=p1, email=p2)
+            return cls(text)
         else:
             return cls(name=text)
 

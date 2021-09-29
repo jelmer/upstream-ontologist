@@ -613,6 +613,10 @@ def guess_from_package_json(path, trust_package):
             url = package['bugs']
         if url:
             yield UpstreamDatum('Bug-Database', url, 'certain')
+    if 'author' in package:
+        yield UpstreamDatum(
+            'X-Author', [Person.from_string(package['author'])],
+            'confident')
 
 
 def xmlparse_simplify_namespaces(path, namespaces):
