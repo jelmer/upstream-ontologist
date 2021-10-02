@@ -78,16 +78,20 @@ class Person:
     def from_string(cls, text):
         text = text.replace(' at ', '@')
         text = text.replace('[AT]', '@')
-        if '<' in text:
-            (name, email) = parseaddr(text)
-            return cls(name=name, email=email)
-        elif '(' in text and text.endswith(')'):
+        if '(' in text and text.endswith(')'):
             (p1, p2) = text[:-1].split('(', 1)
-            if p2.startswith('https://'):
-                return cls(name=p1, url=p2)
+            if p2.startswith('https://') or p2.startswith('http://'):
+                url = p2
+                if '<' in p1:
+                    (name, email) = parseaddr(p1)
+                    return cls(name=name, email=email, url=url)
+                return cls(name=p1, url=url)
             elif '@' in p2:
                 return cls(name=p1, email=p2)
             return cls(text)
+        elif '<' in text:
+            (name, email) = parseaddr(text)
+            return cls(name=name, email=email)
         else:
             return cls(name=text)
 
