@@ -614,9 +614,21 @@ def guess_from_package_json(path, trust_package):
         if url:
             yield UpstreamDatum('Bug-Database', url, 'certain')
     if 'author' in package:
-        yield UpstreamDatum(
-            'X-Author', [Person.from_string(package['author'])],
-            'confident')
+        if isinstance(package['author'], dict):
+            yield UpstreamDatum(
+                'X-Author', [Person(
+                    name=package['author'].get('name'),
+                    url=package['author'].get('url'),
+                    email=package['author'].get('email'))],
+                'confident')
+        elif isinstance(package['author'], str):
+            yield UpstreamDatum(
+                'X-Author', [Person.from_string(package['author'])],
+                'confident')
+        else:
+            logging.warning(
+                'Unsupported type for author in package.json: %r',
+                type(package['author']))
 
 
 def xmlparse_simplify_namespaces(path, namespaces):

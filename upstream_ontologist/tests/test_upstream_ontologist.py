@@ -115,6 +115,11 @@ class GuessFromPackageJsonTests(TestCaseInTempDir):
                 UpstreamDatum(
                     "Repository", "http://github.com/jackmoore/autosize.git", "certain"
                 ),
+                UpstreamDatum(
+                    'X-Author', [Person(
+                        name="Jack Moore",
+                        url="http://www.jacklmoore.com", 
+                        email="hello@jacklmoore.com")], 'confident')
             ],
             list(guess_from_package_json("package.json", False)),
         )
