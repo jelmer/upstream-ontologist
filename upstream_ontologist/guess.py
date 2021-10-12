@@ -3100,6 +3100,9 @@ def guess_from_aur(package: str):
             if e.code != 404:
                 raise
             continue
+        except socket.timeout:
+            logging.warning('timeout contacting aur, ignoring: %s', url)
+            continue
         else:
             break
     else:
