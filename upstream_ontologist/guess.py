@@ -1357,6 +1357,8 @@ def guess_from_doap(path, trust_package):  # noqa: C901
                 maintainer = Person(
                     name, email_tag.text if email_tag is not None else None)
                 yield UpstreamDatum('X-Maintainer', maintainer, 'certain')
+        elif child.tag == '{%s}mailing-list' % DOAP_NAMESPACE:
+            yield UpstreamDatum('X-MailingList', extract_url(child), 'certain')
         else:
             logging.warning('Unknown tag %s in DOAP file', child.tag)
 
