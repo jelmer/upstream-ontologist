@@ -569,7 +569,7 @@ def guess_from_composer_json(path, trust_package):
         yield UpstreamDatum('X-Version', package['version'], 'certain')
 
 
-def guess_from_package_json(path, trust_package):
+def guess_from_package_json(path, trust_package):  # noqa: C901
     # see https://docs.npmjs.com/cli/v7/configuring-npm/package-json
     with open(path, 'r') as f:
         package = json.load(f)
@@ -1598,7 +1598,7 @@ def guess_from_configure(path, trust_package=False):
                     'Homepage', value.decode(), 'certain', './configure')
 
 
-def guess_from_r_description(path, trust_package=False):
+def guess_from_r_description(path, trust_package: bool = False):  # noqa: C901
     import textwrap
     # See https://r-pkgs.org/description.html
     with open(path, 'rb') as f:
