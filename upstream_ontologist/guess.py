@@ -22,7 +22,7 @@ import os
 import re
 import socket
 import urllib.error
-from typing import Optional, Iterable
+from typing import Optional, Iterable, List
 from urllib.parse import quote, urlparse, urlunparse, urljoin
 from urllib.request import urlopen, Request
 
@@ -2914,14 +2914,14 @@ def _extrapolate_fields(
         if iterations > iteration_limit:
             raise Exception('hit iteration limit %d' % iteration_limit)
         for from_fields, to_fields, fn in EXTRAPOLATE_FNS:
-            from_certainties = []
+            from_certainties: Optional[List[str]] = []
             for from_field in from_fields:
                 try:
                     from_value = upstream_metadata[from_field]
                 except KeyError:
                     from_certainties = None
                     break
-                from_certainties.append(from_value.certainty)
+                from_certainties.append(from_value.certainty)  # type: ignore
             if not from_certainties:
                 # Nope
                 continue
