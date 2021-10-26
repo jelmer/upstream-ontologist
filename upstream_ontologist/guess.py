@@ -1584,7 +1584,7 @@ def guess_from_configure(path, trust_package=False):
                     # upstreams seem to just set this to some random address,
                     # and then forget about it.
                     certainty = 'possible'
-                elif 'mailing list' in value:
+                elif b'mailing list' in value:
                     # Downgrade the trustworthiness of this field if
                     # it contains a mailing list
                     certainty = 'possible'
