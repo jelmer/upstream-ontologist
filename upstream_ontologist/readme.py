@@ -30,44 +30,97 @@ logger = logging.getLogger(__name__)
 
 
 def _skip_paragraph(para, metadata):  # noqa: C901
-    if re.match(r'See .* for more (details|information)\.', para.get_text()):
+    if re.match(r'See .* for more (details|information)\.', para):
         return True
-    if re.match(r'Please refer .*\.', para.get_text()):
+    if re.match(r'See .* for instructions', para):
         return True
-    m = re.match(r'License: (.*)', para.get_text(), re.I)
+    if re.match(r'Please refer .*\.', para):
+        return True
+    m = re.match(r'It is licensed under (.*)', para)
+    if m:
+        metadata.append(UpstreamDatum('X-License', m.group(1), 'possible'))
+        return True
+    m = re.match(r'License: (.*)', para, re.I)
     if m:
         metadata.append(UpstreamDatum('X-License', m.group(1), 'likely'))
         return True
-    m = re.match('(homepage_url|Main website|Website|Homepage): (.*)', para.get_text(), re.I)
+    m = re.match('(Home page|homepage_url|Main website|Website|Homepage): (.*)', para, re.I)
     if m:
         url = m.group(2)
         if url.startswith('<') and url.endswith('>'):
             url = url[1:-1]
         metadata.append(UpstreamDatum('Homepage', url, 'likely'))
         return True
-    m = re.match('More documentation .* at http.*', para.get_text())
+    m = re.match('More documentation .* at http.*', para)
     if m:
         return True
-    m = re.match('Documentation (can be found|is hosted) (at|on) ([^ ]+)', para.get_text())
+    m = re.match('Documentation (can be found|is hosted) (at|on) ([^ ]+)', para)
     if m:
         metadata.append(UpstreamDatum('Documentation', m.group(3), 'likely'))
         return True
-    m = re.match('See (http.*|gopkg.in.*|github.com.*)', para.get_text())
+    m = re.match(r'Documentation for (.*)\s+(can\s+be\s+found|is\s+hosted)\s+(at|on)\s+([^ ]+)', para)
+    if m:
+        metadata.append(UpstreamDatum('Name', m.group(1), 'possible'))
+        metadata.append(UpstreamDatum('Documentation', m.group(4), 'likely'))
+        return True
+    if re.match(r'Documentation[, ].*found.*(at|on).*\.', para, re.S):
+        return True
+    m = re.match('See (http.*|gopkg.in.*|github.com.*)', para)
     if m:
         return True
-    m = re.match('Available on (.*)', para.get_text())
+    m = re.match('Available on (.*)', para)
     if m:
         return True
     m = re.match(
             r'This software is freely distributable under the (.*) license.*',
-            para.get_text())
+            para)
     if m:
         metadata.append(UpstreamDatum('X-License', m.group(1), 'likely'))
         return True
-    m = re.match(r'This .* is hosted at .*', para.get_text())
+    m = re.match(r'This .* is hosted at .*', para)
     if m:
         return True
-    if para.get_text().startswith('Download and install using:'):
+    m = re.match(r'This code has been developed by .*', para)
+    if m:
+        return True
+    if para.startswith('Download and install using:'):
+        return True
+    m = re.match('Bugs should be reported by .*', para)
+    if m:
+        return True
+    m = re.match(r'The bug tracker can be found at (http[^ ]+[^.])', para)
+    if m:
+        metadata.append(UpstreamDatum('Bug-Database', m.group(1), 'likely'))
+        return True
+    m = re.match(r'Copyright (\(c\) |)(.*)', para)
+    if m:
+        metadata.append(UpstreamDatum('X-Copyright', m.group(2), 'possible'))
+        return True
+    if re.match('You install .*', para):
+        return True
+    if re.match('This .* is free software; .*', para):
+        return True
+    m = re.match('Please report any bugs(.*) to <(.*)>', para)
+    if m:
+        metadata.append(UpstreamDatum('Bugs-Submit', m.group(2), 'possible'))
+        return True
+    if re.match('Share and Enjoy', para, re.I):
+        return True
+    lines = para.splitlines(False)
+    if lines and lines[0].strip() in ('perl Makefile.PL', 'make', './configure'):
+        return True
+    if re.match('For further information, .*', para):
+        return True
+    if re.match('Further information .*', para):
+        return True
+    m = re.match(r'A detailed Changelog can be found.*:\s+(http.*)', para, re.I)
+    if m:
+        metadata.append(UpstreamDatum('Changelog', m.group(1), 'possible'))
+        return True
+
+
+def _skip_paragraph_block(para, metadata):  # noqa: C901
+    if _skip_paragraph(para.get_text(), metadata):
         return True
     for c in para.children:
         if isinstance(c, str) and not c.strip():
@@ -83,6 +136,12 @@ def _skip_paragraph(para, metadata):  # noqa: C901
                 name = None
             if name in ('CRAN', 'CRAN_Status_Badge', 'CRAN_Logs_Badge'):
                 metadata.append(UpstreamDatum('Archive', 'CRAN', 'confident'))
+            elif name == 'Gitter':
+                parsed_url = urlparse(c.get('href'))
+                metadata.append(UpstreamDatum(
+                    'Repository',
+                    'https://github.com/%s' % '/'.join(parsed_url.path.strip('/').split('/')[:2]),
+                    'confident'))
             elif name == 'Build Status':
                 parsed_url = urlparse(c.get('href'))
                 if parsed_url.hostname == 'travis-ci.org':
@@ -109,19 +168,30 @@ def render(el):
     return el.get_text()
 
 
+def _parse_first_header_text(text):
+    m = re.fullmatch('([A-Za-z]+) ([0-9.]+)', text)
+    if m:
+        return m.group(1), None, m.group(2)
+    m = re.fullmatch('([A-Za-z]+): (.+)', text)
+    if m:
+        return m.group(1), m.group(2), None
+    m = re.fullmatch('([A-Za-z]+) - (.+)', text)
+    if m:
+        return m.group(1), m.group(2), None
+    m = re.fullmatch('([A-Za-z]+) -- (.+)', text)
+    if m:
+        return m.group(1), m.group(2), None
+    m = re.fullmatch('([A-Za-z]+) version ([^ ]+)', text)
+    if m:
+        name, version = text.split(' version ', 1)
+        summary = None
+        return name, summary, version
+    return None, None, None
+
+
 def _parse_first_header(el):
-    summary = None
-    name = None
-    version = None
-    if ':' in el.get_text():
-        name, summary = el.get_text().split(':', 1)
-    elif ' - ' in el.get_text():
-        name, summary = el.get_text().split(' - ', 1)
-    elif ' -- ' in el.get_text():
-        name, summary = el.get_text().split(' -- ', 1)
-    elif ' version ' in el.get_text():
-        name, version = el.get_text().split(' version ', 1)
-    elif el.get_text():
+    name, summary, version = _parse_first_header_text(el.get_text())
+    if not name and el.get_text():
         name = el.get_text()
     if name:
         if 'installation' in name.lower():
@@ -175,7 +245,7 @@ def _extract_paragraphs(children, metadata):
                     continue
                 else:
                     break
-            if _skip_paragraph(el, metadata):
+            if _skip_paragraph_block(el, metadata):
                 if len(paragraphs) > 0:
                     break
                 else:
@@ -320,13 +390,42 @@ def description_from_readme_rst(rst_text: str) -> Tuple[Optional[str], Iterable[
 
 
 def description_from_readme_plain(text: str) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
-    lines: List[str] = []
-    for line in text.splitlines(False):
-        if line.startswith('You install '):
-            break
-        lines.append(line)
-    if len(lines) > 30:
+    lines = list(text.splitlines(False))
+    metadata = []
+    if not lines:
         return None, {}
-    while lines and not lines[-1].strip():
-        lines.pop(-1)
-    return ''.join([line + '\n' for line in lines]), {}
+    if lines[0].strip() and len(lines) > 1 and (not lines[1] or not lines[1][0].isalnum()):
+        name, summary, version = _parse_first_header_text(lines[0])
+        if name:
+            metadata.append(UpstreamDatum('Name', name, 'likely'))
+        if version:
+            metadata.append(UpstreamDatum('X-Version', version, 'likely'))
+        if summary:
+            metadata.append(UpstreamDatum('X-Summary', summary, 'likely'))
+        if name or version or summary:
+            lines.pop(0)
+    else:
+        name = version = summary = None
+    while lines and not lines[0].strip('-').strip():
+        lines.pop(0)
+
+    paras: List[List[str]] = [[]]
+    for line in lines:
+        if not line.strip():
+            paras.append([])
+        else:
+            paras[-1].append(line)
+
+    output: List[str] = []
+    for para in paras:
+        if not para:
+            continue
+        line = '\n'.join(para)
+        if _skip_paragraph(line, metadata):
+            continue
+        output.append(line + '\n')
+    if len(output) > 30:
+        return None, {}
+    while output and not output[-1].strip():
+        output.pop(-1)
+    return '\n'.join(output), metadata

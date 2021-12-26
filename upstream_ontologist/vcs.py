@@ -23,6 +23,7 @@ __all__ = [
     "browse_url_from_repo_url",
 ]
 
+import http.client
 import re
 from typing import Optional, Union, List, Tuple
 
@@ -37,6 +38,7 @@ from . import _load_json_url
 KNOWN_GITLAB_SITES = [
     "salsa.debian.org",
     "invent.kde.org",
+    "0xacab.org",
 ]
 
 
@@ -90,6 +92,8 @@ def probe_gitlab_host(hostname: str):
     except (socket.timeout, urllib.error.URLError):
         # Probably not?
         return False
+    except http.client.RemoteDisconnected:
+        return False
     return False
 
 
@@ -106,6 +110,8 @@ def is_gitlab_site(hostname: str, net_access: bool = False) -> bool:
 
 
 def browse_url_from_repo_url(url: str, subpath: Optional[str] = None) -> Optional[str]:  # noqa: C901
+    if isinstance(url, list):
+        return None
     parsed_url = urlparse(url)
     if parsed_url.netloc == "github.com":
         path = "/".join(parsed_url.path.split("/")[:3])
@@ -509,6 +515,8 @@ def sanitize_url(url: Union[str, List[str]]) -> str:
 
 
 def guess_repo_from_url(url, net_access=False):  # noqa: C901
+    if isinstance(url, list):
+        return None
     parsed_url = urlparse(url)
     path_elements = parsed_url.path.strip('/').split('/')
     if parsed_url.netloc == 'github.com':
@@ -575,12 +583,8 @@ def guess_repo_from_url(url, net_access=False):  # noqa: C901
         if parsed_url.path.strip('/').count('/') < 1:
             return None
         parts = parsed_url.path.split('/')
-        if 'issues' in parts:
-            parts = parts[:parts.index('issues')]
-        if 'tags' in parts:
-            parts = parts[:parts.index('tags')]
-        if parts[-1] == '-':
-            parts.pop(-1)
+        if '-' in parts:
+            parts = parts[:parts.index('-')]
         return urlunparse(
             parsed_url._replace(path='/'.join(parts), query=''))
     if parsed_url.hostname == 'git.php.net':
