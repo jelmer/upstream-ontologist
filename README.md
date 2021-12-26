@@ -65,11 +65,13 @@ data sources:
  * [Haskell cabal files](https://cabal.readthedocs.io/en/3.4/cabal-package.html)
  * [go.mod](https://golang.org/doc/modules/gomod-ref)
  * [ruby gemspec files](https://guides.rubygems.org/specification-reference/)
+ * [nuspec files](https://docs.microsoft.com/en-us/nuget/reference/nuspec)
+ * [OPAM files](https://opam.ocaml.org/doc/Manual.html#Package-definitions)
  * Debian packaging metadata
    (debian/watch, debian/control, debian/rules, debian/get-orig-source.sh,
     debian/copyright, debian/patches)
 
-It will also scan README for possible upstream repository URLs
+It will also scan README and INSTALL for possible upstream repository URLs
 (and will attempt to verify that those match the local repository).
 
 In addition to local files, it can also consult external directories
