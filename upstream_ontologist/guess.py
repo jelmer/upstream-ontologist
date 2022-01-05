@@ -2936,7 +2936,7 @@ def _extrapolate_fields(
                 to_field: upstream_metadata.get(to_field)
                 for to_field in to_fields}
             if all([old_value is not None and
-                    certainty_to_confidence(from_certainty) > certainty_to_confidence(old_value.certainty)
+                    certainty_to_confidence(from_certainty) > certainty_to_confidence(old_value.certainty)  # type: ignore
                     for old_value in old_to_values.values()]):
                 continue
             changed = update_from_guesses(

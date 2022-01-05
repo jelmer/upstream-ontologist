@@ -386,6 +386,8 @@ def description_from_readme_rst(rst_text: str) -> Tuple[Optional[str], Iterable[
     except FeatureNotFound:
         logger.debug('lxml not available, not parsing README.rst')
         return None, {}
+    if not soup.body:
+        return None, {}
     return _description_from_basic_soup(list(soup.body.children)[0])
 
 
