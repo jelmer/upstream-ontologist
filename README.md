@@ -70,7 +70,7 @@ data sources:
  * Debian packaging metadata
    (debian/watch, debian/control, debian/rules, debian/get-orig-source.sh,
     debian/copyright, debian/patches)
- * Dart's pubspec.yaml
+ * Dart's [pubspec.yaml](https://dart.dev/tools/pub/pubspec)
 
 It will also scan README and INSTALL for possible upstream repository URLs
 (and will attempt to verify that those match the local repository).

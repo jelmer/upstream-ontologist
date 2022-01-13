@@ -949,9 +949,17 @@ def guess_from_pubspec_yaml(path, trust_package):
     if 'name' in data:
         yield UpstreamDatum('Name', data['name'], 'certain')
     if 'description' in data:
-        yield UpstreamDatum('X-Summary', data['description'], 'certain')
+        yield UpstreamDatum('Description', data['description'], 'certain')
     if 'version' in data:
         yield UpstreamDatum('X-Version', data['version'], 'certain')
+    if 'homepage' in data:
+        yield UpstreamDatum('Homepage', data['homepage'], 'certain')
+    if 'repository' in data:
+        yield UpstreamDatum('Repository', data['repository'], 'certain')
+    if 'documentation' in data:
+        yield UpstreamDatum('Documentation', data['documentation'], 'certain')
+    if 'issue_tracker' in data:
+        yield UpstreamDatum('Bug-Database', data['issue_tracker'], 'certain')
 
 
 def guess_from_install(path, trust_package):  # noqa: C901
