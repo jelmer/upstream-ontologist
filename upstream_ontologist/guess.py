@@ -937,6 +937,23 @@ def url_from_fossil_clone_command(command):
     return None
 
 
+def guess_from_pubspec_yaml(path, trust_package):
+    import ruamel.yaml
+    import ruamel.yaml.reader
+    with open(path, 'rb') as f:
+        try:
+            data = ruamel.yaml.load(f, ruamel.yaml.SafeLoader)
+        except ruamel.yaml.reader.ReaderError as e:
+            logging.warning('Unable to parse %s: %s', path, e)
+            return
+    if 'name' in data:
+        yield UpstreamDatum('Name', data['name'], 'certain')
+    if 'description' in data:
+        yield UpstreamDatum('X-Summary', data['description'], 'certain')
+    if 'version' in data:
+        yield UpstreamDatum('X-Version', data['version'], 'certain')
+
+
 def guess_from_install(path, trust_package):  # noqa: C901
     urls = []
     try:
@@ -1997,6 +2014,7 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
         ('wscript', guess_from_wscript),
         ('AUTHORS', guess_from_authors),
         ('INSTALL', guess_from_install),
+        ('pubspec.yaml', guess_from_pubspec_yaml),
         ]
 
     # Search for something Python-y
