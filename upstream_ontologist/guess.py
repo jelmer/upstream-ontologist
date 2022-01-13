@@ -949,7 +949,7 @@ def guess_from_pubspec_yaml(path, trust_package):
     if 'name' in data:
         yield UpstreamDatum('Name', data['name'], 'certain')
     if 'description' in data:
-        yield UpstreamDatum('Description', data['description'], 'certain')
+        yield UpstreamDatum('X-Description', data['description'], 'certain')
     if 'version' in data:
         yield UpstreamDatum('X-Version', data['version'], 'certain')
     if 'homepage' in data:
