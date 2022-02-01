@@ -236,7 +236,7 @@ def _extract_paragraphs(children, metadata):
             continue
         if el.name == 'div':
             paragraphs.extend(_extract_paragraphs(el.children, metadata))
-            if paragraphs and 'section' in el.get('class'):
+            if paragraphs and 'section' in (el.get('class') or []):
                 break
         if el.name == 'p':
             if _is_semi_header(el):
