@@ -77,6 +77,8 @@ class Person:
     @classmethod
     def from_string(cls, text):
         text = text.replace(' at ', '@')
+        text = text.replace(' -at- ', '@')
+        text = text.replace(' -dot- ', '.')
         text = text.replace('[AT]', '@')
         if '(' in text and text.endswith(')'):
             (p1, p2) = text[:-1].split('(', 1)
