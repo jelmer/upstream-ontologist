@@ -1566,7 +1566,7 @@ def guess_from_cabal_lines(lines):  # noqa: C901
             unsplit_vcs_url(repo_url, repo_branch, repo_subpath))
 
 
-def guess_from_cabal(path, trust_package=False):  # noqa: C901
+def guess_from_cabal(path, trust_package=False):
     with open(path, 'r', encoding='utf-8') as f:
         for name, value in guess_from_cabal_lines(f):
             yield UpstreamDatum(name, value, 'certain', origin=path)
@@ -2859,7 +2859,7 @@ EXTRAPOLATE_FNS = [
 ]
 
 
-def extend_upstream_metadata(upstream_metadata,  # noqa: C901
+def extend_upstream_metadata(upstream_metadata,
                              path, minimum_certainty=None,
                              net_access=False,
                              consult_external_directory=False):
