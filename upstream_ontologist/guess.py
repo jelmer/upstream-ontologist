@@ -2668,9 +2668,9 @@ def check_bug_database_canonical(url: str) -> str:
         if not data['has_issues']:
             raise InvalidUrl(
                 url, "GitHub project does not have issues enabled")
-        if not data.get('archived', False):
+        if data.get('archived', False):
             raise InvalidUrl(url, "GitHub project is archived")
-        return urljoin(data['html_url'], 'issues')
+        return urljoin(data['html_url'] + '/', 'issues')
     if is_gitlab_site(parsed_url.netloc):
         path_elements = parsed_url.path.strip('/').split('/')
         if len(path_elements) < 3 or path_elements[-1] != 'issues':
@@ -2685,7 +2685,7 @@ def check_bug_database_canonical(url: str) -> str:
             raise
         if not data['issues_enabled']:
             raise InvalidUrl(url, "Project does not have issues enabled")
-        return urljoin(data['web_url'], '-/issues')
+        return urljoin(data['web_url'] + '/', '-/issues')
     raise UrlUnverifiable(url, "unsupported hoster")
 
 
@@ -2695,7 +2695,7 @@ def check_bug_submit_url_canonical(url: str) -> str:
         path = '/'.join(parsed_url.path.strip('/').split('/')[:-1])
         db_url = urlunparse(parsed_url._replace(path=path))
         canonical_db_url = check_bug_database_canonical(db_url)
-        return urljoin(canonical_db_url, "new")
+        return urljoin(canonical_db_url + '/', "new")
     raise UrlUnverifiable(url, "unsupported hoster")
 
 
