@@ -613,19 +613,6 @@ def guess_repo_from_url(url, net_access=False):  # noqa: C901
     return None
 
 
-def verify_repository_url(
-        url: str, version: Optional[str] = None) -> Optional[bool]:
-    """Verify whether a repository URL is valid."""
-    try:
-        check_repository_url_canonical(url, version)
-    except UrlUnverifiable:
-        return None
-    except InvalidUrl:
-        return False
-    else:
-        return True
-
-
 def check_repository_url_canonical(
         url: str, version: Optional[str] = None) -> str:
     parsed_url = urlparse(url)
