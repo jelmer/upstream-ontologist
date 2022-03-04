@@ -203,3 +203,19 @@ def _load_json_url(http_url: str, timeout: int = DEFAULT_URLLIB_TIMEOUT):
         Request(http_url, headers=headers),
         timeout=timeout).read()
     return json.loads(http_contents)
+
+
+class UrlUnverifiable(Exception):
+    """Unable to check specified URL."""
+
+    def __init__(self, url, reason):
+        self.url = url
+        self.reason = reason
+
+
+class InvalidUrl(Exception):
+    """Specified URL is invalid."""
+
+    def __init__(self, url, reason):
+        self.url = url
+        self.reason = reason
