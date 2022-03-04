@@ -24,6 +24,7 @@ __all__ = [
 ]
 
 import http.client
+import logging
 import re
 from typing import Optional, Union, List, Tuple
 
@@ -632,8 +633,11 @@ def check_repository_url_canonical(
                 raise InvalidUrl(
                     url, "API URL %s does not exist" % api_url)
             elif e.code == 403:
-                # Probably rate-limited. Let's just hope for the best.
-                pass
+                # Probably rate limited
+                logging.warning(
+                    'Unable to verify bug database URL %s: %s',
+                    url, e.reason)
+                raise UrlUnverifiable(url, "GitHub URL rate-limited")
             else:
                 raise
         else:
