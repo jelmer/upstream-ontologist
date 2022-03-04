@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+ !/usr/bin/python3
 # Copyright (C) 2018 Jelmer Vernooij <jelmer@debian.org>
 #
 # This program is free software; you can redistribute it and/or modify
@@ -2676,13 +2676,14 @@ def verify_bug_database_url(url):
     return None
 
 
-def verify_bug_submit_url(url):
+def check_bug_submit_url_canonical(url: str) -> str:
     parsed_url = urlparse(url)
     if parsed_url.netloc == 'github.com' or is_gitlab_site(parsed_url.netloc):
         path = '/'.join(parsed_url.path.strip('/').split('/')[:-1])
-        return verify_bug_database_url(
-            urlunparse(parsed_url._replace(path=path)))
-    return None
+        db_url = urlunparse(parsed_url._replace(path=path))
+        if verify_bug_database_url(db_url):
+            return url
+    raise UrlUnverifiable(url, "unsupported hoster")
 
 
 def _extrapolate_repository_from_homepage(upstream_metadata, net_access):
@@ -3017,7 +3018,15 @@ def check_upstream_metadata(upstream_metadata, version=None):
             bug_database.certainty = 'certain'
     bug_submit = upstream_metadata.get('Bug-Submit')
     if bug_submit and bug_submit.certainty == 'likely':
-        if verify_bug_submit_url(bug_submit.value):
+        try:
+            canonical_url = check_bug_submit_url_canonical(bug_submit.value):
+        except UrlUnverifiable:
+            pass
+        except InvalidUrl:
+            # TODO(jelmer): Perhaps remove altogether?
+            bug_submit.certainty = 'possible'
+        else:
+            bug_submit.value = canonical_url
             bug_submit.certainty = 'certain'
     screenshots = upstream_metadata.get('Screenshots')
     if screenshots and screenshots.certainty == 'likely':
