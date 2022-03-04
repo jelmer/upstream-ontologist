@@ -606,9 +606,10 @@ def guess_repo_from_url(url, net_access=False):  # noqa: C901
         # 'svn' subdomains are often used for hosting SVN repositories.
         return url
     if net_access:
-        if verify_repository_url(url):
-            return url
-        return None
+        try:
+            return check_repository_url_canonical(url)
+        except (UrlUnverifiable, InvalidUrl):
+            return None
     return None
 
 

@@ -34,7 +34,7 @@ from .vcs import (
     sanitize_url as sanitize_vcs_url,
     is_gitlab_site,
     guess_repo_from_url,
-    verify_repository_url,
+    check_repository_url_canonical,
     )
 
 from . import (
@@ -46,6 +46,8 @@ from . import (
     certainty_sufficient,
     _load_json_url,
     Person,
+    InvalidUrl,
+    UrlUnverifiable,
     )
 
 
@@ -2994,16 +2996,21 @@ def check_upstream_metadata(upstream_metadata, version=None):
     """
     repository = upstream_metadata.get('Repository')
     if repository and repository.certainty == 'likely':
-        if verify_repository_url(repository.value, version=version):
+        try:
+            canonical_url = check_repository_url_canonical(
+                repository.value, version=version)
+        except UrlUnverifiable:
+            pass
+        except InvalidUrl:
+            # Downgrade. Perhaps we should remove altogether?
+            repository.certainty = 'possible'
+        else:
+            repository.value = canonical_url
             repository.certainty = 'certain'
             derived_browse_url = browse_url_from_repo_url(repository.value)
             browse_repo = upstream_metadata.get('Repository-Browse')
             if browse_repo and derived_browse_url == browse_repo.value:
                 browse_repo.certainty = repository.certainty
-        else:
-            # TODO(jelmer): Remove altogether, or downgrade to a lesser
-            # certainty?
-            pass
     bug_database = upstream_metadata.get('Bug-Database')
     if bug_database and bug_database.certainty == 'likely':
         if verify_bug_database_url(bug_database.value):
