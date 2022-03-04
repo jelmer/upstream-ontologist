@@ -1,4 +1,4 @@
- !/usr/bin/python3
+#!/usr/bin/python3
 # Copyright (C) 2018 Jelmer Vernooij <jelmer@debian.org>
 #
 # This program is free software; you can redistribute it and/or modify
@@ -2276,7 +2276,13 @@ def guess_from_sf(sf_project: str, subproject: Optional[str] = None):  # noqa: C
     if data.get('external_homepage'):
         yield 'Homepage', data['external_homepage']
     if data.get('preferred_support_url'):
-        if verify_bug_database_url(data['preferred_support_url']):
+        try:
+            canonical_url = check_bug_database_canonical(data['preferred_support_url'])
+        except UrlUnverifiable:
+            yield 'Bug-Database', data['preferred_support_url']
+        except InvalidUrl:
+            pass
+        else:
             yield 'Bug-Database', data['preferred_support_url']
     # In theory there are screenshots linked from the sourceforge project that
     # we can use, but if there are multiple "subprojects" then it will be
@@ -2639,41 +2645,48 @@ def bug_submit_url_from_bug_database_url(url):
     return None
 
 
-def verify_bug_database_url(url):
+def check_bug_database_canonical(url: str) -> str:
     parsed_url = urlparse(url)
     if parsed_url.netloc == 'github.com':
         path_elements = parsed_url.path.strip('/').split('/')
         if len(path_elements) < 3 or path_elements[2] != 'issues':
-            return False
+            raise InvalidUrl(url, "GitHub URL with missing path elements")
         api_url = 'https://api.github.com/repos/%s/%s' % (
             path_elements[0], path_elements[1])
         try:
             data = _load_json_url(api_url)
         except urllib.error.HTTPError as e:
             if e.code == 404:
-                return False
+                raise InvalidUrl(url, "Project does not exist")
             if e.code == 403:
                 # Probably rate limited
                 logging.warning(
                     'Unable to verify bug database URL %s: %s',
                     url, e.reason)
-                return None
+                raise UrlUnverifiable(url, "rate-limited by GitHub API")
             raise
-        return data['has_issues'] and not data.get('archived', False)
+        if not data['has_issues']:
+            raise InvalidUrl(
+                url, "GitHub project does not have issues enabled")
+        if not data.get('archived', False):
+            raise InvalidUrl(url, "GitHub project is archived")
+        return urlutils.join(data['html_url'], 'issues')
     if is_gitlab_site(parsed_url.netloc):
         path_elements = parsed_url.path.strip('/').split('/')
         if len(path_elements) < 3 or path_elements[-1] != 'issues':
-            return False
-        api_url = 'https://%s/api/v4/projects/%s/issues' % (
+            raise InvalidUrl(url, "GitLab URL with missing path elements")
+        api_url = 'https://%s/api/v4/projects/%s' % (
             parsed_url.netloc, quote('/'.join(path_elements[:-1]), safe=''))
         try:
             data = _load_json_url(api_url)
         except urllib.error.HTTPError as e:
             if e.code == 404:
-                return False
+                raise InvalidUrl(url, "Project does not exist")
             raise
-        return len(data) > 0
-    return None
+        if not data['issues_enabled']:
+            raise InvalidUrl(url, "Project does not have issues enabled")
+        return urlutils.join(data['web_url'], '-/issues')
+    raise UrlUnverifiable(url, "unsupported hoster")
 
 
 def check_bug_submit_url_canonical(url: str) -> str:
@@ -2681,8 +2694,8 @@ def check_bug_submit_url_canonical(url: str) -> str:
     if parsed_url.netloc == 'github.com' or is_gitlab_site(parsed_url.netloc):
         path = '/'.join(parsed_url.path.strip('/').split('/')[:-1])
         db_url = urlunparse(parsed_url._replace(path=path))
-        if verify_bug_database_url(db_url):
-            return url
+        canonical_db_url = check_bug_database_canonical(db_url)
+        return urlutils.join(canonical_db_url, "new")
     raise UrlUnverifiable(url, "unsupported hoster")
 
 
@@ -3014,12 +3027,20 @@ def check_upstream_metadata(upstream_metadata, version=None):
                 browse_repo.certainty = repository.certainty
     bug_database = upstream_metadata.get('Bug-Database')
     if bug_database and bug_database.certainty == 'likely':
-        if verify_bug_database_url(bug_database.value):
+        try:
+            canonical_url = check_bug_database_canonical(bug_database.value)
+        except UrlUnverifiable:
+            pass
+        except InvalidUrl:
+            # TODO(jelmer): delete altogether?
+            bug_database.certainty = 'possible'
+        else:
+            bug_database.value = canonical_url
             bug_database.certainty = 'certain'
     bug_submit = upstream_metadata.get('Bug-Submit')
     if bug_submit and bug_submit.certainty == 'likely':
         try:
-            canonical_url = check_bug_submit_url_canonical(bug_submit.value):
+            canonical_url = check_bug_submit_url_canonical(bug_submit.value)
         except UrlUnverifiable:
             pass
         except InvalidUrl:
