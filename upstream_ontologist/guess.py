@@ -3014,8 +3014,8 @@ def check_url_canonical(url: str) -> str:
             Request(url, headers=headers),
             timeout=DEFAULT_URLLIB_TIMEOUT)
     except urllib.error.HTTPError as e:
-        if e.code != 404:
-            raise
+        if e.code == 404:
+            raise InvalidUrl(url, "url not found")
         if e.code == 429:
             raise UrlUnverifiable(url, "rate-by")
         raise
