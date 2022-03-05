@@ -3018,9 +3018,11 @@ def check_url_canonical(url: str) -> str:
             raise
         if e.code == 429:
             raise UrlUnverifiable(url, "rate-by")
-        return url
+        raise
     except socket.timeout:
         raise UrlUnverifiable(url, 'timeout contacting')
+    else:
+        return url
 
 
 def check_upstream_metadata(upstream_metadata, version=None):
