@@ -60,7 +60,7 @@ from email.utils import parseaddr
 
 SUPPORTED_CERTAINTIES = ["certain", "confident", "likely", "possible", None]
 
-version_string = "0.1.24"
+version_string = "0.1.25"
 
 USER_AGENT = "upstream-ontologist/" + version_string
 # Too aggressive?
