@@ -678,6 +678,8 @@ def probe_upstream_branch_url(
         return None
     import breezy.ui
     from breezy.branch import Branch
+    import breezy.bzr
+    import breezy.git
     old_ui = breezy.ui.ui_factory
     breezy.ui.ui_factory = breezy.ui.SilentUIFactory()
     try:
