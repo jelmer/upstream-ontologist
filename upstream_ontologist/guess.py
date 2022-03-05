@@ -3003,6 +3003,26 @@ def verify_screenshots(urls):
             yield url, True
 
 
+def check_url_canonical(url: str) -> str:
+    parsed_url = urlparse(url)
+    if parsed_url.scheme not in ('https', 'http'):
+        raise UrlUnverifiable(
+            url, "unable to check URL with scheme %s" % parsed_url.scheme)
+    headers = {'User-Agent': USER_AGENT}
+    try:
+        urlopen(
+            Request(url, headers=headers),
+            timeout=DEFAULT_URLLIB_TIMEOUT)
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            raise
+        if e.code == 429:
+            raise UrlUnverifiable(url, "rate-by")
+        return url
+    except socket.timeout:
+        raise UrlUnverifiable(url, 'timeout contacting')
+
+
 def check_upstream_metadata(upstream_metadata, version=None):
     """Check upstream metadata.
 
@@ -3025,6 +3045,18 @@ def check_upstream_metadata(upstream_metadata, version=None):
             browse_repo = upstream_metadata.get('Repository-Browse')
             if browse_repo and derived_browse_url == browse_repo.value:
                 browse_repo.certainty = repository.certainty
+    homepage = upstream_metadata.get('Homepage')
+    if homepage and homepage.certainty == 'likely':
+        try:
+            canonical_url = check_url_canonical(repository.value)
+        except UrlUnverifiable:
+            pass
+        except InvalidUrl:
+            # Downgrade. Perhaps we should remove altogether?
+            homepage.certainty = 'possible'
+        else:
+            homepage.value = canonical_url
+            homepage.certainty = 'certain'
     bug_database = upstream_metadata.get('Bug-Database')
     if bug_database and bug_database.certainty == 'likely':
         try:
