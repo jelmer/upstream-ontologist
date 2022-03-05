@@ -590,6 +590,8 @@ def guess_repo_from_url(url, net_access=False):  # noqa: C901
         parts = parsed_url.path.split('/')
         if '-' in parts:
             parts = parts[:parts.index('-')]
+        if 'tags' in parts:
+            parts = parts[:parts.index('tags')]
         return urlunparse(
             parsed_url._replace(path='/'.join(parts), query=''))
     if parsed_url.hostname == 'git.php.net':
