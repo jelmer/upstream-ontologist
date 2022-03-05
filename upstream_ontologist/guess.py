@@ -3010,7 +3010,7 @@ def check_url_canonical(url: str) -> str:
             url, "unable to check URL with scheme %s" % parsed_url.scheme)
     headers = {'User-Agent': USER_AGENT}
     try:
-        urlopen(
+        resp = urlopen(
             Request(url, headers=headers),
             timeout=DEFAULT_URLLIB_TIMEOUT)
     except urllib.error.HTTPError as e:
@@ -3022,7 +3022,7 @@ def check_url_canonical(url: str) -> str:
     except socket.timeout:
         raise UrlUnverifiable(url, 'timeout contacting')
     else:
-        return url
+        return resp.geturl()
 
 
 def check_upstream_metadata(upstream_metadata, version=None):
