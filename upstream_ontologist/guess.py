@@ -2283,7 +2283,7 @@ def guess_from_sf(sf_project: str, subproject: Optional[str] = None):  # noqa: C
         except InvalidUrl:
             pass
         else:
-            yield 'Bug-Database', data['preferred_support_url']
+            yield 'Bug-Database', canonical_url
     # In theory there are screenshots linked from the sourceforge project that
     # we can use, but if there are multiple "subprojects" then it will be
     # unclear which one they belong to.
@@ -3025,7 +3025,7 @@ def check_url_canonical(url: str) -> str:
         return resp.geturl()
 
 
-def check_upstream_metadata(upstream_metadata, version=None):
+def check_upstream_metadata(upstream_metadata, version=None):  # noqa: C901
     """Check upstream metadata.
 
     This will make network connections, etc.
