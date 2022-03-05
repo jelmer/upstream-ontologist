@@ -3050,7 +3050,7 @@ def check_upstream_metadata(upstream_metadata, version=None):
     homepage = upstream_metadata.get('Homepage')
     if homepage and homepage.certainty == 'likely':
         try:
-            canonical_url = check_url_canonical(repository.value)
+            canonical_url = check_url_canonical(homepage.value)
         except UrlUnverifiable:
             pass
         except InvalidUrl:
@@ -3059,6 +3059,18 @@ def check_upstream_metadata(upstream_metadata, version=None):
         else:
             homepage.value = canonical_url
             homepage.certainty = 'certain'
+    repository_browse = upstream_metadata.get('Repository-Browse')
+    if repository_browse and repository_browse.certainty == 'likely':
+        try:
+            canonical_url = check_url_canonical(repository_browse.value)
+        except UrlUnverifiable:
+            pass
+        except InvalidUrl:
+            # Downgrade. Perhaps we should remove altogether?
+            repository_browse.certainty = 'possible'
+        else:
+            repository_browse.value = canonical_url
+            repository_browse.certainty = 'certain'
     bug_database = upstream_metadata.get('Bug-Database')
     if bug_database and bug_database.certainty == 'likely':
         try:
