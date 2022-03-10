@@ -353,6 +353,8 @@ def description_from_readme_md(md_text: str) -> Tuple[Optional[str], Iterable[Up
     except ModuleNotFoundError:
         logger.debug('BeautifulSoup not available, not parsing README.md')
         return None, {}
+    # Strip surrogates
+    html_text = html_text.encode('utf-8', 'replace').decode('utf-8')
     try:
         soup = BeautifulSoup(html_text, 'lxml')
     except FeatureNotFound:
