@@ -809,7 +809,10 @@ def guess_from_debian_copyright(path, trust_package):
             header = copyright.header
     if header:
         if header.upstream_name:
-            yield UpstreamDatum("Name", header.upstream_name, 'certain')
+            certainty = 'certain'
+            if ' ' in header.upstream_name:
+                certainty = 'confident'
+            yield UpstreamDatum("Name", header.upstream_name, certainty)
         if header.upstream_contact:
             yield UpstreamDatum(
                 "Contact", ','.join(header.upstream_contact), 'certain')
@@ -937,6 +940,20 @@ def url_from_fossil_clone_command(command):
     if plausible_vcs_url(url):
         return url
     return None
+
+
+def guess_from_meson(path, trust_package):
+    import subprocess
+    try:
+        output = subprocess.check_output(['meson', 'introspect', '--projectinfo', path])
+    except FileNotFoundError:
+        logging.warning('meson not installed; skipping meson.build introspection')
+        return
+    project_info = json.loads(output)
+    if 'descriptive_name' in project_info:
+        yield UpstreamDatum('Name', project_info['descriptive_name'], 'certain')
+    if 'version' in project_info:
+        yield UpstreamDatum('X-Version', project_info['version'], 'certain')
 
 
 def guess_from_pubspec_yaml(path, trust_package):
@@ -2025,6 +2042,7 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
         ('AUTHORS', guess_from_authors),
         ('INSTALL', guess_from_install),
         ('pubspec.yaml', guess_from_pubspec_yaml),
+        ('meson.build', guess_from_meson),
         ]
 
     # Search for something Python-y
