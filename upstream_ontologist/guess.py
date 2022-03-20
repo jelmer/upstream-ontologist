@@ -785,7 +785,7 @@ def guess_from_dist_ini(path, trust_package):
         yield from guess_from_perl_dist_name(path, dist_name)
 
 
-def guess_from_debian_copyright(path, trust_package):
+def guess_from_debian_copyright(path, trust_package):  # noqa: C901
     from debian.copyright import (
         Copyright,
         NotMachineReadableError,
