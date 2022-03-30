@@ -2534,6 +2534,19 @@ def extend_from_aur(upstream_metadata, minimum_certainty, package):
         upstream_metadata, aur_certainty, aur_fields, guess_from_aur(package))
 
 
+def extend_from_gobo(upstream_metadata, minimum_certainty, package):
+    # The set of fields that gobo can possibly provide:
+    gobo_fields = ['Homepage', 'Repository']
+    gobo_certainty = 'possible'
+
+    if certainty_sufficient(gobo_certainty, minimum_certainty):
+        # Don't bother talking to gobo if we're not speculating.
+        return
+
+    extend_from_external_guesser(
+        upstream_metadata, gobo_certainty, gobo_fields, guess_from_gobo(package))
+
+
 def extract_sf_project_name(url):
     if isinstance(url, list):
         return None
@@ -2955,6 +2968,7 @@ def extend_upstream_metadata(upstream_metadata,  # noqa: C901
         else:
             extend_from_lp(upstream_metadata, minimum_certainty, package)
             extend_from_aur(upstream_metadata, minimum_certainty, package)
+            extend_from_gobo(upstream_metadata, minimum_certainty, package)
             extend_from_repology(upstream_metadata, minimum_certainty, package)
     pecl_url = upstream_metadata.get('X-Pecl-URL')
     if net_access and pecl_url:
@@ -3216,6 +3230,67 @@ def strip_vcs_prefixes(url):
         if url.startswith(prefix+'+'):
             return url[len(prefix)+1:]
     return url
+
+
+def guess_from_gobo(package: str):
+    packages_url = "https://api.github.com/repos/gobolinux/Recipes/contents"
+    try:
+        contents = _load_json_url(packages_url)
+    except urllib.error.HTTPError as e:
+        raise
+    packages = [entry['name'] for entry in contents]
+    for p in packages:
+        if p.lower() == package.lower():
+            package = p
+            break
+    else:
+        logging.debug('No gobo package named %s', package)
+        return
+
+    contents_url = "https://api.github.com/repos/gobolinux/Recipes/contents/%s" % package
+    contents = _load_json_url(contents_url)
+    versions = [entry['name'] for entry in contents]
+    base_url = 'https://raw.githubusercontent.com/gobolinux/Recipes/master/%s/%s' % (package, versions[-1])
+    headers = {'User-Agent': USER_AGENT}
+    try:
+        f = urlopen(
+            Request(base_url + '/Recipe', headers=headers),
+            timeout=DEFAULT_URLLIB_TIMEOUT)
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            raise
+    else:
+        for line in f:
+            m = re.match(b'url="(.*)"$', line)
+            if m:
+                yield 'X-Download', m.group(1).decode()
+
+    try:
+        f = urlopen(
+            Request(base_url + '/Resources/Description', headers=headers),
+            timeout=DEFAULT_URLLIB_TIMEOUT)
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            raise
+    else:
+        for line in f:
+            m = re.match(b'\\[(.*)\\] (.*)', line)
+            if not m:
+                continue
+            key = m.group(1).decode()
+            value = m.group(2).decode()
+            if key == 'Name':
+                yield 'Name', value
+            elif key == 'Summary':
+                yield 'X-Summary', value
+            elif key == 'License':
+                yield 'X-License', value
+            elif key == 'Description':
+                yield 'X-Description', value
+            elif key == 'Homepage':
+                yield 'Homepage', value
+            else:
+                logging.warning('Unknown field %s in gobo Description', key)
 
 
 def guess_from_aur(package: str):
