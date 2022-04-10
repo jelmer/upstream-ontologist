@@ -114,6 +114,7 @@ DATUM_TYPES = {
     'X-Security-MD': str,
     'X-Maintainer': Person,
     'X-Cargo-Crate': str,
+    'X-API-Documentation': str,
     }
 
 

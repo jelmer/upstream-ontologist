@@ -142,19 +142,25 @@ def _skip_paragraph_block(para, metadata):  # noqa: C901
                     'Repository',
                     'https://github.com/%s' % '/'.join(parsed_url.path.strip('/').split('/')[:2]),
                     'confident'))
-            elif name == 'Build Status':
+            elif name.lower() == 'build status':
                 parsed_url = urlparse(c.get('href'))
                 if parsed_url.hostname == 'travis-ci.org':
                     metadata.append(UpstreamDatum(
                         'Repository',
                         'https://github.com/%s' % '/'.join(parsed_url.path.strip('/').split('/')[:2]),
                         'confident'))
+            elif name == 'API Docs':
+                metadata.append(UpstreamDatum(
+                    'X-API-Documentation', c.get('href'), 'confident'))
+            elif name == 'Downloads':
+                metadata.append(UpstreamDatum(
+                    'X-Download', c.get('href'), 'confident'))
             elif name:
                 m = re.match('(.*) License', name)
                 if m:
                     metadata.append(UpstreamDatum('X-License', m.group(1), 'likely'))
                 else:
-                    logging.debug('Unnhandled field %r in README', name)
+                    logging.debug('Unhandled field %r in README', name)
             continue
         break
     else:
