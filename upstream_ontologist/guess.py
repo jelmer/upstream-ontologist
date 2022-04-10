@@ -113,6 +113,7 @@ DATUM_TYPES = {
     'X-Author': list,
     'X-Security-MD': str,
     'X-Maintainer': Person,
+    'X-Cargo-Crate': str,
     }
 
 
