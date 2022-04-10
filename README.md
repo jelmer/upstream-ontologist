@@ -39,7 +39,7 @@ Extensions for upstream-ontologist, not defined in DEP-12:
  * ``X-Copyright``: List of copyright holders
  * ``X-Version``: Current upstream version
  * ``X-Security-MD``: URL to markdown file with security policy
- * ``X-Authors``: List of people who contributed to the project
+ * ``X-Author``: List of people who contributed to the project
  * ``X-Maintainer``: The maintainer of the project
 
 Supported Data Sources

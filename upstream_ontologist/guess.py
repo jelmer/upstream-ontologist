@@ -110,6 +110,8 @@ DATUM_TYPES = {
     'X-Pecl-URL': str,
     'Screenshots': list,
     'Contact': str,
+    'X-Author': list,
+    'X-Security-MD': str,
     'X-Maintainer': Person,
     }
 
@@ -351,7 +353,7 @@ def guess_from_python_metadata(pkg_info):
     if 'Author' in pkg_info:
         author_email = pkg_info.get('Author-email')
         author = Person(pkg_info['Author'], author_email)
-        yield UpstreamDatum('X-Authors', [author], 'certain')
+        yield UpstreamDatum('X-Author', [author], 'certain')
     if 'License' in pkg_info:
         yield UpstreamDatum('X-License', pkg_info['License'], 'certain')
     if 'Download-URL' in pkg_info:
@@ -2006,7 +2008,7 @@ def guess_from_authors(path, trust_package=False):
                 continue
             if '<' in m or m.count(' ') < 5:
                 authors.append(Person.from_string(m))
-    yield UpstreamDatum('X-Authors', authors, 'likely')
+    yield UpstreamDatum('X-Author', authors, 'likely')
 
 
 def _get_guessers(path, trust_package=False):  # noqa: C901
