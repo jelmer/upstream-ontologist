@@ -3236,12 +3236,9 @@ def strip_vcs_prefixes(url):
     return url
 
 
-def guess_from_gobo(package: str):
+def guess_from_gobo(package: str):   # noqa: C901
     packages_url = "https://api.github.com/repos/gobolinux/Recipes/contents"
-    try:
-        contents = _load_json_url(packages_url)
-    except urllib.error.HTTPError as e:
-        raise
+    contents = _load_json_url(packages_url)
     packages = [entry['name'] for entry in contents]
     for p in packages:
         if p.lower() == package.lower():
