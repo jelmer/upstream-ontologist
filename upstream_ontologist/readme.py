@@ -142,7 +142,7 @@ def _skip_paragraph_block(para, metadata):  # noqa: C901
                     'Repository',
                     'https://github.com/%s' % '/'.join(parsed_url.path.strip('/').split('/')[:2]),
                     'confident'))
-            elif name.lower() == 'build status':
+            elif name and name.lower() == 'build status':
                 parsed_url = urlparse(c.get('href'))
                 if parsed_url.hostname == 'travis-ci.org':
                     metadata.append(UpstreamDatum(
