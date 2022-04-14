@@ -400,16 +400,15 @@ def drop_git_username(parsed, branch, subpath):
 
 
 def fix_branch_argument(parsed, branch, subpath):
-    if parsed.hostname != "github.com":
-        return None, None, None
-    # TODO(jelmer): Handle gitlab sites too?
-    path_elements = parsed.path.strip("/").split("/")
-    if len(path_elements) > 2 and path_elements[2] == "tree":
-        return (
-            parsed._replace(path="/".join(path_elements[:2])),
-            "/".join(path_elements[3:]),
-            subpath,
-        )
+    if parsed.hostname == "github.com":
+        # TODO(jelmer): Handle gitlab sites too?
+        path_elements = parsed.path.strip("/").split("/")
+        if len(path_elements) > 2 and path_elements[2] == "tree":
+            return (
+                parsed._replace(path="/".join(path_elements[:2])),
+                "/".join(path_elements[3:]),
+                subpath,
+            )
     return None, None, None
 
 
