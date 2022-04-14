@@ -24,6 +24,7 @@ __all__ = [
 ]
 
 import http.client
+import logging
 import re
 from typing import Optional, Union, List, Tuple
 
@@ -32,7 +33,11 @@ import urllib
 from urllib.parse import urlparse, urlunparse, ParseResult, parse_qs
 
 
-from . import _load_json_url
+from . import (
+    _load_json_url,
+    InvalidUrl,
+    UrlUnverifiable,
+    )
 
 
 KNOWN_GITLAB_SITES = [
@@ -585,6 +590,8 @@ def guess_repo_from_url(url, net_access=False):  # noqa: C901
         parts = parsed_url.path.split('/')
         if '-' in parts:
             parts = parts[:parts.index('-')]
+        if 'tags' in parts:
+            parts = parts[:parts.index('tags')]
         return urlunparse(
             parsed_url._replace(path='/'.join(parts), query=''))
     if parsed_url.hostname == 'git.php.net':
@@ -602,19 +609,21 @@ def guess_repo_from_url(url, net_access=False):  # noqa: C901
         # 'svn' subdomains are often used for hosting SVN repositories.
         return url
     if net_access:
-        if verify_repository_url(url):
-            return url
-        return None
+        try:
+            return check_repository_url_canonical(url)
+        except (UrlUnverifiable, InvalidUrl):
+            return None
     return None
 
 
-def verify_repository_url(url: str, version: Optional[str] = None) -> bool:
-    """Verify whether a repository URL is valid."""
+def check_repository_url_canonical(
+        url: str, version: Optional[str] = None) -> str:
     parsed_url = urlparse(url)
     if parsed_url.netloc == 'github.com':
         path_elements = parsed_url.path.strip('/').split('/')
         if len(path_elements) < 2:
-            return False
+            raise InvalidUrl(
+                url, "GitHub URL with less than 2 path elements")
         if path_elements[1].endswith('.git'):
             path_elements[1] = path_elements[1][:-4]
         api_url = 'https://api.github.com/repos/%s/%s' % (
@@ -623,39 +632,56 @@ def verify_repository_url(url: str, version: Optional[str] = None) -> bool:
             data = _load_json_url(api_url)
         except urllib.error.HTTPError as e:
             if e.code == 404:
-                return False
+                raise InvalidUrl(
+                    url, "API URL %s does not exist" % api_url)
             elif e.code == 403:
-                # Probably rate-limited. Let's just hope for the best.
-                pass
+                # Probably rate limited
+                logging.warning(
+                    'Unable to verify bug database URL %s: %s',
+                    url, e.reason)
+                raise UrlUnverifiable(url, "GitHub URL rate-limited")
             else:
                 raise
         else:
             if data.get('archived', False):
-                return False
+                raise InvalidUrl(url, "Repository is archived")
             if data['description']:
                 if data['description'].startswith('Moved to '):
-                    return False
+                    return check_repository_url_canonical(
+                        data['description'][len('Moved to '):],
+                        version=version)
                 if 'has moved' in data['description']:
-                    return False
+                    raise InvalidUrl(url, "repository has moved")
                 if data['description'].startswith('Mirror of '):
-                    return False
+                    return check_repository_url_canonical(
+                        data['description'][len('Mirror of '):],
+                        version=version)
             homepage = data.get('homepage')
             if homepage and is_gitlab_site(homepage):
-                return False
+                raise InvalidUrl(url, 'homepage is on GitLab: %s' % homepage)
             # TODO(jelmer): Look at the contents of the repository; if it
             # contains just a single README file with < 10 lines, assume
             # the worst.
             # return data['clone_url']
-    return probe_upstream_branch_url(url, version=version)
+            url = data['clone_url']
+    is_valid = probe_upstream_branch_url(url, version=version)
+    if is_valid is None:
+        raise UrlUnverifiable(url, "unable to probe")
+    if is_valid:
+        return url
+    raise InvalidUrl(url, "unable to successfully probe URL")
 
 
-def probe_upstream_branch_url(url: str, version=None):
+def probe_upstream_branch_url(
+        url: str, version: Optional[str] = None) -> Optional[bool]:
     parsed = urlparse(url)
     if parsed.scheme in ('git+ssh', 'ssh', 'bzr+ssh'):
         # Let's not probe anything possibly non-public.
         return None
     import breezy.ui
     from breezy.branch import Branch
+    import breezy.bzr
+    import breezy.git
     old_ui = breezy.ui.ui_factory
     breezy.ui.ui_factory = breezy.ui.SilentUIFactory()
     try:

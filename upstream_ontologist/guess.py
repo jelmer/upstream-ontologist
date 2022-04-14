@@ -34,7 +34,7 @@ from .vcs import (
     sanitize_url as sanitize_vcs_url,
     is_gitlab_site,
     guess_repo_from_url,
-    verify_repository_url,
+    check_repository_url_canonical,
     )
 
 from . import (
@@ -46,6 +46,8 @@ from . import (
     certainty_sufficient,
     _load_json_url,
     Person,
+    InvalidUrl,
+    UrlUnverifiable,
     )
 
 
@@ -935,6 +937,31 @@ def url_from_fossil_clone_command(command):
     if plausible_vcs_url(url):
         return url
     return None
+
+
+def guess_from_pubspec_yaml(path, trust_package):
+    import ruamel.yaml
+    import ruamel.yaml.reader
+    with open(path, 'rb') as f:
+        try:
+            data = ruamel.yaml.load(f, ruamel.yaml.SafeLoader)
+        except ruamel.yaml.reader.ReaderError as e:
+            logging.warning('Unable to parse %s: %s', path, e)
+            return
+    if 'name' in data:
+        yield UpstreamDatum('Name', data['name'], 'certain')
+    if 'description' in data:
+        yield UpstreamDatum('X-Description', data['description'], 'certain')
+    if 'version' in data:
+        yield UpstreamDatum('X-Version', data['version'], 'certain')
+    if 'homepage' in data:
+        yield UpstreamDatum('Homepage', data['homepage'], 'certain')
+    if 'repository' in data:
+        yield UpstreamDatum('Repository', data['repository'], 'certain')
+    if 'documentation' in data:
+        yield UpstreamDatum('Documentation', data['documentation'], 'certain')
+    if 'issue_tracker' in data:
+        yield UpstreamDatum('Bug-Database', data['issue_tracker'], 'certain')
 
 
 def guess_from_install(path, trust_package):  # noqa: C901
@@ -1997,6 +2024,7 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
         ('wscript', guess_from_wscript),
         ('AUTHORS', guess_from_authors),
         ('INSTALL', guess_from_install),
+        ('pubspec.yaml', guess_from_pubspec_yaml),
         ]
 
     # Search for something Python-y
@@ -2248,8 +2276,14 @@ def guess_from_sf(sf_project: str, subproject: Optional[str] = None):  # noqa: C
     if data.get('external_homepage'):
         yield 'Homepage', data['external_homepage']
     if data.get('preferred_support_url'):
-        if verify_bug_database_url(data['preferred_support_url']):
+        try:
+            canonical_url = check_bug_database_canonical(data['preferred_support_url'])
+        except UrlUnverifiable:
             yield 'Bug-Database', data['preferred_support_url']
+        except InvalidUrl:
+            pass
+        else:
+            yield 'Bug-Database', canonical_url
     # In theory there are screenshots linked from the sourceforge project that
     # we can use, but if there are multiple "subprojects" then it will be
     # unclear which one they belong to.
@@ -2611,50 +2645,58 @@ def bug_submit_url_from_bug_database_url(url):
     return None
 
 
-def verify_bug_database_url(url):
+def check_bug_database_canonical(url: str) -> str:
     parsed_url = urlparse(url)
     if parsed_url.netloc == 'github.com':
         path_elements = parsed_url.path.strip('/').split('/')
         if len(path_elements) < 3 or path_elements[2] != 'issues':
-            return False
+            raise InvalidUrl(url, "GitHub URL with missing path elements")
         api_url = 'https://api.github.com/repos/%s/%s' % (
             path_elements[0], path_elements[1])
         try:
             data = _load_json_url(api_url)
         except urllib.error.HTTPError as e:
             if e.code == 404:
-                return False
+                raise InvalidUrl(url, "Project does not exist")
             if e.code == 403:
                 # Probably rate limited
                 logging.warning(
                     'Unable to verify bug database URL %s: %s',
                     url, e.reason)
-                return None
+                raise UrlUnverifiable(url, "rate-limited by GitHub API")
             raise
-        return data['has_issues'] and not data.get('archived', False)
+        if not data['has_issues']:
+            raise InvalidUrl(
+                url, "GitHub project does not have issues enabled")
+        if data.get('archived', False):
+            raise InvalidUrl(url, "GitHub project is archived")
+        return urljoin(data['html_url'] + '/', 'issues')
     if is_gitlab_site(parsed_url.netloc):
         path_elements = parsed_url.path.strip('/').split('/')
         if len(path_elements) < 3 or path_elements[-1] != 'issues':
-            return False
-        api_url = 'https://%s/api/v4/projects/%s/issues' % (
+            raise InvalidUrl(url, "GitLab URL with missing path elements")
+        api_url = 'https://%s/api/v4/projects/%s' % (
             parsed_url.netloc, quote('/'.join(path_elements[:-1]), safe=''))
         try:
             data = _load_json_url(api_url)
         except urllib.error.HTTPError as e:
             if e.code == 404:
-                return False
+                raise InvalidUrl(url, "Project does not exist")
             raise
-        return len(data) > 0
-    return None
+        if not data['issues_enabled']:
+            raise InvalidUrl(url, "Project does not have issues enabled")
+        return urljoin(data['web_url'] + '/', '-/issues')
+    raise UrlUnverifiable(url, "unsupported hoster")
 
 
-def verify_bug_submit_url(url):
+def check_bug_submit_url_canonical(url: str) -> str:
     parsed_url = urlparse(url)
     if parsed_url.netloc == 'github.com' or is_gitlab_site(parsed_url.netloc):
         path = '/'.join(parsed_url.path.strip('/').split('/')[:-1])
-        return verify_bug_database_url(
-            urlunparse(parsed_url._replace(path=path)))
-    return None
+        db_url = urlunparse(parsed_url._replace(path=path))
+        canonical_db_url = check_bug_database_canonical(db_url)
+        return urljoin(canonical_db_url + '/', "new")
+    raise UrlUnverifiable(url, "unsupported hoster")
 
 
 def _extrapolate_repository_from_homepage(upstream_metadata, net_access):
@@ -2936,7 +2978,7 @@ def _extrapolate_fields(
                 to_field: upstream_metadata.get(to_field)
                 for to_field in to_fields}
             if all([old_value is not None and
-                    certainty_to_confidence(from_certainty) > certainty_to_confidence(old_value.certainty)
+                    certainty_to_confidence(from_certainty) > certainty_to_confidence(old_value.certainty)  # type: ignore
                     for old_value in old_to_values.values()]):
                 continue
             changed = update_from_guesses(
@@ -2961,30 +3003,97 @@ def verify_screenshots(urls):
             yield url, True
 
 
-def check_upstream_metadata(upstream_metadata, version=None):
+def check_url_canonical(url: str) -> str:
+    parsed_url = urlparse(url)
+    if parsed_url.scheme not in ('https', 'http'):
+        raise UrlUnverifiable(
+            url, "unable to check URL with scheme %s" % parsed_url.scheme)
+    headers = {'User-Agent': USER_AGENT}
+    try:
+        resp = urlopen(
+            Request(url, headers=headers),
+            timeout=DEFAULT_URLLIB_TIMEOUT)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            raise InvalidUrl(url, "url not found")
+        if e.code == 429:
+            raise UrlUnverifiable(url, "rate-by")
+        raise
+    except socket.timeout:
+        raise UrlUnverifiable(url, 'timeout contacting')
+    else:
+        return resp.geturl()
+
+
+def check_upstream_metadata(upstream_metadata, version=None):  # noqa: C901
     """Check upstream metadata.
 
     This will make network connections, etc.
     """
     repository = upstream_metadata.get('Repository')
     if repository and repository.certainty == 'likely':
-        if verify_repository_url(repository.value, version=version):
+        try:
+            canonical_url = check_repository_url_canonical(
+                repository.value, version=version)
+        except UrlUnverifiable:
+            pass
+        except InvalidUrl:
+            # Downgrade. Perhaps we should remove altogether?
+            repository.certainty = 'possible'
+        else:
+            repository.value = canonical_url
             repository.certainty = 'certain'
             derived_browse_url = browse_url_from_repo_url(repository.value)
             browse_repo = upstream_metadata.get('Repository-Browse')
             if browse_repo and derived_browse_url == browse_repo.value:
                 browse_repo.certainty = repository.certainty
-        else:
-            # TODO(jelmer): Remove altogether, or downgrade to a lesser
-            # certainty?
+    homepage = upstream_metadata.get('Homepage')
+    if homepage and homepage.certainty == 'likely':
+        try:
+            canonical_url = check_url_canonical(homepage.value)
+        except UrlUnverifiable:
             pass
+        except InvalidUrl:
+            # Downgrade. Perhaps we should remove altogether?
+            homepage.certainty = 'possible'
+        else:
+            homepage.value = canonical_url
+            homepage.certainty = 'certain'
+    repository_browse = upstream_metadata.get('Repository-Browse')
+    if repository_browse and repository_browse.certainty == 'likely':
+        try:
+            canonical_url = check_url_canonical(repository_browse.value)
+        except UrlUnverifiable:
+            pass
+        except InvalidUrl:
+            # Downgrade. Perhaps we should remove altogether?
+            repository_browse.certainty = 'possible'
+        else:
+            repository_browse.value = canonical_url
+            repository_browse.certainty = 'certain'
     bug_database = upstream_metadata.get('Bug-Database')
     if bug_database and bug_database.certainty == 'likely':
-        if verify_bug_database_url(bug_database.value):
+        try:
+            canonical_url = check_bug_database_canonical(bug_database.value)
+        except UrlUnverifiable:
+            pass
+        except InvalidUrl:
+            # TODO(jelmer): delete altogether?
+            bug_database.certainty = 'possible'
+        else:
+            bug_database.value = canonical_url
             bug_database.certainty = 'certain'
     bug_submit = upstream_metadata.get('Bug-Submit')
     if bug_submit and bug_submit.certainty == 'likely':
-        if verify_bug_submit_url(bug_submit.value):
+        try:
+            canonical_url = check_bug_submit_url_canonical(bug_submit.value)
+        except UrlUnverifiable:
+            pass
+        except InvalidUrl:
+            # TODO(jelmer): Perhaps remove altogether?
+            bug_submit.certainty = 'possible'
+        else:
+            bug_submit.value = canonical_url
             bug_submit.certainty = 'certain'
     screenshots = upstream_metadata.get('Screenshots')
     if screenshots and screenshots.certainty == 'likely':

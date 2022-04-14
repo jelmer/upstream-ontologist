@@ -12,7 +12,7 @@ setup(
     package_data={
         'upstream_ontologist.tests': ['readme_data/*/*'],
     },
-    version="0.1.24",
+    version="0.1.25",
     author="Jelmer Vernooij",
     author_email="jelmer@jelmer.uk",
     maintainer="Jelmer Vernooij",

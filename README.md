@@ -17,30 +17,30 @@ Provided Fields
 
 Standard fields:
 
- * Homepage: homepage URL
- * Name: human name of the upstream project
- * Contact: contact address of some sort of the upstream (e-mail, mailing list URL)
- * Repository: VCS URL
- * Repository-Browse: Web URL for viewing the VCS
- * Bug-Database: Bug database URL (for web viewing, generally)
- * Bug-Submit: URL to use to submit new bugs (either on the web or an e-mail address)
- * Screenshots: List of URLs with screenshots
- * Archive: Archive used - e.g. SourceForge
- * Security-Contact: e-mail or URL with instructions for reporting security issues
- * Documentation: Link to documentation on the web
+ * ``Homepage``: homepage URL
+ * ``Name``: human name of the upstream project
+ * ``Contact``: contact address of some sort of the upstream (e-mail, mailing list URL)
+ * ``Repository``: VCS URL
+ * ``Repository-Browse``: Web URL for viewing the VCS
+ * ``Bug-Database``: Bug database URL (for web viewing, generally)
+ * ``Bug-Submit``: URL to use to submit new bugs (either on the web or an e-mail address)
+ * ``Screenshots``: List of URLs with screenshots
+ * ``Archive``: Archive used - e.g. SourceForge
+ * ``Security-Contact``: e-mail or URL with instructions for reporting security issues
+ * ``Documentation``: Link to documentation on the web
 
 Extensions for upstream-ontologist, not defined in DEP-12:
 
- * X-SourceForge-Project: sourceforge project name
- * X-Wiki: Wiki URL
- * X-Summary: one-line description of the project
- * X-Description: longer description of the project
- * X-License: Single line license (e.g. "GPL 2.0")
- * X-Copyright: List of copyright holders
- * X-Version: Current upstream version
- * X-Security-MD: URL to markdown file with security policy
- * X-Authors: List of people who contributed to the project
- * X-Maintainer: The maintainer of the project
+ * ``X-SourceForge-Project``: sourceforge project name
+ * ``X-Wiki``: Wiki URL
+ * ``X-Summary``: one-line description of the project
+ * ``X-Description``: longer description of the project
+ * ``X-License``: Single line license (e.g. "GPL 2.0")
+ * ``X-Copyright``: List of copyright holders
+ * ``X-Version``: Current upstream version
+ * ``X-Security-MD``: URL to markdown file with security policy
+ * ``X-Authors``: List of people who contributed to the project
+ * ``X-Maintainer``: The maintainer of the project
 
 Supported Data Sources
 ----------------------
@@ -70,6 +70,7 @@ data sources:
  * Debian packaging metadata
    (debian/watch, debian/control, debian/rules, debian/get-orig-source.sh,
     debian/copyright, debian/patches)
+ * Dart's [pubspec.yaml](https://dart.dev/tools/pub/pubspec)
 
 It will also scan README and INSTALL for possible upstream repository URLs
 (and will attempt to verify that those match the local repository).
@@ -77,12 +78,12 @@ It will also scan README and INSTALL for possible upstream repository URLs
 In addition to local files, it can also consult external directories
 using their APIs:
 
- * GitHub
- * SourceForge
- * repology
- * Launchpad
- * PECL
- * AUR
+ * [GitHub](https://github.com/)
+ * [SourceForge](https://sourceforge.net/)
+ * [repology](https://www.repology.org/)
+ * [Launchpad](https://launchpad.net/)
+ * [PECL](https://pecl.php.net/)
+ * [AUR](https://aur.archlinux.org/)
 
 Example Usage
 -------------
