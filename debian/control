@@ -13,7 +13,7 @@ Package: python3-upstream-ontologist
 Architecture: all
 Replaces: lintian-brush (<< 0.95)
 Depends: ${misc:Depends}, ${python3:Depends}, python3-debian, python3-debmutate
-Recommends: python3-bs4, python3-toml, python3-dulwich, python3-distro-info, python3-markdown, python3-docutils, python3-lxml
+Recommends: python3-bs4, python3-toml, python3-dulwich, python3-distro-info, python3-markdown, python3-docutils, python3-lxml, python3-setuptools, python3-tomlkit
 Suggests: python3-breezy, python3-ruamel.yaml
 Description: discover metadata about upstream projects
  The upstream ontologist discovers metadata about the upstream part of a
