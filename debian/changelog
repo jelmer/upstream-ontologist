@@ -1,9 +1,9 @@
-upstream-ontologist (0.1.25-3) UNRELEASED; urgency=medium
+upstream-ontologist (0.1.25-3) unstable; urgency=medium
 
   * Recommend python3-setuptools, for reading setup files.
   * Recommend python3-tomlkit.
 
- -- Jelmer Vernooĳ <jelmer@debian.org>  Thu, 14 Apr 2022 20:26:32 +0100
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Thu, 14 Apr 2022 20:27:25 +0100
 
 upstream-ontologist (0.1.25-2) unstable; urgency=medium
 
