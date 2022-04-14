@@ -236,7 +236,7 @@ def _extract_paragraphs(children, metadata):
             continue
         if el.name == 'div':
             paragraphs.extend(_extract_paragraphs(el.children, metadata))
-            if paragraphs and 'section' in el.get('class'):
+            if paragraphs and 'section' in (el.get('class') or []):
                 break
         if el.name == 'p':
             if _is_semi_header(el):
@@ -385,6 +385,8 @@ def description_from_readme_rst(rst_text: str) -> Tuple[Optional[str], Iterable[
         soup = BeautifulSoup(html_text, 'lxml')
     except FeatureNotFound:
         logger.debug('lxml not available, not parsing README.rst')
+        return None, {}
+    if not soup.body:
         return None, {}
     return _description_from_basic_soup(list(soup.body.children)[0])
 

@@ -135,3 +135,13 @@ class GuessRepoFromUrlTests(TestCase):
             'https://github.com/jelmer/dulwich',
             guess_repo_from_url(
                 'https://coveralls.io/r/jelmer/dulwich'))
+
+    def test_gitlab(self):
+        self.assertEqual(
+            'https://gitlab.com/jelmer/dulwich',
+            guess_repo_from_url(
+                'https://gitlab.com/jelmer/dulwich'))
+        self.assertEqual(
+            'https://gitlab.com/jelmer/dulwich',
+            guess_repo_from_url(
+                'https://gitlab.com/jelmer/dulwich/tags'))
