@@ -1,6 +1,6 @@
 Source: upstream-ontologist
 Rules-Requires-Root: no
-Standards-Version: 4.5.1
+Standards-Version: 4.6.0
 Build-Depends: debhelper-compat (= 13), python3-all, dh-python, python3-setuptools, python3-debian, python3-debmutate, python3-breezy, python3-bs4, python3-toml, python3-dulwich, python3-distro-info, python3-ruamel.yaml, python3-markdown, python3-docutils, python3-lxml
 Priority: optional
 Section: python
