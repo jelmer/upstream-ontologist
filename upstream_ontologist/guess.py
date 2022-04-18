@@ -2008,6 +2008,8 @@ def guess_from_authors(path, trust_package=False):
                 m = m.split(' for ')[0]
             if not m[0].isalpha():
                 continue
+            if '<' not in m and line.startswith(b'\t'):
+                continue
             if '<' in m or m.count(' ') < 5:
                 authors.append(Person.from_string(m))
     yield UpstreamDatum('X-Author', authors, 'likely')
