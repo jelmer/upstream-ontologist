@@ -63,5 +63,9 @@ def _guess_from_page(text: bytes):
 def _guess_from_soup(soup):
     for a in soup.findAll('a'):
         href = a.get('href')
-        if a.get('aria-label') in ('github', 'git', 'repository'):
-            yield UpstreamDatum('Repository', href, certainty='confident')
+        labels = [a.get('aria-label'), a.text]
+        for label in filter(None, labels):
+            if label.lower() in ('github', 'git', 'repository', 'github repository'):
+                yield UpstreamDatum('Repository', href, certainty='confident')
+            if label.lower() in ('github bug tracking', 'bug tracker'):
+                yield UpstreamDatum('Bug-Database', href, certainty='confident')
