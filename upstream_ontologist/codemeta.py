@@ -49,6 +49,8 @@ def codemeta_file_from_upstream_info(upstream_info):
     for link_field in ["Documentation", "Homepage"]:
         if link_field in upstream_info:
             ret.setdefault("relatedLink", []).append(upstream_info[link_field])
+    if "X-Download" in upstream_info:
+        ret["downloadUrl"] = upstream_info["X-Download"]
     return ret
 
 
