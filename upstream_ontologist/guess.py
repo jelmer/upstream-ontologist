@@ -337,11 +337,8 @@ def guess_from_python_metadata(pkg_info):
         yield UpstreamDatum('Name', pkg_info['name'], 'certain')
     if 'Version' in pkg_info:
         yield UpstreamDatum('X-Version', pkg_info['Version'], 'certain')
-    if 'Home-Page' in pkg_info:
-        repo = guess_repo_from_url(pkg_info['Home-Page'])
-        if repo:
-            yield UpstreamDatum(
-                'Repository', repo, 'likely')
+    if 'Home-page' in pkg_info:
+        yield UpstreamDatum('Homepage', pkg_info['Home-page'], 'certain')
     for value in pkg_info.get_all('Project-URL', []):
         url_type, url = value.split(', ')
         if url_type in ('GitHub', 'Repository', 'Source Code'):
