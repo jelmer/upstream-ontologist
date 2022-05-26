@@ -54,7 +54,7 @@ def _skip_paragraph(para, metadata):  # noqa: C901
     m = re.match('More documentation .* at http.*', para)
     if m:
         return True
-    m = re.match('Documentation (can be found|is hosted) (at|on) ([^ ]+)', para)
+    m = re.match('Documentation (can be found|is hosted|is available) (at|on) ([^ ]+)', para)
     if m:
         metadata.append(UpstreamDatum('Documentation', m.group(3), 'likely'))
         return True

@@ -381,6 +381,8 @@ def parse_python_long_description(long_description, content_type):
     # Discard encoding, etc.
     if content_type:
         content_type = content_type.split(';')[0]
+    if '-*-restructuredtext-*-' in long_description.splitlines()[0]:
+        content_type = 'text/restructured-text'
     if content_type in (None, 'text/plain'):
         if len(long_description.splitlines()) > 30:
             return
