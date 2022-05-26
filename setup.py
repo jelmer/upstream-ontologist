@@ -28,6 +28,8 @@ setup(
              'upstream_ontologist.__main__:main'),
             ('autodoap='
              'upstream_ontologist.doap:main'),
+            ('autocodemeta='
+             'upstream_ontologist.codemeta.main'),
         ],
     },
     install_requires=['python_debian', 'debmutate'],
