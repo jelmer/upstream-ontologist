@@ -1,3 +1,9 @@
+upstream-ontologist (0.1.25-2) UNRELEASED; urgency=medium
+
+  * Recommend perl-doc.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Fri, 27 May 2022 18:33:06 +0100
+
 upstream-ontologist (0.1.25-1) unstable; urgency=medium
 
   * Recommend python3-setuptools, for reading setup files.
