@@ -2719,7 +2719,7 @@ def check_bug_database_canonical(url: str) -> str:
             if e.code == 404:
                 raise InvalidUrl(url, "Project does not exist")
             raise
-        if not data['issues_enabled']:
+        if data.get('issues_enabled') is False:
             raise InvalidUrl(url, "Project does not have issues enabled")
         return urljoin(data['web_url'] + '/', '-/issues')
     raise UrlUnverifiable(url, "unsupported hoster")
