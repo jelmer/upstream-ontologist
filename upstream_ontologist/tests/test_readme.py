@@ -25,7 +25,7 @@ from upstream_ontologist.readme import (
     description_from_readme_md,
     description_from_readme_rst,
     description_from_readme_plain,
-    )
+)
 
 
 class ReadmeTestCase(TestCase):
@@ -84,12 +84,12 @@ class ReadmeTestCase(TestCase):
                 self.skipTest(
                     'Skipping README.rst tests, docutils not available')
             actual_description, unused_rst = description_from_readme_rst(
-                    readme_rst)
+                readme_rst)
             self.assertEqual(actual_description, description)
 
         if readme_plain is not None:
             actual_description, unused_rst = description_from_readme_plain(
-                    readme_plain)
+                readme_plain)
             self.assertEqual(actual_description, description)
 
 

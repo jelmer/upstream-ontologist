@@ -37,7 +37,7 @@ from . import (
     _load_json_url,
     InvalidUrl,
     UrlUnverifiable,
-    )
+)
 
 
 KNOWN_GITLAB_SITES = [
@@ -226,16 +226,15 @@ def find_secure_repo_url(
         return url
 
     # Sites we know to be available over https
-    if parsed_repo_url.hostname and (
-        is_gitlab_site(parsed_repo_url.hostname, net_access)
-        or parsed_repo_url.hostname
-        in [
-            "github.com",
-            "git.launchpad.net",
-            "bazaar.launchpad.net",
-            "code.launchpad.net",
-        ]
-    ):
+    if (parsed_repo_url.hostname
+        and (
+            is_gitlab_site(parsed_repo_url.hostname, net_access)
+            or parsed_repo_url.hostname in [
+                "github.com",
+                "git.launchpad.net",
+                "bazaar.launchpad.net",
+                "code.launchpad.net",
+            ])):
         parsed_repo_url = parsed_repo_url._replace(scheme="https")
 
     if parsed_repo_url.scheme == "lp":
@@ -526,14 +525,14 @@ def guess_repo_from_url(url, net_access=False):  # noqa: C901
     if parsed_url.netloc == 'github.com':
         if len(path_elements) < 2:
             return None
-        return ('https://github.com' +
+        return ('https://github.com'
                 '/'.join(parsed_url.path.split('/')[:3]))
     if parsed_url.netloc == 'travis-ci.org':
-        return ('https://github.com/' +
+        return ('https://github.com/'
                 '/'.join(path_elements[:3]))
-    if (parsed_url.netloc == 'coveralls.io' and
-            parsed_url.path.startswith('/r/')):
-        return ('https://github.com/' +
+    if (parsed_url.netloc == 'coveralls.io'
+            and parsed_url.path.startswith('/r/')):
+        return ('https://github.com/'
                 '/'.join(path_elements[1:4]))
     if parsed_url.netloc == 'launchpad.net':
         return 'https://code.launchpad.net/%s' % (
@@ -557,8 +556,8 @@ def guess_repo_from_url(url, net_access=False):  # noqa: C901
             return 'https://anongit.kde.org/%s.git' % path_elements[1]
     if parsed_url.netloc == 'ftp.gnome.org':
         if (len(path_elements) >= 4 and [
-              e.lower() for e in path_elements[:3]] == [
-                  'pub', 'gnome', 'sources']):
+            e.lower() for e in path_elements[:3]] == [
+                'pub', 'gnome', 'sources']):
             return 'https://gitlab.gnome.org/GNOME/%s.git' % path_elements[3]
     if parsed_url.netloc == 'sourceforge.net':
         if (len(path_elements) >= 4 and path_elements[0] == 'p'

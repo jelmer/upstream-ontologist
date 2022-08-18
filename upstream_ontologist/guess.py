@@ -35,7 +35,7 @@ from .vcs import (
     is_gitlab_site,
     guess_repo_from_url,
     check_repository_url_canonical,
-    )
+)
 
 from . import (
     DEFAULT_URLLIB_TIMEOUT,
@@ -48,7 +48,7 @@ from . import (
     Person,
     InvalidUrl,
     UrlUnverifiable,
-    )
+)
 
 
 # Pecl is quite slow, so up the timeout a bit.
@@ -115,7 +115,7 @@ DATUM_TYPES = {
     'X-Maintainer': Person,
     'X-Cargo-Crate': str,
     'X-API-Documentation': str,
-    }
+}
 
 
 def known_bad_guess(datum):  # noqa: C901
@@ -177,8 +177,8 @@ def update_from_guesses(upstream_metadata, guessed_items):
     for datum in guessed_items:
         current_datum = upstream_metadata.get(datum.field)
         if not current_datum or (
-                certainty_to_confidence(datum.certainty) <
-                certainty_to_confidence(current_datum.certainty)):
+                certainty_to_confidence(datum.certainty)
+                < certainty_to_confidence(current_datum.certainty)):
             upstream_metadata[datum.field] = datum
             changed = True
     return changed
@@ -237,8 +237,8 @@ def _metadata_from_url(url: str, origin=None):
                 "X-SourceForge-Project", m.group(1), "certain",
                 origin=origin)
         return
-    if (url.startswith('https://pecl.php.net/package/') or
-            url.startswith('http://pecl.php.net/package/')):
+    if (url.startswith('https://pecl.php.net/package/')
+            or url.startswith('http://pecl.php.net/package/')):
         yield UpstreamDatum('X-Pecl-URL', url, 'certain', origin=origin)
 
 
@@ -246,7 +246,7 @@ def guess_from_debian_watch(path, trust_package):
     from debmutate.watch import (
         parse_watch_file,
         MissingVersion,
-        )
+    )
 
     def get_package_name():
         from debian.deb822 import Deb822
@@ -736,7 +736,7 @@ def guess_from_dist_ini(path, trust_package):
         NoSectionError,
         NoOptionError,
         ParsingError,
-        )
+    )
     parser = RawConfigParser(strict=False)
     with open(path, 'r') as f:
         try:
@@ -793,7 +793,7 @@ def guess_from_debian_copyright(path, trust_package):  # noqa: C901
         Copyright,
         NotMachineReadableError,
         MachineReadableFormatError,
-        )
+    )
     from_urls = []
     with open(path, 'r') as f:
         try:
@@ -992,10 +992,10 @@ def guess_from_install(path, trust_package):  # noqa: C901
             for i, line in enumerate(lines):
                 line = line.strip()
                 cmdline = line.strip().lstrip(b'$').strip()
-                if (cmdline.startswith(b'git clone ') or
-                        cmdline.startswith(b'fossil clone ')):
+                if (cmdline.startswith(b'git clone ')
+                        or cmdline.startswith(b'fossil clone ')):
                     while cmdline.endswith(b'\\'):
-                        cmdline += lines[i+1]
+                        cmdline += lines[i + 1]
                         cmdline = cmdline.strip()
                         i += 1
                     if cmdline.startswith(b'git clone '):
@@ -1052,10 +1052,10 @@ def guess_from_readme(path, trust_package):  # noqa: C901
             for i, line in enumerate(lines):
                 line = line.strip()
                 cmdline = line.strip().lstrip(b'$').strip()
-                if (cmdline.startswith(b'git clone ') or
-                        cmdline.startswith(b'fossil clone ')):
+                if (cmdline.startswith(b'git clone ')
+                        or cmdline.startswith(b'fossil clone ')):
                     while cmdline.endswith(b'\\'):
-                        cmdline += lines[i+1]
+                        cmdline += lines[i + 1]
                         cmdline = cmdline.strip()
                         i += 1
                     if cmdline.startswith(b'git clone '):
@@ -1624,8 +1624,8 @@ def guess_from_configure(path, trust_package=False):
             elif key == b'PACKAGE_BUGREPORT':
                 if value in (b'BUG-REPORT-ADDRESS', ):
                     certainty = 'invalid'
-                elif (is_email_address(value.decode()) and
-                        not value.endswith(b'gnu.org')):
+                elif (is_email_address(value.decode())
+                        and not value.endswith(b'gnu.org')):
                     # Downgrade the trustworthiness of this field for most
                     # upstreams if it contains an e-mail address. Most
                     # upstreams seem to just set this to some random address,
@@ -1824,8 +1824,8 @@ def guess_from_pom_xml(path, trust_package=False):  # noqa: C901
     for scm_tag in root.findall('scm'):
         url_tag = scm_tag.find('url')
         if url_tag is not None:
-            if (url_tag.text.startswith('scm:') and
-                    url_tag.text.count(':') >= 3):
+            if (url_tag.text.startswith('scm:')
+                    and url_tag.text.count(':') >= 3):
                 url = url_tag.text.split(':', 2)[2]
             else:
                 url = url_tag.text
@@ -2048,7 +2048,7 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
         ('INSTALL', guess_from_install),
         ('pubspec.yaml', guess_from_pubspec_yaml),
         ('meson.build', guess_from_meson),
-        ]
+    ]
 
     # Search for something Python-y
     found_pkg_info = os.path.exists(os.path.join(path, 'PKG-INFO'))
@@ -2080,8 +2080,8 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
 
     doap_filenames = [
         n for n in os.listdir(path)
-        if n.endswith('.doap') or
-        (n.endswith('.xml') and n.startswith('doap_XML_'))]
+        if n.endswith('.doap')
+        or (n.endswith('.xml') and n.startswith('doap_XML_'))]
     if doap_filenames:
         if len(doap_filenames) == 1:
             CANDIDATES.append((doap_filenames[0], guess_from_doap))
@@ -2160,7 +2160,7 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
 def guess_upstream_metadata_items(
         path: str, trust_package: bool = False,
         minimum_certainty: Optional[str] = None
-        ) -> Iterable[UpstreamDatum]:
+) -> Iterable[UpstreamDatum]:
     """Guess upstream metadata items, in no particular order.
 
     Args:
@@ -2523,7 +2523,7 @@ def extend_from_lp(upstream_metadata, minimum_certainty, package,
 
     extend_from_external_guesser(
         upstream_metadata, lp_certainty, lp_fields, guess_from_launchpad(
-             package, distribution=distribution, suite=suite))
+            package, distribution=distribution, suite=suite))
 
 
 def extend_from_aur(upstream_metadata, minimum_certainty, package):
@@ -2573,9 +2573,9 @@ def repo_url_from_merge_request_url(url):
                  None, None, None))
     if is_gitlab_site(parsed_url.netloc):
         path_elements = parsed_url.path.strip('/').split('/')
-        if (len(path_elements) > 2 and
-                path_elements[-2] == 'merge_requests' and
-                path_elements[-1].isdigit()):
+        if (len(path_elements) > 2
+                and path_elements[-2] == 'merge_requests'
+                and path_elements[-1].isdigit()):
             return urlunparse(
                 ('https', parsed_url.netloc, '/'.join(path_elements[:-2]),
                  None, None, None))
@@ -2591,9 +2591,9 @@ def bug_database_from_issue_url(url):
                  None, None, None))
     if is_gitlab_site(parsed_url.netloc):
         path_elements = parsed_url.path.strip('/').split('/')
-        if (len(path_elements) > 2 and
-                path_elements[-2] == 'issues' and
-                path_elements[-1].isdigit()):
+        if (len(path_elements) > 2
+                and path_elements[-2] == 'issues'
+                and path_elements[-1].isdigit()):
             return urlunparse(
                 ('https', parsed_url.netloc, '/'.join(path_elements[:-2]),
                  None, None, None))
@@ -2670,14 +2670,14 @@ def bug_submit_url_from_bug_database_url(url):
     if parsed_url.netloc == 'bugs.launchpad.net':
         if len(path_elements) == 1:
             return urlunparse(
-                parsed_url._replace(path=parsed_url.path+'/+filebug'))
+                parsed_url._replace(path=parsed_url.path + '/+filebug'))
     if is_gitlab_site(parsed_url.netloc):
         if len(path_elements) < 2:
             return None
         if path_elements[-1] != 'issues':
             return None
         return urlunparse(
-            parsed_url._replace(path=parsed_url.path.rstrip('/')+'/new'))
+            parsed_url._replace(path=parsed_url.path.rstrip('/') + '/new'))
     return None
 
 
@@ -2737,7 +2737,7 @@ def check_bug_submit_url_canonical(url: str) -> str:
 
 def _extrapolate_repository_from_homepage(upstream_metadata, net_access):
     repo = guess_repo_from_url(
-            upstream_metadata['Homepage'].value, net_access=net_access)
+        upstream_metadata['Homepage'].value, net_access=net_access)
     if repo:
         yield UpstreamDatum(
             'Repository', repo,
@@ -2746,7 +2746,7 @@ def _extrapolate_repository_from_homepage(upstream_metadata, net_access):
 
 def _extrapolate_repository_from_download(upstream_metadata, net_access):
     repo = guess_repo_from_url(
-            upstream_metadata['X-Download'].value, net_access=net_access)
+        upstream_metadata['X-Download'].value, net_access=net_access)
     if repo:
         yield UpstreamDatum(
             'Repository', repo,
@@ -2766,7 +2766,7 @@ def _extrapolate_repository_from_bug_db(upstream_metadata, net_access):
 
 def _extrapolate_name_from_repository(upstream_metadata, net_access):
     repo = guess_repo_from_url(
-            upstream_metadata['Repository'].value, net_access=net_access)
+        upstream_metadata['Repository'].value, net_access=net_access)
     if repo:
         parsed = urlparse(repo)
         name = parsed.path.split('/')[-1]
@@ -2781,7 +2781,7 @@ def _extrapolate_name_from_repository(upstream_metadata, net_access):
 def _extrapolate_repository_browse_from_repository(
         upstream_metadata, net_access):
     browse_url = browse_url_from_repo_url(
-            upstream_metadata['Repository'].value)
+        upstream_metadata['Repository'].value)
     if browse_url:
         yield UpstreamDatum(
             'Repository-Browse', browse_url,
@@ -2933,27 +2933,27 @@ def extend_upstream_metadata(upstream_metadata,
             break
 
     archive = upstream_metadata.get('Archive')
-    if (archive and archive.value == 'SourceForge' and
-            'X-SourceForge-Project' in upstream_metadata and
-            net_access):
+    if (archive and archive.value == 'SourceForge'
+            and 'X-SourceForge-Project' in upstream_metadata
+            and net_access):
         sf_project = upstream_metadata['X-SourceForge-Project'].value
         try:
             extend_from_sf(upstream_metadata, sf_project)
         except NoSuchSourceForgeProject:
             del upstream_metadata['X-SourceForge-Project']
 
-    if (archive and archive.value == 'Hackage' and
-            'X-Hackage-Package' in upstream_metadata and
-            net_access):
+    if (archive and archive.value == 'Hackage'
+            and 'X-Hackage-Package' in upstream_metadata
+            and net_access):
         hackage_package = upstream_metadata['X-Hackage-Package'].value
         try:
             extend_from_hackage(upstream_metadata, hackage_package)
         except NoSuchHackagePackage:
             del upstream_metadata['X-Hackage-Package']
 
-    if (archive and archive.value == 'crates.io' and
-            'X-Cargo-Crate' in upstream_metadata and
-            net_access):
+    if (archive and archive.value == 'crates.io'
+            and 'X-Cargo-Crate' in upstream_metadata
+            and net_access):
         crate = upstream_metadata['X-Cargo-Crate'].value
         try:
             extend_from_crates_io(upstream_metadata, crate)
@@ -3014,8 +3014,8 @@ def _extrapolate_fields(
             old_to_values = {
                 to_field: upstream_metadata.get(to_field)
                 for to_field in to_fields}
-            if all([old_value is not None and
-                    certainty_to_confidence(from_certainty) > certainty_to_confidence(old_value.certainty)  # type: ignore
+            if all([old_value is not None
+                    and certainty_to_confidence(from_certainty) > certainty_to_confidence(old_value.certainty)  # type: ignore
                     for old_value in old_to_values.values()]):
                 continue
             changed = update_from_guesses(
@@ -3159,8 +3159,8 @@ def parse_pkgbuild_variables(f):
             existing = line[:-2]
             continue
         existing = None
-        if (line.startswith(b'\t') or line.startswith(b' ') or
-                line.startswith(b'#')):
+        if (line.startswith(b'\t') or line.startswith(b' ')
+                or line.startswith(b'#')):
             continue
         if keep:
             keep = (keep[0], keep[1] + line)
@@ -3191,7 +3191,7 @@ def guess_from_pecl(package):
     data = dict(guess_from_pecl_url(url))
     try:
         data['Repository'] = guess_repo_from_url(
-                data['Repository-Browse'], net_access=True)
+            data['Repository-Browse'], net_access=True)
     except KeyError:
         pass
     return data.items()
@@ -3232,8 +3232,8 @@ def guess_from_pecl_url(url):
 
 def strip_vcs_prefixes(url):
     for prefix in ['git', 'hg']:
-        if url.startswith(prefix+'+'):
-            return url[len(prefix)+1:]
+        if url.startswith(prefix + '+'):
+            return url[len(prefix) + 1:]
     return url
 
 
@@ -3335,7 +3335,7 @@ def guess_from_aur(package: str):
             except ValueError:
                 url = value
             url = url.replace('#branch=', ',branch=')
-            if any([url.startswith(vcs+'+') for vcs in vcses]):
+            if any([url.startswith(vcs + '+') for vcs in vcses]):
                 yield 'Repository', strip_vcs_prefixes(url)
         if key == '_gitroot':
             repo_url = value[0]

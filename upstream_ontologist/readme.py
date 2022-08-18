@@ -72,8 +72,8 @@ def _skip_paragraph(para, metadata):  # noqa: C901
     if m:
         return True
     m = re.match(
-            r'This software is freely distributable under the (.*) license.*',
-            para)
+        r'This software is freely distributable under the (.*) license.*',
+        para)
     if m:
         metadata.append(UpstreamDatum('X-License', m.group(1), 'likely'))
         return True
