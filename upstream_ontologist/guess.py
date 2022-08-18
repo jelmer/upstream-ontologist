@@ -432,7 +432,12 @@ def parse_python_url(url):
 
 def guess_from_setup_py_executed(path):
     from distutils.core import run_setup
-    result = run_setup(os.path.abspath(path), stop_after="init")
+    orig = os.getcwd()
+    try:
+        os.chdir(os.path.dirname(path))
+        result = run_setup(os.path.abspath(path), stop_after="config")
+    finally:
+        os.chdir(orig)
     if result.get_name() not in (None, '', 'UNKNOWN'):
         yield UpstreamDatum('Name', result.get_name(), 'certain')
     if result.get_version() not in (None, '', 'UNKNOWN'):
