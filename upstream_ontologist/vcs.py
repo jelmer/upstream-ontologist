@@ -525,15 +525,15 @@ def guess_repo_from_url(url, net_access=False):  # noqa: C901
     if parsed_url.netloc == 'github.com':
         if len(path_elements) < 2:
             return None
-        return ('https://github.com' +
-                '/'.join(parsed_url.path.split('/')[:3]))
+        return ('https://github.com'
+                + '/'.join(parsed_url.path.split('/')[:3]))
     if parsed_url.netloc == 'travis-ci.org':
-        return ('https://github.com/' +
-                '/'.join(path_elements[:3]))
+        return ('https://github.com/'
+                + '/'.join(path_elements[:3]))
     if (parsed_url.netloc == 'coveralls.io'
             and parsed_url.path.startswith('/r/')):
-        return ('https://github.com/' +
-                '/'.join(path_elements[1:4]))
+        return ('https://github.com/'
+                + '/'.join(path_elements[1:4]))
     if parsed_url.netloc == 'launchpad.net':
         return 'https://code.launchpad.net/%s' % (
             parsed_url.path.strip('/').split('/')[0])
