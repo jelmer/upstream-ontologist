@@ -21,7 +21,7 @@ from unittest import TestCase
 
 from upstream_ontologist.debian import (
     upstream_name_to_debian_source_name,
-    )
+)
 
 
 class UpstreamNameToDebianSourceNameTests(TestCase):
