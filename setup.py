@@ -29,7 +29,7 @@ setup(
             ('autodoap='
              'upstream_ontologist.doap:main'),
             ('autocodemeta='
-             'upstream_ontologist.codemeta.main'),
+             'upstream_ontologist.codemeta:main'),
         ],
     },
     install_requires=['python_debian', 'debmutate'],
