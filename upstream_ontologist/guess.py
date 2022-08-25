@@ -891,6 +891,10 @@ def url_from_cvs_co_command(command):
 
 
 def url_from_svn_co_command(command):
+    if commands.endswith('\\'):
+        logging.warning(
+            'Ignoring command with line break: %s', command)
+        return None
     import shlex
     argv = shlex.split(command.decode('utf-8', 'surrogateescape'))
     args = [arg for arg in argv if arg.strip()]
@@ -902,6 +906,10 @@ def url_from_svn_co_command(command):
 
 
 def url_from_git_clone_command(command):
+    if commands.endswith('\\'):
+        logging.warning(
+            'Ignoring command with line break: %s', command)
+        return None
     import shlex
     argv = shlex.split(command.decode('utf-8', 'surrogateescape'))
     args = [arg for arg in argv if arg.strip()]
