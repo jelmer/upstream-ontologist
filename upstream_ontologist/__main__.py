@@ -60,6 +60,10 @@ def main(argv=None):
         help="Scan for metadata rather than printing results.",
     )
     parser.add_argument(
+        "--from-homepage",
+        type=str,
+        help="Scan specified homepage rather than current directory")
+    parser.add_argument(
         "--consult-external-directory",
         action="store_true",
         help="Pull in external (not maintained by upstream) directory data",
@@ -79,7 +83,15 @@ def main(argv=None):
         sys.stderr.write("%s is not a directory\n" % args.path)
         return 1
 
-    if args.scan:
+    if args.from_homepage:
+        from .homepage import guess_from_homepage
+        for entry in guess_from_homepage(args.from_homepage):
+            if isinstance(entry, UpstreamDatum):
+                print(
+                    "%s: %r - certainty %s (from %s)"
+                    % (entry.field, entry.value, entry.certainty, entry.origin)
+                )
+    elif args.scan:
         for entry in guess_upstream_info(args.path, args.trust):
             if isinstance(entry, UpstreamDatum):
                 print(
