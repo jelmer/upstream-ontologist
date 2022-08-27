@@ -2582,7 +2582,7 @@ def repo_url_from_merge_request_url(url):
         path_elements = parsed_url.path.strip('/').split('/')
         if len(path_elements) > 2 and path_elements[2] == 'issues':
             return urlunparse(
-                ('https', 'github.com', '/'.join(path_elements[:3]),
+                ('https', 'github.com', '/'.join(path_elements[:2]),
                  None, None, None))
     if is_gitlab_site(parsed_url.netloc):
         path_elements = parsed_url.path.strip('/').split('/')
