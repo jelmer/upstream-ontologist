@@ -891,7 +891,7 @@ def url_from_cvs_co_command(command):
 
 
 def url_from_svn_co_command(command):
-    if command.endswith('\\'):
+    if command.endswith(b'\\'):
         logging.warning(
             'Ignoring command with line break: %s', command)
         return None
@@ -906,7 +906,7 @@ def url_from_svn_co_command(command):
 
 
 def url_from_git_clone_command(command):
-    if command.endswith('\\'):
+    if command.endswith(b'\\'):
         logging.warning(
             'Ignoring command with line break: %s', command)
         return None
