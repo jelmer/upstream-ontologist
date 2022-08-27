@@ -78,7 +78,7 @@ def unsplit_vcs_url(
     return url
 
 
-def probe_gitlab_host(hostname: str):
+def probe_gitlab_host(hostname: str) -> bool:
     import json
     try:
         _load_json_url("https://%s/api/v4/version" % hostname)
@@ -582,7 +582,7 @@ def guess_repo_from_url(url, net_access=False):  # noqa: C901
             return 'https://git.savannah.gnu.org/git/%s.git' % (
                 path_elements[1])
         return None
-    if is_gitlab_site(parsed_url.netloc, net_access):
+    if is_gitlab_site(parsed_url.hostname, net_access):
         if parsed_url.path.strip('/').count('/') < 1:
             return None
         parts = parsed_url.path.split('/')

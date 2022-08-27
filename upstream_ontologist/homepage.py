@@ -16,6 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
 import urllib.error
+from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 import logging
@@ -66,6 +67,12 @@ def _guess_from_soup(soup):
         labels = [a.get('aria-label'), a.text]
         for label in filter(None, labels):
             if label.lower() in ('github', 'git', 'repository', 'github repository'):
-                yield UpstreamDatum('Repository', href, certainty='confident')
+                try:
+                    parsed = urlparse(href)
+                except ValueError:
+                    continue
+                if not parsed.scheme or not parsed.netloc:
+                    continue
+                yield UpstreamDatum('Repository', href, certainty='possible')
             if label.lower() in ('github bug tracking', 'bug tracker'):
                 yield UpstreamDatum('Bug-Database', href, certainty='confident')

@@ -891,6 +891,10 @@ def url_from_cvs_co_command(command):
 
 
 def url_from_svn_co_command(command):
+    if command.endswith(b'\\'):
+        logging.warning(
+            'Ignoring command with line break: %s', command)
+        return None
     import shlex
     argv = shlex.split(command.decode('utf-8', 'surrogateescape'))
     args = [arg for arg in argv if arg.strip()]
@@ -902,6 +906,10 @@ def url_from_svn_co_command(command):
 
 
 def url_from_git_clone_command(command):
+    if command.endswith(b'\\'):
+        logging.warning(
+            'Ignoring command with line break: %s', command)
+        return None
     import shlex
     argv = shlex.split(command.decode('utf-8', 'surrogateescape'))
     args = [arg for arg in argv if arg.strip()]
@@ -2574,7 +2582,7 @@ def repo_url_from_merge_request_url(url):
         path_elements = parsed_url.path.strip('/').split('/')
         if len(path_elements) > 2 and path_elements[2] == 'issues':
             return urlunparse(
-                ('https', 'github.com', '/'.join(path_elements[:3]),
+                ('https', 'github.com', '/'.join(path_elements[:2]),
                  None, None, None))
     if is_gitlab_site(parsed_url.netloc):
         path_elements = parsed_url.path.strip('/').split('/')
