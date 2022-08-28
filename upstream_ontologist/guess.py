@@ -1343,7 +1343,8 @@ def guess_from_doap(path, trust_package):  # noqa: C901
     for child in root:
         if child.tag == ('{%s}name' % DOAP_NAMESPACE) and child.text:
             yield UpstreamDatum('Name', child.text, 'certain')
-        elif child.tag == ('{%s}short-name' % DOAP_NAMESPACE) and child.text:
+        elif child.tag in ('{%s}shortname' % DOAP_NAMESPACE,
+                           '{%s}short-name' % DOAP_NAMESPACE) and child.text:
             yield UpstreamDatum('Name', child.text, 'likely')
         elif child.tag == ('{%s}bug-database' % DOAP_NAMESPACE):
             url = extract_url(child)
