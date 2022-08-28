@@ -2283,7 +2283,7 @@ def _sf_git_extract_url(page):
         return None
     bs = BeautifulSoup(page, features='lxml')
     el = bs.find(id='access_url')
-    if el is not None:
+    if el is None:
         return None
     value = el.get('value')
     if value is None:
