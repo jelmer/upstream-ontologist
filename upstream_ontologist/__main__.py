@@ -112,7 +112,8 @@ def main(argv=None):
         yaml = ruamel.yaml.YAML()
         ruamel.yaml.scalarstring.walk_tree(metadata)
         yaml.register_class(Person)
-        yaml.dump(metadata, sys.stdout)
+        # Prefer .buffer so we can write e.g. surrogates
+        yaml.dump(metadata, getattr(sys.stdout, 'buffer', sys.stdout))
         return 0
 
 
