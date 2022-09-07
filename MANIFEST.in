@@ -2,3 +2,4 @@ include CODE_OF_CONDUCT.md
 include README.md
 include SECURITY.md
 include AUTHORS
+recursive-include tests

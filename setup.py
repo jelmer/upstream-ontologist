@@ -7,11 +7,7 @@ setup(
     packages=[
         "upstream_ontologist",
         "upstream_ontologist.debian",
-        "upstream_ontologist.tests",
     ],
-    package_data={
-        'upstream_ontologist.tests': ['readme_data/*/*'],
-    },
     version="0.1.25",
     author="Jelmer Vernooij",
     author_email="jelmer@jelmer.uk",
@@ -39,7 +35,7 @@ setup(
         'setup.cfg': ['setuptools'],
     },
     tests_require=['breezy'],
-    test_suite="upstream_ontologist.tests.test_suite",
+    test_suite="tests.test_suite",
     data_files=[
         ('share/man/man1', ['man/guess-upstream-metadata.1']),
     ],
