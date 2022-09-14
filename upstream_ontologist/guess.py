@@ -414,6 +414,8 @@ def guess_from_setup_cfg(path, trust_package):
     if metadata:
         if 'name' in metadata:
             yield UpstreamDatum('Name', metadata['name'], 'certain')
+        if 'version' in metadata:
+            yield UpstreamDatum('Name', metadata['version'], 'certain')
         if 'url' in metadata:
             yield from parse_python_url(metadata['url'])
         yield from parse_python_long_description(
@@ -1910,8 +1912,9 @@ def guess_from_get_orig_source(path, trust_package=False):
         for line in f:
             if line.startswith(b'git clone'):
                 url = url_from_git_clone_command(line)
+                certainty = 'likely' if '$' not in url else 'possible'
                 if url:
-                    yield UpstreamDatum('Repository', url, 'likely')
+                    yield UpstreamDatum('Repository', url, certainty)
 
 
 # https://docs.github.com/en/free-pro-team@latest/github/\

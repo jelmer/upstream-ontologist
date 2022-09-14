@@ -16,8 +16,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
 import urllib.error
-from urllib.parse import urlparse
 from urllib.request import Request, urlopen
+from urllib.parse import urljoin
 
 import logging
 
@@ -42,12 +42,12 @@ def guess_from_homepage(url: str):
         logging.warning(
             'unable to access homepage %r: %s', url, e)
         return
-    for entry in _guess_from_page(f.read()):
+    for entry in _guess_from_page(f.read(), url):
         entry.origin = url
         yield entry
 
 
-def _guess_from_page(text: bytes):
+def _guess_from_page(text: bytes, basehref: str):
     try:
         from bs4 import BeautifulSoup, FeatureNotFound
     except ModuleNotFoundError:
@@ -58,21 +58,15 @@ def _guess_from_page(text: bytes):
     except FeatureNotFound:
         logger.debug('lxml not available, not parsing README.md')
         return
-    return _guess_from_soup(soup)
+    return _guess_from_soup(soup, basehref)
 
 
-def _guess_from_soup(soup):
+def _guess_from_soup(soup, basehref):
     for a in soup.findAll('a'):
         href = a.get('href')
         labels = [a.get('aria-label'), a.text]
         for label in filter(None, labels):
             if label.lower() in ('github', 'git', 'repository', 'github repository'):
-                try:
-                    parsed = urlparse(href)
-                except ValueError:
-                    continue
-                if not parsed.scheme or not parsed.netloc:
-                    continue
-                yield UpstreamDatum('Repository', href, certainty='possible')
+                yield UpstreamDatum('Repository', urljoin(basehref, href), certainty='possible')
             if label.lower() in ('github bug tracking', 'bug tracker'):
-                yield UpstreamDatum('Bug-Database', href, certainty='confident')
+                yield UpstreamDatum('Bug-Database', urljoin(basehref, href), certainty='possible')
