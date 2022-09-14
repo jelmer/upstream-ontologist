@@ -530,7 +530,7 @@ def guess_from_setup_py(path, trust_package):  # noqa: C901
                 elif isinstance(kw.value, ast.Dict):
                     setup_args[arg_name] = {}
                     for (key, value) in zip(kw.value.keys, kw.value.values):
-                        if isinstance(value, (ast.Str, ast.Constant)):
+                        if isinstance(key, ast.Str) and isinstance(value, (ast.Str, ast.Constant)):
                             setup_args[key.s] = value.s
 
                 # TODO: what if kw.value is an expression like a call to
@@ -563,6 +563,20 @@ def guess_from_setup_py(path, trust_package):  # noqa: C901
         if isinstance(maintainer, str):
             maintainer = Person(maintainer, maintainer_email)
             yield UpstreamDatum('X-Maintainer', maintainer, 'certain')
+    if 'author' in setup_args:
+        author_email = setup_args.get('author_email')
+        author = setup_args['author']
+        if isinstance(author, str):
+            authors = [author]
+            author_emails = [author_email]
+        elif isinstance(author, list):
+            authors = author
+            author_emails = author_email
+        yield UpstreamDatum(
+            'X-Author',
+            [Person(author, email)
+             for (author, email) in zip(authors, author_emails)],
+            'certain')
 
 
 def guess_from_composer_json(path, trust_package):
