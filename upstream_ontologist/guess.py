@@ -404,7 +404,10 @@ def parse_python_long_description(long_description, content_type):
 
 
 def guess_from_setup_cfg(path, trust_package):
-    from setuptools.config import read_configuration
+    try:
+        from setuptools.config.setupcfg import read_configuration
+    except ImportError:  # older setuptools
+        from setuptools.config import read_configuration
     # read_configuration needs a function cwd
     try:
         os.getcwd()
