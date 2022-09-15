@@ -22,7 +22,7 @@ import os
 import re
 import socket
 import urllib.error
-from typing import Optional, Iterable, List
+from typing import Optional, Iterable, List, Dict, Any
 from urllib.parse import quote, urlparse, urlunparse, urljoin
 from urllib.request import urlopen, Request
 
@@ -49,6 +49,9 @@ from . import (
     InvalidUrl,
     UrlUnverifiable,
 )
+
+
+UpstreamMetadata = Dict[str, Any]
 
 
 # Pecl is quite slow, so up the timeout a bit.
@@ -172,7 +175,7 @@ def filter_bad_guesses(
     return filter(lambda x: not known_bad_guess(x), guessed_items)
 
 
-def update_from_guesses(upstream_metadata, guessed_items):
+def update_from_guesses(upstream_metadata: UpstreamMetadata, guessed_items):
     changed = False
     for datum in guessed_items:
         current_datum = upstream_metadata.get(datum.field)
@@ -2217,8 +2220,10 @@ def guess_upstream_info(
             yield entry
 
 
-def get_upstream_info(path, trust_package=False, net_access=False,
-                      consult_external_directory=False, check=False):
+def get_upstream_info(
+        path: str, trust_package: bool = False,
+        net_access: bool = False, consult_external_directory: bool = False,
+        check: bool = False) -> UpstreamMetadata:
     metadata_items = []
     for entry in guess_upstream_info(path, trust_package=trust_package):
         if isinstance(entry, UpstreamDatum):
@@ -2231,8 +2236,10 @@ def get_upstream_info(path, trust_package=False, net_access=False,
 
 
 def summarize_upstream_metadata(
-        metadata_items, path, net_access=False,
-        consult_external_directory=False, check=False):
+        metadata_items, path: str,
+        net_access: bool = False,
+        consult_external_directory: bool = False,
+        check: bool = False) -> UpstreamMetadata:
     """Summarize the upstream metadata into a dictionary.
 
     Args:
@@ -2262,8 +2269,10 @@ def summarize_upstream_metadata(
 
 
 def guess_upstream_metadata(
-        path, trust_package=False, net_access=False,
-        consult_external_directory=False, check=False):
+        path: str, trust_package: bool = False,
+        net_access: bool = False,
+        consult_external_directory: bool = False,
+        check: bool = False) -> UpstreamMetadata:
     """Guess the upstream metadata dictionary.
 
     Args:
@@ -2334,8 +2343,10 @@ def guess_from_sf(sf_project: str, subproject: Optional[str] = None):  # noqa: C
             canonical_url = check_bug_database_canonical(data['preferred_support_url'])
         except UrlUnverifiable:
             yield 'Bug-Database', data['preferred_support_url']
-        except InvalidUrl:
-            pass
+        except InvalidUrl as e:
+            logging.debug(
+                'Ignoring invalid preferred_support_url %s: %s',
+                e.url, e.reason)
         else:
             yield 'Bug-Database', canonical_url
     # In theory there are screenshots linked from the sourceforge project that
@@ -3099,15 +3110,18 @@ def check_upstream_metadata(upstream_metadata, version=None):  # noqa: C901
     This will make network connections, etc.
     """
     repository = upstream_metadata.get('Repository')
-    if repository and repository.certainty == 'likely':
+    if repository and repository.certainty == 'confident':
         try:
             canonical_url = check_repository_url_canonical(
                 repository.value, version=version)
         except UrlUnverifiable:
             pass
-        except InvalidUrl:
-            # Downgrade. Perhaps we should remove altogether?
-            repository.certainty = 'possible'
+        except InvalidUrl as e:
+            logging.debug(
+                'Deleting invalid Repository URL %s: %s',
+                e.url,
+                e.reason)
+            del upstream_metadata["Repository"]
         else:
             repository.value = canonical_url
             repository.certainty = 'certain'
@@ -3121,9 +3135,11 @@ def check_upstream_metadata(upstream_metadata, version=None):  # noqa: C901
             canonical_url = check_url_canonical(homepage.value)
         except UrlUnverifiable:
             pass
-        except InvalidUrl:
-            # Downgrade. Perhaps we should remove altogether?
-            homepage.certainty = 'possible'
+        except InvalidUrl as e:
+            logging.debug(
+                'Deleting invalid Homepage URL %s: %s',
+                e.url, e.reason)
+            del upstream_metadata["Homepage"]
         else:
             homepage.value = canonical_url
             homepage.certainty = 'certain'
@@ -3133,9 +3149,11 @@ def check_upstream_metadata(upstream_metadata, version=None):  # noqa: C901
             canonical_url = check_url_canonical(repository_browse.value)
         except UrlUnverifiable:
             pass
-        except InvalidUrl:
-            # Downgrade. Perhaps we should remove altogether?
-            repository_browse.certainty = 'possible'
+        except InvalidUrl as e:
+            logging.debug(
+                'Deleting invalid Repository-Browse URL %s: %s',
+                e.url, e.reason)
+            del upstream_metadata['Repository-Browse']
         else:
             repository_browse.value = canonical_url
             repository_browse.certainty = 'certain'
@@ -3145,9 +3163,10 @@ def check_upstream_metadata(upstream_metadata, version=None):  # noqa: C901
             canonical_url = check_bug_database_canonical(bug_database.value)
         except UrlUnverifiable:
             pass
-        except InvalidUrl:
-            # TODO(jelmer): delete altogether?
-            bug_database.certainty = 'possible'
+        except InvalidUrl as e:
+            logging.debug("Deleting invalid Bug-Database URL %s: %s",
+                          e.url, e.reason)
+            del upstream_metadata['Bug-Database']
         else:
             bug_database.value = canonical_url
             bug_database.certainty = 'certain'
@@ -3157,9 +3176,11 @@ def check_upstream_metadata(upstream_metadata, version=None):  # noqa: C901
             canonical_url = check_bug_submit_url_canonical(bug_submit.value)
         except UrlUnverifiable:
             pass
-        except InvalidUrl:
-            # TODO(jelmer): Perhaps remove altogether?
-            bug_submit.certainty = 'possible'
+        except InvalidUrl as e:
+            logging.debug(
+                'Deleting invalid Bug-Submit URL %s: %s',
+                e.url, e.reason)
+            del upstream_metadata['Bug-Submit']
         else:
             bug_submit.value = canonical_url
             bug_submit.certainty = 'certain'
@@ -3464,7 +3485,7 @@ def guess_from_launchpad(package, distribution=None, suite=None):  # noqa: C901
         raise AssertionError('unknown vcs: %r' % project_data['vcs'])
 
 
-def fix_upstream_metadata(upstream_metadata):
+def fix_upstream_metadata(upstream_metadata: UpstreamMetadata):
     """Fix existing upstream metadata."""
     if 'Repository' in upstream_metadata:
         repo = upstream_metadata['Repository']
