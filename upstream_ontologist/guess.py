@@ -22,7 +22,7 @@ import os
 import re
 import socket
 import urllib.error
-from typing import Optional, Iterable, List, Dict, Any
+from typing import Optional, Iterable, List
 from urllib.parse import quote, urlparse, urlunparse, urljoin
 from urllib.request import urlopen, Request
 
@@ -41,6 +41,7 @@ from . import (
     DEFAULT_URLLIB_TIMEOUT,
     USER_AGENT,
     UpstreamDatum,
+    UpstreamMetadata,
     min_certainty,
     certainty_to_confidence,
     certainty_sufficient,
@@ -49,9 +50,6 @@ from . import (
     InvalidUrl,
     UrlUnverifiable,
 )
-
-
-UpstreamMetadata = Dict[str, Any]
 
 
 # Pecl is quite slow, so up the timeout a bit.
@@ -180,7 +178,7 @@ def update_from_guesses(upstream_metadata: UpstreamMetadata, guessed_items):
     for datum in guessed_items:
         current_datum = upstream_metadata.get(datum.field)
         if not current_datum or (
-                certainty_to_confidence(datum.certainty)
+                certainty_to_confidence(datum.certainty)  # type: ignore
                 < certainty_to_confidence(current_datum.certainty)):
             upstream_metadata[datum.field] = datum
             changed = True
@@ -2251,7 +2249,7 @@ def summarize_upstream_metadata(
       consult_external_directory: Whether to pull in data
         from external (user-maintained) directories.
     """
-    upstream_metadata = {}
+    upstream_metadata: UpstreamMetadata = {}
     update_from_guesses(
         upstream_metadata,
         filter_bad_guesses(metadata_items))

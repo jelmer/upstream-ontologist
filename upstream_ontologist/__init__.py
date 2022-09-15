@@ -53,7 +53,7 @@ Supported, but currently not set.
 - Webservice
 """
 
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Dict
 from dataclasses import dataclass
 from email.utils import parseaddr
 
@@ -138,6 +138,9 @@ class UpstreamDatum(object):
             self.certainty,
             self.origin,
         )
+
+
+UpstreamMetadata = Dict[str, UpstreamDatum]
 
 
 class UpstreamPackage(object):
