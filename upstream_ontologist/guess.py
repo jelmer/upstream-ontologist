@@ -3111,7 +3111,7 @@ def check_upstream_metadata(upstream_metadata, version=None):  # noqa: C901
     This will make network connections, etc.
     """
     repository = upstream_metadata.get('Repository')
-    if repository and repository.certainty == 'confident':
+    if repository:
         try:
             canonical_url = check_repository_url_canonical(
                 repository.value, version=version)
@@ -3125,13 +3125,14 @@ def check_upstream_metadata(upstream_metadata, version=None):  # noqa: C901
             del upstream_metadata["Repository"]
         else:
             repository.value = canonical_url
-            repository.certainty = 'certain'
+            if repository.certainty == 'confident':
+                repository.certainty = 'certain'
             derived_browse_url = browse_url_from_repo_url(repository.value)
             browse_repo = upstream_metadata.get('Repository-Browse')
             if browse_repo and derived_browse_url == browse_repo.value:
                 browse_repo.certainty = repository.certainty
     homepage = upstream_metadata.get('Homepage')
-    if homepage and homepage.certainty == 'likely':
+    if homepage:
         try:
             canonical_url = check_url_canonical(homepage.value)
         except UrlUnverifiable:
@@ -3143,9 +3144,10 @@ def check_upstream_metadata(upstream_metadata, version=None):  # noqa: C901
             del upstream_metadata["Homepage"]
         else:
             homepage.value = canonical_url
-            homepage.certainty = 'certain'
+            if certainty_sufficient(homepage.certainty, 'likely'):
+                homepage.certainty = 'certain'
     repository_browse = upstream_metadata.get('Repository-Browse')
-    if repository_browse and repository_browse.certainty == 'likely':
+    if repository_browse:
         try:
             canonical_url = check_url_canonical(repository_browse.value)
         except UrlUnverifiable:
@@ -3157,9 +3159,10 @@ def check_upstream_metadata(upstream_metadata, version=None):  # noqa: C901
             del upstream_metadata['Repository-Browse']
         else:
             repository_browse.value = canonical_url
-            repository_browse.certainty = 'certain'
+            if certainty_sufficient(repository_browse.certainty, 'likely'):
+                repository_browse.certainty = 'certain'
     bug_database = upstream_metadata.get('Bug-Database')
-    if bug_database and bug_database.certainty == 'likely':
+    if bug_database:
         try:
             canonical_url = check_bug_database_canonical(bug_database.value)
         except UrlUnverifiable:
@@ -3170,9 +3173,10 @@ def check_upstream_metadata(upstream_metadata, version=None):  # noqa: C901
             del upstream_metadata['Bug-Database']
         else:
             bug_database.value = canonical_url
-            bug_database.certainty = 'certain'
+            if certainty_sufficient(bug_database.certainty, 'likely'):
+                bug_database.certainty = 'certain'
     bug_submit = upstream_metadata.get('Bug-Submit')
-    if bug_submit and bug_submit.certainty == 'likely':
+    if bug_submit:
         try:
             canonical_url = check_bug_submit_url_canonical(bug_submit.value)
         except UrlUnverifiable:
@@ -3184,7 +3188,8 @@ def check_upstream_metadata(upstream_metadata, version=None):  # noqa: C901
             del upstream_metadata['Bug-Submit']
         else:
             bug_submit.value = canonical_url
-            bug_submit.certainty = 'certain'
+            if certainty_sufficient(bug_submit.certainty, 'likely'):
+                bug_submit.certainty = 'certain'
     screenshots = upstream_metadata.get('Screenshots')
     if screenshots and screenshots.certainty == 'likely':
         newvalue = []
