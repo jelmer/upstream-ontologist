@@ -147,6 +147,8 @@ def known_bad_guess(datum):  # noqa: C901
             return True
         if parsed_url.hostname == 'git.gitorious.org':
             return True
+        if parsed_url.path.endswith('/sign_in'):
+            return True
     if datum.field == 'Homepage':
         parsed_url = urlparse(datum.value)
         if parsed_url.hostname in ('pypi.org', 'rubygems.org'):
@@ -3110,7 +3112,9 @@ def check_url_canonical(url: str) -> str:
         return resp.geturl()
 
 
-def check_upstream_metadata(upstream_metadata, version=None):  # noqa: C901
+def check_upstream_metadata(
+        upstream_metadata: UpstreamMetadata,
+        version: Optional[str] = None):  # noqa: C901
     """Check upstream metadata.
 
     This will make network connections, etc.
