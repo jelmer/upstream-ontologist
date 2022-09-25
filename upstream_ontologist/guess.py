@@ -437,6 +437,11 @@ def parse_python_url(url):
 
 
 def guess_from_setup_py_executed(path):
+    # Import setuptools, just in case it replaces distutils
+    try:
+        import setuptools
+    except ImportError:
+        pass
     from distutils.core import run_setup
     orig = os.getcwd()
     try:
