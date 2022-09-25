@@ -3112,7 +3112,7 @@ def check_url_canonical(url: str) -> str:
         return resp.geturl()
 
 
-def check_upstream_metadata(
+def check_upstream_metadata(  # noqa: C901
         upstream_metadata: UpstreamMetadata,
         version: Optional[str] = None):  # noqa: C901
     """Check upstream metadata.
