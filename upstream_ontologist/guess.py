@@ -439,7 +439,7 @@ def parse_python_url(url):
 def guess_from_setup_py_executed(path):
     # Import setuptools, just in case it replaces distutils
     try:
-        import setuptools
+        import setuptools  # noqa: F401
     except ImportError:
         pass
     from distutils.core import run_setup
