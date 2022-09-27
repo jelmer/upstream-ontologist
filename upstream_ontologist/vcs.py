@@ -363,6 +363,13 @@ def fix_gitlab_scheme(parsed, branch, subpath: Optional[str]):
     return None, None, None
 
 
+def fix_github_scheme(parsed, branch, subpath: Optional[str]):
+    # GitHub no longer supports the git:// scheme
+    if parsed.hostname == 'github.com' and parsed.scheme == 'git':
+        return parsed._replace(scheme='https'), branch, subpath
+    return None, None, None
+
+
 def fix_salsa_cgit_url(parsed, branch, subpath):
     if parsed.hostname == "salsa.debian.org" and parsed.path.startswith("/cgit/"):
         return parsed._replace(path=parsed.path[5:]), branch, subpath
@@ -448,6 +455,7 @@ def fix_freedesktop_org_url(
 FIXERS = [
     fix_path_in_port,
     fix_gitlab_scheme,
+    fix_github_scheme,
     fix_salsa_cgit_url,
     fix_gitlab_tree_in_url,
     fix_double_slash,

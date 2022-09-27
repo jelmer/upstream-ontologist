@@ -25,6 +25,7 @@ from upstream_ontologist.vcs import (
     canonical_git_repo_url,
     find_public_repo_url,
     guess_repo_from_url,
+    fixup_broken_git_details,
 )
 
 
@@ -145,3 +146,11 @@ class GuessRepoFromUrlTests(TestCase):
             'https://gitlab.com/jelmer/dulwich',
             guess_repo_from_url(
                 'https://gitlab.com/jelmer/dulwich/tags'))
+
+
+class FixupBrokenGitDetailsTests(TestCase):
+
+    def test_github(self):
+        self.assertEqual(
+            ('https://github.com/jelmer/dulwich', None, None),
+            fixup_broken_git_details('git://github.com/jelmer/dulwich', None, None))
