@@ -2026,6 +2026,19 @@ def guess_from_wscript(path, trust_package=False):
                 yield UpstreamDatum('X-Version', m.group(1).decode(), 'confident')
 
 
+def guess_from_metadata_json(path, trust_package=False):
+    with open(path, 'r') as f:
+        data = json.load(f)
+        if data.get('description'):
+            yield UpstreamDatum('X-Description', data['description'], 'certain')
+        if 'name' in data:
+            yield UpstreamDatum('Name', data['name'], 'certain')
+        if 'version' in data:
+            yield UpstreamDatum('X-Version', str(data['version']), 'certain')
+        if data.get('url'):
+            yield UpstreamDatum('Homepage', data['url'], 'certain')
+
+
 def guess_from_authors(path, trust_package=False):
     authors = []
     with open(path, 'rb') as f:
@@ -2090,6 +2103,7 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
         ('INSTALL', guess_from_install),
         ('pubspec.yaml', guess_from_pubspec_yaml),
         ('meson.build', guess_from_meson),
+        ('metadata.json', guess_from_metadata_json),
     ]
 
     # Search for something Python-y
@@ -3306,7 +3320,13 @@ def strip_vcs_prefixes(url):
 
 def guess_from_gobo(package: str):   # noqa: C901
     packages_url = "https://api.github.com/repos/gobolinux/Recipes/contents"
-    contents = _load_json_url(packages_url)
+    try:
+        contents = _load_json_url(packages_url)
+    except urllib.error.HTTPError as e:
+        if e.code == 403:
+            logging.debug('error loading %s: %r. rate limiting?', packages_url, e)
+            return
+        raise
     packages = [entry['name'] for entry in contents]
     for p in packages:
         if p.lower() == package.lower():
@@ -3317,7 +3337,13 @@ def guess_from_gobo(package: str):   # noqa: C901
         return
 
     contents_url = "https://api.github.com/repos/gobolinux/Recipes/contents/%s" % package
-    contents = _load_json_url(contents_url)
+    try:
+        contents = _load_json_url(contents_url)
+    except urllib.error.HTTPError as e:
+        if e.code == 403:
+            logging.debug('error loading %s: %r. rate limiting?', contents_url, e)
+            return
+        raise
     versions = [entry['name'] for entry in contents]
     base_url = 'https://raw.githubusercontent.com/gobolinux/Recipes/master/%s/%s' % (package, versions[-1])
     headers = {'User-Agent': USER_AGENT}
@@ -3326,6 +3352,9 @@ def guess_from_gobo(package: str):   # noqa: C901
             Request(base_url + '/Recipe', headers=headers),
             timeout=DEFAULT_URLLIB_TIMEOUT)
     except urllib.error.HTTPError as e:
+        if e.code == 403:
+            logging.debug('error loading %s: %r. rate limiting?', base_url, e)
+            return
         if e.code != 404:
             raise
     else:
@@ -3334,11 +3363,15 @@ def guess_from_gobo(package: str):   # noqa: C901
             if m:
                 yield 'X-Download', m.group(1).decode()
 
+    url = base_url + '/Resources/Description'
     try:
         f = urlopen(
-            Request(base_url + '/Resources/Description', headers=headers),
+            Request(url, headers=headers),
             timeout=DEFAULT_URLLIB_TIMEOUT)
     except urllib.error.HTTPError as e:
+        if e.code == 403:
+            logging.debug('error loading %s: %r. rate limiting?', url, e)
+            return
         if e.code != 404:
             raise
     else:
