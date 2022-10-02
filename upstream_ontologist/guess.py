@@ -1806,6 +1806,7 @@ def guess_from_cargo(path, trust_package):
     else:
         if 'name' in package:
             yield UpstreamDatum('Name', str(package['name']), 'certain')
+            yield UpstreamDatum('X-Cargo-Crate', str(package['name']), 'certain')
         if 'description' in package:
             yield UpstreamDatum('X-Summary', str(package['description']), 'certain')
         if 'homepage' in package:

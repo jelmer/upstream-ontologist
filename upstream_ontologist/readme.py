@@ -158,6 +158,11 @@ def _skip_paragraph_block(para, metadata):
             elif name.lower() == 'downloads':
                 metadata.append(UpstreamDatum(
                     'X-Download', c.get('href'), 'confident'))
+            elif name.lower() == 'crates.io':
+                href = c.get('href')
+                if href.startswith('https://crates.io/crates/'):
+                    metadata.append(UpstreamDatum(
+                        'X-Cargo-Crate', href.rsplit('/')[-1], 'confident'))
             elif name:
                 m = re.match('(.*) License', name)
                 if m:
