@@ -59,6 +59,12 @@ PECL_URLLIB_TIMEOUT = 15
 logger = logging.getLogger(__name__)
 
 
+def warn_missing_dependency(path, module_name):
+    logger.warning(
+        'Not scanning %s, because the python module %s is not available',
+        path, module_name)
+
+
 class NoSuchSourceForgeProject(Exception):
 
     def __init__(self, project):
@@ -246,10 +252,14 @@ def _metadata_from_url(url: str, origin=None):
 
 
 def guess_from_debian_watch(path, trust_package):
-    from debmutate.watch import (
-        parse_watch_file,
-        MissingVersion,
-    )
+    try:
+        from debmutate.watch import (
+            parse_watch_file,
+            MissingVersion,
+        )
+    except ModuleNotFoundError as e:
+        warn_missing_dependency(path, e.name)
+        return
 
     def get_package_name():
         from debian.deb822 import Deb822
@@ -442,7 +452,7 @@ def guess_from_setup_py_executed(path):
     # Import setuptools, just in case it replaces distutils
     try:
         import setuptools  # noqa: F401
-    except ImportError:
+    except ModuleNotFoundError:
         pass
     from distutils.core import run_setup
     orig = os.getcwd()
@@ -1774,7 +1784,8 @@ def guess_from_cargo(path, trust_package):
     try:
         from tomlkit import loads
         from tomlkit.exceptions import ParseError
-    except ImportError:
+    except ModuleNotFoundError as e:
+        warn_missing_dependency(path, e.name)
         return
     try:
         with open(path, 'r') as f:
@@ -1807,7 +1818,8 @@ def guess_from_pyproject_toml(path, trust_package):
     try:
         from tomlkit import loads
         from tomlkit.exceptions import ParseError
-    except ImportError:
+    except ModuleNotFoundError as e:
+        warn_missing_dependency(path, e.name)
         return
     try:
         with open(path, 'r') as f:
