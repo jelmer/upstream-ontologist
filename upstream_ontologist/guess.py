@@ -194,7 +194,11 @@ def update_from_guesses(upstream_metadata: UpstreamMetadata, guessed_items):
 
 
 def guess_from_debian_rules(path, trust_package):
-    from debmutate._rules import Makefile
+    try:
+        from debmutate._rules import Makefile
+    except ModuleNotFoundError as e:
+        warn_missing_dependency(path, e.name)
+        return
     mf = Makefile.from_path(path)
     try:
         upstream_git = mf.get_variable(b'UPSTREAM_GIT')
