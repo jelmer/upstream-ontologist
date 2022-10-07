@@ -119,7 +119,7 @@ def _skip_paragraph(para, metadata):  # noqa: C901
         return True
 
 
-def _skip_paragraph_block(para, metadata):
+def _skip_paragraph_block(para, metadata):  # noqa: C901
     if _skip_paragraph(para.get_text(), metadata):
         return True
     for c in para.children:
@@ -158,6 +158,11 @@ def _skip_paragraph_block(para, metadata):
             elif name and name.lower() == 'downloads':
                 metadata.append(UpstreamDatum(
                     'X-Download', c.get('href'), 'confident'))
+            elif name and name.lower() == 'crates.io':
+                href = c.get('href')
+                if href.startswith('https://crates.io/crates/'):
+                    metadata.append(UpstreamDatum(
+                        'X-Cargo-Crate', href.rsplit('/')[-1], 'confident'))
             elif name:
                 m = re.match('(.*) License', name)
                 if m:
