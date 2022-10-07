@@ -119,7 +119,7 @@ def _skip_paragraph(para, metadata):  # noqa: C901
         return True
 
 
-def _skip_paragraph_block(para, metadata):
+def _skip_paragraph_block(para, metadata):  # noqa: C901
     if _skip_paragraph(para.get_text(), metadata):
         return True
     for c in para.children:
