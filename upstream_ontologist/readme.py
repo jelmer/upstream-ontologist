@@ -149,13 +149,13 @@ def _skip_paragraph_block(para, metadata):
                         'Repository',
                         'https://github.com/%s' % '/'.join(parsed_url.path.strip('/').split('/')[:2]),
                         'confident'))
-            elif name.lower() == 'documentation':
+            elif name and name.lower() == 'documentation':
                 metadata.append(UpstreamDatum(
                     'Documentation', c.get('href'), 'confident'))
-            elif name.lower() == 'api docs':
+            elif name and name.lower() == 'api docs':
                 metadata.append(UpstreamDatum(
                     'X-API-Documentation', c.get('href'), 'confident'))
-            elif name.lower() == 'downloads':
+            elif name and name.lower() == 'downloads':
                 metadata.append(UpstreamDatum(
                     'X-Download', c.get('href'), 'confident'))
             elif name:
