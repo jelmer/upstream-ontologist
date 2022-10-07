@@ -149,16 +149,16 @@ def _skip_paragraph_block(para, metadata):  # noqa: C901
                         'Repository',
                         'https://github.com/%s' % '/'.join(parsed_url.path.strip('/').split('/')[:2]),
                         'confident'))
-            elif name.lower() == 'documentation':
+            elif name and name.lower() == 'documentation':
                 metadata.append(UpstreamDatum(
                     'Documentation', c.get('href'), 'confident'))
-            elif name.lower() == 'api docs':
+            elif name and name.lower() == 'api docs':
                 metadata.append(UpstreamDatum(
                     'X-API-Documentation', c.get('href'), 'confident'))
-            elif name.lower() == 'downloads':
+            elif name and name.lower() == 'downloads':
                 metadata.append(UpstreamDatum(
                     'X-Download', c.get('href'), 'confident'))
-            elif name.lower() == 'crates.io':
+            elif name and name.lower() == 'crates.io':
                 href = c.get('href')
                 if href.startswith('https://crates.io/crates/'):
                     metadata.append(UpstreamDatum(
