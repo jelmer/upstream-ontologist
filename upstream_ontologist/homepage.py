@@ -58,7 +58,7 @@ def _guess_from_page(text: bytes, basehref: str):
     except FeatureNotFound:
         logger.debug('lxml not available, not parsing README.md')
         return
-    return _guess_from_soup(soup, basehref)
+    yield from _guess_from_soup(soup, basehref)
 
 
 def _guess_from_soup(soup, basehref):
