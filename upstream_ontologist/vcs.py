@@ -114,7 +114,9 @@ def is_gitlab_site(hostname: str, net_access: bool = False) -> bool:
     return False
 
 
-def browse_url_from_repo_url(url: str, subpath: Optional[str] = None) -> Optional[str]:  # noqa: C901
+def browse_url_from_repo_url(  # noqa: C901
+        url: str, branch: Optional[str] = None,
+        subpath: Optional[str] = None) -> Optional[str]:
     if isinstance(url, list):
         return None
     parsed_url = urlparse(url)
@@ -123,7 +125,11 @@ def browse_url_from_repo_url(url: str, subpath: Optional[str] = None) -> Optiona
         if path.endswith(".git"):
             path = path[:-4]
         if subpath is not None:
-            path += "/tree/HEAD/" + subpath
+            if branch:
+                path += "/tree/%s" % branch
+            else:
+                path += "/tree/HEAD"
+            path += "/" + subpath
         return urlunparse(("https", "github.com", path, None, None, None))
     elif parsed_url.hostname == 'gopkg.in':
         els = parsed_url.path.split("/")[:3]
