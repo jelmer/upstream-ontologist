@@ -124,11 +124,9 @@ def browse_url_from_repo_url(  # noqa: C901
         path = "/".join(parsed_url.path.split("/")[:3])
         if path.endswith(".git"):
             path = path[:-4]
+        if subpath is not None or branch is not None:
+            path += "/tree/%s" % branch or "HEAD"
         if subpath is not None:
-            if branch:
-                path += "/tree/%s" % branch
-            else:
-                path += "/tree/HEAD"
             path += "/" + subpath
         return urlunparse(("https", "github.com", path, None, None, None))
     elif parsed_url.hostname == 'gopkg.in':
