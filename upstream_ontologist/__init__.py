@@ -209,7 +209,8 @@ def _load_json_url(http_url: str, timeout: int = DEFAULT_URLLIB_TIMEOUT):
         'User-Agent': USER_AGENT,
         'Accept': 'application/json',
     }
-    if urlparse(http_url).hostname == 'github.com':
+    if urlparse(http_url).hostname in (
+            'github.com', 'raw.githubusercontent.com'):
         try:
             headers['WWW-Authenticate'] = 'Bearer %s' % (
                 os.environ['GITHUB_TOKEN'])
