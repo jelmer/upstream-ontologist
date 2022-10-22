@@ -53,9 +53,11 @@ Supported, but currently not set.
 - Webservice
 """
 
+import os
 from typing import Optional, Sequence, Dict
 from dataclasses import dataclass
 from email.utils import parseaddr
+from urllib.parse import urlparse
 
 
 SUPPORTED_CERTAINTIES = ["certain", "confident", "likely", "possible", None]
@@ -203,7 +205,16 @@ def certainty_sufficient(
 def _load_json_url(http_url: str, timeout: int = DEFAULT_URLLIB_TIMEOUT):
     from urllib.request import urlopen, Request
     import json
-    headers = {'User-Agent': USER_AGENT, 'Accept': 'application/json'}
+    headers = {
+        'User-Agent': USER_AGENT,
+        'Accept': 'application/json',
+    }
+    if urlparse(http_url).hostname == 'github.com':
+        try:
+            headers['WWW-Authenticate'] = 'Bearer %s' % (
+                os.environ['GITHUB_TOKEN'])
+        except KeyError:
+            pass
     http_contents = urlopen(
         Request(http_url, headers=headers),
         timeout=timeout).read()
