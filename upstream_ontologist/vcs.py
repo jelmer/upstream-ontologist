@@ -688,31 +688,52 @@ def probe_upstream_branch_url(
     if parsed.scheme in ('git+ssh', 'ssh', 'bzr+ssh'):
         # Let's not probe anything possibly non-public.
         return None
-    import breezy.ui
-    from breezy.branch import Branch
-    import breezy.bzr
-    import breezy.git
-    old_ui = breezy.ui.ui_factory
-    breezy.ui.ui_factory = breezy.ui.SilentUIFactory()
-    try:
-        b = Branch.open(url)
-        b.last_revision()
-        if version is not None:
-            version = version.split('+git')[0]
-            tag_names = b.tags.get_tag_dict().keys()
-            if not tag_names:
-                # Uhm, hmm
-                return True
+    if parsed.hostname == 'github.com':
+        api_url = ('https://api.github.com/repos/%s/tags'
+                   % parsed.path.strip('/'))
+        try:
+            data = _load_json_url(api_url)
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return False
+            elif e.code == 403:
+                logging.warning('Rate-limited by GitHub')
+                return None
+            else:
+                raise
+        else:
+            tag_names = [k['name'] for k in data]
             if _version_in_tags(version, tag_names):
                 return True
             return False
-        else:
-            return True
-    except Exception:
-        # TODO(jelmer): Catch more specific exceptions?
-        return False
-    finally:
-        breezy.ui.ui_factory = old_ui
+    else:
+        import breezy.ui
+        from breezy.branch import Branch
+        import breezy.bzr
+        import breezy.git
+        old_ui = breezy.ui.ui_factory
+        breezy.ui.ui_factory = breezy.ui.SilentUIFactory()
+        try:
+            b = Branch.open(url)
+            b.last_revision()
+            if version is not None:
+                version = version.split('+git')[0]
+                tag_names = b.tags.get_tag_dict().keys()
+                if not tag_names:
+                    # Uhm, hmm
+                    return True
+                if _version_in_tags(version, tag_names):
+                    return True
+                return False
+            else:
+                return True
+        except Exception as e:
+            logging.debug(
+                'Error accessing %s: %s', url, e)
+            # TODO(jelmer): Catch more specific exceptions?
+            return False
+        finally:
+            breezy.ui.ui_factory = old_ui
 
 
 def _version_in_tags(version, tag_names):
