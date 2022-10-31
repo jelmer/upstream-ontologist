@@ -130,12 +130,12 @@ def known_bad_guess(datum):  # noqa: C901
         expected_type = DATUM_TYPES[datum.field]
     except KeyError:
         if datum.field.startswith('X-'):
-            logging.debug('Unknown field %s', datum.field)
+            logger.debug('Unknown field %s', datum.field)
         else:
-            logging.warning('Unknown field %s', datum.field)
+            logger.warning('Unknown field %s', datum.field)
         return False
     if not isinstance(datum.value, expected_type):
-        logging.warning(
+        logger.warning(
             'filtering out bad value %r for %s',
             datum.value, datum.field)
         return True
@@ -181,15 +181,16 @@ def filter_bad_guesses(
     return filter(lambda x: not known_bad_guess(x), guessed_items)
 
 
-def update_from_guesses(upstream_metadata: UpstreamMetadata, guessed_items):
-    changed = False
+def update_from_guesses(upstream_metadata: UpstreamMetadata,
+                        guessed_items: Iterable[UpstreamDatum]):
+    changed = []
     for datum in guessed_items:
         current_datum = upstream_metadata.get(datum.field)
         if not current_datum or (
                 certainty_to_confidence(datum.certainty)  # type: ignore
                 < certainty_to_confidence(current_datum.certainty)):
             upstream_metadata[datum.field] = datum
-            changed = True
+            changed.append(datum)
     return changed
 
 
@@ -503,7 +504,7 @@ def parse_python_project_urls(urls):
             yield UpstreamDatum(
                 'Documentation', url, 'certain')
         else:
-            logging.debug(
+            logger.debug(
                 'Unknown Python project URL type: %s', url_type)
 
 
@@ -512,7 +513,7 @@ def guess_from_setup_py(path, trust_package):  # noqa: C901
         try:
             yield from guess_from_setup_py_executed(path)
         except Exception as e:
-            logging.warning('Failed to run setup.py: %r', e)
+            logger.warning('Failed to run setup.py: %r', e)
         else:
             return
     with open(path) as inp:
@@ -528,7 +529,7 @@ def guess_from_setup_py(path, trust_package):  # noqa: C901
     try:
         tree = ast.parse(setup_text)
     except SyntaxError as e:
-        logging.warning('Syntax error while parsing setup.py: %s', e)
+        logger.warning('Syntax error while parsing setup.py: %s', e)
         return
     setup_args = {}
 
@@ -683,7 +684,7 @@ def guess_from_package_json(path, trust_package):  # noqa: C901
                 'X-Author', [Person.from_string(package['author'])],
                 'confident')
         else:
-            logging.warning(
+            logger.warning(
                 'Unsupported type for author in package.json: %r',
                 type(package['author']))
 
@@ -706,7 +707,7 @@ def guess_from_package_xml(path, trust_package):
             'http://pear.php.net/dtd/package-2.0',
             'http://pear.php.net/dtd/package-2.1'])
     except ET.ParseError as e:
-        logging.warning('Unable to parse package.xml: %s', e)
+        logger.warning('Unable to parse package.xml: %s', e)
         return
     assert root.tag == 'package', 'root tag is %r' % root.tag
     name_tag = root.find('name')
@@ -770,7 +771,7 @@ def guess_from_perl_module(path):
     try:
         stdout = subprocess.check_output(['perldoc', '-u', path])
     except subprocess.CalledProcessError:
-        logging.warning('Error running perldoc, skipping.')
+        logger.warning('Error running perldoc, skipping.')
         return
     yield from guess_from_pod(stdout)
 
@@ -794,7 +795,7 @@ def guess_from_dist_ini(path, trust_package):
         try:
             parser.read_string('[START]\n' + f.read())
         except ParsingError as e:
-            logging.warning('Unable to parse dist.ini: %r', e)
+            logger.warning('Unable to parse dist.ini: %r', e)
     try:
         dist_name = parser['START']['name']
     except (NoSectionError, NoOptionError, KeyError):
@@ -853,12 +854,12 @@ def guess_from_debian_copyright(path, trust_package):  # noqa: C901
         except NotMachineReadableError:
             header = None
         except MachineReadableFormatError as e:
-            logging.warning('Error parsing copyright file: %s', e)
+            logger.warning('Error parsing copyright file: %s', e)
             header = None
         except ValueError as e:
             # This can happen with an error message of
             # ValueError: value must not have blank lines
-            logging.warning('Error parsing copyright file: %s', e)
+            logger.warning('Error parsing copyright file: %s', e)
             header = None
         else:
             header = copyright.header
@@ -939,7 +940,7 @@ def url_from_cvs_co_command(command):
 
 def url_from_svn_co_command(command):
     if command.endswith(b'\\'):
-        logging.warning(
+        logger.warning(
             'Ignoring command with line break: %s', command)
         return None
     import shlex
@@ -954,7 +955,7 @@ def url_from_svn_co_command(command):
 
 def url_from_git_clone_command(command):
     if command.endswith(b'\\'):
-        logging.warning(
+        logger.warning(
             'Ignoring command with line break: %s', command)
         return None
     import shlex
@@ -1010,7 +1011,7 @@ def guess_from_meson(path, trust_package):
     try:
         output = subprocess.check_output(['meson', 'introspect', '--projectinfo', path])
     except FileNotFoundError:
-        logging.warning('meson not installed; skipping meson.build introspection')
+        logger.warning('meson not installed; skipping meson.build introspection')
         return
     project_info = json.loads(output)
     if 'descriptive_name' in project_info:
@@ -1026,7 +1027,7 @@ def guess_from_pubspec_yaml(path, trust_package):
         try:
             data = ruamel.yaml.load(f, ruamel.yaml.SafeLoader)
         except ruamel.yaml.reader.ReaderError as e:
-            logging.warning('Unable to parse %s: %s', path, e)
+            logger.warning('Unable to parse %s: %s', path, e)
             return
     if 'name' in data:
         yield UpstreamDatum('Name', data['name'], 'certain')
@@ -1284,7 +1285,7 @@ def guess_from_travis_yml(path, trust_package):
         try:
             ruamel.yaml.load(f, ruamel.yaml.SafeLoader)
         except ruamel.yaml.reader.ReaderError as e:
-            logging.warning('Unable to parse %s: %s', path, e)
+            logger.warning('Unable to parse %s: %s', path, e)
             return
 
 
@@ -1300,10 +1301,10 @@ def guess_from_meta_yml(path, trust_package):
         try:
             data = ruamel.yaml.load(f, ruamel.yaml.SafeLoader)
         except ruamel.yaml.reader.ReaderError as e:
-            logging.warning('Unable to parse %s: %s', path, e)
+            logger.warning('Unable to parse %s: %s', path, e)
             return
         except ruamel.yaml.parser.ParserError as e:
-            logging.warning('Unable to parse %s: %s', path, e)
+            logger.warning('Unable to parse %s: %s', path, e)
             return
         if data is None:
             # Empty file?
@@ -1375,7 +1376,7 @@ def guess_from_doap(path, trust_package):  # noqa: C901
         [root] = list(root)
 
     if root.tag != ('{%s}Project' % DOAP_NAMESPACE):
-        logging.warning('Doap file does not have DOAP project as root')
+        logger.warning('Doap file does not have DOAP project as root')
         return
 
     def extract_url(el):
@@ -1468,7 +1469,7 @@ def guess_from_doap(path, trust_package):  # noqa: C901
         elif child.tag == '{%s}mailing-list' % DOAP_NAMESPACE:
             yield UpstreamDatum('X-MailingList', extract_url(child), 'certain')
         else:
-            logging.warning('Unknown tag %s in DOAP file', child.tag)
+            logger.warning('Unknown tag %s in DOAP file', child.tag)
 
 
 def _yield_opam_fields(f):
@@ -1488,7 +1489,7 @@ def _yield_opam_fields(f):
         try:
             (field, val) = line.rstrip().split(':', 1)
         except ValueError:
-            logging.debug('Error parsing line %d: %r', lineno, line)
+            logger.debug('Error parsing line %d: %r', lineno, line)
             in_field = None
             continue
         val = val.lstrip()
@@ -1551,7 +1552,7 @@ def guess_from_nuspec(path, trust_package=False):
         root = xmlparse_simplify_namespaces(path, [
             "http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd"])
     except ET.ParseError as e:
-        logging.warning('Unable to parse nuspec: %s', e)
+        logger.warning('Unable to parse nuspec: %s', e)
         return
     assert root.tag == 'package', 'root tag is %r' % root.tag
     metadata = root.find('metadata')
@@ -1803,7 +1804,7 @@ def guess_from_cargo(path, trust_package):
     except FileNotFoundError:
         return
     except ParseError as e:
-        logging.warning('Error parsing toml file %s: %s', path, e)
+        logger.warning('Error parsing toml file %s: %s', path, e)
         return
     try:
         package = cargo['package']
@@ -1838,7 +1839,7 @@ def guess_from_pyproject_toml(path, trust_package):
     except FileNotFoundError:
         return
     except ParseError as e:
-        logging.warning('Error parsing toml file %s: %s', path, e)
+        logger.warning('Error parsing toml file %s: %s', path, e)
         return
     if 'poetry' in pyproject.get('tool', []):
         yield from guess_from_poetry(pyproject['tool']['poetry'])
@@ -1865,7 +1866,7 @@ def guess_from_pom_xml(path, trust_package=False):  # noqa: C901
         root = xmlparse_simplify_namespaces(path, [
             'http://maven.apache.org/POM/4.0.0'])
     except ET.ParseError as e:
-        logging.warning('Unable to parse package.xml: %s', e)
+        logger.warning('Unable to parse package.xml: %s', e)
         return
     assert root.tag == 'project', 'root tag is %r' % root.tag
     name_tag = root.find('name')
@@ -1904,11 +1905,11 @@ def guess_from_pom_xml(path, trust_package=False):  # noqa: C901
             try:
                 (scm, provider, provider_specific) = connection.split(':', 2)
             except ValueError:
-                logging.warning(
+                logger.warning(
                     'Invalid format for SCM connection: %s', connection)
                 continue
             if scm != 'scm':
-                logging.warning(
+                logger.warning(
                     'SCM connection does not start with scm: prefix: %s',
                     connection)
                 continue
@@ -2020,7 +2021,7 @@ def guess_from_gemspec(path, trust_package=False):
                 elif key == 'description':
                     yield UpstreamDatum('X-Description', val, 'certain')
             else:
-                logging.debug(
+                logger.debug(
                     'ignoring unparseable line in %s: %r',
                     path, line)
 
@@ -2168,7 +2169,7 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
         if len(doap_filenames) == 1:
             CANDIDATES.append((doap_filenames[0], guess_from_doap))
         else:
-            logging.warning(
+            logger.warning(
                 'More than one doap filename, ignoring all: %r',
                 doap_filenames)
 
@@ -2179,7 +2180,7 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
         if len(metainfo_filenames) == 1:
             CANDIDATES.append((metainfo_filenames[0], guess_from_metainfo))
         else:
-            logging.warning(
+            logger.warning(
                 'More than one metainfo filename, ignoring all: %r',
                 metainfo_filenames)
 
@@ -2188,7 +2189,7 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
         if len(cabal_filenames) == 1:
             CANDIDATES.append((cabal_filenames[0], guess_from_cabal))
         else:
-            logging.warning(
+            logger.warning(
                 'More than one cabal filename, ignoring all: %r',
                 cabal_filenames)
 
@@ -2205,7 +2206,7 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
         if len(nuspec_filenames) == 1:
             CANDIDATES.append((nuspec_filenames[0], guess_from_nuspec))
         else:
-            logging.warning(
+            logger.warning(
                 'More than one nuspec filename, ignoring all: %r',
                 nuspec_filenames)
 
@@ -2214,7 +2215,7 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
         if len(opam_filenames) == 1:
             CANDIDATES.append((opam_filenames[0], guess_from_opam))
         else:
-            logging.warning(
+            logger.warning(
                 'More than one opam filename, ignoring all: %r',
                 opam_filenames)
 
@@ -2352,7 +2353,7 @@ def _sf_git_extract_url(page):
     try:
         from bs4 import BeautifulSoup
     except ModuleNotFoundError:
-        logging.warning(
+        logger.warning(
             'Not scanning sourceforge page, since python3-bs4 is missing')
         return None
     bs = BeautifulSoup(page, features='lxml')
@@ -2372,12 +2373,12 @@ def guess_from_sf(sf_project: str, subproject: Optional[str] = None):  # noqa: C
     try:
         data = get_sf_metadata(sf_project)
     except socket.timeout:
-        logging.warning(
+        logger.warning(
             'timeout contacting sourceforge, ignoring: %s',
             sf_project)
         return
     except urllib.error.URLError as e:
-        logging.warning(
+        logger.warning(
             'Unable to retrieve sourceforge project metadata: %s: %s',
             sf_project, e)
         return
@@ -2392,7 +2393,7 @@ def guess_from_sf(sf_project: str, subproject: Optional[str] = None):  # noqa: C
         except UrlUnverifiable:
             yield 'Bug-Database', data['preferred_support_url']
         except InvalidUrl as e:
-            logging.debug(
+            logger.debug(
                 'Ignoring invalid preferred_support_url %s: %s',
                 e.url, e.reason)
         else:
@@ -2442,14 +2443,14 @@ def guess_from_sf(sf_project: str, subproject: Optional[str] = None):  # noqa: C
         if url is not None:
             yield 'Repository', url
     elif len(vcs_tools) > 1:
-        logging.warning('multiple possible VCS URLs found: %r', vcs_tools)
+        logger.warning('multiple possible VCS URLs found: %r', vcs_tools)
 
 
 def guess_from_repology(repology_project):
     try:
         metadata = get_repology_metadata(repology_project)
     except socket.timeout:
-        logging.warning(
+        logger.warning(
             'timeout contacting repology, ignoring: %s', repology_project)
         return
 
@@ -2786,7 +2787,7 @@ def check_bug_database_canonical(url: str) -> str:
                 raise InvalidUrl(url, "Project does not exist")
             if e.code == 403:
                 # Probably rate limited
-                logging.warning(
+                logger.warning(
                     'Unable to verify bug database URL %s: %s',
                     url, e.reason)
                 raise UrlUnverifiable(url, "rate-limited by GitHub API")
@@ -2809,9 +2810,15 @@ def check_bug_database_canonical(url: str) -> str:
             if e.code == 404:
                 raise InvalidUrl(url, "Project does not exist")
             raise
-        if data.get('issues_enabled') is False:
+        # issues_enabled is only provided when the user is authenticated,
+        # so if we're not then we just fall back to checking the canonical URL
+        issues_enabled = data.get('issues_enabled')
+        if issues_enabled is False:
             raise InvalidUrl(url, "Project does not have issues enabled")
-        return urljoin(data['web_url'] + '/', '-/issues')
+        canonical_url = urljoin(data['web_url'] + '/', '-/issues')
+        if issues_enabled is True:
+            return canonical_url
+        return check_url_canonical(canonical_url)
     raise UrlUnverifiable(url, "unsupported hoster")
 
 
@@ -3108,8 +3115,14 @@ def _extrapolate_fields(
                     and certainty_to_confidence(from_certainty) > certainty_to_confidence(old_value.certainty)  # type: ignore
                     for old_value in old_to_values.values()]):
                 continue
-            changed = update_from_guesses(
-                upstream_metadata, fn(upstream_metadata, net_access))
+            changes = update_from_guesses(upstream_metadata, fn(upstream_metadata, net_access))
+            if changes:
+                logger.debug(
+                    'Extrapolating (%r => %r) from (\'%s: %s\', %s)',
+                    ["%s: %s" % (us.field, us.value) for us in old_to_values.values() if us],
+                    ["%s: %s" % (us.field, us.value) for us in changes if us],
+                    from_value.field, from_value.value, from_value.certainty)
+                changed = True
 
 
 def verify_screenshots(urls):
@@ -3167,7 +3180,7 @@ def check_upstream_metadata(  # noqa: C901
         except UrlUnverifiable:
             pass
         except InvalidUrl as e:
-            logging.debug(
+            logger.debug(
                 'Deleting invalid Repository URL %s: %s',
                 e.url,
                 e.reason)
@@ -3187,7 +3200,7 @@ def check_upstream_metadata(  # noqa: C901
         except UrlUnverifiable:
             pass
         except InvalidUrl as e:
-            logging.debug(
+            logger.debug(
                 'Deleting invalid Homepage URL %s: %s',
                 e.url, e.reason)
             del upstream_metadata["Homepage"]
@@ -3202,7 +3215,7 @@ def check_upstream_metadata(  # noqa: C901
         except UrlUnverifiable:
             pass
         except InvalidUrl as e:
-            logging.debug(
+            logger.debug(
                 'Deleting invalid Repository-Browse URL %s: %s',
                 e.url, e.reason)
             del upstream_metadata['Repository-Browse']
@@ -3217,8 +3230,8 @@ def check_upstream_metadata(  # noqa: C901
         except UrlUnverifiable:
             pass
         except InvalidUrl as e:
-            logging.debug("Deleting invalid Bug-Database URL %s: %s",
-                          e.url, e.reason)
+            logger.debug("Deleting invalid Bug-Database URL %s: %s",
+                         e.url, e.reason)
             del upstream_metadata['Bug-Database']
         else:
             bug_database.value = canonical_url
@@ -3231,7 +3244,7 @@ def check_upstream_metadata(  # noqa: C901
         except UrlUnverifiable:
             pass
         except InvalidUrl as e:
-            logging.debug(
+            logger.debug(
                 'Deleting invalid Bug-Submit URL %s: %s',
                 e.url, e.reason)
             del upstream_metadata['Bug-Submit']
@@ -3315,12 +3328,12 @@ def guess_from_pecl_url(url):
             raise
         return
     except socket.timeout:
-        logging.warning('timeout contacting pecl, ignoring: %s', url)
+        logger.warning('timeout contacting pecl, ignoring: %s', url)
         return
     try:
         from bs4 import BeautifulSoup
     except ModuleNotFoundError:
-        logging.warning(
+        logger.warning(
             'bs4 missing so unable to scan pecl page, ignoring %s', url)
         return
     bs = BeautifulSoup(f.read(), features='lxml')
@@ -3350,7 +3363,7 @@ def guess_from_gobo(package: str):   # noqa: C901
         contents = _load_json_url(packages_url)
     except urllib.error.HTTPError as e:
         if e.code == 403:
-            logging.debug('error loading %s: %r. rate limiting?', packages_url, e)
+            logger.debug('error loading %s: %r. rate limiting?', packages_url, e)
             return
         raise
     packages = [entry['name'] for entry in contents]
@@ -3359,7 +3372,7 @@ def guess_from_gobo(package: str):   # noqa: C901
             package = p
             break
     else:
-        logging.debug('No gobo package named %s', package)
+        logger.debug('No gobo package named %s', package)
         return
 
     contents_url = "https://api.github.com/repos/gobolinux/Recipes/contents/%s" % package
@@ -3367,7 +3380,7 @@ def guess_from_gobo(package: str):   # noqa: C901
         contents = _load_json_url(contents_url)
     except urllib.error.HTTPError as e:
         if e.code == 403:
-            logging.debug('error loading %s: %r. rate limiting?', contents_url, e)
+            logger.debug('error loading %s: %r. rate limiting?', contents_url, e)
             return
         raise
     versions = [entry['name'] for entry in contents]
@@ -3379,7 +3392,7 @@ def guess_from_gobo(package: str):   # noqa: C901
             timeout=DEFAULT_URLLIB_TIMEOUT)
     except urllib.error.HTTPError as e:
         if e.code == 403:
-            logging.debug('error loading %s: %r. rate limiting?', base_url, e)
+            logger.debug('error loading %s: %r. rate limiting?', base_url, e)
             return
         if e.code != 404:
             raise
@@ -3396,7 +3409,7 @@ def guess_from_gobo(package: str):   # noqa: C901
             timeout=DEFAULT_URLLIB_TIMEOUT)
     except urllib.error.HTTPError as e:
         if e.code == 403:
-            logging.debug('error loading %s: %r. rate limiting?', url, e)
+            logger.debug('error loading %s: %r. rate limiting?', url, e)
             return
         if e.code != 404:
             raise
@@ -3418,7 +3431,7 @@ def guess_from_gobo(package: str):   # noqa: C901
             elif key == 'Homepage':
                 yield 'Homepage', value
             else:
-                logging.warning('Unknown field %s in gobo Description', key)
+                logger.warning('Unknown field %s in gobo Description', key)
 
 
 def guess_from_aur(package: str):
@@ -3437,7 +3450,7 @@ def guess_from_aur(package: str):
                 raise
             continue
         except socket.timeout:
-            logging.warning('timeout contacting aur, ignoring: %s', url)
+            logger.warning('timeout contacting aur, ignoring: %s', url)
             continue
         else:
             break
@@ -3479,7 +3492,7 @@ def guess_from_launchpad(package, distribution=None, suite=None):  # noqa: C901
             try:
                 suite = ubuntu.devel()
             except DistroDataOutdated as e:
-                logging.warning('%s', str(e))
+                logger.warning('%s', str(e))
                 suite = ubuntu.all[-1]
         elif distribution == 'debian':
             suite = 'sid'
@@ -3496,7 +3509,7 @@ def guess_from_launchpad(package, distribution=None, suite=None):  # noqa: C901
             raise
         return
     except socket.timeout:
-        logging.warning('timeout contacting launchpad, ignoring')
+        logger.warning('timeout contacting launchpad, ignoring')
         return
 
     productseries_url = sourcepackage_data.get('productseries_link')
