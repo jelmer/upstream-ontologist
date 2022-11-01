@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright (C) 2018 Jelmer Vernooij
+# Copyright (C) 2022 Jelmer Vernooij
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,15 +15,21 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
-import unittest
+"""Tests for Debian mangling."""
+
+from unittest import TestCase
+
+from upstream_ontologist.debian import (
+    upstream_name_to_debian_source_name,
+)
 
 
-def test_suite():
-    names = [
-        "upstream_ontologist",
-        "vcs",
-    ]
-    module_names = [__name__ + ".test_" + name for name in names]
-    module_names.append(__name__ + ".test_readme.test_suite")
-    loader = unittest.TestLoader()
-    return loader.loadTestsFromNames(module_names)
+class UpstreamNameToDebianSourceNameTests(TestCase):
+
+    def test_gnu(self):
+        self.assertEqual(
+            'lala', upstream_name_to_debian_source_name('GNU Lala'))
+
+    def test_parentheses(self):
+        self.assertEqual(
+            'mun', upstream_name_to_debian_source_name('Made Up Name (MUN)'))
