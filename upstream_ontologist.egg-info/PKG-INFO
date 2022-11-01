@@ -1,20 +1,18 @@
 Metadata-Version: 2.1
 Name: upstream-ontologist
-Version: 0.1.25
+Version: 0.1.30
 Summary: tracking of upstream project metadata
 Home-page: https://github.com/jelmer/upstream-ontologist
 Author: Jelmer Vernooij
 Author-email: jelmer@jelmer.uk
 Maintainer: Jelmer Vernooij
 Maintainer-email: jelmer@jelmer.uk
-License: UNKNOWN
 Project-URL: Repository, https://github.com/jelmer/upstream-ontologist.git
-Platform: UNKNOWN
 Provides-Extra: cargo
+Provides-Extra: debian_watch
+Provides-Extra: debian_rules
+Provides-Extra: pyproject
 Provides-Extra: readme
 Provides-Extra: setup.cfg
 License-File: LICENSE
 License-File: AUTHORS
-
-UNKNOWN
-

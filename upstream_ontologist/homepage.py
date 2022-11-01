@@ -17,6 +17,7 @@
 
 import urllib.error
 from urllib.request import Request, urlopen
+from urllib.parse import urljoin
 
 import logging
 
@@ -41,12 +42,12 @@ def guess_from_homepage(url: str):
         logging.warning(
             'unable to access homepage %r: %s', url, e)
         return
-    for entry in _guess_from_page(f.read()):
+    for entry in _guess_from_page(f.read(), url):
         entry.origin = url
         yield entry
 
 
-def _guess_from_page(text: bytes):
+def _guess_from_page(text: bytes, basehref: str):
     try:
         from bs4 import BeautifulSoup, FeatureNotFound
     except ModuleNotFoundError:
@@ -57,11 +58,15 @@ def _guess_from_page(text: bytes):
     except FeatureNotFound:
         logger.debug('lxml not available, not parsing README.md')
         return
-    return _guess_from_soup(soup)
+    yield from _guess_from_soup(soup, basehref)
 
 
-def _guess_from_soup(soup):
+def _guess_from_soup(soup, basehref):
     for a in soup.findAll('a'):
         href = a.get('href')
-        if a.get('aria-label') in ('github', 'git', 'repository'):
-            yield UpstreamDatum('Repository', href, certainty='confident')
+        labels = [a.get('aria-label'), a.text]
+        for label in filter(None, labels):
+            if label.lower() in ('github', 'git', 'repository', 'github repository'):
+                yield UpstreamDatum('Repository', urljoin(basehref, href), certainty='possible')
+            if label.lower() in ('github bug tracking', 'bug tracker'):
+                yield UpstreamDatum('Bug-Database', urljoin(basehref, href), certainty='possible')

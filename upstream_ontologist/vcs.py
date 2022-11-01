@@ -37,7 +37,7 @@ from . import (
     _load_json_url,
     InvalidUrl,
     UrlUnverifiable,
-    )
+)
 
 
 KNOWN_GITLAB_SITES = [
@@ -78,7 +78,7 @@ def unsplit_vcs_url(
     return url
 
 
-def probe_gitlab_host(hostname: str):
+def probe_gitlab_host(hostname: str) -> bool:
     import json
     try:
         _load_json_url("https://%s/api/v4/version" % hostname)
@@ -114,7 +114,9 @@ def is_gitlab_site(hostname: str, net_access: bool = False) -> bool:
     return False
 
 
-def browse_url_from_repo_url(url: str, subpath: Optional[str] = None) -> Optional[str]:  # noqa: C901
+def browse_url_from_repo_url(  # noqa: C901
+        url: str, *, branch: Optional[str] = None,
+        subpath: Optional[str] = None) -> Optional[str]:
     if isinstance(url, list):
         return None
     parsed_url = urlparse(url)
@@ -122,8 +124,10 @@ def browse_url_from_repo_url(url: str, subpath: Optional[str] = None) -> Optiona
         path = "/".join(parsed_url.path.split("/")[:3])
         if path.endswith(".git"):
             path = path[:-4]
+        if subpath is not None or branch is not None:
+            path += "/tree/%s" % (branch or "HEAD")
         if subpath is not None:
-            path += "/tree/HEAD/" + subpath
+            path += "/" + subpath
         return urlunparse(("https", "github.com", path, None, None, None))
     elif parsed_url.hostname == 'gopkg.in':
         els = parsed_url.path.split("/")[:3]
@@ -226,16 +230,15 @@ def find_secure_repo_url(
         return url
 
     # Sites we know to be available over https
-    if parsed_repo_url.hostname and (
-        is_gitlab_site(parsed_repo_url.hostname, net_access)
-        or parsed_repo_url.hostname
-        in [
-            "github.com",
-            "git.launchpad.net",
-            "bazaar.launchpad.net",
-            "code.launchpad.net",
-        ]
-    ):
+    if (parsed_repo_url.hostname
+        and (
+            is_gitlab_site(parsed_repo_url.hostname, net_access)
+            or parsed_repo_url.hostname in [
+                "github.com",
+                "git.launchpad.net",
+                "bazaar.launchpad.net",
+                "code.launchpad.net",
+            ])):
         parsed_repo_url = parsed_repo_url._replace(scheme="https")
 
     if parsed_repo_url.scheme == "lp":
@@ -364,6 +367,13 @@ def fix_gitlab_scheme(parsed, branch, subpath: Optional[str]):
     return None, None, None
 
 
+def fix_github_scheme(parsed, branch, subpath: Optional[str]):
+    # GitHub no longer supports the git:// scheme
+    if parsed.hostname == 'github.com' and parsed.scheme == 'git':
+        return parsed._replace(scheme='https'), branch, subpath
+    return None, None, None
+
+
 def fix_salsa_cgit_url(parsed, branch, subpath):
     if parsed.hostname == "salsa.debian.org" and parsed.path.startswith("/cgit/"):
         return parsed._replace(path=parsed.path[5:]), branch, subpath
@@ -400,16 +410,15 @@ def drop_git_username(parsed, branch, subpath):
 
 
 def fix_branch_argument(parsed, branch, subpath):
-    if parsed.hostname != "github.com":
-        return None, None, None
-    # TODO(jelmer): Handle gitlab sites too?
-    path_elements = parsed.path.strip("/").split("/")
-    if len(path_elements) > 2 and path_elements[2] == "tree":
-        return (
-            parsed._replace(path="/".join(path_elements[:2])),
-            "/".join(path_elements[3:]),
-            subpath,
-        )
+    if parsed.hostname == "github.com":
+        # TODO(jelmer): Handle gitlab sites too?
+        path_elements = parsed.path.strip("/").split("/")
+        if len(path_elements) > 2 and path_elements[2] == "tree":
+            return (
+                parsed._replace(path="/".join(path_elements[:2])),
+                "/".join(path_elements[3:]),
+                subpath,
+            )
     return None, None, None
 
 
@@ -450,6 +459,7 @@ def fix_freedesktop_org_url(
 FIXERS = [
     fix_path_in_port,
     fix_gitlab_scheme,
+    fix_github_scheme,
     fix_salsa_cgit_url,
     fix_gitlab_tree_in_url,
     fix_double_slash,
@@ -527,15 +537,15 @@ def guess_repo_from_url(url, net_access=False):  # noqa: C901
     if parsed_url.netloc == 'github.com':
         if len(path_elements) < 2:
             return None
-        return ('https://github.com' +
-                '/'.join(parsed_url.path.split('/')[:3]))
+        return ('https://github.com'
+                + '/'.join(parsed_url.path.split('/')[:3]))
     if parsed_url.netloc == 'travis-ci.org':
-        return ('https://github.com/' +
-                '/'.join(path_elements[:3]))
-    if (parsed_url.netloc == 'coveralls.io' and
-            parsed_url.path.startswith('/r/')):
-        return ('https://github.com/' +
-                '/'.join(path_elements[1:4]))
+        return ('https://github.com/'
+                + '/'.join(path_elements[:3]))
+    if (parsed_url.netloc == 'coveralls.io'
+            and parsed_url.path.startswith('/r/')):
+        return ('https://github.com/'
+                + '/'.join(path_elements[1:4]))
     if parsed_url.netloc == 'launchpad.net':
         return 'https://code.launchpad.net/%s' % (
             parsed_url.path.strip('/').split('/')[0])
@@ -558,8 +568,8 @@ def guess_repo_from_url(url, net_access=False):  # noqa: C901
             return 'https://anongit.kde.org/%s.git' % path_elements[1]
     if parsed_url.netloc == 'ftp.gnome.org':
         if (len(path_elements) >= 4 and [
-              e.lower() for e in path_elements[:3]] == [
-                  'pub', 'gnome', 'sources']):
+            e.lower() for e in path_elements[:3]] == [
+                'pub', 'gnome', 'sources']):
             return 'https://gitlab.gnome.org/GNOME/%s.git' % path_elements[3]
     if parsed_url.netloc == 'sourceforge.net':
         if (len(path_elements) >= 4 and path_elements[0] == 'p'
@@ -584,7 +594,7 @@ def guess_repo_from_url(url, net_access=False):  # noqa: C901
             return 'https://git.savannah.gnu.org/git/%s.git' % (
                 path_elements[1])
         return None
-    if is_gitlab_site(parsed_url.netloc, net_access):
+    if is_gitlab_site(parsed_url.hostname, net_access):
         if parsed_url.path.strip('/').count('/') < 1:
             return None
         parts = parsed_url.path.split('/')
@@ -678,31 +688,52 @@ def probe_upstream_branch_url(
     if parsed.scheme in ('git+ssh', 'ssh', 'bzr+ssh'):
         # Let's not probe anything possibly non-public.
         return None
-    import breezy.ui
-    from breezy.branch import Branch
-    import breezy.bzr
-    import breezy.git
-    old_ui = breezy.ui.ui_factory
-    breezy.ui.ui_factory = breezy.ui.SilentUIFactory()
-    try:
-        b = Branch.open(url)
-        b.last_revision()
-        if version is not None:
-            version = version.split('+git')[0]
-            tag_names = b.tags.get_tag_dict().keys()
-            if not tag_names:
-                # Uhm, hmm
-                return True
+    if parsed.hostname == 'github.com':
+        api_url = ('https://api.github.com/repos/%s/tags'
+                   % parsed.path.strip('/'))
+        try:
+            data = _load_json_url(api_url)
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return False
+            elif e.code == 403:
+                logging.warning('Rate-limited by GitHub')
+                return None
+            else:
+                raise
+        else:
+            tag_names = [k['name'] for k in data]
             if _version_in_tags(version, tag_names):
                 return True
             return False
-        else:
-            return True
-    except Exception:
-        # TODO(jelmer): Catch more specific exceptions?
-        return False
-    finally:
-        breezy.ui.ui_factory = old_ui
+    else:
+        import breezy.ui
+        from breezy.branch import Branch
+        import breezy.bzr
+        import breezy.git
+        old_ui = breezy.ui.ui_factory
+        breezy.ui.ui_factory = breezy.ui.SilentUIFactory()
+        try:
+            b = Branch.open(url)
+            b.last_revision()
+            if version is not None:
+                version = version.split('+git')[0]
+                tag_names = b.tags.get_tag_dict().keys()
+                if not tag_names:
+                    # Uhm, hmm
+                    return True
+                if _version_in_tags(version, tag_names):
+                    return True
+                return False
+            else:
+                return True
+        except Exception as e:
+            logging.debug(
+                'Error accessing %s: %s', url, e)
+            # TODO(jelmer): Catch more specific exceptions?
+            return False
+        finally:
+            breezy.ui.ui_factory = old_ui
 
 
 def _version_in_tags(version, tag_names):
