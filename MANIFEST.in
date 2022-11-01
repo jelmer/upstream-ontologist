@@ -2,4 +2,4 @@ include CODE_OF_CONDUCT.md
 include README.md
 include SECURITY.md
 include AUTHORS
-recursive-include tests *
+recursive-include tests *.py README README.md description README.rst
