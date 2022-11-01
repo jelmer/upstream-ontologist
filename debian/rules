@@ -2,3 +2,6 @@
 
 %:
 	dh $@ --buildsystem=pybuild --with=python3
+
+override_dh_auto_test:
+	python3 -m unittest tests.test_suite
