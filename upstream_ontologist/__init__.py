@@ -53,14 +53,16 @@ Supported, but currently not set.
 - Webservice
 """
 
-from typing import Optional, Sequence
+import os
+from typing import Optional, Sequence, Dict
 from dataclasses import dataclass
 from email.utils import parseaddr
+from urllib.parse import urlparse
 
 
 SUPPORTED_CERTAINTIES = ["certain", "confident", "likely", "possible", None]
 
-version_string = "0.1.25"
+version_string = "0.1.29"
 
 USER_AGENT = "upstream-ontologist/" + version_string
 # Too aggressive?
@@ -77,6 +79,8 @@ class Person:
     @classmethod
     def from_string(cls, text):
         text = text.replace(' at ', '@')
+        text = text.replace(' -at- ', '@')
+        text = text.replace(' -dot- ', '.')
         text = text.replace('[AT]', '@')
         if '(' in text and text.endswith(')'):
             (p1, p2) = text[:-1].split('(', 1)
@@ -136,6 +140,9 @@ class UpstreamDatum(object):
             self.certainty,
             self.origin,
         )
+
+
+UpstreamMetadata = Dict[str, UpstreamDatum]
 
 
 class UpstreamPackage(object):
@@ -198,7 +205,17 @@ def certainty_sufficient(
 def _load_json_url(http_url: str, timeout: int = DEFAULT_URLLIB_TIMEOUT):
     from urllib.request import urlopen, Request
     import json
-    headers = {'User-Agent': USER_AGENT, 'Accept': 'application/json'}
+    headers = {
+        'User-Agent': USER_AGENT,
+        'Accept': 'application/json',
+    }
+    if urlparse(http_url).hostname in (
+            'github.com', 'raw.githubusercontent.com'):
+        try:
+            headers['WWW-Authenticate'] = 'Bearer %s' % (
+                os.environ['GITHUB_TOKEN'])
+        except KeyError:
+            pass
     http_contents = urlopen(
         Request(http_url, headers=headers),
         timeout=timeout).read()

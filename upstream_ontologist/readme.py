@@ -54,7 +54,7 @@ def _skip_paragraph(para, metadata):  # noqa: C901
     m = re.match('More documentation .* at http.*', para)
     if m:
         return True
-    m = re.match('Documentation (can be found|is hosted) (at|on) ([^ ]+)', para)
+    m = re.match('Documentation (can be found|is hosted|is available) (at|on) ([^ ]+)', para)
     if m:
         metadata.append(UpstreamDatum('Documentation', m.group(3), 'likely'))
         return True
@@ -72,8 +72,8 @@ def _skip_paragraph(para, metadata):  # noqa: C901
     if m:
         return True
     m = re.match(
-            r'This software is freely distributable under the (.*) license.*',
-            para)
+        r'This software is freely distributable under the (.*) license.*',
+        para)
     if m:
         metadata.append(UpstreamDatum('X-License', m.group(1), 'likely'))
         return True
@@ -142,19 +142,33 @@ def _skip_paragraph_block(para, metadata):  # noqa: C901
                     'Repository',
                     'https://github.com/%s' % '/'.join(parsed_url.path.strip('/').split('/')[:2]),
                     'confident'))
-            elif name == 'Build Status':
+            elif name and name.lower() == 'build status':
                 parsed_url = urlparse(c.get('href'))
                 if parsed_url.hostname == 'travis-ci.org':
                     metadata.append(UpstreamDatum(
                         'Repository',
                         'https://github.com/%s' % '/'.join(parsed_url.path.strip('/').split('/')[:2]),
                         'confident'))
+            elif name and name.lower() == 'documentation':
+                metadata.append(UpstreamDatum(
+                    'Documentation', c.get('href'), 'confident'))
+            elif name and name.lower() == 'api docs':
+                metadata.append(UpstreamDatum(
+                    'X-API-Documentation', c.get('href'), 'confident'))
+            elif name and name.lower() == 'downloads':
+                metadata.append(UpstreamDatum(
+                    'X-Download', c.get('href'), 'confident'))
+            elif name and name.lower() == 'crates.io':
+                href = c.get('href')
+                if href.startswith('https://crates.io/crates/'):
+                    metadata.append(UpstreamDatum(
+                        'X-Cargo-Crate', href.rsplit('/')[-1], 'confident'))
             elif name:
                 m = re.match('(.*) License', name)
                 if m:
                     metadata.append(UpstreamDatum('X-License', m.group(1), 'likely'))
                 else:
-                    logging.debug('Unnhandled field %r in README', name)
+                    logging.debug('Unhandled field %r in README', name)
             continue
         break
     else:
@@ -353,6 +367,8 @@ def description_from_readme_md(md_text: str) -> Tuple[Optional[str], Iterable[Up
     except ModuleNotFoundError:
         logger.debug('BeautifulSoup not available, not parsing README.md')
         return None, {}
+    # Strip surrogates
+    html_text = html_text.encode('utf-8', 'replace').decode('utf-8')
     try:
         soup = BeautifulSoup(html_text, 'lxml')
     except FeatureNotFound:

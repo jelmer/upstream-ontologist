@@ -39,7 +39,7 @@ Extensions for upstream-ontologist, not defined in DEP-12:
  * ``X-Copyright``: List of copyright holders
  * ``X-Version``: Current upstream version
  * ``X-Security-MD``: URL to markdown file with security policy
- * ``X-Authors``: List of people who contributed to the project
+ * ``X-Author``: List of people who contributed to the project
  * ``X-Maintainer``: The maintainer of the project
 
 Supported Data Sources
@@ -71,6 +71,7 @@ data sources:
    (debian/watch, debian/control, debian/rules, debian/get-orig-source.sh,
     debian/copyright, debian/patches)
  * Dart's [pubspec.yaml](https://dart.dev/tools/pub/pubspec)
+ * meson.build
 
 It will also scan README and INSTALL for possible upstream repository URLs
 (and will attempt to verify that those match the local repository).
@@ -102,4 +103,7 @@ X-Summary: Python Git Library
 Bug-Submit: https://github.com/dulwich/dulwich/issues/new
 ```
 
-Alternatively, there is a Python API.
+Alternatively, there is a Python API. There are also ``autocodemeta`` and
+``autodoap`` commands that can generate output in the
+[codemeta](https://codemeta.github.io/) and
+[DOAP](https://github.com/ewilderj/doap) formats, respectively.

@@ -1,4 +1,4 @@
 [console_scripts]
+autocodemeta = upstream_ontologist.codemeta:main
 autodoap = upstream_ontologist.doap:main
 guess-upstream-metadata = upstream_ontologist.__main__:main
-
