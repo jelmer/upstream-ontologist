@@ -2944,7 +2944,7 @@ def _extrapolate_security_contact_from_security_md(
     repository_url = upstream_metadata['Repository']
     security_md_path = upstream_metadata['X-Security-MD']
     security_url = browse_url_from_repo_url(
-        repository_url.value, security_md_path.value)
+        repository_url.value, subpath=security_md_path.value)
     if security_url is None:
         return None
     yield UpstreamDatum(

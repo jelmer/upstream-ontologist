@@ -115,7 +115,7 @@ def is_gitlab_site(hostname: str, net_access: bool = False) -> bool:
 
 
 def browse_url_from_repo_url(  # noqa: C901
-        url: str, branch: Optional[str] = None,
+        url: str, *, branch: Optional[str] = None,
         subpath: Optional[str] = None) -> Optional[str]:
     if isinstance(url, list):
         return None
