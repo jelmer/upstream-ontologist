@@ -125,7 +125,7 @@ def browse_url_from_repo_url(  # noqa: C901
         if path.endswith(".git"):
             path = path[:-4]
         if subpath is not None or branch is not None:
-            path += "/tree/%s" % branch or "HEAD"
+            path += "/tree/%s" % (branch or "HEAD")
         if subpath is not None:
             path += "/" + subpath
         return urlunparse(("https", "github.com", path, None, None, None))
