@@ -62,7 +62,7 @@ from urllib.parse import urlparse
 
 SUPPORTED_CERTAINTIES = ["certain", "confident", "likely", "possible", None]
 
-version_string = "0.1.28"
+version_string = "0.1.29"
 
 USER_AGENT = "upstream-ontologist/" + version_string
 # Too aggressive?
