@@ -2372,7 +2372,7 @@ def _sf_git_extract_url(page):
 def guess_from_sf(sf_project: str, subproject: Optional[str] = None):  # noqa: C901
     try:
         data = get_sf_metadata(sf_project)
-    except socket.timeout:
+    except (socket.timeout, TimeoutError):
         logger.warning(
             'timeout contacting sourceforge, ignoring: %s',
             sf_project)
@@ -2449,7 +2449,7 @@ def guess_from_sf(sf_project: str, subproject: Optional[str] = None):  # noqa: C
 def guess_from_repology(repology_project):
     try:
         metadata = get_repology_metadata(repology_project)
-    except socket.timeout:
+    except (socket.timeout, TimeoutError):
         logger.warning(
             'timeout contacting repology, ignoring: %s', repology_project)
         return
@@ -3159,7 +3159,7 @@ def check_url_canonical(url: str) -> str:
         if e.code == 429:
             raise UrlUnverifiable(url, "rate-by")
         raise
-    except socket.timeout:
+    except (socket.timeout, TimeoutError):
         raise UrlUnverifiable(url, 'timeout contacting')
     else:
         return resp.geturl()
@@ -3327,7 +3327,7 @@ def guess_from_pecl_url(url):
         if e.code != 404:
             raise
         return
-    except socket.timeout:
+    except (socket.timeout, TimeoutError):
         logger.warning('timeout contacting pecl, ignoring: %s', url)
         return
     try:
@@ -3449,7 +3449,7 @@ def guess_from_aur(package: str):
             if e.code != 404:
                 raise
             continue
-        except socket.timeout:
+        except (socket.timeout, TimeoutError):
             logger.warning('timeout contacting aur, ignoring: %s', url)
             continue
         else:
@@ -3508,7 +3508,7 @@ def guess_from_launchpad(package, distribution=None, suite=None):  # noqa: C901
         if e.code != 404:
             raise
         return
-    except socket.timeout:
+    except (socket.timeout, TimeoutError):
         logger.warning('timeout contacting launchpad, ignoring')
         return
 
