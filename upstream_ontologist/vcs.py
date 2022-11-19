@@ -51,6 +51,9 @@ KNOWN_HOSTING_SITES = [
     'code.launchpad.net', 'github.com', 'launchpad.net', 'git.openstack.org']
 
 
+logger = logging.getLogger(__name__)
+
+
 def plausible_browse_url(url: str) -> bool:
     return url.startswith("https://") or url.startswith("http://")
 
@@ -646,7 +649,7 @@ def check_repository_url_canonical(
                     url, "API URL %s does not exist" % api_url)
             elif e.code == 403:
                 # Probably rate limited
-                logging.warning(
+                logger.warning(
                     'Unable to verify bug database URL %s: %s',
                     url, e.reason)
                 raise UrlUnverifiable(url, "GitHub URL rate-limited")
@@ -697,7 +700,7 @@ def probe_upstream_branch_url(
             if e.code == 404:
                 return False
             elif e.code == 403:
-                logging.warning('Rate-limited by GitHub')
+                logger.warning('Rate-limited by GitHub')
                 return None
             else:
                 raise
@@ -728,7 +731,7 @@ def probe_upstream_branch_url(
             else:
                 return True
         except Exception as e:
-            logging.debug(
+            logger.debug(
                 'Error accessing %s: %s', url, e)
             # TODO(jelmer): Catch more specific exceptions?
             return False
