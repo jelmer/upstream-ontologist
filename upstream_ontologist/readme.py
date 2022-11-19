@@ -168,7 +168,7 @@ def _skip_paragraph_block(para, metadata):  # noqa: C901
                 if m:
                     metadata.append(UpstreamDatum('X-License', m.group(1), 'likely'))
                 else:
-                    logging.debug('Unhandled field %r in README', name)
+                    logger.debug('Unhandled field %r in README', name)
             continue
         break
     else:
@@ -343,12 +343,12 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[Upstream
     paragraphs.extend(_extract_paragraphs(soup.children, metadata))
 
     if len(paragraphs) == 0:
-        logging.debug('Empty description; no paragraphs.')
+        logger.debug('Empty description; no paragraphs.')
         return None, metadata
 
     if len(paragraphs) < 6:
         return '\n'.join(paragraphs), metadata
-    logging.debug(
+    logger.debug(
         'Not returning description, number of paragraphs too high: %d',
         len(paragraphs))
     return None, metadata

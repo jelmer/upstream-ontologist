@@ -353,9 +353,9 @@ def guess_from_debian_changelog(path, trust_package):
     # Find the ITP
     itp = None
     for change in cl[-1].changes():
-        m = re.match(r'  * Initial Release\..*Closes: \#([0-9]+).*', change)
+        m = re.match(r'[\s\*]*Initial Release.*Closes: \#([0-9]+).*', change, re.I)
         if m:
-            itp = int(m.group(0))
+            itp = int(m.group(1))
     if itp:
         yield UpstreamDatum('X-Debian-ITP', str(itp), 'certain')
         try:
@@ -365,12 +365,13 @@ def guess_from_debian_changelog(path, trust_package):
         else:
             import pysimplesoap
 
+            logger.debug('Retrieving Debian bug %d', itp)
             try:
                 orig = debianbts.get_bug_log(itp)[0]
             except pysimplesoap.client.SoapFault as e:
                 logger.warning('Unable to get info about %d: %s' % (itp, e))
             else:
-                yield from metadata_from_itp_bug_body(orig['message']['body'])
+                yield from metadata_from_itp_bug_body(orig['body'])
 
 
 def metadata_from_itp_bug_body(body):
@@ -399,8 +400,16 @@ def metadata_from_itp_bug_body(body):
             yield UpstreamDatum('X-License', value, 'confident')
         elif key == 'Description':
             yield UpstreamDatum('X-Summary', value, 'confident')
+        else:
+            logger.debug(f'Unknown pseudo-header {key} in ITP bug body')
 
-    yield UpstreamDatum('X-Description', '\n'.join(line_iter), 'likely')
+    rest = []
+    for line in line_iter:
+        if line.strip() == '-- System Information:':
+            break
+        rest.append(line)
+
+    yield UpstreamDatum('X-Description', '\n'.join(rest), 'likely')
 
 
 def guess_from_python_metadata(pkg_info):
