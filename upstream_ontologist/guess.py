@@ -332,6 +332,7 @@ def guess_from_debian_changelog(path, trust_package):
     with open(path, 'rb') as f:
         cl = Changelog(f)
     source = cl.package
+    yield UpstreamDatum('Name', cl.package, 'confident')
     if source.startswith('rust-'):
         try:
             from toml.decoder import load as load_toml
@@ -348,6 +349,58 @@ def guess_from_debian_changelog(path, trust_package):
             crate = cargo_translate_dashes(crate)
         yield UpstreamDatum('Archive', 'crates.io', 'certain')
         yield UpstreamDatum('X-Cargo-Crate', crate, 'certain')
+
+    # Find the ITP
+    itp = None
+    for change in cl[-1].changes():
+        m = re.match(r'  * Initial Release\..*Closes: \#([0-9]+).*', change)
+        if m:
+            itp = int(m.group(0))
+    if itp:
+        yield UpstreamDatum('X-Debian-ITP', str(itp), 'certain')
+        try:
+            import debianbts
+        except ModuleNotFoundError:
+            return
+        else:
+            import pysimplesoap
+
+            try:
+                orig = debianbts.get_bug_log(itp)[0]
+            except pysimplesoap.client.SoapFault as e:
+                logger.warning('Unable to get info about %d: %s' % (itp, e))
+            else:
+                yield from metadata_from_itp_bug_body(orig['message']['body'])
+
+
+def metadata_from_itp_bug_body(body):
+    line_iter = iter(body.splitlines(False))
+    # Skip first few lines with bug metadata (severity, owner, etc)
+    while next(line_iter).strip():
+        pass
+
+    for line in line_iter:
+        line = line.lstrip().lstrip('*').lstrip()
+        if line == '':
+            break
+        key, value = line.split(':', 1)
+        key = key.strip()
+        value = value.strip()
+        if key == 'Package name':
+            yield UpstreamDatum('Name', value, 'confident')
+        elif key == 'Version':
+            # This data is almost certainly for an older version
+            yield UpstreamDatum('X-Version', value, 'possible')
+        elif key == 'Upstream Author':
+            yield UpstreamDatum('X-Author', [value], 'confident')
+        elif key == 'URL':
+            yield UpstreamDatum('Homepage', value, 'confident')
+        elif key == 'License':
+            yield UpstreamDatum('X-License', value, 'confident')
+        elif key == 'Description':
+            yield UpstreamDatum('X-Summary', value, 'confident')
+
+    yield UpstreamDatum('X-Description', '\n'.join(line_iter), 'likely')
 
 
 def guess_from_python_metadata(pkg_info):
