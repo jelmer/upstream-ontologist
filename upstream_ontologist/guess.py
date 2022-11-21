@@ -1742,14 +1742,16 @@ def guess_from_configure(path, trust_package=False):
             if key == b'PACKAGE_NAME':
                 yield UpstreamDatum(
                     'Name', value.decode(), 'certain', './configure')
+            elif key == b'PACKAGE_TARNAME':
+                yield UpstreamDatum(
+                    'Name', value.decode(), 'certain', './configure')
             elif key == b'PACKAGE_VERSION':
                 yield UpstreamDatum(
                     'X-Version', value.decode(), 'certain', './configure')
             elif key == b'PACKAGE_BUGREPORT':
                 if value in (b'BUG-REPORT-ADDRESS', ):
                     certainty = 'invalid'
-                elif (is_email_address(value.decode())
-                        and not value.endswith(b'gnu.org')):
+                elif is_email_address(value.decode()):
                     # Downgrade the trustworthiness of this field for most
                     # upstreams if it contains an e-mail address. Most
                     # upstreams seem to just set this to some random address,
