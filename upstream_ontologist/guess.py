@@ -145,6 +145,8 @@ def known_bad_guess(datum):  # noqa: C901
             return True
         if parsed_url.hostname == 'bugs.freedesktop.org':
             return True
+        if parsed_url.path.endswith('/sign_in'):
+            return True
     if datum.field == 'Repository':
         if '${' in datum.value:
             return True
@@ -164,6 +166,8 @@ def known_bad_guess(datum):  # noqa: C901
             return True
         parsed_url = urlparse(datum.value)
         if parsed_url.hostname == 'cgit.kde.org':
+            return True
+        if parsed_url.path.endswith('/sign_in'):
             return True
     if datum.field == 'Name':
         if datum.value.lower() == 'package':
