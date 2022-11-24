@@ -79,7 +79,7 @@ class Person:
     def __init__(self, name, email=None, url=None):
         self.name = name
         self.email = email
-        if url.startswith('mailto:'):
+        if url and url.startswith('mailto:'):
             self.email = url[len('mailto:'):]
             self.url = None
         else:
