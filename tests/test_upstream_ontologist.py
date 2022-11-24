@@ -57,7 +57,7 @@ class GuessFromDebianWatchTests(TestCaseInTempDir):
     def setUp(self):
         super(GuessFromDebianWatchTests, self).setUp()
         try:
-            import pcre
+            import pcre  # noqa: F401
         except ModuleNotFoundError:
             self.skipTest('pcre not available')
 
