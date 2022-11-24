@@ -32,6 +32,13 @@ jobs:
           python -m pip install -e \
             '.[readme,cargo,pyproject,debian_watch,debian_rules,setup.cfg]'
           python setup.py develop
+        if: "matrix.os == 'ubuntu-latest'"
+      - name: Install dependencies
+        run: |
+          python -m pip install -e \
+            '.[readme,cargo,pyproject,setup.cfg]'
+          python setup.py develop
+        if: "matrix.os == 'macos-latest'"
       - name: Install breezy
         run: |
           python -m pip install breezy
