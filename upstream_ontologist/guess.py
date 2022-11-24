@@ -396,7 +396,7 @@ def metadata_from_itp_bug_body(body):
         elif key == 'Version':
             # This data is almost certainly for an older version
             yield UpstreamDatum('X-Version', value, 'possible')
-        elif key == 'Upstream Author':
+        elif key == 'Upstream Author' and value:
             yield UpstreamDatum('X-Author', [value], 'confident')
         elif key == 'URL':
             yield UpstreamDatum('Homepage', value, 'confident')
@@ -1530,7 +1530,9 @@ def guess_from_doap(path, trust_package):  # noqa: C901
                 name = person.find('{http://xmlns.com/foaf/0.1/}name').text
                 email_tag = person.find('{http://xmlns.com/foaf/0.1/}mbox')
                 maintainer = Person(
-                    name, email_tag.text if email_tag is not None else None)
+                    name,
+                    email=(email_tag.text if email_tag is not None else None),
+                    url=(extract_url(email_tag) if email_tag is not None else None))
                 yield UpstreamDatum('X-Maintainer', maintainer, 'certain')
         elif child.tag == '{%s}mailing-list' % DOAP_NAMESPACE:
             yield UpstreamDatum('X-MailingList', extract_url(child), 'certain')

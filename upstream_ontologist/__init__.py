@@ -76,6 +76,15 @@ class Person:
     email: Optional[str] = None
     url: Optional[str] = None
 
+    def __init__(self, name, email=None, url=None):
+        self.name = name
+        self.email = email
+        if url.startswith('mailto:'):
+            self.email = url[len('mailto:'):]
+            self.url = None
+        else:
+            self.url = url
+
     @classmethod
     def from_string(cls, text):
         text = text.replace(' at ', '@')
