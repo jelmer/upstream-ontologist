@@ -270,8 +270,13 @@ def guess_from_debian_watch(path, trust_package):
         warn_missing_dependency(path, e.name)
         return
 
-    def get_package_name():
+    try:
         from debian.deb822 import Deb822
+    except ModuleNotFoundError as e:
+        warn_missing_dependency(path, e.name)
+        return
+
+    def get_package_name():
         with open(os.path.join(os.path.dirname(path), 'control'), 'r') as f:
             return Deb822(f)['Source']
     with open(path, 'r') as f:
@@ -312,8 +317,12 @@ def guess_from_debian_watch(path, trust_package):
 
 
 def guess_from_debian_control(path, trust_package):
-    with open(path, 'r') as f:
+    try:
         from debian.deb822 import Deb822
+    except ModuleNotFoundError as e:
+        warn_missing_dependency(path, e.name)
+        return
+    with open(path, 'r') as f:
         control = Deb822(f)
     if 'Homepage' in control:
         yield UpstreamDatum('Homepage', control['Homepage'], 'certain')
@@ -332,7 +341,11 @@ def guess_from_debian_control(path, trust_package):
 
 
 def guess_from_debian_changelog(path, trust_package):
-    from debian.changelog import Changelog
+    try:
+        from debian.changelog import Changelog
+    except ModuleNotFoundError as e:
+        warn_missing_dependency(path, e.name)
+        return
     with open(path, 'rb') as f:
         cl = Changelog(f)
     source = cl.package
@@ -364,7 +377,8 @@ def guess_from_debian_changelog(path, trust_package):
         yield UpstreamDatum('X-Debian-ITP', str(itp), 'certain')
         try:
             import debianbts
-        except ModuleNotFoundError:
+        except ModuleNotFoundError as e:
+            warn_missing_dependency(path, e.name)
             return
         else:
             import pysimplesoap
@@ -908,11 +922,15 @@ def guess_from_dist_ini(path, trust_package):
 
 
 def guess_from_debian_copyright(path, trust_package):  # noqa: C901
-    from debian.copyright import (
-        Copyright,
-        NotMachineReadableError,
-        MachineReadableFormatError,
-    )
+    try:
+        from debian.copyright import (
+            Copyright,
+            NotMachineReadableError,
+            MachineReadableFormatError,
+        )
+    except ModuleNotFoundError as e:
+        warn_missing_dependency(path, e.name)
+        return
     from_urls = []
     with open(path, 'r') as f:
         try:
