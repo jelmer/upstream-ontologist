@@ -388,6 +388,9 @@ def guess_from_debian_changelog(path, trust_package):
                 orig = debianbts.get_bug_log(itp)[0]
             except pysimplesoap.client.SoapFault as e:
                 logger.warning('Unable to get info about %d: %s' % (itp, e))
+            except (TypeError, ValueError):
+                # Almost certainly a broken pysimplesoap bug :(
+                logger.exception('Error getting bug log')
             else:
                 yield from metadata_from_itp_bug_body(orig['body'])
 
