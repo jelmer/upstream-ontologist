@@ -328,7 +328,10 @@ def find_public_repo_url(repo_url: str) -> Optional[str]:
 
 
 def fixup_rcp_style_git_repo_url(url: str) -> str:
-    from breezy.location import rcp_location_to_url
+    try:
+        from breezy.location import rcp_location_to_url
+    except ModuleNotFoundError:
+        return url
 
     try:
         repo_url = rcp_location_to_url(url)
