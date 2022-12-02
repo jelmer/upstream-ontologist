@@ -316,6 +316,11 @@ def guess_from_debian_watch(path, trust_package):
                     "X-Hackage-Package", m.group(1), "certain", origin=path)
 
 
+def debian_is_native(path):
+    with open(os.path.join(path, "source/format"), "r") as f:
+        return (f.read().strip() == "3.0 (native)")
+
+
 def guess_from_debian_control(path, trust_package):
     try:
         from debian.deb822 import Deb822
@@ -323,22 +328,38 @@ def guess_from_debian_control(path, trust_package):
         warn_missing_dependency(path, e.name)
         return
     with open(path, 'r') as f:
-        control = Deb822(f)
-    if 'Homepage' in control:
-        yield UpstreamDatum('Homepage', control['Homepage'], 'certain')
-    if 'XS-Go-Import-Path' in control:
-        yield (
-            UpstreamDatum(
-                'Repository',
-                'https://' + control['XS-Go-Import-Path'],
-                'likely'))
-    if 'Description' in control:
-        yield UpstreamDatum(
-            'X-Summary', control['Description'].splitlines(False)[0], 'certain')
-        yield UpstreamDatum(
-            'X-Description',
-            ''.join(control['Description'].splitlines(True)[1:]), 'certain')
-
+        source = Deb822(f)
+        is_native = debian_is_native(os.path.dirname(path))
+        if 'Homepage' in source:
+            yield UpstreamDatum('Homepage', source['Homepage'], 'certain')
+        if 'XS-Go-Import-Path' in source:
+            yield (
+                UpstreamDatum(
+                    'Repository',
+                    'https://' + source['XS-Go-Import-Path'],
+                    'likely'))
+        if is_native:
+            if 'Vcs-Git' in source:
+                yield UpstreamDatum('Repository', source['Vcs-Git'], 'certain')
+            if 'Vcs-Browse' in source:
+                yield UpstreamDatum('Repository-Browse', source['Vcs-Browse'], 'certain')
+        other_paras = list(Deb822.iter_paragraphs(f))
+        if len(other_paras) == 1 and is_native:
+            certainty = "certain"
+        elif len(other_paras) > 1 and is_native:
+            certainty = "possible"
+        elif len(other_paras) == 1 and not is_native:
+            certainty = "confident"
+        else:
+            certainty = "likely"
+        for para in other_paras:
+            if 'Description' in para:
+                yield UpstreamDatum(
+                    'X-Summary', para['Description'].splitlines(False)[0], certainty)
+                yield UpstreamDatum(
+                    'X-Description',
+                    ''.join(para['Description'].splitlines(True)[1:]), certainty)
+        
 
 def guess_from_debian_changelog(path, trust_package):
     try:
@@ -350,6 +371,7 @@ def guess_from_debian_changelog(path, trust_package):
         cl = Changelog(f)
     source = cl.package
     yield UpstreamDatum('Name', cl.package, 'confident')
+    yield UpstreamDatum('X-Version', cl.version.upstream_version, 'confident')
     if source.startswith('rust-'):
         try:
             from toml.decoder import load as load_toml
@@ -976,6 +998,12 @@ def guess_from_debian_copyright(path, trust_package):  # noqa: C901
                 [m.group(0)
                  for m in
                  re.finditer(r'((http|https):\/\/([^ ]+))', header.source)])
+        referenced_licenses = set()
+        for para in copyright.all_paragraphs():
+            if para.license:
+                referenced_licenses.add(para.license.synopsis)
+        if len(referenced_licenses) == 1 and referenced_licenses != set([None]):
+            yield UpstreamDatum('X-License', referenced_licenses.pop(), 'certain')
     else:
         with open(path, 'r') as f:
             for line in f:
