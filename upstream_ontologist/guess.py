@@ -2706,7 +2706,7 @@ def extend_from_pecl(upstream_metadata, pecl_url, certainty):
 def extend_from_lp(upstream_metadata, minimum_certainty, package,
                    distribution=None, suite=None):
     # The set of fields that Launchpad can possibly provide:
-    lp_fields = ['Homepage', 'Repository', 'Name']
+    lp_fields = ['Homepage', 'Repository', 'Name', 'X-Download']
     lp_certainty = 'possible'
 
     if certainty_sufficient(lp_certainty, minimum_certainty):
@@ -3629,6 +3629,8 @@ def guess_from_launchpad(package, distribution=None, suite=None):  # noqa: C901
         yield ('X-Wiki', project_data['wiki_url'])
     if project_data.get('summary'):
         yield ('X-Summary', project_data['summary'])
+    if project_data.get('download_url'):
+        yield ('X-Download', project_data['download_url'])
     if project_data['vcs'] == 'Bazaar':
         branch_link = productseries_data.get('branch_link')
         if branch_link:
