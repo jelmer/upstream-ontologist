@@ -398,10 +398,20 @@ def guess_from_debian_changelog(path, trust_package):
 def metadata_from_itp_bug_body(body):
     line_iter = iter(body.splitlines(False))
     # Skip first few lines with bug metadata (severity, owner, etc)
-    while next(line_iter).strip():
-        pass
+    line = next(line_iter)
+    while line.strip():
+        try:
+            line = next(line_iter)
+        except StopIteration:
+            return
 
-    for line in line_iter:
+    while line == '':
+        try:
+            line = next(line_iter)
+        except StopIteration:
+            return
+
+    while line:
         line = line.lstrip().lstrip('*').lstrip()
         if line == '':
             break
@@ -423,6 +433,7 @@ def metadata_from_itp_bug_body(body):
             yield UpstreamDatum('X-Summary', value, 'confident')
         else:
             logger.debug(f'Unknown pseudo-header {key} in ITP bug body')
+        line = next(line_iter)
 
     rest = []
     for line in line_iter:
