@@ -505,13 +505,7 @@ def convert_cvs_list_to_str(urls):
     if not isinstance(urls, list):
         return urls
     if urls[0].startswith(":extssh:") or urls[0].startswith(":pserver:"):
-        try:
-            from breezy.location import cvs_to_url
-        except ImportError:
-            from breezy.location import pserver_to_url as cvs_to_url
-
-            if urls[0].startswith(":extssh:"):
-                raise NotImplementedError("unable to deal with extssh CVS locations.")
+        from breezy.location import cvs_to_url
         return cvs_to_url(urls[0]) + "#" + urls[1]
     return urls
 
@@ -649,13 +643,13 @@ def check_repository_url_canonical(
         except urllib.error.HTTPError as e:
             if e.code == 404:
                 raise InvalidUrl(
-                    url, "API URL %s does not exist" % api_url)
+                    url, "API URL %s does not exist" % api_url) from e
             elif e.code == 403:
                 # Probably rate limited
                 logger.warning(
                     'Unable to verify bug database URL %s: %s',
                     url, e.reason)
-                raise UrlUnverifiable(url, "GitHub URL rate-limited")
+                raise UrlUnverifiable(url, "GitHub URL rate-limited") from e
             else:
                 raise
         else:

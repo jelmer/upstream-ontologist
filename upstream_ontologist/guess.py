@@ -78,7 +78,7 @@ def get_sf_metadata(project):
     except urllib.error.HTTPError as e:
         if e.code != 404:
             raise
-        raise NoSuchSourceForgeProject(project)
+        raise NoSuchSourceForgeProject(project) from e
 
 
 class NoSuchRepologyProject(Exception):
@@ -95,7 +95,7 @@ def get_repology_metadata(srcname, repo='debian_unstable'):
     except urllib.error.HTTPError as e:
         if e.code != 404:
             raise
-        raise NoSuchRepologyProject(srcname)
+        raise NoSuchRepologyProject(srcname) from e
 
 
 DATUM_TYPES = {
@@ -117,7 +117,7 @@ DATUM_TYPES = {
     'X-Pecl-URL': str,
     'Screenshots': list,
     'Contact': str,
-    'X-Author': list,
+    'X-Author': list[Person],
     'X-Security-MD': str,
     'X-Maintainer': Person,
     'X-Cargo-Crate': str,
@@ -2659,7 +2659,7 @@ def guess_from_hackage(hackage_package):
             timeout=DEFAULT_URLLIB_TIMEOUT).read()
     except urllib.error.HTTPError as e:
         if e.code == 404:
-            raise NoSuchHackagePackage(hackage_package)
+            raise NoSuchHackagePackage(hackage_package) from e
         raise
     return guess_from_cabal_lines(
         http_contents.decode('utf-8', 'surrogateescape').splitlines(True))
@@ -2914,13 +2914,13 @@ def check_bug_database_canonical(url: str) -> str:
             data = _load_json_url(api_url)
         except urllib.error.HTTPError as e:
             if e.code == 404:
-                raise InvalidUrl(url, "Project does not exist")
+                raise InvalidUrl(url, "Project does not exist") from e
             if e.code == 403:
                 # Probably rate limited
                 logger.warning(
                     'Unable to verify bug database URL %s: %s',
                     url, e.reason)
-                raise UrlUnverifiable(url, "rate-limited by GitHub API")
+                raise UrlUnverifiable(url, "rate-limited by GitHub API") from e
             raise
         if not data['has_issues']:
             raise InvalidUrl(
@@ -2938,7 +2938,7 @@ def check_bug_database_canonical(url: str) -> str:
             data = _load_json_url(api_url)
         except urllib.error.HTTPError as e:
             if e.code == 404:
-                raise InvalidUrl(url, "Project does not exist")
+                raise InvalidUrl(url, "Project does not exist") from e
             raise
         # issues_enabled is only provided when the user is authenticated,
         # so if we're not then we just fall back to checking the canonical URL
@@ -3076,8 +3076,8 @@ def _extrapolate_security_contact_from_security_md(
     security_url = browse_url_from_repo_url(
         repository_url.value, subpath=security_md_path.value)
     if security_url is None:
-        return None
-    yield UpstreamDatum(
+        return
+    yield UpstreamDatum(   # noqa: B901
         'Security-Contact', security_url,
         certainty=min_certainty(
             [repository_url.certainty, security_md_path.certainty]),
@@ -3285,12 +3285,12 @@ def check_url_canonical(url: str) -> str:
             timeout=DEFAULT_URLLIB_TIMEOUT)
     except urllib.error.HTTPError as e:
         if e.code == 404:
-            raise InvalidUrl(url, "url not found")
+            raise InvalidUrl(url, "url not found") from e
         if e.code == 429:
-            raise UrlUnverifiable(url, "rate-by")
+            raise UrlUnverifiable(url, "rate-by") from e
         raise
-    except (socket.timeout, TimeoutError):
-        raise UrlUnverifiable(url, 'timeout contacting')
+    except (socket.timeout, TimeoutError) as e:
+        raise UrlUnverifiable(url, 'timeout contacting') from e
     else:
         return resp.geturl()
 
@@ -3386,8 +3386,7 @@ def check_upstream_metadata(  # noqa: C901
     if screenshots and screenshots.certainty == 'likely':
         newvalue = []
         screenshots.certainty = 'certain'
-        for i, (url, status) in enumerate(verify_screenshots(
-                screenshots.value)):
+        for url, status in verify_screenshots(screenshots.value):
             if status is True:
                 newvalue.append(url)
             elif status is False:
