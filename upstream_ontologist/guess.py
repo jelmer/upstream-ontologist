@@ -117,7 +117,7 @@ DATUM_TYPES = {
     'X-Pecl-URL': str,
     'Screenshots': list,
     'Contact': str,
-    'X-Author': list[Person],
+    'X-Author': List[Person],
     'X-Security-MD': str,
     'X-Maintainer': Person,
     'X-Cargo-Crate': str,
