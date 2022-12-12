@@ -1651,7 +1651,7 @@ def guess_from_opam(path, trust_package=False):
                 yield UpstreamDatum('X-License', value, 'confident')
             elif key == 'homepage':
                 yield UpstreamDatum('Homepage', value, 'confident')
-            elif key == 'dev-repo':
+            elif key in ('dev-repo', 'repository'):
                 yield UpstreamDatum('Repository', value, 'confident')
             elif key == 'bug-reports':
                 yield UpstreamDatum('Bug-Database', value, 'confident')
