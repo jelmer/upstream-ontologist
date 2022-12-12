@@ -185,8 +185,8 @@ def confidence_to_certainty(confidence: Optional[int]) -> str:
         return "unknown"
     try:
         return SUPPORTED_CERTAINTIES[confidence] or "unknown"
-    except IndexError:
-        raise ValueError(confidence)
+    except IndexError as e:
+        raise ValueError(confidence) from e
 
 
 def certainty_sufficient(
