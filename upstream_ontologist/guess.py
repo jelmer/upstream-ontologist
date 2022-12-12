@@ -1954,6 +1954,9 @@ def guess_from_cargo(path, trust_package):
             yield UpstreamDatum('Repository', str(package['repository']), 'certain')
         if 'version' in package:
             yield UpstreamDatum('X-Version', str(package['version']), 'confident')
+        if 'authors' in package:
+            yield UpstreamDatum(
+                'X-Author', [Person.from_string(author) for author in package['authors']], 'confident')
 
 
 def guess_from_pyproject_toml(path, trust_package):
