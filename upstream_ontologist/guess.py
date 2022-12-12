@@ -119,6 +119,7 @@ DATUM_TYPES = {
     'Contact': str,
     'X-Author': list,
     'X-Security-MD': str,
+    # TODO(jelmer): Allow multiple maintainers?
     'X-Maintainer': Person,
     'X-Cargo-Crate': str,
     'X-API-Documentation': str,
@@ -1513,6 +1514,7 @@ def guess_from_doap(path, trust_package):  # noqa: C901
         return el.attrib.get('{http://www.w3.org/XML/1998/namespace}lang')
 
     screenshots = []
+    maintainers = []
 
     for child in root:
         if child.tag == ('{%s}name' % DOAP_NAMESPACE) and child.text:
@@ -1593,11 +1595,19 @@ def guess_from_doap(path, trust_package):  # noqa: C901
                     name,
                     email=(email_tag.text if email_tag is not None else None),
                     url=(extract_url(email_tag) if email_tag is not None else None))
-                yield UpstreamDatum('X-Maintainer', maintainer, 'certain')
+                maintainers.append(maintainer)
         elif child.tag == '{%s}mailing-list' % DOAP_NAMESPACE:
             yield UpstreamDatum('X-MailingList', extract_url(child), 'certain')
         else:
             logger.warning('Unknown tag %s in DOAP file', child.tag)
+
+    # TODO(jelmer): Allow multiple maintainers
+    # yield UpstreamDatum('X-Maintainer', maintainers, 'possible')
+    if len(maintainers) == 1:
+        yield UpstreamDatum('X-Maintainer', maintainers[0], 'certain')
+    else:
+        for maintainer in maintainers:
+            yield UpstreamDatum('X-Maintainer', maintainer, 'possible')
 
 
 def _yield_opam_fields(f):
