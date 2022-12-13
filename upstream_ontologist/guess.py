@@ -1661,7 +1661,7 @@ def guess_from_opam(path, trust_package=False):
                 yield UpstreamDatum('X-License', value, 'confident')
             elif key == 'homepage':
                 yield UpstreamDatum('Homepage', value, 'confident')
-            elif key == 'dev-repo':
+            elif key in ('dev-repo', 'repository'):
                 yield UpstreamDatum('Repository', value, 'confident')
             elif key == 'bug-reports':
                 yield UpstreamDatum('Bug-Database', value, 'confident')
@@ -1964,6 +1964,9 @@ def guess_from_cargo(path, trust_package):
             yield UpstreamDatum('Repository', str(package['repository']), 'certain')
         if 'version' in package:
             yield UpstreamDatum('X-Version', str(package['version']), 'confident')
+        if 'authors' in package:
+            yield UpstreamDatum(
+                'X-Author', [Person.from_string(author) for author in package['authors']], 'confident')
 
 
 def guess_from_pyproject_toml(path, trust_package):
