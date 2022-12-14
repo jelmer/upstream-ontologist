@@ -117,7 +117,7 @@ DATUM_TYPES = {
     'X-Pecl-URL': str,
     'Screenshots': list,
     'Contact': str,
-    'X-Author': List[Person],
+    'X-Author': list,
     'X-Security-MD': str,
     # TODO(jelmer): Allow multiple maintainers?
     'X-Maintainer': Person,
