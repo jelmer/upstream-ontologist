@@ -418,7 +418,7 @@ def guess_from_debian_changelog(path, trust_package):
                 yield from metadata_from_itp_bug_body(orig['body'])
 
 
-def metadata_from_itp_bug_body(body):
+def metadata_from_itp_bug_body(body):  # noqa: C901
     line_iter = iter(body.splitlines(False))
     # Skip first few lines with bug metadata (severity, owner, etc)
     line = next(line_iter)
@@ -438,24 +438,28 @@ def metadata_from_itp_bug_body(body):
         line = line.lstrip().lstrip('*').lstrip()
         if line == '':
             break
-        key, value = line.split(':', 1)
-        key = key.strip()
-        value = value.strip()
-        if key == 'Package name':
-            yield UpstreamDatum('Name', value, 'confident')
-        elif key == 'Version':
-            # This data is almost certainly for an older version
-            yield UpstreamDatum('X-Version', value, 'possible')
-        elif key == 'Upstream Author' and value:
-            yield UpstreamDatum('X-Author', [value], 'confident')
-        elif key == 'URL':
-            yield UpstreamDatum('Homepage', value, 'confident')
-        elif key == 'License':
-            yield UpstreamDatum('X-License', value, 'confident')
-        elif key == 'Description':
-            yield UpstreamDatum('X-Summary', value, 'confident')
+        try:
+            key, value = line.split(':', 1)
+        except ValueError:
+            logger.debug('Ignoring non-semi-field line %r', line)
         else:
-            logger.debug(f'Unknown pseudo-header {key} in ITP bug body')
+            key = key.strip()
+            value = value.strip()
+            if key == 'Package name':
+                yield UpstreamDatum('Name', value, 'confident')
+            elif key == 'Version':
+                # This data is almost certainly for an older version
+                yield UpstreamDatum('X-Version', value, 'possible')
+            elif key == 'Upstream Author' and value:
+                yield UpstreamDatum('X-Author', [value], 'confident')
+            elif key == 'URL':
+                yield UpstreamDatum('Homepage', value, 'confident')
+            elif key == 'License':
+                yield UpstreamDatum('X-License', value, 'confident')
+            elif key == 'Description':
+                yield UpstreamDatum('X-Summary', value, 'confident')
+            else:
+                logger.debug(f'Unknown pseudo-header {key} in ITP bug body')
         line = next(line_iter)
 
     rest = []
