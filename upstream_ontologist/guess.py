@@ -126,6 +126,12 @@ DATUM_TYPES = {
 }
 
 
+def known_bad_url(value):
+    if '${' in value:
+        return True
+    return False
+
+
 def known_bad_guess(datum):  # noqa: C901
     try:
         expected_type = DATUM_TYPES[datum.field]
@@ -141,6 +147,8 @@ def known_bad_guess(datum):  # noqa: C901
             datum.value, datum.field)
         return True
     if datum.field in ('Bug-Submit', 'Bug-Database'):
+        if known_bad_url(datum.value):
+            return True
         parsed_url = urlparse(datum.value)
         if parsed_url.hostname == 'bugzilla.gnome.org':
             return True
@@ -149,7 +157,7 @@ def known_bad_guess(datum):  # noqa: C901
         if parsed_url.path.endswith('/sign_in'):
             return True
     if datum.field == 'Repository':
-        if '${' in datum.value:
+        if known_bad_url(datum.value):
             return True
         parsed_url = urlparse(datum.value)
         if parsed_url.hostname == 'anongit.kde.org':
@@ -163,13 +171,19 @@ def known_bad_guess(datum):  # noqa: C901
         if parsed_url.hostname in ('pypi.org', 'rubygems.org'):
             return True
     if datum.field == 'Repository-Browse':
-        if '${' in datum.value:
+        if known_bad_url(datum.value):
             return True
         parsed_url = urlparse(datum.value)
         if parsed_url.hostname == 'cgit.kde.org':
             return True
         if parsed_url.path.endswith('/sign_in'):
             return True
+    if datum.field == 'X-Author':
+        for value in datum.value:
+            if 'Maintainer' in value.name:
+                return True
+            if 'Contributor' in value.name:
+                return True
     if datum.field == 'Name':
         if datum.value.lower() == 'package':
             return True
@@ -355,11 +369,21 @@ def guess_from_debian_control(path, trust_package):
             certainty = "likely"
         for para in other_paras:
             if 'Description' in para:
+                lines = para['Description'].splitlines(True)
+                summary = lines[0].rstrip('\n')
+                description_lines = [
+                    ('\n' if line == ' .\n' else line[1:]) for line in lines[1:]]
+                if description_lines[-1].startswith('This package contains '):
+                    if ' - ' in summary:
+                        summary = summary.rsplit(' - ', 1)[0]
+                    del description_lines[-1]
+                if not description_lines[-1].strip():
+                    del description_lines[-1]
                 yield UpstreamDatum(
-                    'X-Summary', para['Description'].splitlines(False)[0], certainty)
+                    'X-Summary', summary, certainty)
                 yield UpstreamDatum(
                     'X-Description',
-                    ''.join(para['Description'].splitlines(True)[1:]), certainty)
+                    ''.join(description_lines), certainty)
         
 
 def guess_from_debian_changelog(path, trust_package):
