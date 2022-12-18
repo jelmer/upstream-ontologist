@@ -418,7 +418,7 @@ def guess_from_debian_changelog(path, trust_package):
                 yield from metadata_from_itp_bug_body(orig['body'])
 
 
-def metadata_from_itp_bug_body(body):
+def metadata_from_itp_bug_body(body):  # noqa: C901
     line_iter = iter(body.splitlines(False))
     # Skip first few lines with bug metadata (severity, owner, etc)
     line = next(line_iter)
