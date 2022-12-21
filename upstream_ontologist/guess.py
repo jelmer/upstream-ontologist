@@ -373,11 +373,12 @@ def guess_from_debian_control(path, trust_package):
                 summary = lines[0].rstrip('\n')
                 description_lines = [
                     ('\n' if line == ' .\n' else line[1:]) for line in lines[1:]]
-                if description_lines[-1].startswith('This package contains '):
+                if (description_lines
+                        and description_lines[-1].startswith('This package contains ')):
                     if ' - ' in summary:
                         summary = summary.rsplit(' - ', 1)[0]
                     del description_lines[-1]
-                if not description_lines[-1].strip():
+                if description_lines and not description_lines[-1].strip():
                     del description_lines[-1]
                 yield UpstreamDatum(
                     'X-Summary', summary, certainty)
