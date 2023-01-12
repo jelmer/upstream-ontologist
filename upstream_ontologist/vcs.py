@@ -75,9 +75,9 @@ def unsplit_vcs_url(
     """
     url = repo_url
     if branch:
-        url = "%s -b %s" % (url, branch)
+        url = "{} -b {}".format(url, branch)
     if subpath:
-        url = "%s [%s]" % (url, subpath)
+        url = "{} [{}]".format(url, subpath)
     return url
 
 
@@ -361,7 +361,7 @@ def fix_path_in_port(
     if not port or port.isdigit():
         return None, None, None
     return (
-        parsed._replace(path="%s/%s" % (port, parsed.path.lstrip("/")), netloc=host),
+        parsed._replace(path="{}/{}".format(port, parsed.path.lstrip("/")), netloc=host),
         branch,
         subpath,
     )
@@ -574,15 +574,15 @@ def guess_repo_from_url(url, net_access=False):  # noqa: C901
     if parsed_url.netloc == 'sourceforge.net':
         if (len(path_elements) >= 4 and path_elements[0] == 'p'
                 and path_elements[3] == 'ci'):
-            return 'https://sourceforge.net/p/%s/%s' % (
+            return 'https://sourceforge.net/p/{}/{}'.format(
                 path_elements[1], path_elements[2])
     if parsed_url.netloc == 'www.apache.org':
         if len(path_elements) > 2 and path_elements[0] == 'dist':
-            return 'https://svn.apache.org/repos/asf/%s/%s' % (
+            return 'https://svn.apache.org/repos/asf/{}/{}'.format(
                 path_elements[1], path_elements[2])
     if parsed_url.netloc == 'bitbucket.org':
         if len(path_elements) >= 2:
-            return 'https://bitbucket.org/%s/%s' % (
+            return 'https://bitbucket.org/{}/{}'.format(
                 path_elements[0], path_elements[1])
     if parsed_url.netloc == 'ftp.gnu.org':
         if len(path_elements) >= 2 and path_elements[0] == 'gnu':
@@ -636,7 +636,7 @@ def check_repository_url_canonical(
                 url, "GitHub URL with less than 2 path elements")
         if path_elements[1].endswith('.git'):
             path_elements[1] = path_elements[1][:-4]
-        api_url = 'https://api.github.com/repos/%s/%s' % (
+        api_url = 'https://api.github.com/repos/{}/{}'.format(
             path_elements[0], path_elements[1])
         try:
             data = _load_json_url(api_url)
