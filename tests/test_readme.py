@@ -31,11 +31,11 @@ from upstream_ontologist.readme import (
 class ReadmeTestCase(TestCase):
 
     def __init__(self, path):
-        super(ReadmeTestCase, self).__init__()
+        super().__init__()
         self.path = path
 
     def setUp(self):
-        super(ReadmeTestCase, self).setUp()
+        super().setUp()
         self.maxDiff = None
 
     def runTest(self):
@@ -48,17 +48,17 @@ class ReadmeTestCase(TestCase):
                 continue
             base, ext = os.path.splitext(entry.name)
             if entry.name == 'description':
-                with open(entry.path, 'r') as f:
+                with open(entry.path) as f:
                     description = f.read()
             elif base == "README":
                 if ext == '.md':
-                    with open(entry.path, 'r') as f:
+                    with open(entry.path) as f:
                         readme_md = f.read()
                 elif ext == '.rst':
-                    with open(entry.path, 'r') as f:
+                    with open(entry.path) as f:
                         readme_rst = f.read()
                 elif ext == '':
-                    with open(entry.path, 'r') as f:
+                    with open(entry.path) as f:
                         readme_plain = f.read()
                 else:
                     raise NotImplementedError(ext)

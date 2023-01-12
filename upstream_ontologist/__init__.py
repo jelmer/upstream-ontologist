@@ -110,11 +110,11 @@ class Person:
 
     def __str__(self):
         if self.email:
-            return '%s <%s>' % (self.name, self.email)
+            return '{} <{}>'.format(self.name, self.email)
         return self.name
 
 
-class UpstreamDatum(object):
+class UpstreamDatum:
     """A single piece of upstream metadata."""
 
     __slots__ = ["field", "value", "certainty", "origin"]
@@ -139,10 +139,10 @@ class UpstreamDatum(object):
         )
 
     def __str__(self):
-        return "%s: %s" % (self.field, self.value)
+        return "{}: {}".format(self.field, self.value)
 
     def __repr__(self):
-        return "%s(%r, %r, %r, %r)" % (
+        return "{}({!r}, {!r}, {!r}, {!r})".format(
             type(self).__name__,
             self.field,
             self.value,
@@ -154,7 +154,7 @@ class UpstreamDatum(object):
 UpstreamMetadata = Dict[str, UpstreamDatum]
 
 
-class UpstreamPackage(object):
+class UpstreamPackage:
     def __init__(self, family, name):
         self.family = family
         self.name = name
