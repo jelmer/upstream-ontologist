@@ -695,8 +695,11 @@ def probe_upstream_branch_url(
         # Let's not probe anything possibly non-public.
         return None
     if parsed.hostname == 'github.com':
+        path = parsed.path
+        if path.endswith('.git'):
+            path = path[:-4]
         api_url = ('https://api.github.com/repos/%s/tags'
-                   % parsed.path.strip('/'))
+                   % path.strip('/'))
         try:
             data = _load_json_url(api_url)
         except urllib.error.HTTPError as e:
