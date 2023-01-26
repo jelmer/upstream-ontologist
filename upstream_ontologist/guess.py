@@ -1564,6 +1564,8 @@ def guess_from_doap(path, trust_package):  # noqa: C901
             pass
         elif child.tag == '{https://schema.org/}logo':
             pass
+        elif child.tag == '{%s}platform' % DOAP_NAMESPACE:
+            pass
         elif child.tag == '{https://schema.org/}screenshot':
             url = extract_url(child)
             if url:
