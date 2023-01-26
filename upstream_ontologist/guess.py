@@ -22,7 +22,7 @@ import os
 import re
 import socket
 import urllib.error
-from typing import Optional, Iterable, List
+from typing import Optional, Iterable, List, Iterator
 from urllib.parse import quote, urlparse, urlunparse, urljoin
 from urllib.request import urlopen, Request
 
@@ -181,8 +181,12 @@ def known_bad_guess(datum):  # noqa: C901
 
 
 def filter_bad_guesses(
-        guessed_items: Iterable[UpstreamDatum]) -> Iterable[UpstreamDatum]:
-    return filter(lambda x: not known_bad_guess(x), guessed_items)
+        guessed_items: Iterable[UpstreamDatum]) -> Iterator[UpstreamDatum]:
+    for item in guessed_items:
+        if known_bad_guess(item):
+            logger.debug('Excluding known bad item %r', item)
+        else:
+            yield item
 
 
 def update_from_guesses(upstream_metadata: UpstreamMetadata,
