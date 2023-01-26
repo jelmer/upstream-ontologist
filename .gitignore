@@ -6,3 +6,4 @@ build
 dist
 upstream_ontologist.egg-info
 .eggs
+.tox
