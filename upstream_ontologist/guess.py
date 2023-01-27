@@ -1168,6 +1168,9 @@ def guess_from_meson(path, trust_package):
     except FileNotFoundError:
         logger.warning('meson not installed; skipping meson.build introspection')
         return
+    except subprocess.CalledProcessError as e:
+        logger.warning('meson failed to run; exited with code %d', e.returncode)
+        return
     project_info = json.loads(output)
     if 'descriptive_name' in project_info:
         yield UpstreamDatum('Name', project_info['descriptive_name'], 'certain')
