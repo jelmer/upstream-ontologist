@@ -1163,6 +1163,10 @@ def url_from_fossil_clone_command(command):
 
 def guess_from_meson(path, trust_package):
     import subprocess
+    # TODO(jelmer): consider looking for a meson build directory to call "meson
+    # introspect" on
+    # TODO(jelmer): mesonbuild is python; consider using its internal functions to parse
+    # meson.build?
     try:
         output = subprocess.check_output(['meson', 'introspect', '--projectinfo', path])
     except FileNotFoundError:
