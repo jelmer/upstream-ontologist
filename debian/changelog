@@ -2,6 +2,7 @@ upstream-ontologist (0.1.33-1) UNRELEASED; urgency=medium
 
   * Update watch file from github
   * New upstream release.
+  * Update standards version to 4.6.2, no changes needed.
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Fri, 27 Jan 2023 00:59:08 -0000
 
