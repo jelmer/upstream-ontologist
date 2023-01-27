@@ -62,7 +62,7 @@ from urllib.parse import urlparse
 
 SUPPORTED_CERTAINTIES = ["certain", "confident", "likely", "possible", None]
 
-version_string = "0.1.30"
+version_string = "0.1.33"
 
 USER_AGENT = "upstream-ontologist/" + version_string
 # Too aggressive?
@@ -75,6 +75,15 @@ class Person:
     name: str
     email: Optional[str] = None
     url: Optional[str] = None
+
+    def __init__(self, name, email=None, url=None):
+        self.name = name
+        self.email = email
+        if url and url.startswith('mailto:'):
+            self.email = url[len('mailto:'):]
+            self.url = None
+        else:
+            self.url = url
 
     @classmethod
     def from_string(cls, text):
@@ -101,11 +110,11 @@ class Person:
 
     def __str__(self):
         if self.email:
-            return '%s <%s>' % (self.name, self.email)
+            return '{} <{}>'.format(self.name, self.email)
         return self.name
 
 
-class UpstreamDatum(object):
+class UpstreamDatum:
     """A single piece of upstream metadata."""
 
     __slots__ = ["field", "value", "certainty", "origin"]
@@ -130,10 +139,10 @@ class UpstreamDatum(object):
         )
 
     def __str__(self):
-        return "%s: %s" % (self.field, self.value)
+        return "{}: {}".format(self.field, self.value)
 
     def __repr__(self):
-        return "%s(%r, %r, %r, %r)" % (
+        return "{}({!r}, {!r}, {!r}, {!r})".format(
             type(self).__name__,
             self.field,
             self.value,
@@ -145,7 +154,7 @@ class UpstreamDatum(object):
 UpstreamMetadata = Dict[str, UpstreamDatum]
 
 
-class UpstreamPackage(object):
+class UpstreamPackage:
     def __init__(self, family, name):
         self.family = family
         self.name = name
@@ -176,8 +185,8 @@ def confidence_to_certainty(confidence: Optional[int]) -> str:
         return "unknown"
     try:
         return SUPPORTED_CERTAINTIES[confidence] or "unknown"
-    except IndexError:
-        raise ValueError(confidence)
+    except IndexError as e:
+        raise ValueError(confidence) from e
 
 
 def certainty_sufficient(

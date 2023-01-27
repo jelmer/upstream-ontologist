@@ -22,7 +22,7 @@ import os
 import re
 import socket
 import urllib.error
-from typing import Optional, Iterable, List
+from typing import Optional, Iterable, List, Iterator
 from urllib.parse import quote, urlparse, urlunparse, urljoin
 from urllib.request import urlopen, Request
 
@@ -78,7 +78,7 @@ def get_sf_metadata(project):
     except urllib.error.HTTPError as e:
         if e.code != 404:
             raise
-        raise NoSuchSourceForgeProject(project)
+        raise NoSuchSourceForgeProject(project) from e
 
 
 class NoSuchRepologyProject(Exception):
@@ -95,7 +95,7 @@ def get_repology_metadata(srcname, repo='debian_unstable'):
     except urllib.error.HTTPError as e:
         if e.code != 404:
             raise
-        raise NoSuchRepologyProject(srcname)
+        raise NoSuchRepologyProject(srcname) from e
 
 
 DATUM_TYPES = {
@@ -119,10 +119,17 @@ DATUM_TYPES = {
     'Contact': str,
     'X-Author': list,
     'X-Security-MD': str,
+    # TODO(jelmer): Allow multiple maintainers?
     'X-Maintainer': Person,
     'X-Cargo-Crate': str,
     'X-API-Documentation': str,
 }
+
+
+def known_bad_url(value):
+    if '${' in value:
+        return True
+    return False
 
 
 def known_bad_guess(datum):  # noqa: C901
@@ -140,13 +147,17 @@ def known_bad_guess(datum):  # noqa: C901
             datum.value, datum.field)
         return True
     if datum.field in ('Bug-Submit', 'Bug-Database'):
+        if known_bad_url(datum.value):
+            return True
         parsed_url = urlparse(datum.value)
         if parsed_url.hostname == 'bugzilla.gnome.org':
             return True
         if parsed_url.hostname == 'bugs.freedesktop.org':
             return True
+        if parsed_url.path.endswith('/sign_in'):
+            return True
     if datum.field == 'Repository':
-        if '${' in datum.value:
+        if known_bad_url(datum.value):
             return True
         parsed_url = urlparse(datum.value)
         if parsed_url.hostname == 'anongit.kde.org':
@@ -160,11 +171,19 @@ def known_bad_guess(datum):  # noqa: C901
         if parsed_url.hostname in ('pypi.org', 'rubygems.org'):
             return True
     if datum.field == 'Repository-Browse':
-        if '${' in datum.value:
+        if known_bad_url(datum.value):
             return True
         parsed_url = urlparse(datum.value)
         if parsed_url.hostname == 'cgit.kde.org':
             return True
+        if parsed_url.path.endswith('/sign_in'):
+            return True
+    if datum.field == 'X-Author':
+        for value in datum.value:
+            if 'Maintainer' in value.name:
+                return True
+            if 'Contributor' in value.name:
+                return True
     if datum.field == 'Name':
         if datum.value.lower() == 'package':
             return True
@@ -177,8 +196,12 @@ def known_bad_guess(datum):  # noqa: C901
 
 
 def filter_bad_guesses(
-        guessed_items: Iterable[UpstreamDatum]) -> Iterable[UpstreamDatum]:
-    return filter(lambda x: not known_bad_guess(x), guessed_items)
+        guessed_items: Iterable[UpstreamDatum]) -> Iterator[UpstreamDatum]:
+    for item in guessed_items:
+        if known_bad_guess(item):
+            logger.debug('Excluding known bad item %r', item)
+        else:
+            yield item
 
 
 def update_from_guesses(upstream_metadata: UpstreamMetadata,
@@ -266,11 +289,16 @@ def guess_from_debian_watch(path, trust_package):
         warn_missing_dependency(path, e.name)
         return
 
-    def get_package_name():
+    try:
         from debian.deb822 import Deb822
-        with open(os.path.join(os.path.dirname(path), 'control'), 'r') as f:
+    except ModuleNotFoundError as e:
+        warn_missing_dependency(path, e.name)
+        return
+
+    def get_package_name():
+        with open(os.path.join(os.path.dirname(path), 'control')) as f:
             return Deb822(f)['Source']
-    with open(path, 'r') as f:
+    with open(path) as f:
         try:
             wf = parse_watch_file(f)
         except MissingVersion:
@@ -307,35 +335,77 @@ def guess_from_debian_watch(path, trust_package):
                     "X-Hackage-Package", m.group(1), "certain", origin=path)
 
 
-def guess_from_debian_control(path, trust_package):
-    with open(path, 'r') as f:
-        from debian.deb822 import Deb822
-        control = Deb822(f)
-    if 'Homepage' in control:
-        yield UpstreamDatum('Homepage', control['Homepage'], 'certain')
-    if 'XS-Go-Import-Path' in control:
-        yield (
-            UpstreamDatum(
-                'Repository',
-                'https://' + control['XS-Go-Import-Path'],
-                'likely'))
-    if 'Description' in control:
-        yield UpstreamDatum(
-            'X-Summary', control['Description'].splitlines(False)[0], 'certain')
-        yield UpstreamDatum(
-            'X-Description',
-            ''.join(control['Description'].splitlines(True)[1:]), 'certain')
+def debian_is_native(path):
+    with open(os.path.join(path, "source/format")) as f:
+        return (f.read().strip() == "3.0 (native)")
 
+
+def guess_from_debian_control(path, trust_package):
+    try:
+        from debian.deb822 import Deb822
+    except ModuleNotFoundError as e:
+        warn_missing_dependency(path, e.name)
+        return
+    with open(path) as f:
+        source = Deb822(f)
+        is_native = debian_is_native(os.path.dirname(path))
+        if 'Homepage' in source:
+            yield UpstreamDatum('Homepage', source['Homepage'], 'certain')
+        if 'XS-Go-Import-Path' in source:
+            yield (
+                UpstreamDatum(
+                    'Repository',
+                    'https://' + source['XS-Go-Import-Path'],
+                    'likely'))
+        if is_native:
+            if 'Vcs-Git' in source:
+                yield UpstreamDatum('Repository', source['Vcs-Git'], 'certain')
+            if 'Vcs-Browse' in source:
+                yield UpstreamDatum('Repository-Browse', source['Vcs-Browse'], 'certain')
+        other_paras = list(Deb822.iter_paragraphs(f))
+        if len(other_paras) == 1 and is_native:
+            certainty = "certain"
+        elif len(other_paras) > 1 and is_native:
+            certainty = "possible"
+        elif len(other_paras) == 1 and not is_native:
+            certainty = "confident"
+        else:
+            certainty = "likely"
+        for para in other_paras:
+            if 'Description' in para:
+                lines = para['Description'].splitlines(True)
+                summary = lines[0].rstrip('\n')
+                description_lines = [
+                    ('\n' if line == ' .\n' else line[1:]) for line in lines[1:]]
+                if (description_lines
+                        and description_lines[-1].startswith('This package contains ')):
+                    if ' - ' in summary:
+                        summary = summary.rsplit(' - ', 1)[0]
+                    del description_lines[-1]
+                if description_lines and not description_lines[-1].strip():
+                    del description_lines[-1]
+                yield UpstreamDatum(
+                    'X-Summary', summary, certainty)
+                yield UpstreamDatum(
+                    'X-Description',
+                    ''.join(description_lines), certainty)
+        
 
 def guess_from_debian_changelog(path, trust_package):
-    from debian.changelog import Changelog
+    try:
+        from debian.changelog import Changelog
+    except ModuleNotFoundError as e:
+        warn_missing_dependency(path, e.name)
+        return
     with open(path, 'rb') as f:
         cl = Changelog(f)
     source = cl.package
+    yield UpstreamDatum('Name', cl.package, 'confident')
+    yield UpstreamDatum('X-Version', cl.version.upstream_version, 'confident')
     if source.startswith('rust-'):
         try:
             from toml.decoder import load as load_toml
-            with open('debian/debcargo.toml', 'r') as f:
+            with open('debian/debcargo.toml') as f:
                 debcargo = load_toml(f)
         except FileNotFoundError:
             semver_suffix = False
@@ -348,6 +418,86 @@ def guess_from_debian_changelog(path, trust_package):
             crate = cargo_translate_dashes(crate)
         yield UpstreamDatum('Archive', 'crates.io', 'certain')
         yield UpstreamDatum('X-Cargo-Crate', crate, 'certain')
+
+    # Find the ITP
+    itp = None
+    for change in cl[-1].changes():
+        m = re.match(r'[\s\*]*Initial Release.*Closes: \#([0-9]+).*', change, re.I)
+        if m:
+            itp = int(m.group(1))
+    if itp:
+        yield UpstreamDatum('X-Debian-ITP', str(itp), 'certain')
+        try:
+            import debianbts
+        except ModuleNotFoundError as e:
+            warn_missing_dependency(path, e.name)
+            return
+        else:
+            import pysimplesoap
+
+            logger.debug('Retrieving Debian bug %d', itp)
+            try:
+                orig = debianbts.get_bug_log(itp)[0]
+            except pysimplesoap.client.SoapFault as e:
+                logger.warning('Unable to get info about %d: %s' % (itp, e))
+            except (TypeError, ValueError):
+                # Almost certainly a broken pysimplesoap bug :(
+                logger.exception('Error getting bug log')
+            else:
+                yield from metadata_from_itp_bug_body(orig['body'])
+
+
+def metadata_from_itp_bug_body(body):  # noqa: C901
+    line_iter = iter(body.splitlines(False))
+    # Skip first few lines with bug metadata (severity, owner, etc)
+    line = next(line_iter)
+    while line.strip():
+        try:
+            line = next(line_iter)
+        except StopIteration:
+            return
+
+    while line == '':
+        try:
+            line = next(line_iter)
+        except StopIteration:
+            return
+
+    while line:
+        line = line.lstrip().lstrip('*').lstrip()
+        if line == '':
+            break
+        try:
+            key, value = line.split(':', 1)
+        except ValueError:
+            logger.debug('Ignoring non-semi-field line %r', line)
+        else:
+            key = key.strip()
+            value = value.strip()
+            if key == 'Package name':
+                yield UpstreamDatum('Name', value, 'confident')
+            elif key == 'Version':
+                # This data is almost certainly for an older version
+                yield UpstreamDatum('X-Version', value, 'possible')
+            elif key == 'Upstream Author' and value:
+                yield UpstreamDatum('X-Author', [value], 'confident')
+            elif key == 'URL':
+                yield UpstreamDatum('Homepage', value, 'confident')
+            elif key == 'License':
+                yield UpstreamDatum('X-License', value, 'confident')
+            elif key == 'Description':
+                yield UpstreamDatum('X-Summary', value, 'confident')
+            else:
+                logger.debug(f'Unknown pseudo-header {key} in ITP bug body')
+        line = next(line_iter)
+
+    rest = []
+    for line in line_iter:
+        if line.strip() == '-- System Information:':
+            break
+        rest.append(line)
+
+    yield UpstreamDatum('X-Description', '\n'.join(rest), 'likely')
 
 
 def guess_from_python_metadata(pkg_info):
@@ -383,7 +533,7 @@ def guess_from_pkg_info(path, trust_package):
     """Get the metadata from a PKG-INFO file."""
     from email.parser import Parser
     try:
-        with open(path, 'r') as f:
+        with open(path) as f:
             pkg_info = Parser().parse(f)
     except FileNotFoundError:
         return
@@ -416,8 +566,7 @@ def parse_python_long_description(long_description, content_type):
             yield UpstreamDatum('X-Description', description, 'possible')
     else:
         extra_md = []
-    for datum in extra_md:
-        yield datum
+    yield from extra_md
 
 
 def guess_from_setup_cfg(path, trust_package):
@@ -613,7 +762,7 @@ def guess_from_setup_py(path, trust_package):  # noqa: C901
 
 def guess_from_composer_json(path, trust_package):
     # https://getcomposer.org/doc/04-schema.md
-    with open(path, 'r') as f:
+    with open(path) as f:
         package = json.load(f)
     if 'name' in package:
         yield UpstreamDatum('Name', package['name'], 'certain')
@@ -629,7 +778,7 @@ def guess_from_composer_json(path, trust_package):
 
 def guess_from_package_json(path, trust_package):  # noqa: C901
     # see https://docs.npmjs.com/cli/v7/configuring-npm/package-json
-    with open(path, 'r') as f:
+    with open(path) as f:
         package = json.load(f)
     if 'name' in package:
         yield UpstreamDatum('Name', package['name'], 'certain')
@@ -791,7 +940,7 @@ def guess_from_dist_ini(path, trust_package):
         ParsingError,
     )
     parser = RawConfigParser(strict=False)
-    with open(path, 'r') as f:
+    with open(path) as f:
         try:
             parser.read_string('[START]\n' + f.read())
         except ParsingError as e:
@@ -827,7 +976,7 @@ def guess_from_dist_ini(path, trust_package):
     except (NoSectionError, NoOptionError, KeyError):
         pass
     try:
-        copyright = '%s %s' % (
+        copyright = '{} {}'.format(
             parser['START']['copyright_year'],
             parser['START']['copyright_holder'],
         )
@@ -842,13 +991,17 @@ def guess_from_dist_ini(path, trust_package):
 
 
 def guess_from_debian_copyright(path, trust_package):  # noqa: C901
-    from debian.copyright import (
-        Copyright,
-        NotMachineReadableError,
-        MachineReadableFormatError,
-    )
+    try:
+        from debian.copyright import (
+            Copyright,
+            NotMachineReadableError,
+            MachineReadableFormatError,
+        )
+    except ModuleNotFoundError as e:
+        warn_missing_dependency(path, e.name)
+        return
     from_urls = []
-    with open(path, 'r') as f:
+    with open(path) as f:
         try:
             copyright = Copyright(f, strict=False)
         except NotMachineReadableError:
@@ -889,8 +1042,14 @@ def guess_from_debian_copyright(path, trust_package):  # noqa: C901
                 [m.group(0)
                  for m in
                  re.finditer(r'((http|https):\/\/([^ ]+))', header.source)])
+        referenced_licenses = set()
+        for para in copyright.all_paragraphs():
+            if para.license:
+                referenced_licenses.add(para.license.synopsis)
+        if len(referenced_licenses) == 1 and referenced_licenses != {None}:
+            yield UpstreamDatum('X-License', referenced_licenses.pop(), 'certain')
     else:
-        with open(path, 'r') as f:
+        with open(path) as f:
             for line in f:
                 m = re.match(r'.* was downloaded from ([^\s]+)', line)
                 if m:
@@ -1008,10 +1167,17 @@ def url_from_fossil_clone_command(command):
 
 def guess_from_meson(path, trust_package):
     import subprocess
+    # TODO(jelmer): consider looking for a meson build directory to call "meson
+    # introspect" on
+    # TODO(jelmer): mesonbuild is python; consider using its internal functions to parse
+    # meson.build?
     try:
         output = subprocess.check_output(['meson', 'introspect', '--projectinfo', path])
     except FileNotFoundError:
         logger.warning('meson not installed; skipping meson.build introspection')
+        return
+    except subprocess.CalledProcessError as e:
+        logger.warning('meson failed to run; exited with code %d', e.returncode)
         return
     project_info = json.loads(output)
     if 'descriptive_name' in project_info:
@@ -1142,13 +1308,13 @@ def guess_from_readme(path, trust_package):  # noqa: C901
                 for m in re.finditer(
                         b'https://travis-ci.org/' + project_re, line):
                     yield UpstreamDatum(
-                        'Repository', 'https://github.com/%s/%s' % (
+                        'Repository', 'https://github.com/{}/{}'.format(
                             m.group(1).decode(), m.group(2).decode().rstrip()),
                         'possible')
                 for m in re.finditer(
                         b'https://coveralls.io/r/' + project_re, line):
                     yield UpstreamDatum(
-                        'Repository', 'https://github.com/%s/%s' % (
+                        'Repository', 'https://github.com/{}/{}'.format(
                             m.group(1).decode(), m.group(2).decode().rstrip()),
                         'possible')
                 for m in re.finditer(
@@ -1208,8 +1374,7 @@ def guess_from_readme(path, trust_package):  # noqa: C901
         if description is not None:
             yield UpstreamDatum(
                 'X-Description', description, 'possible')
-        for datum in extra_md:
-            yield datum
+        yield from extra_md
         if path.lower().endswith('readme.pod'):
             with open(path, 'rb') as f:
                 yield from guess_from_pod(f.read())
@@ -1241,7 +1406,7 @@ def guess_from_debian_patch(path, trust_package):
 
 
 def guess_from_meta_json(path, trust_package):
-    with open(path, 'r') as f:
+    with open(path) as f:
         data = json.load(f)
         if 'name' in data:
             dist_name = data['name']
@@ -1387,6 +1552,7 @@ def guess_from_doap(path, trust_package):  # noqa: C901
         return el.attrib.get('{http://www.w3.org/XML/1998/namespace}lang')
 
     screenshots = []
+    maintainers = []
 
     for child in root:
         if child.tag == ('{%s}name' % DOAP_NAMESPACE) and child.text:
@@ -1449,6 +1615,8 @@ def guess_from_doap(path, trust_package):  # noqa: C901
             pass
         elif child.tag == '{https://schema.org/}logo':
             pass
+        elif child.tag == '{%s}platform' % DOAP_NAMESPACE:
+            pass
         elif child.tag == '{https://schema.org/}screenshot':
             url = extract_url(child)
             if url:
@@ -1464,12 +1632,22 @@ def guess_from_doap(path, trust_package):  # noqa: C901
                 name = person.find('{http://xmlns.com/foaf/0.1/}name').text
                 email_tag = person.find('{http://xmlns.com/foaf/0.1/}mbox')
                 maintainer = Person(
-                    name, email_tag.text if email_tag is not None else None)
-                yield UpstreamDatum('X-Maintainer', maintainer, 'certain')
+                    name,
+                    email=(email_tag.text if email_tag is not None else None),
+                    url=(extract_url(email_tag) if email_tag is not None else None))
+                maintainers.append(maintainer)
         elif child.tag == '{%s}mailing-list' % DOAP_NAMESPACE:
             yield UpstreamDatum('X-MailingList', extract_url(child), 'certain')
         else:
             logger.warning('Unknown tag %s in DOAP file', child.tag)
+
+    # TODO(jelmer): Allow multiple maintainers
+    # yield UpstreamDatum('X-Maintainer', maintainers, 'possible')
+    if len(maintainers) == 1:
+        yield UpstreamDatum('X-Maintainer', maintainers[0], 'certain')
+    else:
+        for maintainer in maintainers:
+            yield UpstreamDatum('X-Maintainer', maintainer, 'possible')
 
 
 def _yield_opam_fields(f):
@@ -1515,7 +1693,7 @@ def _yield_opam_fields(f):
 def guess_from_opam(path, trust_package=False):
     # Documentation: https://opam.ocaml.org/doc/Manual.html#Package-definitions
 
-    with open(path, 'r') as f:
+    with open(path) as f:
         for key, value in _yield_opam_fields(f):
             if key == 'maintainer':
                 yield UpstreamDatum('Maintainer', Person.from_string(value), 'confident')
@@ -1523,7 +1701,7 @@ def guess_from_opam(path, trust_package=False):
                 yield UpstreamDatum('X-License', value, 'confident')
             elif key == 'homepage':
                 yield UpstreamDatum('Homepage', value, 'confident')
-            elif key == 'dev-repo':
+            elif key in ('dev-repo', 'repository'):
                 yield UpstreamDatum('Repository', value, 'confident')
             elif key == 'bug-reports':
                 yield UpstreamDatum('Bug-Database', value, 'confident')
@@ -1651,7 +1829,7 @@ def guess_from_cabal_lines(lines):  # noqa: C901
 
 
 def guess_from_cabal(path, trust_package=False):
-    with open(path, 'r', encoding='utf-8') as f:
+    with open(path, encoding='utf-8') as f:
         for name, value in guess_from_cabal_lines(f):
             yield UpstreamDatum(name, value, 'certain', origin=path)
 
@@ -1680,14 +1858,16 @@ def guess_from_configure(path, trust_package=False):
             if key == b'PACKAGE_NAME':
                 yield UpstreamDatum(
                     'Name', value.decode(), 'certain', './configure')
+            elif key == b'PACKAGE_TARNAME':
+                yield UpstreamDatum(
+                    'Name', value.decode(), 'certain', './configure')
             elif key == b'PACKAGE_VERSION':
                 yield UpstreamDatum(
                     'X-Version', value.decode(), 'certain', './configure')
             elif key == b'PACKAGE_BUGREPORT':
                 if value in (b'BUG-REPORT-ADDRESS', ):
                     certainty = 'invalid'
-                elif (is_email_address(value.decode())
-                        and not value.endswith(b'gnu.org')):
+                elif is_email_address(value.decode()):
                     # Downgrade the trustworthiness of this field for most
                     # upstreams if it contains an e-mail address. Most
                     # upstreams seem to just set this to some random address,
@@ -1799,7 +1979,7 @@ def guess_from_cargo(path, trust_package):
         warn_missing_dependency(path, e.name)
         return
     try:
-        with open(path, 'r') as f:
+        with open(path) as f:
             cargo = loads(f.read())
     except FileNotFoundError:
         return
@@ -1824,6 +2004,9 @@ def guess_from_cargo(path, trust_package):
             yield UpstreamDatum('Repository', str(package['repository']), 'certain')
         if 'version' in package:
             yield UpstreamDatum('X-Version', str(package['version']), 'confident')
+        if 'authors' in package:
+            yield UpstreamDatum(
+                'X-Author', [Person.from_string(author) for author in package['authors']], 'confident')
 
 
 def guess_from_pyproject_toml(path, trust_package):
@@ -1834,7 +2017,7 @@ def guess_from_pyproject_toml(path, trust_package):
         warn_missing_dependency(path, e.name)
         return
     try:
-        with open(path, 'r') as f:
+        with open(path) as f:
             pyproject = loads(f.read())
     except FileNotFoundError:
         return
@@ -1989,7 +2172,7 @@ def guess_from_go_mod(path, trust_package=False):
 
 def guess_from_gemspec(path, trust_package=False):
     # TODO(jelmer): use a proper ruby wrapper instead?
-    with open(path, 'r') as f:
+    with open(path) as f:
         for line in f:
             if line.startswith('#'):
                 continue
@@ -2054,7 +2237,7 @@ def guess_from_wscript(path, trust_package=False):
 
 
 def guess_from_metadata_json(path, trust_package=False):
-    with open(path, 'r') as f:
+    with open(path) as f:
         data = json.load(f)
         if data.get('description'):
             yield UpstreamDatum('X-Description', data['description'], 'certain')
@@ -2372,7 +2555,7 @@ def _sf_git_extract_url(page):
 def guess_from_sf(sf_project: str, subproject: Optional[str] = None):  # noqa: C901
     try:
         data = get_sf_metadata(sf_project)
-    except socket.timeout:
+    except (socket.timeout, TimeoutError):
         logger.warning(
             'timeout contacting sourceforge, ignoring: %s',
             sf_project)
@@ -2433,7 +2616,7 @@ def guess_from_sf(sf_project: str, subproject: Optional[str] = None):  # noqa: C
         elif kind == 'hg':
             url = urljoin('https://hg.code.sf.net/', url)
         elif kind == 'cvs':
-            url = 'cvs+pserver://anonymous@%s.cvs.sourceforge.net/cvsroot/%s' % (
+            url = 'cvs+pserver://anonymous@{}.cvs.sourceforge.net/cvsroot/{}'.format(
                 sf_project, url.strip('/').rsplit('/')[-2])
         elif kind == 'bzr':
             # TODO(jelmer)
@@ -2449,7 +2632,7 @@ def guess_from_sf(sf_project: str, subproject: Optional[str] = None):  # noqa: C
 def guess_from_repology(repology_project):
     try:
         metadata = get_repology_metadata(repology_project)
-    except socket.timeout:
+    except (socket.timeout, TimeoutError):
         logger.warning(
             'timeout contacting repology, ignoring: %s', repology_project)
         return
@@ -2520,7 +2703,7 @@ class NoSuchHackagePackage(Exception):
 
 
 def guess_from_hackage(hackage_package):
-    http_url = 'http://hackage.haskell.org/package/%s/%s.cabal' % (
+    http_url = 'http://hackage.haskell.org/package/{}/{}.cabal'.format(
         hackage_package, hackage_package)
     headers = {'User-Agent': USER_AGENT}
     try:
@@ -2529,7 +2712,7 @@ def guess_from_hackage(hackage_package):
             timeout=DEFAULT_URLLIB_TIMEOUT).read()
     except urllib.error.HTTPError as e:
         if e.code == 404:
-            raise NoSuchHackagePackage(hackage_package)
+            raise NoSuchHackagePackage(hackage_package) from e
         raise
     return guess_from_cabal_lines(
         http_contents.decode('utf-8', 'surrogateescape').splitlines(True))
@@ -2604,7 +2787,7 @@ def extend_from_pecl(upstream_metadata, pecl_url, certainty):
 def extend_from_lp(upstream_metadata, minimum_certainty, package,
                    distribution=None, suite=None):
     # The set of fields that Launchpad can possibly provide:
-    lp_fields = ['Homepage', 'Repository', 'Name']
+    lp_fields = ['Homepage', 'Repository', 'Name', 'X-Download']
     lp_certainty = 'possible'
 
     if certainty_sufficient(lp_certainty, minimum_certainty):
@@ -2778,19 +2961,19 @@ def check_bug_database_canonical(url: str) -> str:
         path_elements = parsed_url.path.strip('/').split('/')
         if len(path_elements) < 3 or path_elements[2] != 'issues':
             raise InvalidUrl(url, "GitHub URL with missing path elements")
-        api_url = 'https://api.github.com/repos/%s/%s' % (
+        api_url = 'https://api.github.com/repos/{}/{}'.format(
             path_elements[0], path_elements[1])
         try:
             data = _load_json_url(api_url)
         except urllib.error.HTTPError as e:
             if e.code == 404:
-                raise InvalidUrl(url, "Project does not exist")
+                raise InvalidUrl(url, "Project does not exist") from e
             if e.code == 403:
                 # Probably rate limited
                 logger.warning(
                     'Unable to verify bug database URL %s: %s',
                     url, e.reason)
-                raise UrlUnverifiable(url, "rate-limited by GitHub API")
+                raise UrlUnverifiable(url, "rate-limited by GitHub API") from e
             raise
         if not data['has_issues']:
             raise InvalidUrl(
@@ -2802,13 +2985,13 @@ def check_bug_database_canonical(url: str) -> str:
         path_elements = parsed_url.path.strip('/').split('/')
         if len(path_elements) < 3 or path_elements[-1] != 'issues':
             raise InvalidUrl(url, "GitLab URL with missing path elements")
-        api_url = 'https://%s/api/v4/projects/%s' % (
+        api_url = 'https://{}/api/v4/projects/{}'.format(
             parsed_url.netloc, quote('/'.join(path_elements[:-1]), safe=''))
         try:
             data = _load_json_url(api_url)
         except urllib.error.HTTPError as e:
             if e.code == 404:
-                raise InvalidUrl(url, "Project does not exist")
+                raise InvalidUrl(url, "Project does not exist") from e
             raise
         # issues_enabled is only provided when the user is authenticated,
         # so if we're not then we just fall back to checking the canonical URL
@@ -2946,8 +3129,8 @@ def _extrapolate_security_contact_from_security_md(
     security_url = browse_url_from_repo_url(
         repository_url.value, subpath=security_md_path.value)
     if security_url is None:
-        return None
-    yield UpstreamDatum(
+        return
+    yield UpstreamDatum(   # noqa: B901
         'Security-Contact', security_url,
         certainty=min_certainty(
             [repository_url.certainty, security_md_path.certainty]),
@@ -3062,7 +3245,7 @@ def extend_upstream_metadata(upstream_metadata,
         from debian.deb822 import Deb822
 
         try:
-            with open(os.path.join(path, 'debian/control'), 'r') as f:
+            with open(os.path.join(path, 'debian/control')) as f:
                 package = Deb822(f)['Source']
         except FileNotFoundError:
             # Huh, okay.
@@ -3119,8 +3302,8 @@ def _extrapolate_fields(
             if changes:
                 logger.debug(
                     'Extrapolating (%r => %r) from (\'%s: %s\', %s)',
-                    ["%s: %s" % (us.field, us.value) for us in old_to_values.values() if us],
-                    ["%s: %s" % (us.field, us.value) for us in changes if us],
+                    ["{}: {}".format(us.field, us.value) for us in old_to_values.values() if us],
+                    ["{}: {}".format(us.field, us.value) for us in changes if us],
                     from_value.field, from_value.value, from_value.certainty)
                 changed = True
 
@@ -3155,12 +3338,12 @@ def check_url_canonical(url: str) -> str:
             timeout=DEFAULT_URLLIB_TIMEOUT)
     except urllib.error.HTTPError as e:
         if e.code == 404:
-            raise InvalidUrl(url, "url not found")
+            raise InvalidUrl(url, "url not found") from e
         if e.code == 429:
-            raise UrlUnverifiable(url, "rate-by")
+            raise UrlUnverifiable(url, "rate-by") from e
         raise
-    except socket.timeout:
-        raise UrlUnverifiable(url, 'timeout contacting')
+    except (socket.timeout, TimeoutError) as e:
+        raise UrlUnverifiable(url, 'timeout contacting') from e
     else:
         return resp.geturl()
 
@@ -3256,8 +3439,7 @@ def check_upstream_metadata(  # noqa: C901
     if screenshots and screenshots.certainty == 'likely':
         newvalue = []
         screenshots.certainty = 'certain'
-        for i, (url, status) in enumerate(verify_screenshots(
-                screenshots.value)):
+        for url, status in verify_screenshots(screenshots.value):
             if status is True:
                 newvalue.append(url)
             elif status is False:
@@ -3327,7 +3509,7 @@ def guess_from_pecl_url(url):
         if e.code != 404:
             raise
         return
-    except socket.timeout:
+    except (socket.timeout, TimeoutError):
         logger.warning('timeout contacting pecl, ignoring: %s', url)
         return
     try:
@@ -3384,7 +3566,7 @@ def guess_from_gobo(package: str):   # noqa: C901
             return
         raise
     versions = [entry['name'] for entry in contents]
-    base_url = 'https://raw.githubusercontent.com/gobolinux/Recipes/master/%s/%s' % (package, versions[-1])
+    base_url = 'https://raw.githubusercontent.com/gobolinux/Recipes/master/{}/{}'.format(package, versions[-1])
     headers = {'User-Agent': USER_AGENT}
     try:
         f = urlopen(
@@ -3449,7 +3631,7 @@ def guess_from_aur(package: str):
             if e.code != 404:
                 raise
             continue
-        except socket.timeout:
+        except (socket.timeout, TimeoutError):
             logger.warning('timeout contacting aur, ignoring: %s', url)
             continue
         else:
@@ -3508,7 +3690,7 @@ def guess_from_launchpad(package, distribution=None, suite=None):  # noqa: C901
         if e.code != 404:
             raise
         return
-    except socket.timeout:
+    except (socket.timeout, TimeoutError):
         logger.warning('timeout contacting launchpad, ignoring')
         return
 
@@ -3527,6 +3709,8 @@ def guess_from_launchpad(package, distribution=None, suite=None):  # noqa: C901
         yield ('X-Wiki', project_data['wiki_url'])
     if project_data.get('summary'):
         yield ('X-Summary', project_data['summary'])
+    if project_data.get('download_url'):
+        yield ('X-Download', project_data['download_url'])
     if project_data['vcs'] == 'Bazaar':
         branch_link = productseries_data.get('branch_link')
         if branch_link:

@@ -46,13 +46,21 @@ from upstream_ontologist.guess import (
 
 class TestCaseInTempDir(TestCase):
     def setUp(self):
-        super(TestCaseInTempDir, self).setUp()
+        super().setUp()
         self.testdir = tempfile.mkdtemp()
         os.chdir(self.testdir)
         self.addCleanup(shutil.rmtree, self.testdir)
 
 
 class GuessFromDebianWatchTests(TestCaseInTempDir):
+
+    def setUp(self):
+        super().setUp()
+        try:
+            import pcre  # noqa: F401
+        except ModuleNotFoundError:
+            self.skipTest('pcre not available')
+
     def test_empty(self):
         with open("watch", "w") as f:
             f.write(

@@ -1,8 +1,9 @@
-upstream-ontologist (0.1.30-3) UNRELEASED; urgency=medium
+upstream-ontologist (0.1.33-1) UNRELEASED; urgency=medium
 
   * Update watch file from github
+  * New upstream release.
 
- -- Jelmer Vernooĳ <jelmer@debian.org>  Fri, 27 Jan 2023 00:58:41 -0000
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Fri, 27 Jan 2023 00:59:08 -0000
 
 upstream-ontologist (0.1.30-2) unstable; urgency=medium
 
