@@ -229,7 +229,7 @@ def guess_from_debian_rules(path, trust_package):
     except KeyError:
         pass
     else:
-        yield UpstreamDatum(
+        yield UpstreamDatum[str](
             "Repository", upstream_git.decode(), "likely")
     try:
         upstream_url = mf.get_variable(b'DEB_UPSTREAM_URL')

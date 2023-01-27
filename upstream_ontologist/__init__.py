@@ -54,7 +54,7 @@ Supported, but currently not set.
 """
 
 import os
-from typing import Optional, Sequence, Dict
+from typing import Optional, Sequence, Dict, TypeVar, Generic
 from dataclasses import dataclass
 from email.utils import parseaddr
 from urllib.parse import urlparse
@@ -114,12 +114,21 @@ class Person:
         return self.name
 
 
-class UpstreamDatum:
+T = TypeVar('T')
+
+
+class UpstreamDatum(Generic[T]):
     """A single piece of upstream metadata."""
 
     __slots__ = ["field", "value", "certainty", "origin"]
 
-    def __init__(self, field, value, certainty=None, origin=None):
+    field: str
+    value: T
+    certainty: Optional[str]
+    origin: Optional[str]
+
+    def __init__(self, field: str, value: T, certainty: Optional[str] = None,
+                 origin: Optional[str] = None) -> None:
         self.field = field
         if value is None:
             raise ValueError(field)
@@ -190,7 +199,7 @@ def confidence_to_certainty(confidence: Optional[int]) -> str:
 
 
 def certainty_sufficient(
-    actual_certainty: str, minimum_certainty: Optional[str]
+    actual_certainty: Optional[str], minimum_certainty: Optional[str]
 ) -> bool:
     """Check if the actual certainty is sufficient.
 
