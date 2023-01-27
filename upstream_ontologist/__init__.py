@@ -54,10 +54,16 @@ Supported, but currently not set.
 """
 
 import os
-from typing import Optional, Sequence, Dict, TypeVar, Generic
+from typing import Optional, Sequence, TypeVar, Generic, List
 from dataclasses import dataclass
 from email.utils import parseaddr
 from urllib.parse import urlparse
+
+
+try:
+    from typing import TypedDict  # type: ignore
+except ImportError:
+    from typing_extensions import TypedDict  # type: ignore
 
 
 SUPPORTED_CERTAINTIES = ["certain", "confident", "likely", "possible", None]
@@ -160,7 +166,17 @@ class UpstreamDatum(Generic[T]):
         )
 
 
-UpstreamMetadata = Dict[str, UpstreamDatum]
+UpstreamMetadata = TypedDict('UpstreamMetadata', {
+    'Name': UpstreamDatum[str],
+    'Contact': UpstreamDatum[str],
+    'Repository': UpstreamDatum[str],
+    'Repository-Browse': UpstreamDatum[str],
+    'X-Summary': UpstreamDatum[str],
+    'Bug-Database': UpstreamDatum[str],
+    'Bug-Submit': UpstreamDatum[str],
+    'Homepage': UpstreamDatum[str],
+    'Screenshots': UpstreamDatum[List[str]],
+}, total=False)
 
 
 class UpstreamPackage:

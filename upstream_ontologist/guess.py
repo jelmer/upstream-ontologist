@@ -22,7 +22,7 @@ import os
 import re
 import socket
 import urllib.error
-from typing import Optional, Iterable, List, Iterator
+from typing import Optional, Iterable, List, Iterator, Any, Dict, Tuple, cast, Callable
 from urllib.parse import quote, urlparse, urlunparse, urljoin
 from urllib.request import urlopen, Request
 
@@ -132,7 +132,7 @@ def known_bad_url(value):
     return False
 
 
-def known_bad_guess(datum):  # noqa: C901
+def known_bad_guess(datum: UpstreamDatum) -> bool:  # noqa: C901
     try:
         expected_type = DATUM_TYPES[datum.field]
     except KeyError:
@@ -147,6 +147,7 @@ def known_bad_guess(datum):  # noqa: C901
             datum.value, datum.field)
         return True
     if datum.field in ('Bug-Submit', 'Bug-Database'):
+        assert isinstance(datum.value, str)
         if known_bad_url(datum.value):
             return True
         parsed_url = urlparse(datum.value)
@@ -157,6 +158,7 @@ def known_bad_guess(datum):  # noqa: C901
         if parsed_url.path.endswith('/sign_in'):
             return True
     if datum.field == 'Repository':
+        assert isinstance(datum.value, str)
         if known_bad_url(datum.value):
             return True
         parsed_url = urlparse(datum.value)
@@ -167,10 +169,12 @@ def known_bad_guess(datum):  # noqa: C901
         if parsed_url.path.endswith('/sign_in'):
             return True
     if datum.field == 'Homepage':
+        assert isinstance(datum.value, str)
         parsed_url = urlparse(datum.value)
         if parsed_url.hostname in ('pypi.org', 'rubygems.org'):
             return True
     if datum.field == 'Repository-Browse':
+        assert isinstance(datum.value, str)
         if known_bad_url(datum.value):
             return True
         parsed_url = urlparse(datum.value)
@@ -179,15 +183,18 @@ def known_bad_guess(datum):  # noqa: C901
         if parsed_url.path.endswith('/sign_in'):
             return True
     if datum.field == 'X-Author':
+        assert isinstance(datum.value, list)
         for value in datum.value:
             if 'Maintainer' in value.name:
                 return True
             if 'Contributor' in value.name:
                 return True
     if datum.field == 'Name':
+        assert isinstance(datum.value, str)
         if datum.value.lower() == 'package':
             return True
     if datum.field == 'X-Version':
+        assert isinstance(datum.value, str)
         if datum.value.lower() in ('devel', ):
             return True
     if isinstance(datum.value, str) and datum.value.strip().lower() == 'unknown':
@@ -208,11 +215,12 @@ def update_from_guesses(upstream_metadata: UpstreamMetadata,
                         guessed_items: Iterable[UpstreamDatum]):
     changed = []
     for datum in guessed_items:
-        current_datum = upstream_metadata.get(datum.field)
+        current_datum: Optional[UpstreamDatum] = cast(
+            Optional[UpstreamDatum], upstream_metadata.get(datum.field))
         if not current_datum or (
                 certainty_to_confidence(datum.certainty)  # type: ignore
                 < certainty_to_confidence(current_datum.certainty)):
-            upstream_metadata[datum.field] = datum
+            upstream_metadata[datum.field] = datum  # type: ignore
             changed.append(datum)
     return changed
 
@@ -403,6 +411,7 @@ def guess_from_debian_changelog(path, trust_package):
     yield UpstreamDatum('Name', cl.package, 'confident')
     yield UpstreamDatum('X-Version', cl.version.upstream_version, 'confident')
     if source.startswith('rust-'):
+        semver_suffix: Optional[bool]
         try:
             from toml.decoder import load as load_toml
             with open('debian/debcargo.toml') as f:
@@ -410,7 +419,12 @@ def guess_from_debian_changelog(path, trust_package):
         except FileNotFoundError:
             semver_suffix = False
         else:
-            semver_suffix = debcargo.get('semver_suffix')
+            semver_suffix = debcargo.get('semver_suffix', False)
+            if not isinstance(semver_suffix, bool):
+                logging.warning(
+                    'Unexpected setting for semver_suffix: %r, resetting to False',
+                    semver_suffix)
+                semver_suffix = False
         from debmutate.debcargo import parse_debcargo_source_name, cargo_translate_dashes
         crate, crate_semver_version = parse_debcargo_source_name(
             source, semver_suffix)
@@ -540,7 +554,8 @@ def guess_from_pkg_info(path, trust_package):
     yield from guess_from_python_metadata(pkg_info)
 
 
-def parse_python_long_description(long_description, content_type):
+def parse_python_long_description(long_description, content_type) -> Iterator[UpstreamDatum]:
+    description: Optional[str]
     if long_description in (None, ''):
         return
     # Discard encoding, etc.
@@ -548,6 +563,7 @@ def parse_python_long_description(long_description, content_type):
         content_type = content_type.split(';')[0]
     if '-*-restructuredtext-*-' in long_description.splitlines()[0]:
         content_type = 'text/restructured-text'
+    extra_md: Iterable[UpstreamDatum]
     if content_type in (None, 'text/plain'):
         if len(long_description.splitlines()) > 30:
             return
@@ -573,7 +589,7 @@ def guess_from_setup_cfg(path, trust_package):
     try:
         from setuptools.config.setupcfg import read_configuration
     except ImportError:  # older setuptools
-        from setuptools.config import read_configuration
+        from setuptools.config import read_configuration  # type: ignore
     # read_configuration needs a function cwd
     try:
         os.getcwd()
@@ -610,6 +626,7 @@ def guess_from_setup_py_executed(path):
         pass
     from distutils.core import run_setup
     orig = os.getcwd()
+    result: Any
     try:
         os.chdir(os.path.dirname(path))
         result = run_setup(os.path.abspath(path), stop_after="config")
@@ -710,7 +727,7 @@ def guess_from_setup_py(path, trust_package):  # noqa: C901
 
                 elif isinstance(kw.value, ast.Dict):
                     setup_args[arg_name] = {}
-                    for (key, value) in zip(kw.value.keys, kw.value.values):
+                    for (key, value) in zip(kw.value.keys, kw.value.values):  # type: ignore
                         if isinstance(key, ast.Str) and isinstance(value, (ast.Str, ast.Constant)):
                             setup_args[key.s] = value.s
 
@@ -752,7 +769,7 @@ def guess_from_setup_py(path, trust_package):  # noqa: C901
             author_emails = [author_email]
         elif isinstance(author, list):
             authors = author
-            author_emails = author_email
+            author_emails = author_email  # type: ignore
         yield UpstreamDatum(
             'X-Author',
             [Person(author, email)
@@ -845,7 +862,7 @@ def xmlparse_simplify_namespaces(path, namespaces):
     for _, el in tree:
         for namespace in namespaces:
             el.tag = el.tag.replace(namespace, '')
-    return tree.root
+    return tree.root  # type: ignore
 
 
 def guess_from_package_xml(path, trust_package):
@@ -1027,13 +1044,13 @@ def guess_from_debian_copyright(path, trust_package):  # noqa: C901
                 "Contact", ','.join(header.upstream_contact), 'certain')
         if header.source:
             if ' ' in header.source:
-                from_urls.extend([u for u in re.split('[ ,\n]', header.source) if u])
+                from_urls.extend([u for u in re.split('[ ,\n]', header.source) if u])  # type: ignore
             else:
                 from_urls.append(header.source)
-        if "X-Upstream-Bugs" in header:
+        if "X-Upstream-Bugs" in header:  # type: ignore
             yield UpstreamDatum(
                 "Bug-Database", header["X-Upstream-Bugs"], 'certain')
-        if "X-Source-Downloaded-From" in header:
+        if "X-Source-Downloaded-From" in header:  # type: ignore
             url = guess_repo_from_url(header["X-Source-Downloaded-From"])
             if url is not None:
                 yield UpstreamDatum("Repository", url, 'certain')
@@ -1041,11 +1058,11 @@ def guess_from_debian_copyright(path, trust_package):  # noqa: C901
             from_urls.extend(
                 [m.group(0)
                  for m in
-                 re.finditer(r'((http|https):\/\/([^ ]+))', header.source)])
+                 re.finditer(r'((http|https):\/\/([^ ]+))', header.source)])  # type: ignore
         referenced_licenses = set()
         for para in copyright.all_paragraphs():
             if para.license:
-                referenced_licenses.add(para.license.synopsis)
+                referenced_licenses.add(para.license.synopsis)  # type: ignore
         if len(referenced_licenses) == 1 and referenced_licenses != {None}:
             yield UpstreamDatum('X-License', referenced_licenses.pop(), 'certain')
     else:
@@ -1629,12 +1646,14 @@ def guess_from_doap(path, trust_package):  # noqa: C901
             for person in child:
                 if person.tag != '{http://xmlns.com/foaf/0.1/}Person':
                     continue
-                name = person.find('{http://xmlns.com/foaf/0.1/}name').text
+                name_tag = person.find('{http://xmlns.com/foaf/0.1/}name')
+                if isinstance(name_tag, ElementTree.Element):
+                    name = name_tag.text
                 email_tag = person.find('{http://xmlns.com/foaf/0.1/}mbox')
                 maintainer = Person(
                     name,
-                    email=(email_tag.text if email_tag is not None else None),
-                    url=(extract_url(email_tag) if email_tag is not None else None))
+                    email=(email_tag.text if isinstance(email_tag, ElementTree.Element) else None),
+                    url=(extract_url(email_tag) if isinstance(email_tag, ElementTree.Element) is not None else None))
                 maintainers.append(maintainer)
         elif child.tag == '{%s}mailing-list' % DOAP_NAMESPACE:
             yield UpstreamDatum('X-MailingList', extract_url(child), 'certain')
@@ -1974,6 +1993,7 @@ def guess_from_cargo(path, trust_package):
     # see https://doc.rust-lang.org/cargo/reference/manifest.html
     try:
         from tomlkit import loads
+        from tomlkit.container import Container
         from tomlkit.exceptions import ParseError
     except ModuleNotFoundError as e:
         warn_missing_dependency(path, e.name)
@@ -1991,6 +2011,9 @@ def guess_from_cargo(path, trust_package):
     except KeyError:
         pass
     else:
+        if not isinstance(package, Container):
+            logging.warning('Cargo.toml does not appear to be a toml container?')
+            return
         if 'name' in package:
             yield UpstreamDatum('Name', str(package['name']), 'certain')
             yield UpstreamDatum('X-Cargo-Crate', str(package['name']), 'certain')
@@ -2004,14 +2027,16 @@ def guess_from_cargo(path, trust_package):
             yield UpstreamDatum('Repository', str(package['repository']), 'certain')
         if 'version' in package:
             yield UpstreamDatum('X-Version', str(package['version']), 'confident')
-        if 'authors' in package:
+        if 'authors' in package and isinstance(package['authors'], Container):
             yield UpstreamDatum(
-                'X-Author', [Person.from_string(author) for author in package['authors']], 'confident')
+                'X-Author',
+                [Person.from_string(author) for author in package['authors']], 'confident')
 
 
 def guess_from_pyproject_toml(path, trust_package):
     try:
         from tomlkit import loads
+        from tomlkit.container import Container
         from tomlkit.exceptions import ParseError
     except ModuleNotFoundError as e:
         warn_missing_dependency(path, e.name)
@@ -2024,8 +2049,16 @@ def guess_from_pyproject_toml(path, trust_package):
     except ParseError as e:
         logger.warning('Error parsing toml file %s: %s', path, e)
         return
-    if 'poetry' in pyproject.get('tool', []):
-        yield from guess_from_poetry(pyproject['tool']['poetry'])
+    try:
+        if isinstance(pyproject['tool'], Container):
+            poetry = pyproject['tool']['poetry']
+        else:
+            poetry = None
+    except KeyError:
+        pass
+    else:
+        if isinstance(poetry, Container):
+            yield from guess_from_poetry(pyproject)
 
 
 def guess_from_poetry(poetry):
@@ -2280,7 +2313,7 @@ def guess_from_authors(path, trust_package=False):
 
 
 def _get_guessers(path, trust_package=False):  # noqa: C901
-    CANDIDATES = [
+    CANDIDATES: List[Tuple[str, Callable[[str, bool], Iterator[UpstreamDatum]]]] = [
         ('debian/watch', guess_from_debian_watch),
         ('debian/control', guess_from_debian_control),
         ('debian/changelog', guess_from_debian_changelog),
@@ -2420,7 +2453,7 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
         abspath = os.path.join(path, relpath)
         if not os.path.exists(abspath):
             continue
-        yield relpath, guesser(abspath, trust_package=trust_package)
+        yield relpath, guesser(abspath, trust_package)
 
 
 def guess_upstream_metadata_items(
@@ -2455,7 +2488,7 @@ def guess_upstream_info(
 def get_upstream_info(
         path: str, trust_package: bool = False,
         net_access: bool = False, consult_external_directory: bool = False,
-        check: bool = False) -> UpstreamMetadata:
+        check: bool = False) -> Dict[str, Any]:
     metadata_items = []
     for entry in guess_upstream_info(path, trust_package=trust_package):
         if isinstance(entry, UpstreamDatum):
@@ -2471,7 +2504,7 @@ def summarize_upstream_metadata(
         metadata_items, path: str,
         net_access: bool = False,
         consult_external_directory: bool = False,
-        check: bool = False) -> UpstreamMetadata:
+        check: bool = False) -> Dict[str, Any]:
     """Summarize the upstream metadata into a dictionary.
 
     Args:
@@ -2497,14 +2530,16 @@ def summarize_upstream_metadata(
 
     fix_upstream_metadata(upstream_metadata)
 
-    return {k: v.value for (k, v) in upstream_metadata.items()}
+    return {
+        k: cast(UpstreamDatum, v).value
+        for (k, v) in upstream_metadata.items()}
 
 
 def guess_upstream_metadata(
         path: str, trust_package: bool = False,
         net_access: bool = False,
         consult_external_directory: bool = False,
-        check: bool = False) -> UpstreamMetadata:
+        check: bool = False) -> Dict[str, Any]:
     """Guess the upstream metadata dictionary.
 
     Args:
@@ -2534,19 +2569,19 @@ def _possible_fields_missing(upstream_metadata, fields, field_certainty):
 
 def _sf_git_extract_url(page):
     try:
-        from bs4 import BeautifulSoup
+        from bs4 import BeautifulSoup, Tag
     except ModuleNotFoundError:
         logger.warning(
             'Not scanning sourceforge page, since python3-bs4 is missing')
         return None
     bs = BeautifulSoup(page, features='lxml')
     el = bs.find(id='access_url')
-    if el is None:
+    if el is None or not isinstance(el, Tag):
         return None
     value = el.get('value')
     if value is None:
         return None
-    access_command = value.split(' ')
+    access_command = value.split(' ')  # type: ignore
     if access_command[:2] != ['git', 'clone']:
         return None
     return access_command[2]
@@ -2603,14 +2638,14 @@ def guess_from_sf(sf_project: str, subproject: Optional[str] = None):  # noqa: C
     if len(vcs_tools) > 1 and 'cvs' in [t[0] for t in vcs_tools]:
         vcs_tools = [v for v in vcs_tools if v[0] != 'cvs']
     if len(vcs_tools) == 1:
-        (kind, label, url) = vcs_tools[0]
+        (kind, _label, url) = vcs_tools[0]
         if kind == 'git':
             url = urljoin('https://sourceforge.net/', url)
             headers = {'User-Agent': USER_AGENT, 'Accept': 'text/html'}
-            http_contents = urlopen(
-                Request(url, headers=headers),
-                timeout=DEFAULT_URLLIB_TIMEOUT).read()
-            url = _sf_git_extract_url(http_contents)
+            with urlopen(
+                    Request(url, headers=headers),
+                    timeout=DEFAULT_URLLIB_TIMEOUT) as resp:
+                url = _sf_git_extract_url(resp.read())
         elif kind == 'svn':
             url = urljoin('https://svn.code.sf.net/', url)
         elif kind == 'hg':
@@ -2637,7 +2672,7 @@ def guess_from_repology(repology_project):
             'timeout contacting repology, ignoring: %s', repology_project)
         return
 
-    fields = {}
+    fields: Dict[str, Dict[str, int]] = {}
 
     def _add_field(name, value, add):
         fields.setdefault(name, {})
@@ -3308,7 +3343,7 @@ def _extrapolate_fields(
                 changed = True
 
 
-def verify_screenshots(urls):
+def verify_screenshots(urls: List[str]) -> Iterator[Tuple[str, Optional[bool]]]:
     headers = {'User-Agent': USER_AGENT}
     for url in urls:
         try:
@@ -3513,22 +3548,22 @@ def guess_from_pecl_url(url):
         logger.warning('timeout contacting pecl, ignoring: %s', url)
         return
     try:
-        from bs4 import BeautifulSoup
+        from bs4 import BeautifulSoup, Tag
     except ModuleNotFoundError:
         logger.warning(
             'bs4 missing so unable to scan pecl page, ignoring %s', url)
         return
     bs = BeautifulSoup(f.read(), features='lxml')
     tag = bs.find('a', text='Browse Source')
-    if tag is not None:
+    if isinstance(tag, Tag):
         yield 'Repository-Browse', tag.attrs['href']
     tag = bs.find('a', text='Package Bugs')
-    if tag is not None:
+    if isinstance(tag, Tag):
         yield 'Bug-Database', tag.attrs['href']
     label_tag = bs.find('th', text='Homepage')
-    if label_tag is not None:
+    if isinstance(label_tag, Tag) and label_tag.parent is not None:
         tag = label_tag.parent.find('a')
-        if tag is not None:
+        if isinstance(tag, Tag):
             yield 'Homepage', tag.attrs['href']
 
 
