@@ -22,11 +22,11 @@ SubElement = etree.SubElement
 tostring = etree.tostring
 
 RDF_NS = "http://www.w3.org/1999/02/22-rdf-syntax-ns"
-etree.register_namespace('rdf', RDF_NS)
+etree.register_namespace('rdf', RDF_NS)  # type: ignore
 FOAF_NS = "http://xmlns.com/foaf/0.1/"
-etree.register_namespace('foaf', FOAF_NS)
+etree.register_namespace('foaf', FOAF_NS)  # type: ignore
 DOAP_NS = "http://usefulinc.com/ns/doap"
-etree.register_namespace('doap', DOAP_NS)
+etree.register_namespace('doap', DOAP_NS)  # type: ignore
 
 
 def doap_file_from_upstream_info(upstream_info):
