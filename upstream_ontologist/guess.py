@@ -480,7 +480,7 @@ def metadata_from_itp_bug_body(body):  # noqa: C901
                 # This data is almost certainly for an older version
                 yield UpstreamDatum('X-Version', value, 'possible')
             elif key == 'Upstream Author' and value:
-                yield UpstreamDatum('X-Author', [value], 'confident')
+                yield UpstreamDatum('X-Author', [Person.from_string(value)], 'confident')
             elif key == 'URL':
                 yield UpstreamDatum('Homepage', value, 'confident')
             elif key == 'License':
