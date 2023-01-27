@@ -51,6 +51,9 @@ KNOWN_HOSTING_SITES = [
     'code.launchpad.net', 'github.com', 'launchpad.net', 'git.openstack.org']
 
 
+logger = logging.getLogger(__name__)
+
+
 def plausible_browse_url(url: str) -> bool:
     return url.startswith("https://") or url.startswith("http://")
 
@@ -72,9 +75,9 @@ def unsplit_vcs_url(
     """
     url = repo_url
     if branch:
-        url = "%s -b %s" % (url, branch)
+        url = "{} -b {}".format(url, branch)
     if subpath:
-        url = "%s [%s]" % (url, subpath)
+        url = "{} [{}]".format(url, subpath)
     return url
 
 
@@ -325,7 +328,10 @@ def find_public_repo_url(repo_url: str) -> Optional[str]:
 
 
 def fixup_rcp_style_git_repo_url(url: str) -> str:
-    from breezy.location import rcp_location_to_url
+    try:
+        from breezy.location import rcp_location_to_url
+    except ModuleNotFoundError:
+        return url
 
     try:
         repo_url = rcp_location_to_url(url)
@@ -355,7 +361,7 @@ def fix_path_in_port(
     if not port or port.isdigit():
         return None, None, None
     return (
-        parsed._replace(path="%s/%s" % (port, parsed.path.lstrip("/")), netloc=host),
+        parsed._replace(path="{}/{}".format(port, parsed.path.lstrip("/")), netloc=host),
         branch,
         subpath,
     )
@@ -499,13 +505,7 @@ def convert_cvs_list_to_str(urls):
     if not isinstance(urls, list):
         return urls
     if urls[0].startswith(":extssh:") or urls[0].startswith(":pserver:"):
-        try:
-            from breezy.location import cvs_to_url
-        except ImportError:
-            from breezy.location import pserver_to_url as cvs_to_url
-
-            if urls[0].startswith(":extssh:"):
-                raise NotImplementedError("unable to deal with extssh CVS locations.")
+        from breezy.location import cvs_to_url
         return cvs_to_url(urls[0]) + "#" + urls[1]
     return urls
 
@@ -574,15 +574,15 @@ def guess_repo_from_url(url, net_access=False):  # noqa: C901
     if parsed_url.netloc == 'sourceforge.net':
         if (len(path_elements) >= 4 and path_elements[0] == 'p'
                 and path_elements[3] == 'ci'):
-            return 'https://sourceforge.net/p/%s/%s' % (
+            return 'https://sourceforge.net/p/{}/{}'.format(
                 path_elements[1], path_elements[2])
     if parsed_url.netloc == 'www.apache.org':
         if len(path_elements) > 2 and path_elements[0] == 'dist':
-            return 'https://svn.apache.org/repos/asf/%s/%s' % (
+            return 'https://svn.apache.org/repos/asf/{}/{}'.format(
                 path_elements[1], path_elements[2])
     if parsed_url.netloc == 'bitbucket.org':
         if len(path_elements) >= 2:
-            return 'https://bitbucket.org/%s/%s' % (
+            return 'https://bitbucket.org/{}/{}'.format(
                 path_elements[0], path_elements[1])
     if parsed_url.netloc == 'ftp.gnu.org':
         if len(path_elements) >= 2 and path_elements[0] == 'gnu':
@@ -602,6 +602,8 @@ def guess_repo_from_url(url, net_access=False):  # noqa: C901
             parts = parts[:parts.index('-')]
         if 'tags' in parts:
             parts = parts[:parts.index('tags')]
+        if 'blob' in parts:
+            parts = parts[:parts.index('blob')]
         return urlunparse(
             parsed_url._replace(path='/'.join(parts), query=''))
     if parsed_url.hostname == 'git.php.net':
@@ -636,20 +638,20 @@ def check_repository_url_canonical(
                 url, "GitHub URL with less than 2 path elements")
         if path_elements[1].endswith('.git'):
             path_elements[1] = path_elements[1][:-4]
-        api_url = 'https://api.github.com/repos/%s/%s' % (
+        api_url = 'https://api.github.com/repos/{}/{}'.format(
             path_elements[0], path_elements[1])
         try:
             data = _load_json_url(api_url)
         except urllib.error.HTTPError as e:
             if e.code == 404:
                 raise InvalidUrl(
-                    url, "API URL %s does not exist" % api_url)
+                    url, "API URL %s does not exist" % api_url) from e
             elif e.code == 403:
                 # Probably rate limited
-                logging.warning(
+                logger.warning(
                     'Unable to verify bug database URL %s: %s',
                     url, e.reason)
-                raise UrlUnverifiable(url, "GitHub URL rate-limited")
+                raise UrlUnverifiable(url, "GitHub URL rate-limited") from e
             else:
                 raise
         else:
@@ -689,15 +691,18 @@ def probe_upstream_branch_url(
         # Let's not probe anything possibly non-public.
         return None
     if parsed.hostname == 'github.com':
+        path = parsed.path
+        if path.endswith('.git'):
+            path = path[:-4]
         api_url = ('https://api.github.com/repos/%s/tags'
-                   % parsed.path.strip('/'))
+                   % path.strip('/'))
         try:
             data = _load_json_url(api_url)
         except urllib.error.HTTPError as e:
             if e.code == 404:
                 return False
             elif e.code == 403:
-                logging.warning('Rate-limited by GitHub')
+                logger.warning('Rate-limited by GitHub')
                 return None
             else:
                 raise
@@ -728,7 +733,7 @@ def probe_upstream_branch_url(
             else:
                 return True
         except Exception as e:
-            logging.debug(
+            logger.debug(
                 'Error accessing %s: %s', url, e)
             # TODO(jelmer): Catch more specific exceptions?
             return False
