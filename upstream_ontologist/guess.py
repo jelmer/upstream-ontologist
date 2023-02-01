@@ -344,8 +344,11 @@ def guess_from_debian_watch(path, trust_package):
 
 
 def debian_is_native(path):
-    with open(os.path.join(path, "source/format")) as f:
-        return (f.read().strip() == "3.0 (native)")
+    try:
+        with open(os.path.join(path, "source/format")) as f:
+            return (f.read().strip() == "3.0 (native)")
+    except FileNotFoundError:
+        return None
 
 
 def guess_from_debian_control(path, trust_package):
@@ -392,11 +395,13 @@ def guess_from_debian_control(path, trust_package):
                     del description_lines[-1]
                 if description_lines and not description_lines[-1].strip():
                     del description_lines[-1]
-                yield UpstreamDatum(
-                    'X-Summary', summary, certainty)
-                yield UpstreamDatum(
-                    'X-Description',
-                    ''.join(description_lines), certainty)
+                if summary:
+                    yield UpstreamDatum(
+                        'X-Summary', summary, certainty)
+                if description_lines:
+                    yield UpstreamDatum(
+                        'X-Description',
+                        ''.join(description_lines), certainty)
         
 
 def guess_from_debian_changelog(path, trust_package):
@@ -1653,7 +1658,7 @@ def guess_from_doap(path, trust_package):  # noqa: C901
                 maintainer = Person(
                     name,
                     email=(email_tag.text if isinstance(email_tag, ElementTree.Element) else None),
-                    url=(extract_url(email_tag) if isinstance(email_tag, ElementTree.Element) is not None else None))
+                    url=(extract_url(email_tag) if isinstance(email_tag, ElementTree.Element) else None))
                 maintainers.append(maintainer)
         elif child.tag == '{%s}mailing-list' % DOAP_NAMESPACE:
             yield UpstreamDatum('X-MailingList', extract_url(child), 'certain')
