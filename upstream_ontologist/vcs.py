@@ -636,6 +636,10 @@ def check_repository_url_canonical(
         if len(path_elements) < 2:
             raise InvalidUrl(
                 url, "GitHub URL with less than 2 path elements")
+
+        if path_elements[0] == 'sponsors':
+            raise InvalidUrl(
+                url, "GitHub sponsors URL")
         if path_elements[1].endswith('.git'):
             path_elements[1] = path_elements[1][:-4]
         api_url = 'https://api.github.com/repos/{}/{}'.format(
