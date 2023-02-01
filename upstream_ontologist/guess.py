@@ -1997,8 +1997,8 @@ def guess_from_path(path):
 def guess_from_cargo(path, trust_package):
     # see https://doc.rust-lang.org/cargo/reference/manifest.html
     try:
+        from collections.abc import Mapping, Sequence
         from tomlkit import loads
-        from tomlkit.container import Container
         from tomlkit.exceptions import ParseError
     except ModuleNotFoundError as e:
         warn_missing_dependency(path, e.name)
@@ -2016,8 +2016,8 @@ def guess_from_cargo(path, trust_package):
     except KeyError:
         pass
     else:
-        if not isinstance(package, Container):
-            logging.warning('Cargo.toml does not appear to be a toml container?')
+        if not isinstance(package, Mapping):
+            logging.warning('Cargo.toml package does not appear to be a mapping?')
             return
         if 'name' in package:
             yield UpstreamDatum('Name', str(package['name']), 'certain')
@@ -2032,7 +2032,7 @@ def guess_from_cargo(path, trust_package):
             yield UpstreamDatum('Repository', str(package['repository']), 'certain')
         if 'version' in package:
             yield UpstreamDatum('X-Version', str(package['version']), 'confident')
-        if 'authors' in package and isinstance(package['authors'], Container):
+        if 'authors' in package and isinstance(package['authors'], Sequence):
             yield UpstreamDatum(
                 'X-Author',
                 [Person.from_string(author) for author in package['authors']], 'confident')
@@ -2040,8 +2040,8 @@ def guess_from_cargo(path, trust_package):
 
 def guess_from_pyproject_toml(path, trust_package):
     try:
+        from collections.abc import Mapping
         from tomlkit import loads
-        from tomlkit.container import Container
         from tomlkit.exceptions import ParseError
     except ModuleNotFoundError as e:
         warn_missing_dependency(path, e.name)
@@ -2055,14 +2055,14 @@ def guess_from_pyproject_toml(path, trust_package):
         logger.warning('Error parsing toml file %s: %s', path, e)
         return
     try:
-        if isinstance(pyproject['tool'], Container):
+        if isinstance(pyproject['tool'], Mapping):
             poetry = pyproject['tool']['poetry']
         else:
             poetry = None
     except KeyError:
         pass
     else:
-        if isinstance(poetry, Container):
+        if isinstance(poetry, Mapping):
             yield from guess_from_poetry(pyproject)
 
 
