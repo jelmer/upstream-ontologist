@@ -41,6 +41,7 @@ Extensions for upstream-ontologist, not defined in DEP-12:
  * ``X-Security-MD``: URL to markdown file with security policy
  * ``X-Author``: List of people who contributed to the project
  * ``X-Maintainer``: The maintainer of the project
+ * ``X-Funding``: URL to more information about funding
 
 Supported Data Sources
 ----------------------

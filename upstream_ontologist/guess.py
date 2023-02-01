@@ -648,6 +648,9 @@ def parse_python_project_urls(urls):
         elif url_type in ('Documentation', ):
             yield UpstreamDatum(
                 'Documentation', url, 'certain')
+        elif url_type in ('Funding', ):
+            yield UpstreamDatum(
+                'X-Funding', url, 'certain')
         else:
             logger.debug(
                 'Unknown Python project URL type: %s', url_type)
@@ -2026,6 +2029,8 @@ def guess_from_poetry(poetry):
         yield UpstreamDatum('Repository', str(poetry['repository']), 'certain')
     if 'name' in poetry:
         yield UpstreamDatum('Name', str(poetry['name']), 'certain')
+    if 'urls' in poetry:
+        yield from parse_python_project_urls(poetry['urls'])
 
 
 def guess_from_pom_xml(path, trust_package=False):  # noqa: C901
