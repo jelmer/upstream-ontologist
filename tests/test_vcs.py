@@ -43,7 +43,6 @@ class TestIsGitLabSite(TestCase):
     def test_not_gitlab(self):
         self.assertFalse(is_gitlab_site("foo.example.com"))
         self.assertFalse(is_gitlab_site("github.com"))
-        self.assertFalse(is_gitlab_site(None))
 
     def test_gitlab(self):
         self.assertTrue(is_gitlab_site("gitlab.somehost.com"))

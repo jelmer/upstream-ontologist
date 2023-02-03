@@ -53,7 +53,8 @@ jobs:
           yamllint .
       - name: Typing checks
         run: |
-          pip install -U mypy types-docutils types-Markdown types-toml
+          pip install -U mypy types-docutils types-Markdown types-toml \
+             types-beautifulsoup4
           python -m mypy upstream_ontologist/ tests/
       - name: Test suite run
         run: |

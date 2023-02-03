@@ -19,7 +19,7 @@
 
 from unittest import TestCase
 
-from upstream_ontologist import UpstreamDatum
+from upstream_ontologist import UpstreamDatum, Person
 from upstream_ontologist.guess import (
     metadata_from_itp_bug_body
 )
@@ -31,7 +31,9 @@ class MetadataFromItpBugBody(TestCase):
         self.assertEqual([
             UpstreamDatum('Name', 'setuptools-gettext', 'confident'),
             UpstreamDatum('X-Version', '0.0.1', 'possible'),
-            UpstreamDatum('X-Author', ['Breezy Team <breezy-core@googlegroups.com>'], 'confident'),
+            UpstreamDatum(
+                'X-Author', [Person.from_string(
+                    'Breezy Team <breezy-core@googlegroups.com>')], 'confident'),
             UpstreamDatum('Homepage', 'https://github.com/jelmer/setuptools-gettext', 'confident'),
             UpstreamDatum('X-License', 'GPL', 'confident'),
             UpstreamDatum('X-Summary', 'Compile .po files into .mo files', 'confident'),
