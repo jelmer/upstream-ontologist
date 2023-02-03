@@ -15,6 +15,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
+from typing import List
 import urllib.error
 from urllib.request import Request, urlopen
 from urllib.parse import urljoin
@@ -64,7 +65,7 @@ def _guess_from_page(text: bytes, basehref: str):
 def _guess_from_soup(soup, basehref):
     for a in soup.findAll('a'):
         href = a.get('href')
-        labels = [a.get('aria-label'), a.text]
+        labels: List[str] = [a.get('aria-label'), a.text]
         for label in filter(None, labels):
             if label.lower() in ('github', 'git', 'repository', 'github repository'):
                 yield UpstreamDatum('Repository', urljoin(basehref, href), certainty='possible')

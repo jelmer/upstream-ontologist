@@ -54,15 +54,21 @@ Supported, but currently not set.
 """
 
 import os
-from typing import Optional, Sequence, Dict
+from typing import Optional, Sequence, TypeVar, Generic, List
 from dataclasses import dataclass
 from email.utils import parseaddr
 from urllib.parse import urlparse
 
 
+try:
+    from typing import TypedDict  # type: ignore
+except ImportError:
+    from typing_extensions import TypedDict  # type: ignore
+
+
 SUPPORTED_CERTAINTIES = ["certain", "confident", "likely", "possible", None]
 
-version_string = "0.1.33"
+version_string = "0.1.34"
 
 USER_AGENT = "upstream-ontologist/" + version_string
 # Too aggressive?
@@ -114,12 +120,21 @@ class Person:
         return self.name
 
 
-class UpstreamDatum:
+T = TypeVar('T')
+
+
+class UpstreamDatum(Generic[T]):
     """A single piece of upstream metadata."""
 
     __slots__ = ["field", "value", "certainty", "origin"]
 
-    def __init__(self, field, value, certainty=None, origin=None):
+    field: str
+    value: T
+    certainty: Optional[str]
+    origin: Optional[str]
+
+    def __init__(self, field: str, value: T, certainty: Optional[str] = None,
+                 origin: Optional[str] = None) -> None:
         self.field = field
         if value is None:
             raise ValueError(field)
@@ -151,7 +166,17 @@ class UpstreamDatum:
         )
 
 
-UpstreamMetadata = Dict[str, UpstreamDatum]
+UpstreamMetadata = TypedDict('UpstreamMetadata', {
+    'Name': UpstreamDatum[str],
+    'Contact': UpstreamDatum[str],
+    'Repository': UpstreamDatum[str],
+    'Repository-Browse': UpstreamDatum[str],
+    'X-Summary': UpstreamDatum[str],
+    'Bug-Database': UpstreamDatum[str],
+    'Bug-Submit': UpstreamDatum[str],
+    'Homepage': UpstreamDatum[str],
+    'Screenshots': UpstreamDatum[List[str]],
+}, total=False)
 
 
 class UpstreamPackage:
@@ -190,7 +215,7 @@ def confidence_to_certainty(confidence: Optional[int]) -> str:
 
 
 def certainty_sufficient(
-    actual_certainty: str, minimum_certainty: Optional[str]
+    actual_certainty: Optional[str], minimum_certainty: Optional[str]
 ) -> bool:
     """Check if the actual certainty is sufficient.
 

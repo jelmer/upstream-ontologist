@@ -12,4 +12,4 @@ flake8:
 check:: typing
 
 typing:
-	mypy upstream_ontologist/
+	mypy upstream_ontologist/ tests/

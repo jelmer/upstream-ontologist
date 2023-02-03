@@ -1,3 +1,24 @@
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
+
+[tool.mypy]
+warn_redundant_casts = true
+warn_unused_configs = true
+check_untyped_defs = true
+ignore_missing_imports = false
+
+[[tool.mypy.overrides]]
+module = [
+    # No type hints yet
+    "ruamel.*",
+    "pysimplesoap.*",
+    "debianbts.*",
+    "setuptools.*",
+    "distro_info.*",
+    "pcre.*",
+    "lxml.*",
+    # Not available on Mac OS X
+    "debmutate.*",
+]
+ignore_missing_imports = true
