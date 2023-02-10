@@ -68,7 +68,7 @@ except ImportError:
 
 SUPPORTED_CERTAINTIES = ["certain", "confident", "likely", "possible", None]
 
-version_string = "0.1.34"
+version_string = "0.1.35"
 
 USER_AGENT = "upstream-ontologist/" + version_string
 # Too aggressive?
