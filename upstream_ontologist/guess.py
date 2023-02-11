@@ -3386,6 +3386,8 @@ def check_url_canonical(url: str) -> str:
             raise InvalidUrl(url, "url not found") from e
         if e.code == 429:
             raise UrlUnverifiable(url, "rate-by") from e
+        if e.code == 503:
+            raise UrlUnverifiable(url, "server-down") from e
         raise
     except (socket.timeout, TimeoutError) as e:
         raise UrlUnverifiable(url, 'timeout contacting') from e
