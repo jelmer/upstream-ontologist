@@ -1,6 +1,9 @@
 upstream-ontologist (0.1.35-1) UNRELEASED; urgency=low
 
   * New upstream release.
+  * Add hard dependency on python3-breezy and python3-ruamel.yaml for
+    now. These should eventually be Recommends or Suggest. Closes:
+    #1029750
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Sat, 11 Feb 2023 13:19:14 -0000
 
