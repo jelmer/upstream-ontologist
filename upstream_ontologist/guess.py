@@ -2213,7 +2213,7 @@ def guess_from_go_mod(path, trust_package=False):
                 yield UpstreamDatum('Name', modname.decode('utf-8'), 'certain')
 
 
-def guess_from_gemspec(path, trust_package=False):
+def guess_from_gemspec(path, trust_package=False):  # noqa: C901
     # TODO(jelmer): use a proper ruby wrapper instead?
     with open(path) as f:
         for line in f:
@@ -2229,13 +2229,24 @@ def guess_from_gemspec(path, trust_package=False):
                 except ValueError:
                     continue
                 key = key.strip()
-                rawval = rawval.strip()
-                if rawval.startswith('"') and rawval.endswith('".freeze'):
-                    val = rawval[1:-len('".freeze')]
-                elif rawval.startswith('"') and rawval.endswith('"'):
-                    val = rawval[1:-1]
-                else:
+
+                def parseval(v):
+                    v = v.strip()
+                    if v.startswith('"') and v.endswith('".freeze'):
+                        return v[1:-len('".freeze')]
+                    elif v.startswith('"') and v.endswith('"'):
+                        return v[1:-1]
+                    elif v.startswith("'") and v.endswith("'"):
+                        return v[1:-1]
+                    elif v.startswith("[") and v.endswith("]"):
+                        return [parseval(k) for k in v[1:-1].split(',')]
+                    else:
+                        raise ValueError
+                try:
+                    val = parseval(rawval)
+                except ValueError:
                     continue
+                
                 if key == "name":
                     yield UpstreamDatum('Name', val, 'certain')
                 elif key == 'version':
@@ -2246,6 +2257,23 @@ def guess_from_gemspec(path, trust_package=False):
                     yield UpstreamDatum('X-Summary', val, 'certain')
                 elif key == 'description':
                     yield UpstreamDatum('X-Description', val, 'certain')
+                elif key == 'rubygems_version':
+                    pass
+                elif key == 'required_ruby_version':
+                    pass
+                elif key == 'license':
+                    yield UpstreamDatum('X-License', val, 'certain')
+                elif key == 'authors':
+                    yield UpstreamDatum('X-Authors', [Person.from_string(a) for a in val], 'certain')
+                elif key == 'email':
+                    # Should we assume this belongs to the maintainer? mailing list?
+                    pass
+                elif key == 'require_paths':
+                    pass
+                elif key in ('rdoc_options', 'extra_rdoc_options'):
+                    pass
+                else:
+                    logger.debug('unknown field %s (%r) in gemspec', key, val)
             else:
                 logger.debug(
                     'ignoring unparseable line in %s: %r',
