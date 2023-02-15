@@ -15,6 +15,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
+from functools import partial
 import json
 import logging
 import operator
@@ -2280,11 +2281,11 @@ def guess_from_get_orig_source(path, trust_package=False):
 
 # https://docs.github.com/en/free-pro-team@latest/github/\
 # managing-security-vulnerabilities/adding-a-security-policy-to-your-repository
-def guess_from_security_md(path, trust_package=False):
+def guess_from_security_md(name, path, trust_package=False):
     if path.startswith('./'):
         path = path[2:]
     # TODO(jelmer): scan SECURITY.md for email addresses/URLs with instructions
-    yield UpstreamDatum('X-Security-MD', path, 'certain')
+    yield UpstreamDatum('X-Security-MD', name, 'certain')
 
 
 def guess_from_go_mod(path, trust_package=False):
@@ -2475,9 +2476,6 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
         ('pom.xml', guess_from_pom_xml),
         ('.git/config', guess_from_git_config),
         ('debian/get-orig-source.sh', guess_from_get_orig_source),
-        ('SECURITY.md', guess_from_security_md),
-        ('.github/SECURITY.md', guess_from_security_md),
-        ('docs/SECURITY.md', guess_from_security_md),
         ('pyproject.toml', guess_from_pyproject_toml),
         ('setup.cfg', guess_from_setup_cfg),
         ('go.mod', guess_from_go_mod),
@@ -2491,6 +2489,9 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
         ('metadata.json', guess_from_metadata_json),
         ('.travis.yml', guess_from_travis_yml),
     ]
+
+    for name in ('SECURITY.md', '.github/SECURITY.md', 'docs/SECURITY.md'):
+        CANDIDATES.append((name, partial(guess_from_security_md, name)))
 
     # Search for something Python-y
     found_pkg_info = os.path.exists(os.path.join(path, 'PKG-INFO'))
@@ -3479,7 +3480,7 @@ def _extrapolate_fields(
             changes = update_from_guesses(upstream_metadata, fn(upstream_metadata, net_access))
             if changes:
                 logger.debug(
-                    'Extrapolating (%r => %r) from (\'%s: %s\', %s)',
+                    'Extrapolating (%r ⇒ %r) from (\'%s: %s\', %s)',
                     ["{}: {}".format(us.field, us.value) for us in old_to_values.values() if us],
                     ["{}: {}".format(us.field, us.value) for us in changes if us],
                     from_value.field, from_value.value, from_value.certainty)
