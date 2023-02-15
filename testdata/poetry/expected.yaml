@@ -1,0 +1,19 @@
+Name: gi-docgen
+X-Version: '2021.1'
+X-Summary: Documentation tool for GObject-based libraries
+X-Author:
+- !Person
+  name: Emmanuele Bassi
+  email: ebassi@gnome.org
+X-License: GPL-3.0-or-later AND Apache-2.0 AND CC0-1.0
+Homepage: https://gitlab.gnome.org/GNOME/gi-docgen
+Documentation: https://gnome.pages.gitlab.gnome.org/gi-docgen/
+X-Keywords:
+- documentation
+- introspection
+- gobject
+- gtk
+Bug-Database: https://gitlab.gnome.org/GNOME/gi-docgen/issues
+Repository: https://gitlab.gnome.org/GNOME/gi-docgen.git
+Repository-Browse: https://gitlab.gnome.org/GNOME/gi-docgen
+Bug-Submit: https://gitlab.gnome.org/GNOME/gi-docgen/issues/new
