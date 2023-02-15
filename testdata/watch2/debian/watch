@@ -1,0 +1,4 @@
+version=4
+opts=repack,compression=xz,dversionmangle=s/\+ds//,repacksuffix=+ds \
+    https://github.com/example/example-cat/tags \
+    (?:.*?/)?v?(\d[\d.]*)\.tar\.gz debian uupdate
