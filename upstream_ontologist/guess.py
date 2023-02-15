@@ -125,6 +125,7 @@ DATUM_TYPES = {
     'X-Maintainer': Person,
     'X-Cargo-Crate': str,
     'X-API-Documentation': str,
+    'X-Funding': str,
 }
 
 
@@ -522,30 +523,32 @@ def metadata_from_itp_bug_body(body):  # noqa: C901
 
 
 def guess_from_python_metadata(pkg_info):
-    if 'Name' in pkg_info:
-        yield UpstreamDatum('Name', pkg_info['name'], 'certain')
-    if 'Version' in pkg_info:
-        yield UpstreamDatum('X-Version', pkg_info['Version'], 'certain')
-    if 'Home-page' in pkg_info:
-        yield UpstreamDatum('Homepage', pkg_info['Home-page'], 'certain')
-    for value in pkg_info.get_all('Project-URL', []):
-        url_type, url = value.split(', ')
-        if url_type in ('GitHub', 'Repository', 'Source Code'):
-            yield UpstreamDatum(
-                'Repository', url, 'certain')
-        if url_type in ('Bug Tracker', ):
-            yield UpstreamDatum(
-                'Bug-Database', url, 'certain')
-    if 'Summary' in pkg_info:
-        yield UpstreamDatum('X-Summary', pkg_info['Summary'], 'certain')
-    if 'Author' in pkg_info:
-        author_email = pkg_info.get('Author-email')
-        author = Person(pkg_info['Author'], author_email)
-        yield UpstreamDatum('X-Author', [author], 'certain')
-    if 'License' in pkg_info:
-        yield UpstreamDatum('X-License', pkg_info['License'], 'certain')
-    if 'Download-URL' in pkg_info:
-        yield UpstreamDatum('X-Download', pkg_info['Download-URL'], 'certain')
+    for field, value in pkg_info.items():
+        if field == 'Name':
+            yield UpstreamDatum('Name', value, 'certain')
+        elif field == 'Version':
+            yield UpstreamDatum('X-Version', value, 'certain')
+        elif field == 'Home-page':
+            yield UpstreamDatum('Homepage', value, 'certain')
+        elif field == 'Project-URL':
+            url_type, url = value.split(', ')
+            yield from parse_python_project_urls({url_type: url})
+        elif field == 'Summary':
+            yield UpstreamDatum('X-Summary', value, 'certain')
+        elif field == 'Author':
+            author_email = pkg_info.get('Author-email')
+            author = Person(value, author_email)
+            yield UpstreamDatum('X-Author', [author], 'certain')
+        elif field == 'License':
+            yield UpstreamDatum('X-License', value, 'certain')
+        elif field == 'Download-URL':
+            yield UpstreamDatum('X-Download', value, 'certain')
+        elif field in ('Author-email', 'Classifier', 'Requires-Python',
+                       'License-File', 'Metadata-Version',
+                       'Provides-Extra', 'Description-Content-Type'):
+            pass
+        else:
+            logger.debug('Unknown PKG-INFO field %s (%r)', field, value)
     yield from parse_python_long_description(
         pkg_info.get_payload(), pkg_info.get_content_type())
 
@@ -605,17 +608,36 @@ def guess_from_setup_cfg(path, trust_package):
     config = read_configuration(path)
     metadata = config.get('metadata')
     if metadata:
-        if 'name' in metadata:
-            yield UpstreamDatum('Name', metadata['name'], 'certain')
-        if 'version' in metadata:
-            yield UpstreamDatum('Name', metadata['version'], 'certain')
-        if 'url' in metadata:
-            yield from parse_python_url(metadata['url'])
-        yield from parse_python_long_description(
-            metadata.get('long_description'),
-            metadata.get('long_description_content_type'))
-        if 'description' in metadata:
-            yield UpstreamDatum('X-Summary', metadata['description'], 'certain')
+        for field, value in metadata.items():
+            if field == 'name':
+                yield UpstreamDatum('Name', value, 'certain')
+            elif field == 'version':
+                yield UpstreamDatum('Name', value, 'certain')
+            elif field == 'url':
+                yield from parse_python_url(value)
+            elif field == 'description':
+                yield UpstreamDatum('X-Summary', value, 'certain')
+            elif field == 'long_description':
+                yield from parse_python_long_description(
+                    value,
+                    metadata.get('long_description_content_type'))
+            elif field == 'maintainer':
+                yield UpstreamDatum(
+                    'X-Maintainer',
+                    Person(name=value, email=metadata.get('maintainer_email')),
+                    'certain')
+            elif field == 'author':
+                yield UpstreamDatum(
+                    'X-Author',
+                    [Person(name=value, email=metadata.get('author_email'))],
+                    'certain')
+            elif field == 'project_urls':
+                yield from parse_python_project_urls(value)
+            elif field in ('long_description_content_type', 'maintainer_email',
+                           'author_email'):
+                pass
+            else:
+                logger.debug('Unknown setup.cfg field %s (%r)', field, value)
 
 
 def parse_python_url(url):
@@ -667,10 +689,10 @@ def guess_from_setup_py_executed(path):
 
 def parse_python_project_urls(urls):
     for url_type, url in urls.items():
-        if url_type in ('GitHub', 'Repository', 'Source Code'):
+        if url_type in ('GitHub', 'Repository', 'Source Code', 'Source'):
             yield UpstreamDatum(
                 'Repository', str(url), 'certain')
-        elif url_type in ('Bug Tracker', ):
+        elif url_type in ('Bug Tracker', 'Bug Reports'):
             yield UpstreamDatum(
                 'Bug-Database', str(url), 'certain')
         elif url_type in ('Documentation', ):
@@ -820,62 +842,67 @@ def guess_from_package_json(path, trust_package):  # noqa: C901
     # see https://docs.npmjs.com/cli/v7/configuring-npm/package-json
     with open(path) as f:
         package = json.load(f)
-    if 'name' in package:
-        yield UpstreamDatum('Name', package['name'], 'certain')
-    if 'homepage' in package:
-        yield UpstreamDatum('Homepage', package['homepage'], 'certain')
-    if 'description' in package:
-        yield UpstreamDatum('X-Summary', package['description'], 'certain')
-    if 'license' in package:
-        yield UpstreamDatum('X-License', package['license'], 'certain')
-    if 'version' in package:
-        yield UpstreamDatum('X-Version', package['version'], 'certain')
-    if 'repository' in package:
-        if isinstance(package['repository'], dict):
-            repo_url = package['repository'].get('url')
-        elif isinstance(package['repository'], str):
-            repo_url = package['repository']
-        else:
-            repo_url = None
-        if repo_url:
-            parsed_url = urlparse(repo_url)
-            if parsed_url.scheme and parsed_url.netloc:
-                yield UpstreamDatum(
-                    'Repository', repo_url, 'certain')
-            elif repo_url.startswith('github:'):
-                # Some people seem to default to github. :(
-                repo_url = 'https://github.com/' + repo_url.split(':', 1)[1]
-                yield UpstreamDatum('Repository', repo_url, 'likely')
+    for field, value in package.items():
+        if field == 'name':
+            yield UpstreamDatum('Name', value, 'certain')
+        elif field == 'homepage':
+            yield UpstreamDatum('Homepage', value, 'certain')
+        elif field == 'description':
+            yield UpstreamDatum('X-Summary', value, 'certain')
+        elif field == 'license':
+            yield UpstreamDatum('X-License', value, 'certain')
+        elif field == 'version':
+            yield UpstreamDatum('X-Version', value, 'certain')
+        elif field == 'repository':
+            if isinstance(value, dict):
+                repo_url = value.get('url')
+            elif isinstance(value, str):
+                repo_url = value
             else:
-                # Some people seem to default to github. :(
-                repo_url = 'https://github.com/' + parsed_url.path
+                repo_url = None
+            if repo_url:
+                parsed_url = urlparse(repo_url)
+                if parsed_url.scheme and parsed_url.netloc:
+                    yield UpstreamDatum(
+                        'Repository', repo_url, 'certain')
+                elif repo_url.startswith('github:'):
+                    # Some people seem to default to github. :(
+                    repo_url = 'https://github.com/' + repo_url.split(':', 1)[1]
+                    yield UpstreamDatum('Repository', repo_url, 'likely')
+                else:
+                    # Some people seem to default to github. :(
+                    repo_url = 'https://github.com/' + parsed_url.path
+                    yield UpstreamDatum(
+                        'Repository', repo_url, 'likely')
+        elif field == 'bugs':
+            if isinstance(value, dict):
+                url = value.get('url')
+                if url is None and value.get('email'):
+                    url = 'mailto:' + value['email']
+            else:
+                url = value
+            if url:
+                yield UpstreamDatum('Bug-Database', url, 'certain')
+        elif field == 'author':
+            if isinstance(value, dict):
                 yield UpstreamDatum(
-                    'Repository', repo_url, 'likely')
-    if 'bugs' in package:
-        if isinstance(package['bugs'], dict):
-            url = package['bugs'].get('url')
-            if url is None and package['bugs'].get('email'):
-                url = 'mailto:' + package['bugs']['email']
+                    'X-Author', [Person(
+                        name=value.get('name'),
+                        url=value.get('url'),
+                        email=value.get('email'))],
+                    'confident')
+            elif isinstance(value, str):
+                yield UpstreamDatum(
+                    'X-Author', [Person.from_string(value)],
+                    'confident')
+            else:
+                logger.warning(
+                    'Unsupported type for author in package.json: %r',
+                    type(value))
+        elif field in ('dependencies', 'private', 'devDependencies', 'scripts'):
+            pass
         else:
-            url = package['bugs']
-        if url:
-            yield UpstreamDatum('Bug-Database', url, 'certain')
-    if 'author' in package:
-        if isinstance(package['author'], dict):
-            yield UpstreamDatum(
-                'X-Author', [Person(
-                    name=package['author'].get('name'),
-                    url=package['author'].get('url'),
-                    email=package['author'].get('email'))],
-                'confident')
-        elif isinstance(package['author'], str):
-            yield UpstreamDatum(
-                'X-Author', [Person.from_string(package['author'])],
-                'confident')
-        else:
-            logger.warning(
-                'Unsupported type for author in package.json: %r',
-                type(package['author']))
+            logger.debug('Unknown package.json field %s (%r)', field, value)
 
 
 def xmlparse_simplify_namespaces(path, namespaces):
@@ -899,29 +926,44 @@ def guess_from_package_xml(path, trust_package):
         logger.warning('Unable to parse package.xml: %s', e)
         return
     assert root.tag == 'package', 'root tag is %r' % root.tag
-    name_tag = root.find('name')
-    if name_tag is not None:
-        yield UpstreamDatum('Name', name_tag.text, 'certain')
-    summary_tag = root.find('summary')
-    if summary_tag is not None:
-        yield UpstreamDatum('X-Summary', summary_tag.text, 'certain')
-    description_tag = root.find('description')
-    if description_tag is not None:
-        yield UpstreamDatum('X-Description', description_tag.text, 'certain')
-    version_tag = root.find('version')
-    if version_tag is not None:
-        release_tag = version_tag.find('release')
-        if release_tag is not None:
-            yield UpstreamDatum('X-Version', release_tag.text, 'certain')
-    license_tag = root.find('license')
-    if license_tag is not None:
-        yield UpstreamDatum('X-License', license_tag.text, 'certain')
-    for url_tag in root.findall('url'):
-        if url_tag.get('type') == 'repository':
-            yield UpstreamDatum(
-                'Repository', url_tag.text, 'certain')
-        if url_tag.get('type') == 'bugtracker':
-            yield UpstreamDatum('Bug-Database', url_tag.text, 'certain')
+    leads = []
+    for el in root:
+        if el.tag == 'name':
+            yield UpstreamDatum('Name', el.text, 'certain')
+        elif el.tag == 'summary':
+            yield UpstreamDatum('X-Summary', el.text, 'certain')
+        elif el.tag == 'description':
+            yield UpstreamDatum('X-Description', el.text, 'certain')
+        elif el.tag == 'version':
+            release_tag = el.find('release')
+            if release_tag is not None:
+                yield UpstreamDatum('X-Version', release_tag.text, 'certain')
+        elif el.tag == 'license':
+            yield UpstreamDatum('X-License', el.text, 'certain')
+        elif el.tag == 'url':
+            if el.get('type') == 'repository':
+                yield UpstreamDatum(
+                    'Repository', el.text, 'certain')
+            if el.get('type') == 'bugtracker':
+                yield UpstreamDatum('Bug-Database', el.text, 'certain')
+        elif el.tag == 'lead':
+            leads.append(el)
+        elif el.tag in ('stability', 'dependencies', 'providesextension',
+                        'extsrcrelease', 'channel', 'notes', 'contents',
+                        'date', 'time'):
+            pass
+        else:
+            logger.debug('Unknown package.xml tag %s', el.tag)
+
+    for el in leads[:1]:
+        name_el = el.find('name')
+        email_el = el.find('email')
+        active_el = el.find('active')
+        if active_el is not None and active_el.text != 'yes':
+            continue
+        yield UpstreamDatum('X-Maintainer', Person(
+            name=name_el.text if name_el is not None else None,
+            email=email_el.text if email_el is not None else None), 'confident')
 
 
 def guess_from_pod(contents):

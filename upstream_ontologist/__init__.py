@@ -132,7 +132,7 @@ class Person:
 
     def __str__(self):
         if self.email:
-            return '{} <{}>'.format(self.name, self.email)
+            return f'{self.name} <{self.email}>'
         return self.name
 
 

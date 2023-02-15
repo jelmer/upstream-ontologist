@@ -1,0 +1,13 @@
+Name: autosize
+X-Version: 4.0.2
+X-Author:
+- !Person
+  name: Jack Moore
+  email: hello@jacklmoore.com
+  url: http://www.jacklmoore.com
+X-License: MIT
+Homepage: http://www.jacklmoore.com/autosize
+Repository: https://github.com/jackmoore/autosize.git
+Repository-Browse: https://github.com/jackmoore/autosize
+Bug-Database: https://github.com/jackmoore/autosize/issues
+Bug-Submit: https://github.com/jackmoore/autosize/issues/new
