@@ -1,0 +1,15 @@
+Source: golang-github-blah-blah
+Section: devel
+Priority: optional
+Standards-Version: 4.2.0
+Maintainer: Some Maintainer <example@example.com>
+Build-Depends: debhelper (>= 11~),
+               dh-golang,
+               golang-any
+
+Package: golang-github-blah-blah
+Architecture: all
+Depends: ${misc:Depends}
+Description: blah blah
+ blah blah
+

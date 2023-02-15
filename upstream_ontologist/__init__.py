@@ -58,6 +58,7 @@ from typing import Optional, Sequence, TypeVar, Generic, List
 from dataclasses import dataclass
 from email.utils import parseaddr
 from urllib.parse import urlparse
+import ruamel.yaml
 
 
 try:
@@ -75,8 +76,13 @@ USER_AGENT = "upstream-ontologist/" + version_string
 DEFAULT_URLLIB_TIMEOUT = 3
 
 
+yaml = ruamel.yaml.YAML(typ='safe')
+
+
 @dataclass
+@yaml.register_class
 class Person:
+    yaml_tag = '!Person'
 
     name: str
     email: Optional[str] = None
@@ -90,6 +96,16 @@ class Person:
             self.url = None
         else:
             self.url = url
+
+    @classmethod
+    def from_yaml(cls, constructor, node):
+        d = {}
+        for k, v in node.value:
+            d[k.value] = v.value
+        return cls(
+            name=d.get('name'),
+            email=d.get('email'),
+            url=d.get('url'))
 
     @classmethod
     def from_string(cls, text):
@@ -116,7 +132,7 @@ class Person:
 
     def __str__(self):
         if self.email:
-            return '{} <{}>'.format(self.name, self.email)
+            return f'{self.name} <{self.email}>'
         return self.name
 
 

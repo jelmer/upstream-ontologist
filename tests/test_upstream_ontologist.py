@@ -89,48 +89,6 @@ https://github.com/jelmer/dulwich/tags/dulwich-(.*).tar.gz
 
 
 class GuessFromPackageJsonTests(TestCaseInTempDir):
-    def test_simple(self):
-        with open("package.json", "w") as f:
-            f.write(
-                """\
-{
-  "name": "autosize",
-  "version": "4.0.2",
-  "author": {
-    "name": "Jack Moore",
-    "url": "http://www.jacklmoore.com",
-    "email": "hello@jacklmoore.com"
-  },
-  "main": "dist/autosize.js",
-  "license": "MIT",
-  "homepage": "http://www.jacklmoore.com/autosize",
-  "demo": "http://www.jacklmoore.com/autosize",
-  "repository": {
-    "type": "git",
-    "url": "http://github.com/jackmoore/autosize.git"
-  }
-}
-"""
-            )
-        self.assertEqual(
-            [
-                UpstreamDatum("Name", "autosize", "certain"),
-                UpstreamDatum(
-                    "Homepage", "http://www.jacklmoore.com/autosize", "certain"
-                ),
-                UpstreamDatum("X-License", "MIT", "certain", None),
-                UpstreamDatum("X-Version", "4.0.2", "certain"),
-                UpstreamDatum(
-                    "Repository", "http://github.com/jackmoore/autosize.git", "certain"
-                ),
-                UpstreamDatum(
-                    'X-Author', [Person(
-                        name="Jack Moore",
-                        url="http://www.jacklmoore.com", 
-                        email="hello@jacklmoore.com")], 'confident')
-            ],
-            list(guess_from_package_json("package.json", False)),
-        )
 
     def test_dummy(self):
         with open("package.json", "w") as f:

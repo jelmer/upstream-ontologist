@@ -1,0 +1,13 @@
+Source: haskell-blah
+Section: devel
+Priority: optional
+Standards-Version: 4.2.0
+Maintainer: Some Maintainer <example@example.com>
+Build-Depends: debhelper (>= 11~)
+
+Package: libghc6-haskell-blah
+Architecture: all
+Depends: ${misc:Depends}
+Description: blah blah
+ blah blah
+

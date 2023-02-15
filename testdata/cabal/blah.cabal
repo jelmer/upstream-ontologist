@@ -1,0 +1,23 @@
+Name:           TestPackage
+Version:        0.0
+Cabal-Version:  >= 1.2
+License:        BSD3
+Author:         Angela Author
+Synopsis:       Small package with two programs
+Build-Type:     Simple
+Bug-Reports:    https://github.com/example/foo/issues
+
+Executable program1
+  Build-Depends:  HUnit
+  Main-Is:        Main.hs
+  Hs-Source-Dirs: prog1
+
+Executable program2
+  Main-Is:        Main.hs
+  Build-Depends:  HUnit
+  Hs-Source-Dirs: prog2
+  Other-Modules:  Utils
+
+source-repository head
+  type: git
+  location: https://github.com/example/blah

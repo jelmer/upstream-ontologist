@@ -15,6 +15,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
+from functools import partial
 import json
 import logging
 import operator
@@ -104,7 +105,9 @@ DATUM_TYPES = {
     'Repository': str,
     'Repository-Browse': str,
     'Documentation': str,
+    'X-Keywords': list,
     'X-License': str,
+    'XS-Go-Import-Path': str,
     'X-Summary': str,
     'X-Description': str,
     'X-Wiki': str,
@@ -123,6 +126,7 @@ DATUM_TYPES = {
     'X-Maintainer': Person,
     'X-Cargo-Crate': str,
     'X-API-Documentation': str,
+    'X-Funding': str,
 }
 
 
@@ -402,7 +406,7 @@ def guess_from_debian_control(path, trust_package):
                     yield UpstreamDatum(
                         'X-Description',
                         ''.join(description_lines), certainty)
-        
+
 
 def guess_from_debian_changelog(path, trust_package):
     try:
@@ -520,30 +524,32 @@ def metadata_from_itp_bug_body(body):  # noqa: C901
 
 
 def guess_from_python_metadata(pkg_info):
-    if 'Name' in pkg_info:
-        yield UpstreamDatum('Name', pkg_info['name'], 'certain')
-    if 'Version' in pkg_info:
-        yield UpstreamDatum('X-Version', pkg_info['Version'], 'certain')
-    if 'Home-page' in pkg_info:
-        yield UpstreamDatum('Homepage', pkg_info['Home-page'], 'certain')
-    for value in pkg_info.get_all('Project-URL', []):
-        url_type, url = value.split(', ')
-        if url_type in ('GitHub', 'Repository', 'Source Code'):
-            yield UpstreamDatum(
-                'Repository', url, 'certain')
-        if url_type in ('Bug Tracker', ):
-            yield UpstreamDatum(
-                'Bug-Database', url, 'certain')
-    if 'Summary' in pkg_info:
-        yield UpstreamDatum('X-Summary', pkg_info['Summary'], 'certain')
-    if 'Author' in pkg_info:
-        author_email = pkg_info.get('Author-email')
-        author = Person(pkg_info['Author'], author_email)
-        yield UpstreamDatum('X-Author', [author], 'certain')
-    if 'License' in pkg_info:
-        yield UpstreamDatum('X-License', pkg_info['License'], 'certain')
-    if 'Download-URL' in pkg_info:
-        yield UpstreamDatum('X-Download', pkg_info['Download-URL'], 'certain')
+    for field, value in pkg_info.items():
+        if field == 'Name':
+            yield UpstreamDatum('Name', value, 'certain')
+        elif field == 'Version':
+            yield UpstreamDatum('X-Version', value, 'certain')
+        elif field == 'Home-page':
+            yield UpstreamDatum('Homepage', value, 'certain')
+        elif field == 'Project-URL':
+            url_type, url = value.split(', ')
+            yield from parse_python_project_urls({url_type: url})
+        elif field == 'Summary':
+            yield UpstreamDatum('X-Summary', value, 'certain')
+        elif field == 'Author':
+            author_email = pkg_info.get('Author-email')
+            author = Person(value, author_email)
+            yield UpstreamDatum('X-Author', [author], 'certain')
+        elif field == 'License':
+            yield UpstreamDatum('X-License', value, 'certain')
+        elif field == 'Download-URL':
+            yield UpstreamDatum('X-Download', value, 'certain')
+        elif field in ('Author-email', 'Classifier', 'Requires-Python',
+                       'License-File', 'Metadata-Version',
+                       'Provides-Extra', 'Description-Content-Type'):
+            pass
+        else:
+            logger.debug('Unknown PKG-INFO field %s (%r)', field, value)
     yield from parse_python_long_description(
         pkg_info.get_payload(), pkg_info.get_content_type())
 
@@ -603,17 +609,36 @@ def guess_from_setup_cfg(path, trust_package):
     config = read_configuration(path)
     metadata = config.get('metadata')
     if metadata:
-        if 'name' in metadata:
-            yield UpstreamDatum('Name', metadata['name'], 'certain')
-        if 'version' in metadata:
-            yield UpstreamDatum('Name', metadata['version'], 'certain')
-        if 'url' in metadata:
-            yield from parse_python_url(metadata['url'])
-        yield from parse_python_long_description(
-            metadata.get('long_description'),
-            metadata.get('long_description_content_type'))
-        if 'description' in metadata:
-            yield UpstreamDatum('X-Summary', metadata['description'], 'certain')
+        for field, value in metadata.items():
+            if field == 'name':
+                yield UpstreamDatum('Name', value, 'certain')
+            elif field == 'version':
+                yield UpstreamDatum('Name', value, 'certain')
+            elif field == 'url':
+                yield from parse_python_url(value)
+            elif field == 'description':
+                yield UpstreamDatum('X-Summary', value, 'certain')
+            elif field == 'long_description':
+                yield from parse_python_long_description(
+                    value,
+                    metadata.get('long_description_content_type'))
+            elif field == 'maintainer':
+                yield UpstreamDatum(
+                    'X-Maintainer',
+                    Person(name=value, email=metadata.get('maintainer_email')),
+                    'certain')
+            elif field == 'author':
+                yield UpstreamDatum(
+                    'X-Author',
+                    [Person(name=value, email=metadata.get('author_email'))],
+                    'certain')
+            elif field == 'project_urls':
+                yield from parse_python_project_urls(value)
+            elif field in ('long_description_content_type', 'maintainer_email',
+                           'author_email'):
+                pass
+            else:
+                logger.debug('Unknown setup.cfg field %s (%r)', field, value)
 
 
 def parse_python_url(url):
@@ -665,18 +690,18 @@ def guess_from_setup_py_executed(path):
 
 def parse_python_project_urls(urls):
     for url_type, url in urls.items():
-        if url_type in ('GitHub', 'Repository', 'Source Code'):
+        if url_type in ('GitHub', 'Repository', 'Source Code', 'Source'):
             yield UpstreamDatum(
-                'Repository', url, 'certain')
-        elif url_type in ('Bug Tracker', ):
+                'Repository', str(url), 'certain')
+        elif url_type in ('Bug Tracker', 'Bug Reports'):
             yield UpstreamDatum(
-                'Bug-Database', url, 'certain')
+                'Bug-Database', str(url), 'certain')
         elif url_type in ('Documentation', ):
             yield UpstreamDatum(
-                'Documentation', url, 'certain')
+                'Documentation', str(url), 'certain')
         elif url_type in ('Funding', ):
             yield UpstreamDatum(
-                'X-Funding', url, 'certain')
+                'X-Funding', str(url), 'certain')
         else:
             logger.debug(
                 'Unknown Python project URL type: %s', url_type)
@@ -789,78 +814,96 @@ def guess_from_composer_json(path, trust_package):
     # https://getcomposer.org/doc/04-schema.md
     with open(path) as f:
         package = json.load(f)
-    if 'name' in package:
-        yield UpstreamDatum('Name', package['name'], 'certain')
-    if 'homepage' in package:
-        yield UpstreamDatum('Homepage', package['homepage'], 'certain')
-    if 'description' in package:
-        yield UpstreamDatum('X-Summary', package['description'], 'certain')
-    if 'license' in package:
-        yield UpstreamDatum('X-License', package['license'], 'certain')
-    if 'version' in package:
-        yield UpstreamDatum('X-Version', package['version'], 'certain')
+    for field, value in package.items():
+        if field == 'name':
+            yield UpstreamDatum('Name', value, 'certain')
+        elif field == 'homepage':
+            yield UpstreamDatum('Homepage', value, 'certain')
+        elif field == 'description':
+            yield UpstreamDatum('X-Summary', value, 'certain')
+        elif field == 'license':
+            yield UpstreamDatum('X-License', value, 'certain')
+        elif field == 'version':
+            yield UpstreamDatum('X-Version', value, 'certain')
+        elif field == 'type':
+            if value != 'project':
+                logger.debug('unexpected composer.json type: %r', value)
+        elif field == 'keywords':
+            yield UpstreamDatum('X-Keywords', value, 'certain')
+        elif field in (
+                'require', 'require-dev', 'autoload',
+                'autoload-dev', 'scripts', 'extra', 'config', 'prefer-stable',
+                'minimum-stability'):
+            pass
+        else:
+            logger.debug('Unknown field %s (%r) in composer.json', field, value)
 
 
 def guess_from_package_json(path, trust_package):  # noqa: C901
     # see https://docs.npmjs.com/cli/v7/configuring-npm/package-json
     with open(path) as f:
         package = json.load(f)
-    if 'name' in package:
-        yield UpstreamDatum('Name', package['name'], 'certain')
-    if 'homepage' in package:
-        yield UpstreamDatum('Homepage', package['homepage'], 'certain')
-    if 'description' in package:
-        yield UpstreamDatum('X-Summary', package['description'], 'certain')
-    if 'license' in package:
-        yield UpstreamDatum('X-License', package['license'], 'certain')
-    if 'version' in package:
-        yield UpstreamDatum('X-Version', package['version'], 'certain')
-    if 'repository' in package:
-        if isinstance(package['repository'], dict):
-            repo_url = package['repository'].get('url')
-        elif isinstance(package['repository'], str):
-            repo_url = package['repository']
-        else:
-            repo_url = None
-        if repo_url:
-            parsed_url = urlparse(repo_url)
-            if parsed_url.scheme and parsed_url.netloc:
-                yield UpstreamDatum(
-                    'Repository', repo_url, 'certain')
-            elif repo_url.startswith('github:'):
-                # Some people seem to default to github. :(
-                repo_url = 'https://github.com/' + repo_url.split(':', 1)[1]
-                yield UpstreamDatum('Repository', repo_url, 'likely')
+    for field, value in package.items():
+        if field == 'name':
+            yield UpstreamDatum('Name', value, 'certain')
+        elif field == 'homepage':
+            yield UpstreamDatum('Homepage', value, 'certain')
+        elif field == 'description':
+            yield UpstreamDatum('X-Summary', value, 'certain')
+        elif field == 'license':
+            yield UpstreamDatum('X-License', value, 'certain')
+        elif field == 'version':
+            yield UpstreamDatum('X-Version', value, 'certain')
+        elif field == 'repository':
+            if isinstance(value, dict):
+                repo_url = value.get('url')
+            elif isinstance(value, str):
+                repo_url = value
             else:
-                # Some people seem to default to github. :(
-                repo_url = 'https://github.com/' + parsed_url.path
+                repo_url = None
+            if repo_url:
+                parsed_url = urlparse(repo_url)
+                if parsed_url.scheme and parsed_url.netloc:
+                    yield UpstreamDatum(
+                        'Repository', repo_url, 'certain')
+                elif repo_url.startswith('github:'):
+                    # Some people seem to default to github. :(
+                    repo_url = 'https://github.com/' + repo_url.split(':', 1)[1]
+                    yield UpstreamDatum('Repository', repo_url, 'likely')
+                else:
+                    # Some people seem to default to github. :(
+                    repo_url = 'https://github.com/' + parsed_url.path
+                    yield UpstreamDatum(
+                        'Repository', repo_url, 'likely')
+        elif field == 'bugs':
+            if isinstance(value, dict):
+                url = value.get('url')
+                if url is None and value.get('email'):
+                    url = 'mailto:' + value['email']
+            else:
+                url = value
+            if url:
+                yield UpstreamDatum('Bug-Database', url, 'certain')
+        elif field == 'author':
+            if isinstance(value, dict):
                 yield UpstreamDatum(
-                    'Repository', repo_url, 'likely')
-    if 'bugs' in package:
-        if isinstance(package['bugs'], dict):
-            url = package['bugs'].get('url')
-            if url is None and package['bugs'].get('email'):
-                url = 'mailto:' + package['bugs']['email']
+                    'X-Author', [Person(
+                        name=value.get('name'),
+                        url=value.get('url'),
+                        email=value.get('email'))],
+                    'confident')
+            elif isinstance(value, str):
+                yield UpstreamDatum(
+                    'X-Author', [Person.from_string(value)],
+                    'confident')
+            else:
+                logger.warning(
+                    'Unsupported type for author in package.json: %r',
+                    type(value))
+        elif field in ('dependencies', 'private', 'devDependencies', 'scripts'):
+            pass
         else:
-            url = package['bugs']
-        if url:
-            yield UpstreamDatum('Bug-Database', url, 'certain')
-    if 'author' in package:
-        if isinstance(package['author'], dict):
-            yield UpstreamDatum(
-                'X-Author', [Person(
-                    name=package['author'].get('name'),
-                    url=package['author'].get('url'),
-                    email=package['author'].get('email'))],
-                'confident')
-        elif isinstance(package['author'], str):
-            yield UpstreamDatum(
-                'X-Author', [Person.from_string(package['author'])],
-                'confident')
-        else:
-            logger.warning(
-                'Unsupported type for author in package.json: %r',
-                type(package['author']))
+            logger.debug('Unknown package.json field %s (%r)', field, value)
 
 
 def xmlparse_simplify_namespaces(path, namespaces):
@@ -884,29 +927,44 @@ def guess_from_package_xml(path, trust_package):
         logger.warning('Unable to parse package.xml: %s', e)
         return
     assert root.tag == 'package', 'root tag is %r' % root.tag
-    name_tag = root.find('name')
-    if name_tag is not None:
-        yield UpstreamDatum('Name', name_tag.text, 'certain')
-    summary_tag = root.find('summary')
-    if summary_tag is not None:
-        yield UpstreamDatum('X-Summary', summary_tag.text, 'certain')
-    description_tag = root.find('description')
-    if description_tag is not None:
-        yield UpstreamDatum('X-Description', description_tag.text, 'certain')
-    version_tag = root.find('version')
-    if version_tag is not None:
-        release_tag = version_tag.find('release')
-        if release_tag is not None:
-            yield UpstreamDatum('X-Version', release_tag.text, 'certain')
-    license_tag = root.find('license')
-    if license_tag is not None:
-        yield UpstreamDatum('X-License', license_tag.text, 'certain')
-    for url_tag in root.findall('url'):
-        if url_tag.get('type') == 'repository':
-            yield UpstreamDatum(
-                'Repository', url_tag.text, 'certain')
-        if url_tag.get('type') == 'bugtracker':
-            yield UpstreamDatum('Bug-Database', url_tag.text, 'certain')
+    leads = []
+    for el in root:
+        if el.tag == 'name':
+            yield UpstreamDatum('Name', el.text, 'certain')
+        elif el.tag == 'summary':
+            yield UpstreamDatum('X-Summary', el.text, 'certain')
+        elif el.tag == 'description':
+            yield UpstreamDatum('X-Description', el.text, 'certain')
+        elif el.tag == 'version':
+            release_tag = el.find('release')
+            if release_tag is not None:
+                yield UpstreamDatum('X-Version', release_tag.text, 'certain')
+        elif el.tag == 'license':
+            yield UpstreamDatum('X-License', el.text, 'certain')
+        elif el.tag == 'url':
+            if el.get('type') == 'repository':
+                yield UpstreamDatum(
+                    'Repository', el.text, 'certain')
+            if el.get('type') == 'bugtracker':
+                yield UpstreamDatum('Bug-Database', el.text, 'certain')
+        elif el.tag == 'lead':
+            leads.append(el)
+        elif el.tag in ('stability', 'dependencies', 'providesextension',
+                        'extsrcrelease', 'channel', 'notes', 'contents',
+                        'date', 'time'):
+            pass
+        else:
+            logger.debug('Unknown package.xml tag %s', el.tag)
+
+    for el in leads[:1]:
+        name_el = el.find('name')
+        email_el = el.find('email')
+        active_el = el.find('active')
+        if active_el is not None and active_el.text != 'yes':
+            continue
+        yield UpstreamDatum('X-Maintainer', Person(
+            name=name_el.text if name_el is not None else None,
+            email=email_el.text if email_el is not None else None), 'confident')
 
 
 def guess_from_pod(contents):
@@ -1212,28 +1270,35 @@ def guess_from_meson(path, trust_package):
 
 
 def guess_from_pubspec_yaml(path, trust_package):
-    import ruamel.yaml
+    from ruamel.yaml import YAML
     import ruamel.yaml.reader
+    import ruamel.yaml.parser
+    yaml = YAML(typ='safe', pure=True)
     with open(path, 'rb') as f:
         try:
-            data = ruamel.yaml.load(f, ruamel.yaml.SafeLoader)
+            data = yaml.load(f)
         except ruamel.yaml.reader.ReaderError as e:
             logger.warning('Unable to parse %s: %s', path, e)
             return
-    if 'name' in data:
-        yield UpstreamDatum('Name', data['name'], 'certain')
-    if 'description' in data:
-        yield UpstreamDatum('X-Description', data['description'], 'certain')
-    if 'version' in data:
-        yield UpstreamDatum('X-Version', data['version'], 'certain')
-    if 'homepage' in data:
-        yield UpstreamDatum('Homepage', data['homepage'], 'certain')
-    if 'repository' in data:
-        yield UpstreamDatum('Repository', data['repository'], 'certain')
-    if 'documentation' in data:
-        yield UpstreamDatum('Documentation', data['documentation'], 'certain')
-    if 'issue_tracker' in data:
-        yield UpstreamDatum('Bug-Database', data['issue_tracker'], 'certain')
+    for field in data:
+        if field == 'name':
+            yield UpstreamDatum('Name', data['name'], 'certain')
+        elif field == 'description':
+            yield UpstreamDatum('X-Description', data['description'], 'certain')
+        elif field == 'version':
+            yield UpstreamDatum('X-Version', data['version'], 'certain')
+        elif field == 'homepage':
+            yield UpstreamDatum('Homepage', data['homepage'], 'certain')
+        elif field == 'repository':
+            yield UpstreamDatum('Repository', data['repository'], 'certain')
+        elif field == 'documentation':
+            yield UpstreamDatum('Documentation', data['documentation'], 'certain')
+        elif field == 'issue_tracker':
+            yield UpstreamDatum('Bug-Database', data['issue_tracker'], 'certain')
+        elif field in ('environment', 'dependencies', 'dev_dependencies', 'flutter'):
+            pass
+        else:
+            logger.debug('Unknown field %s (%r) in pubspec.yml', field, data[field])
 
 
 def guess_from_install(path, trust_package):  # noqa: C901
@@ -1469,14 +1534,21 @@ def guess_from_meta_json(path, trust_package):
 
 
 def guess_from_travis_yml(path, trust_package):
-    import ruamel.yaml
+    from ruamel.yaml import YAML
     import ruamel.yaml.reader
+    import ruamel.yaml.parser
+    yaml = YAML(typ='safe', pure=True)
+
     with open(path, 'rb') as f:
         try:
-            ruamel.yaml.load(f, ruamel.yaml.SafeLoader)
+            data = yaml.load(f)
         except ruamel.yaml.reader.ReaderError as e:
             logger.warning('Unable to parse %s: %s', path, e)
             return
+
+        if 'go_import_path' in data:
+            yield UpstreamDatum(
+                'XS-Go-Import-Path', str(data['go_import_path']), certainty='certain')
 
 
 def guess_from_meta_yml(path, trust_package):
@@ -1485,11 +1557,13 @@ def guess_from_meta_yml(path, trust_package):
     See http://module-build.sourceforge.net/META-spec-v1.4.html for the
     specification of the format.
     """
-    import ruamel.yaml
+    from ruamel.yaml import YAML
     import ruamel.yaml.reader
+    import ruamel.yaml.parser
+    yaml = YAML(typ='safe', pure=True)
     with open(path, 'rb') as f:
         try:
-            data = ruamel.yaml.load(f, ruamel.yaml.SafeLoader)
+            data = yaml.load(f)
         except ruamel.yaml.reader.ReaderError as e:
             logger.warning('Unable to parse %s: %s', path, e)
             return
@@ -2000,7 +2074,6 @@ def guess_from_path(path):
 def guess_from_cargo(path, trust_package):
     # see https://doc.rust-lang.org/cargo/reference/manifest.html
     try:
-        from collections.abc import Mapping, Sequence
         from tomlkit import loads
         from tomlkit.exceptions import ParseError
     except ModuleNotFoundError as e:
@@ -2019,31 +2092,32 @@ def guess_from_cargo(path, trust_package):
     except KeyError:
         pass
     else:
-        if not isinstance(package, Mapping):
-            logging.warning('Cargo.toml package does not appear to be a mapping?')
-            return
-        if 'name' in package:
-            yield UpstreamDatum('Name', str(package['name']), 'certain')
-            yield UpstreamDatum('X-Cargo-Crate', str(package['name']), 'certain')
-        if 'description' in package:
-            yield UpstreamDatum('X-Summary', str(package['description']), 'certain')
-        if 'homepage' in package:
-            yield UpstreamDatum('Homepage', str(package['homepage']), 'certain')
-        if 'license' in package:
-            yield UpstreamDatum('X-License', str(package['license']), 'certain')
-        if 'repository' in package:
-            yield UpstreamDatum('Repository', str(package['repository']), 'certain')
-        if 'version' in package:
-            yield UpstreamDatum('X-Version', str(package['version']), 'confident')
-        if 'authors' in package and isinstance(package['authors'], Sequence):
-            yield UpstreamDatum(
-                'X-Author',
-                [Person.from_string(author) for author in package['authors']], 'confident')
+        for field, value in package.items():  # type: ignore
+            if field == 'name':
+                yield UpstreamDatum('Name', str(value), 'certain')
+                yield UpstreamDatum('X-Cargo-Crate', str(value), 'certain')
+            elif field == 'description':
+                yield UpstreamDatum('X-Summary', str(value), 'certain')
+            elif field == 'homepage':
+                yield UpstreamDatum('Homepage', str(value), 'certain')
+            elif field == 'license':
+                yield UpstreamDatum('X-License', str(value), 'certain')
+            elif field == 'repository':
+                yield UpstreamDatum('Repository', str(value), 'certain')
+            elif field == 'version':
+                yield UpstreamDatum('X-Version', str(value), 'confident')
+            elif field == 'authors':
+                yield UpstreamDatum(
+                    'X-Author',
+                    [Person.from_string(author) for author in value], 'confident')
+            elif field in ('edition', 'default-run'):
+                pass
+            else:
+                logger.debug('Unknown Cargo field %s (%r)', field, value)
 
 
 def guess_from_pyproject_toml(path, trust_package):
     try:
-        from collections.abc import Mapping
         from tomlkit import loads
         from tomlkit.exceptions import ParseError
     except ModuleNotFoundError as e:
@@ -2058,30 +2132,40 @@ def guess_from_pyproject_toml(path, trust_package):
         logger.warning('Error parsing toml file %s: %s', path, e)
         return
     try:
-        if isinstance(pyproject['tool'], Mapping):
-            poetry = pyproject['tool']['poetry']
-        else:
-            poetry = None
+        poetry = pyproject['tool']['poetry']  # type: ignore
     except KeyError:
         pass
     else:
-        if isinstance(poetry, Mapping):
-            yield from guess_from_poetry(pyproject)
+        yield from guess_from_poetry(poetry)
 
 
 def guess_from_poetry(poetry):
-    if 'version' in poetry:
-        yield UpstreamDatum('X-Version', str(poetry['version']), 'certain')
-    if 'description' in poetry:
-        yield UpstreamDatum('X-Summary', str(poetry['description']), 'certain')
-    if 'license' in poetry:
-        yield UpstreamDatum('X-License', str(poetry['license']), 'certain')
-    if 'repository' in poetry:
-        yield UpstreamDatum('Repository', str(poetry['repository']), 'certain')
-    if 'name' in poetry:
-        yield UpstreamDatum('Name', str(poetry['name']), 'certain')
-    if 'urls' in poetry:
-        yield from parse_python_project_urls(poetry['urls'])
+    for key, value in poetry.items():
+        if key == 'version':
+            yield UpstreamDatum('X-Version', str(value), 'certain')
+        elif key == 'description':
+            yield UpstreamDatum('X-Summary', str(value), 'certain')
+        elif key == 'license':
+            yield UpstreamDatum('X-License', str(value), 'certain')
+        elif key == 'repository':
+            yield UpstreamDatum('Repository', str(value), 'certain')
+        elif key == 'name':
+            yield UpstreamDatum('Name', str(value), 'certain')
+        elif key == 'urls':
+            yield from parse_python_project_urls(value)
+        elif key == 'keywords':
+            yield UpstreamDatum('X-Keywords', [str(x) for x in value], 'certain')
+        elif key == 'authors':
+            yield UpstreamDatum('X-Author', [Person.from_string(x) for x in value], 'certain')
+        elif key == 'homepage':
+            yield UpstreamDatum('Homepage', str(value), 'certain')
+        elif key == 'documentation':
+            yield UpstreamDatum('Documentation', str(value), 'certain')
+        elif key in ('packages', 'readme', 'classifiers', 'dependencies',
+                     'dev-dependencies', 'scripts'):
+            pass
+        else:
+            logger.debug('Unknown field %s (%r) for poetry', key, value)
 
 
 def guess_from_pom_xml(path, trust_package=False):  # noqa: C901
@@ -2197,11 +2281,11 @@ def guess_from_get_orig_source(path, trust_package=False):
 
 # https://docs.github.com/en/free-pro-team@latest/github/\
 # managing-security-vulnerabilities/adding-a-security-policy-to-your-repository
-def guess_from_security_md(path, trust_package=False):
+def guess_from_security_md(name, path, trust_package=False):
     if path.startswith('./'):
         path = path[2:]
     # TODO(jelmer): scan SECURITY.md for email addresses/URLs with instructions
-    yield UpstreamDatum('X-Security-MD', path, 'certain')
+    yield UpstreamDatum('X-Security-MD', name, 'certain')
 
 
 def guess_from_go_mod(path, trust_package=False):
@@ -2213,7 +2297,7 @@ def guess_from_go_mod(path, trust_package=False):
                 yield UpstreamDatum('Name', modname.decode('utf-8'), 'certain')
 
 
-def guess_from_gemspec(path, trust_package=False):
+def guess_from_gemspec(path, trust_package=False):  # noqa: C901
     # TODO(jelmer): use a proper ruby wrapper instead?
     with open(path) as f:
         for line in f:
@@ -2229,13 +2313,24 @@ def guess_from_gemspec(path, trust_package=False):
                 except ValueError:
                     continue
                 key = key.strip()
-                rawval = rawval.strip()
-                if rawval.startswith('"') and rawval.endswith('".freeze'):
-                    val = rawval[1:-len('".freeze')]
-                elif rawval.startswith('"') and rawval.endswith('"'):
-                    val = rawval[1:-1]
-                else:
+
+                def parseval(v):
+                    v = v.strip()
+                    if v.startswith('"') and v.endswith('".freeze'):
+                        return v[1:-len('".freeze')]
+                    elif v.startswith('"') and v.endswith('"'):
+                        return v[1:-1]
+                    elif v.startswith("'") and v.endswith("'"):
+                        return v[1:-1]
+                    elif v.startswith("[") and v.endswith("]"):
+                        return [parseval(k) for k in v[1:-1].split(',')]
+                    else:
+                        raise ValueError
+                try:
+                    val = parseval(rawval)
+                except ValueError:
                     continue
+                
                 if key == "name":
                     yield UpstreamDatum('Name', val, 'certain')
                 elif key == 'version':
@@ -2246,6 +2341,23 @@ def guess_from_gemspec(path, trust_package=False):
                     yield UpstreamDatum('X-Summary', val, 'certain')
                 elif key == 'description':
                     yield UpstreamDatum('X-Description', val, 'certain')
+                elif key == 'rubygems_version':
+                    pass
+                elif key == 'required_ruby_version':
+                    pass
+                elif key == 'license':
+                    yield UpstreamDatum('X-License', val, 'certain')
+                elif key == 'authors':
+                    yield UpstreamDatum('X-Authors', [Person.from_string(a) for a in val], 'certain')
+                elif key == 'email':
+                    # Should we assume this belongs to the maintainer? mailing list?
+                    pass
+                elif key == 'require_paths':
+                    pass
+                elif key in ('rdoc_options', 'extra_rdoc_options'):
+                    pass
+                else:
+                    logger.debug('unknown field %s (%r) in gemspec', key, val)
             else:
                 logger.debug(
                     'ignoring unparseable line in %s: %r',
@@ -2282,14 +2394,34 @@ def guess_from_wscript(path, trust_package=False):
 def guess_from_metadata_json(path, trust_package=False):
     with open(path) as f:
         data = json.load(f)
-        if data.get('description'):
-            yield UpstreamDatum('X-Description', data['description'], 'certain')
-        if 'name' in data:
-            yield UpstreamDatum('Name', data['name'], 'certain')
-        if 'version' in data:
-            yield UpstreamDatum('X-Version', str(data['version']), 'certain')
-        if data.get('url'):
-            yield UpstreamDatum('Homepage', data['url'], 'certain')
+        for field, value in data.items():
+            if field == 'description' and value:
+                yield UpstreamDatum('X-Description', value, 'certain')
+            elif field == 'name':
+                yield UpstreamDatum('Name', data['name'], 'certain')
+            elif field == 'version':
+                yield UpstreamDatum('X-Version', str(value), 'certain')
+            elif field == 'url' and value:
+                yield UpstreamDatum('Homepage', value, 'certain')
+            elif field == 'license':
+                yield UpstreamDatum('X-License', value, 'certain')
+            elif field == 'source':
+                yield UpstreamDatum('Repository', value, 'certain')
+            elif field == 'summary':
+                yield UpstreamDatum('X-Summary', value, 'certain')
+            elif field == 'issues_url':
+                yield UpstreamDatum('Bug-Database', value, 'certain')
+            elif field == 'project_page':
+                yield UpstreamDatum('Homepage', value, 'likely')
+            elif field == 'author':
+                if isinstance(value, str):
+                    yield UpstreamDatum('X-Author', [Person.from_string(value)], 'likely')
+                else:
+                    yield UpstreamDatum('X-Author', [Person.from_string(v) for v in value], 'likely')
+            elif field in ('operatingsystem_support', 'requirements', 'dependencies'):
+                pass
+            else:
+                logger.debug('Unknown field %s (%r) in metadata.json', field, value)
 
 
 def guess_from_authors(path, trust_package=False):
@@ -2344,9 +2476,6 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
         ('pom.xml', guess_from_pom_xml),
         ('.git/config', guess_from_git_config),
         ('debian/get-orig-source.sh', guess_from_get_orig_source),
-        ('SECURITY.md', guess_from_security_md),
-        ('.github/SECURITY.md', guess_from_security_md),
-        ('docs/SECURITY.md', guess_from_security_md),
         ('pyproject.toml', guess_from_pyproject_toml),
         ('setup.cfg', guess_from_setup_cfg),
         ('go.mod', guess_from_go_mod),
@@ -2355,9 +2484,14 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
         ('AUTHORS', guess_from_authors),
         ('INSTALL', guess_from_install),
         ('pubspec.yaml', guess_from_pubspec_yaml),
+        ('pubspec.yml', guess_from_pubspec_yaml),
         ('meson.build', guess_from_meson),
         ('metadata.json', guess_from_metadata_json),
+        ('.travis.yml', guess_from_travis_yml),
     ]
+
+    for name in ('SECURITY.md', '.github/SECURITY.md', 'docs/SECURITY.md'):
+        CANDIDATES.append((name, partial(guess_from_security_md, name)))
 
     # Search for something Python-y
     found_pkg_info = os.path.exists(os.path.join(path, 'PKG-INFO'))
@@ -3346,7 +3480,7 @@ def _extrapolate_fields(
             changes = update_from_guesses(upstream_metadata, fn(upstream_metadata, net_access))
             if changes:
                 logger.debug(
-                    'Extrapolating (%r => %r) from (\'%s: %s\', %s)',
+                    'Extrapolating (%r ⇒ %r) from (\'%s: %s\', %s)',
                     ["{}: {}".format(us.field, us.value) for us in old_to_values.values() if us],
                     ["{}: {}".format(us.field, us.value) for us in changes if us],
                     from_value.field, from_value.value, from_value.certainty)

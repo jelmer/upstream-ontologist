@@ -1,0 +1,63 @@
+# SPDX-FileCopyrightText: 2021 GNOME Foundation
+#
+# SPDX-License-Identifier: Apache-2.0 OR GPL-3.0-or-later
+
+[tool.poetry]
+name = "gi-docgen"
+packages = [
+    { include = "gidocgen" },
+]
+version = "2021.1"
+description = "Documentation tool for GObject-based libraries"
+authors = ["Emmanuele Bassi <ebassi@gnome.org>"]
+license = "GPL-3.0-or-later AND Apache-2.0 AND CC0-1.0"
+readme = "README.md"
+homepage = "https://gitlab.gnome.org/GNOME/gi-docgen"
+documentation = "https://gnome.pages.gitlab.gnome.org/gi-docgen/"
+keywords = ["documentation","introspection","gobject","gtk"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Natural Language :: English",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: BSD",
+    "Operating System :: POSIX :: Linux",
+    "Topic :: Desktop Environment :: Gnome",
+    "Topic :: Software Development :: Documentation"
+]
+
+[tool.poetry.urls]
+"Bug Tracker" = "https://gitlab.gnome.org/GNOME/gi-docgen/issues"
+
+[tool.poetry.dependencies]
+python = "^3.6"
+Markdown = "^3"
+MarkupSafe = "^1"
+Pygments = "^2"
+Jinja2 = "^2"
+toml = "^0"
+typogrify = "^2"
+
+[tool.poetry.dev-dependencies]
+coverage = "^5"
+green = "^3"
+mypy = "0.812"
+flake8 = "^3"
+black = {version = "^20.8b1", allow-prereleases = true}
+
+[tool.poetry.scripts]
+gi-docgen = "gidocgen.__main__:main"
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if False"
+]
+
+[build-system]
+requires = ["setuptools","wheel"]
