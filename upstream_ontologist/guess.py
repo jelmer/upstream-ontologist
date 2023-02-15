@@ -789,16 +789,27 @@ def guess_from_composer_json(path, trust_package):
     # https://getcomposer.org/doc/04-schema.md
     with open(path) as f:
         package = json.load(f)
-    if 'name' in package:
-        yield UpstreamDatum('Name', package['name'], 'certain')
-    if 'homepage' in package:
-        yield UpstreamDatum('Homepage', package['homepage'], 'certain')
-    if 'description' in package:
-        yield UpstreamDatum('X-Summary', package['description'], 'certain')
-    if 'license' in package:
-        yield UpstreamDatum('X-License', package['license'], 'certain')
-    if 'version' in package:
-        yield UpstreamDatum('X-Version', package['version'], 'certain')
+    for field, value in package.items():
+        if field == 'name':
+            yield UpstreamDatum('Name', value, 'certain')
+        elif field == 'homepage':
+            yield UpstreamDatum('Homepage', value, 'certain')
+        elif field == 'description':
+            yield UpstreamDatum('X-Summary', value, 'certain')
+        elif field == 'license':
+            yield UpstreamDatum('X-License', value, 'certain')
+        elif field == 'version':
+            yield UpstreamDatum('X-Version', value, 'certain')
+        elif field == 'type':
+            if value != 'project':
+                logger.debug('unexpected composer.json type: %r', value)
+        elif field in (
+                'keywords', 'require', 'require-dev', 'autoload',
+                'autoload-dev', 'scripts', 'extra', 'config', 'prefer-stable',
+                'minimum-stability'):
+            pass
+        else:
+            logger.debug('Unknown field %s (%r) in composer.json', field, value)
 
 
 def guess_from_package_json(path, trust_package):  # noqa: C901
@@ -1485,11 +1496,13 @@ def guess_from_meta_yml(path, trust_package):
     See http://module-build.sourceforge.net/META-spec-v1.4.html for the
     specification of the format.
     """
-    import ruamel.yaml
+    from ruamel.yaml import YAML
     import ruamel.yaml.reader
+    import ruamel.yaml.parser
+    yaml = YAML(typ='unsafe', pure=True)
     with open(path, 'rb') as f:
         try:
-            data = ruamel.yaml.load(f, ruamel.yaml.SafeLoader)
+            data = yaml.load(f)
         except ruamel.yaml.reader.ReaderError as e:
             logger.warning('Unable to parse %s: %s', path, e)
             return
@@ -2310,14 +2323,34 @@ def guess_from_wscript(path, trust_package=False):
 def guess_from_metadata_json(path, trust_package=False):
     with open(path) as f:
         data = json.load(f)
-        if data.get('description'):
-            yield UpstreamDatum('X-Description', data['description'], 'certain')
-        if 'name' in data:
-            yield UpstreamDatum('Name', data['name'], 'certain')
-        if 'version' in data:
-            yield UpstreamDatum('X-Version', str(data['version']), 'certain')
-        if data.get('url'):
-            yield UpstreamDatum('Homepage', data['url'], 'certain')
+        for field, value in data.items():
+            if field == 'description' and value:
+                yield UpstreamDatum('X-Description', value, 'certain')
+            elif field == 'name':
+                yield UpstreamDatum('Name', data['name'], 'certain')
+            elif field == 'version':
+                yield UpstreamDatum('X-Version', str(value), 'certain')
+            elif field == 'url' and value:
+                yield UpstreamDatum('Homepage', value, 'certain')
+            elif field == 'license':
+                yield UpstreamDatum('X-License', value, 'certain')
+            elif field == 'source':
+                yield UpstreamDatum('Repository', value, 'certain')
+            elif field == 'summary':
+                yield UpstreamDatum('X-Summary', value, 'certain')
+            elif field == 'issues_url':
+                yield UpstreamDatum('Bug-Database', value, 'certain')
+            elif field == 'project_page':
+                yield UpstreamDatum('Homepage', value, 'likely')
+            elif field == 'author':
+                if isinstance(value, str):
+                    yield UpstreamDatum('X-Author', [Person.from_string(value)], 'likely')
+                else:
+                    yield UpstreamDatum('X-Author', [Person.from_string(v) for v in value], 'likely')
+            elif field in ('operatingsystem_support', 'requirements', 'dependencies'):
+                pass
+            else:
+                logger.debug('Unknown field %s (%r) in metadata.json', field, value)
 
 
 def guess_from_authors(path, trust_package=False):

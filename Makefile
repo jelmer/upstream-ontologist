@@ -3,6 +3,10 @@ check:: unittest
 unittest:
 	python3 -m unittest tests.test_suite
 
+
+coverage:
+	python3 -m coverage run -m unittest tests.test_suite
+
 check:: flake8
 
 flake8:
