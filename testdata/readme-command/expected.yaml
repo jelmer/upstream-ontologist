@@ -4,7 +4,7 @@ Homepage: https://github.com/blah/blah
 Name: readme-command
 Repository: https://github.com/blah/blah.git
 Repository-Browse: https://github.com/blah/blah
-X-Description: >
+Description: >
  This is a project. You can clone it by running:
 
     git clone https://github.com/blah/blah blah

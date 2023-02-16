@@ -5,4 +5,4 @@
  "Name": "Blah",
  "Repository": "https://github.com/example/blah.git",
  "Repository-Browse": "https://github.com/example/blah",
- "X-License": "GPL-2+"}
+ "License": "GPL-2+"}

@@ -38,11 +38,11 @@ def _skip_paragraph(para, metadata):  # noqa: C901
         return True
     m = re.match(r'It is licensed under (.*)', para)
     if m:
-        metadata.append(UpstreamDatum('X-License', m.group(1), 'possible'))
+        metadata.append(UpstreamDatum('License', m.group(1), 'possible'))
         return True
     m = re.match(r'License: (.*)', para, re.I)
     if m:
-        metadata.append(UpstreamDatum('X-License', m.group(1), 'likely'))
+        metadata.append(UpstreamDatum('License', m.group(1), 'likely'))
         return True
     m = re.match('(Home page|homepage_url|Main website|Website|Homepage): (.*)', para, re.I)
     if m:
@@ -75,7 +75,7 @@ def _skip_paragraph(para, metadata):  # noqa: C901
         r'This software is freely distributable under the (.*) license.*',
         para)
     if m:
-        metadata.append(UpstreamDatum('X-License', m.group(1), 'likely'))
+        metadata.append(UpstreamDatum('License', m.group(1), 'likely'))
         return True
     m = re.match(r'This .* is hosted at .*', para)
     if m:
@@ -94,7 +94,7 @@ def _skip_paragraph(para, metadata):  # noqa: C901
         return True
     m = re.match(r'Copyright (\(c\) |)(.*)', para)
     if m:
-        metadata.append(UpstreamDatum('X-Copyright', m.group(2), 'possible'))
+        metadata.append(UpstreamDatum('Copyright', m.group(2), 'possible'))
         return True
     if re.match('You install .*', para):
         return True
@@ -154,19 +154,19 @@ def _skip_paragraph_block(para, metadata):  # noqa: C901
                     'Documentation', c.get('href'), 'confident'))
             elif name and name.lower() == 'api docs':
                 metadata.append(UpstreamDatum(
-                    'X-API-Documentation', c.get('href'), 'confident'))
+                    'API-Documentation', c.get('href'), 'confident'))
             elif name and name.lower() == 'downloads':
                 metadata.append(UpstreamDatum(
-                    'X-Download', c.get('href'), 'confident'))
+                    'Download', c.get('href'), 'confident'))
             elif name and name.lower() == 'crates.io':
                 href = c.get('href')
                 if href.startswith('https://crates.io/crates/'):
                     metadata.append(UpstreamDatum(
-                        'X-Cargo-Crate', href.rsplit('/')[-1], 'confident'))
+                        'Cargo-Crate', href.rsplit('/')[-1], 'confident'))
             elif name:
                 m = re.match('(.*) License', name)
                 if m:
-                    metadata.append(UpstreamDatum('X-License', m.group(1), 'likely'))
+                    metadata.append(UpstreamDatum('License', m.group(1), 'likely'))
                 else:
                     logger.debug('Unhandled field %r in README', name)
             continue
@@ -216,9 +216,9 @@ def _parse_first_header(el):
             name = name[len('About '):]
         yield UpstreamDatum('Name', name.strip(), certainty)
     if summary:
-        yield UpstreamDatum('X-Summary', summary, 'likely')
+        yield UpstreamDatum('Summary', summary, 'likely')
     if version:
-        yield UpstreamDatum('X-Version', version, 'likely')
+        yield UpstreamDatum('Version', version, 'likely')
 
 
 def _is_semi_header(el):
@@ -295,7 +295,7 @@ def _parse_field(name, body):
     if name == 'Documentation' and body.find('a'):
         yield UpstreamDatum('Documentation', body.find('a').get('href'), 'confident')
     if name == 'License':
-        yield UpstreamDatum('X-License', body.get_text(), 'confident')
+        yield UpstreamDatum('License', body.get_text(), 'confident')
 
 
 def _parse_ul_field_list(el):
@@ -417,9 +417,9 @@ def description_from_readme_plain(text: str) -> Tuple[Optional[str], Iterable[Up
         if name:
             metadata.append(UpstreamDatum('Name', name, 'likely'))
         if version:
-            metadata.append(UpstreamDatum('X-Version', version, 'likely'))
+            metadata.append(UpstreamDatum('Version', version, 'likely'))
         if summary:
-            metadata.append(UpstreamDatum('X-Summary', summary, 'likely'))
+            metadata.append(UpstreamDatum('Summary', summary, 'likely'))
         if name or version or summary:
             lines.pop(0)
     else:

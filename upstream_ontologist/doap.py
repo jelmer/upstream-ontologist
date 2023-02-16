@@ -39,17 +39,17 @@ def doap_file_from_upstream_info(upstream_info):
         hp = SubElement(project, '{%s}homepage' % DOAP_NS)
         hp.set('{%s}resource' % RDF_NS, upstream_info['Homepage'])
 
-    if 'X-Summary' in upstream_info:
+    if 'Summary' in upstream_info:
         sd = SubElement(project, '{%s}shortdesc' % DOAP_NS)
-        sd.text = upstream_info['X-Summary']
+        sd.text = upstream_info['Summary']
 
-    if 'X-Description' in upstream_info:
+    if 'Description' in upstream_info:
         sd = SubElement(project, '{%s}description' % DOAP_NS)
-        sd.text = upstream_info['X-Description']
+        sd.text = upstream_info['Description']
 
-    if 'X-Download' in upstream_info:
+    if 'Download' in upstream_info:
         dp = SubElement(project, '{%s}download-page' % DOAP_NS)
-        dp.set('{%s}resource' % RDF_NS, upstream_info['X-Download'])
+        dp.set('{%s}resource' % RDF_NS, upstream_info['Download'])
 
     if 'Repository' in upstream_info or 'Repository-Browse' in upstream_info:
         repository = SubElement(project, '{%s}repository' % DOAP_NS)
@@ -62,9 +62,9 @@ def doap_file_from_upstream_info(upstream_info):
             location = SubElement(git_repo, '{%s}browse' % DOAP_NS)
             location.set('{%s}resource' % RDF_NS, upstream_info['Repository-Browse'])
 
-    if 'X-Mailing-List' in upstream_info:
+    if 'Mailing-List' in upstream_info:
         mailinglist = SubElement(project, '{%s}mailing-list' % DOAP_NS)
-        mailinglist.set('{%s}resource' % RDF_NS, upstream_info['X-Mailing-List'])
+        mailinglist.set('{%s}resource' % RDF_NS, upstream_info['Mailing-List'])
 
     if 'Bug-Database' in upstream_info:
         bugdb = SubElement(project, '{%s}bug-database' % DOAP_NS)
@@ -78,9 +78,9 @@ def doap_file_from_upstream_info(upstream_info):
         security_contact = SubElement(project, '{%s}security-contact' % DOAP_NS)
         security_contact.set('{%s}resource' % RDF_NS, upstream_info['Security-Contact'])
 
-    if 'X-Wiki' in upstream_info:
+    if 'Wiki' in upstream_info:
         wiki = SubElement(project, '{%s}wiki' % DOAP_NS)
-        wiki.set('{%s}resource' % RDF_NS, upstream_info['X-Wiki'])
+        wiki.set('{%s}resource' % RDF_NS, upstream_info['Wiki'])
 
     return etree.ElementTree(project)
 

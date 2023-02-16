@@ -25,17 +25,17 @@ def codemeta_file_from_upstream_info(upstream_info):
     }
     if "Name" in upstream_info:
         ret["name"] = upstream_info["Name"]
-    if "X-Version" in upstream_info:
-        ret["version"] = upstream_info["X-Version"]
+    if "Version" in upstream_info:
+        ret["version"] = upstream_info["Version"]
     if "Repository" in upstream_info:
         ret["codeRepository"] = upstream_info["Repository"]
     if "Bug-Database" in upstream_info:
         ret["issueTracker"] = upstream_info["Bug-Database"]
     # TODO(jelmer): Support setting contIntegration
-    if "X-License" in upstream_info:
-        ret["license"] = "https://spdx.org/licenses/%s" % upstream_info["X-License"]
-    if "X-Description" in upstream_info:
-        ret["description"] = upstream_info["X-Description"]
+    if "License" in upstream_info:
+        ret["license"] = "https://spdx.org/licenses/%s" % upstream_info["License"]
+    if "Description" in upstream_info:
+        ret["description"] = upstream_info["Description"]
     # TODO(jelmer): Support keywords
     # TODO(jelmer): Support funder
     # TODO(jelmer): Support funding
@@ -52,8 +52,8 @@ def codemeta_file_from_upstream_info(upstream_info):
     for link_field in ["Documentation", "Homepage"]:
         if link_field in upstream_info:
             ret.setdefault("relatedLink", []).append(upstream_info[link_field])
-    if "X-Download" in upstream_info:
-        ret["downloadUrl"] = upstream_info["X-Download"]
+    if "Download" in upstream_info:
+        ret["downloadUrl"] = upstream_info["Download"]
     return ret
 
 

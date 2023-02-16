@@ -3,6 +3,6 @@
  "Name": "PerlIO-eol",
  "Repository": "https://github.com/shlomif/PerlIO-eol.git",
  "Repository-Browse": "https://github.com/shlomif/PerlIO-eol",
- "X-Copyright": "2004 Audrey Tang",
- "X-License": "Perl_5"}
+ "Copyright": "2004 Audrey Tang",
+ "License": "Perl_5"}
 

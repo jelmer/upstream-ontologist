@@ -4,11 +4,11 @@ Homepage: http://www.example.com/something
 Name: something
 Repository: https://github.com/jelmer/example.git
 Repository-Browse: https://github.com/jelmer/example
-X-Author:
+Author:
  - !Person
    name: Somebody
    email: somebody@example.com
-X-Cargo-Crate: something
-X-License: Apache-2.0
-X-Summary: Something something
-X-Version: 0.1.0
+Cargo-Crate: something
+License: Apache-2.0
+Summary: Something something
+Version: 0.1.0

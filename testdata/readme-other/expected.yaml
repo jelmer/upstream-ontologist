@@ -4,4 +4,4 @@
  "Name": "readme-other",
  "Repository": "https://github.com/blah/blah.git",
  "Repository-Browse": "https://github.com/blah/blah",
- "X-Description": "This is a project. One of the dependencies is blah, which you can install from:\n\nhttps://github.com/blah/blah.git\n"}
+ "Description": "This is a project. One of the dependencies is blah, which you can install from:\n\nhttps://github.com/blah/blah.git\n"}

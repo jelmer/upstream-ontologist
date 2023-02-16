@@ -31,17 +31,17 @@ Standard fields:
 
 Extensions for upstream-ontologist, not defined in DEP-12:
 
- * ``X-SourceForge-Project``: sourceforge project name
- * ``X-Wiki``: Wiki URL
- * ``X-Summary``: one-line description of the project
- * ``X-Description``: longer description of the project
- * ``X-License``: Single line license (e.g. "GPL 2.0")
- * ``X-Copyright``: List of copyright holders
- * ``X-Version``: Current upstream version
- * ``X-Security-MD``: URL to markdown file with security policy
- * ``X-Author``: List of people who contributed to the project
- * ``X-Maintainer``: The maintainer of the project
- * ``X-Funding``: URL to more information about funding
+ * ``SourceForge-Project``: sourceforge project name
+ * ``Wiki``: Wiki URL
+ * ``Summary``: one-line description of the project
+ * ``Description``: longer description of the project
+ * ``License``: Single line license (e.g. "GPL 2.0")
+ * ``Copyright``: List of copyright holders
+ * ``Version``: Current upstream version
+ * ``Security-MD``: URL to markdown file with security policy
+ * ``Author``: List of people who contributed to the project
+ * ``Maintainer``: The maintainer of the project
+ * ``Funding``: URL to more information about funding
 
 Supported Data Sources
 ----------------------
@@ -95,12 +95,12 @@ The easiest way to use the upstream ontologist is by invoking the
 
 ```console
 $ guess-upstream-metadata ~/src/dulwich
-X-Security-MD: https://github.com/dulwich/dulwich/tree/HEAD/SECURITY.md
+Security-MD: https://github.com/dulwich/dulwich/tree/HEAD/SECURITY.md
 Name: dulwich
-X-Version: 0.20.15
+Version: 0.20.15
 Bug-Database: https://github.com/dulwich/dulwich/issues
 Repository: https://www.dulwich.io/code/
-X-Summary: Python Git Library
+Summary: Python Git Library
 Bug-Submit: https://github.com/dulwich/dulwich/issues/new
 ```
 

@@ -4,5 +4,5 @@
  "Name": "Blah-Blieh",
  "Repository": "https://github.com/example/Blah.git",
  "Repository-Browse": "https://github.com/example/Blah",
- "X-License": "perl",
- "X-Version": "0.110"}
+ "License": "perl",
+ "Version": "0.110"}
