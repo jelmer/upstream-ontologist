@@ -36,14 +36,14 @@ Supported fields:
 - Security-Contact
 
 Extensions for upstream-ontologist.
-- X-SourceForge-Project: Name of the SourceForge project
-- X-Wiki: URL to a wiki
-- X-Summary: A one-line description
-- X-Description: Multi-line description
-- X-License: Short description of the license
-- X-Copyright
-- X-Maintainer
-- X-Authors
+- SourceForge-Project: Name of the SourceForge project
+- Wiki: URL to a wiki
+- Summary: A one-line description
+- Description: Multi-line description
+- License: Short description of the license
+- Copyright
+- Maintainer
+- Authors
 
 Supported, but currently not set.
 - FAQ
@@ -187,7 +187,7 @@ UpstreamMetadata = TypedDict('UpstreamMetadata', {
     'Contact': UpstreamDatum[str],
     'Repository': UpstreamDatum[str],
     'Repository-Browse': UpstreamDatum[str],
-    'X-Summary': UpstreamDatum[str],
+    'Summary': UpstreamDatum[str],
     'Bug-Database': UpstreamDatum[str],
     'Bug-Submit': UpstreamDatum[str],
     'Homepage': UpstreamDatum[str],

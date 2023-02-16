@@ -30,14 +30,14 @@ class MetadataFromItpBugBody(TestCase):
     def test_simple(self):
         self.assertEqual([
             UpstreamDatum('Name', 'setuptools-gettext', 'confident'),
-            UpstreamDatum('X-Version', '0.0.1', 'possible'),
+            UpstreamDatum('Version', '0.0.1', 'possible'),
             UpstreamDatum(
-                'X-Author', [Person.from_string(
+                'Author', [Person.from_string(
                     'Breezy Team <breezy-core@googlegroups.com>')], 'confident'),
             UpstreamDatum('Homepage', 'https://github.com/jelmer/setuptools-gettext', 'confident'),
-            UpstreamDatum('X-License', 'GPL', 'confident'),
-            UpstreamDatum('X-Summary', 'Compile .po files into .mo files', 'confident'),
-            UpstreamDatum('X-Description', """\
+            UpstreamDatum('License', 'GPL', 'confident'),
+            UpstreamDatum('Summary', 'Compile .po files into .mo files', 'confident'),
+            UpstreamDatum('Description', """\
 This extension for setuptools compiles gettext .po files
 found in the source directory into .mo files and installs them.
 """, 'likely')
@@ -45,7 +45,7 @@ found in the source directory into .mo files and installs them.
 Package: wnpp
 Severity: wishlist
 Owner: Jelmer Vernooij <jelmer@debian.org>
-X-Debbugs-Cc: debian-devel@lists.debian.org
+Debbugs-Cc: debian-devel@lists.debian.org
 
 * Package name    : setuptools-gettext
   Version         : 0.0.1

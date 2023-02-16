@@ -4,5 +4,5 @@
  "Name": "blah",
  "Repository": "https://github.com/example/repo.git",
  "Repository-Browse": "https://github.com/example/repo",
- "X-Description": "\n     This package does something\n  ",
- "X-License": "BSD"}
+ "Description": "\n     This package does something\n  ",
+ "License": "BSD"}

@@ -4,5 +4,5 @@
  "Name": "blah",
  "Repository": "https://github.com/blah/blah.git",
  "Repository-Browse": "https://github.com/blah/blah",
- "X-Description": "blah blah",
- "X-Summary": "blah blah"}
+ "Description": "blah blah",
+ "Summary": "blah blah"}

@@ -6,10 +6,10 @@ Homepage: https://github.com/jdonaldson/rtsne/
 Name: tsne
 Repository: https://github.com/jdonaldson/rtsne.git
 Repository-Browse: https://github.com/jdonaldson/rtsne
-X-Description: A "pure R" implementation of the t-SNE algorithm.
-X-License: GPL
-X-Maintainer: !Person
+Description: A "pure R" implementation of the t-SNE algorithm.
+License: GPL
+Maintainer: !Person
    name: Justin Donaldson
    email: jdonaldson@gmail.com
-X-Summary: T-Distributed Stochastic Neighbor Embedding for R (t-SNE)
-X-Version: 0.1-3
+Summary: T-Distributed Stochastic Neighbor Embedding for R (t-SNE)
+Version: 0.1-3

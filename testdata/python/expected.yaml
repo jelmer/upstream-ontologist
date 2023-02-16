@@ -4,6 +4,6 @@
  "Name": "blah",
  "Repository": "https://salsa.debian.org/jelmer/lintian-brush.git",
  "Repository-Browse": "https://salsa.debian.org/jelmer/lintian-brush",
- "X-Description": "blah blah",
- "X-Summary": "Automatic lintian issue fixer",
- "X-Version": "0.16"}
+ "Description": "blah blah",
+ "Summary": "Automatic lintian issue fixer",
+ "Version": "0.16"}

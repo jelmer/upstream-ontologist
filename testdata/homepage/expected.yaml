@@ -4,5 +4,5 @@
  "Name": "arping",
  "Repository": "https://github.com/j-keck/arping.git",
  "Repository-Browse": "https://github.com/j-keck/arping",
- "X-Description": "blah blah",
- "X-Summary": "blah blah"}
+ "Description": "blah blah",
+ "Summary": "blah blah"}

@@ -4,5 +4,5 @@
  "Name": "Some-Blah",
  "Repository": "https://github.com/blah/Blie.git",
  "Repository-Browse": "https://github.com/blah/Blie",
- "X-Summary": "parse and validate simple name/value option pairs",
- "X-Version": "0.110"}
+ "Summary": "parse and validate simple name/value option pairs",
+ "Version": "0.110"}

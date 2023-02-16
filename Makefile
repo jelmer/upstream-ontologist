@@ -15,7 +15,6 @@ check:: flake8
 flake8:
 	flake8 .
 
-
 check:: typing
 
 typing:

@@ -4,6 +4,6 @@
  "Name": "TestPackage",
  "Repository": "https://github.com/example/blah.git",
  "Repository-Browse": "https://github.com/example/blah",
- "X-Description": "blah blah",
- "X-License": "BSD3",
- "X-Summary": "blah blah"}
+ "Description": "blah blah",
+ "License": "BSD3",
+ "Summary": "blah blah"}
