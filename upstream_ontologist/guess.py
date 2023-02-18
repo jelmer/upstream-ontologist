@@ -23,7 +23,7 @@ import os
 import re
 import socket
 import urllib.error
-from typing import Optional, Iterable, List, Iterator, Any, Dict, Tuple, cast, Callable
+from typing import Optional, Iterable, List, Iterator, Any, Dict, Tuple, cast, Callable, Type
 from urllib.parse import quote, urlparse, urlunparse, urljoin
 from urllib.request import urlopen, Request
 
@@ -66,7 +66,7 @@ def warn_missing_dependency(path, module_name):
         path, module_name)
 
 
-class NoSuchSourceForgeProject(Exception):
+class NoSuchForgeProject(Exception):
 
     def __init__(self, project):
         self.project = project
@@ -79,7 +79,7 @@ def get_sf_metadata(project):
     except urllib.error.HTTPError as e:
         if e.code != 404:
             raise
-        raise NoSuchSourceForgeProject(project) from e
+        raise NoSuchForgeProject(project) from e
 
 
 class NoSuchRepologyProject(Exception):
@@ -107,7 +107,7 @@ DATUM_TYPES = {
     'Documentation': str,
     'Keywords': list,
     'License': str,
-    'XS-Go-Import-Path': str,
+    'Go-Import-Path': str,
     'Summary': str,
     'Description': str,
     'Wiki': str,
@@ -117,7 +117,7 @@ DATUM_TYPES = {
     'Name': str,
     'Version': str,
     'Download': str,
-    'Pecl-URL': str,
+    'Pecl-Package': str,
     'Screenshots': list,
     'Contact': str,
     'Author': list,
@@ -127,6 +127,10 @@ DATUM_TYPES = {
     'Cargo-Crate': str,
     'API-Documentation': str,
     'Funding': str,
+    'GitHub-Project': str,
+
+    # We should possibly hide these:
+    'Debian-ITP': int,
 }
 
 
@@ -248,6 +252,13 @@ def guess_from_debian_rules(path, trust_package):
         yield UpstreamDatum("Download", upstream_url.decode(), "likely")
 
 
+def extract_pecl_package_name(url):
+    m = re.match('https?://pecl.php.net/package/(.*)', url)
+    if m:
+        return m.group(1)
+    return None
+
+
 def _metadata_from_url(url: str, origin=None):
     """Obtain metadata from a URL related to the project.
 
@@ -255,37 +266,21 @@ def _metadata_from_url(url: str, origin=None):
       url: The URL to inspect
       origin: Origin to report for metadata
     """
-    m = re.match('https?://www.(sf|sourceforge).net/projects/([^/]+)', url)
-    if m:
+    sf_project = extract_sf_project_name(url)
+    if sf_project:
         yield UpstreamDatum(
             "Archive", "SourceForge", "certain",
             origin=origin)
         yield UpstreamDatum(
-            "SourceForge-Project", m.group(2), "certain",
+            "SourceForge-Project", sf_project, "certain",
             origin=origin)
-    m = re.match('https?://(sf|sourceforge).net/([^/]+)', url)
-    if m:
+    pecl_package = extract_pecl_package_name(url)
+    if pecl_package:
         yield UpstreamDatum(
-            "Archive", "SourceForge", "certain",
+            "Archive", "Pecl", "certain",
             origin=origin)
-        if m.group(1) != "www":
-            yield UpstreamDatum(
-                "SourceForge-Project", m.group(2), "certain",
-                origin=origin)
-        return
-    m = re.match('https?://(.*).(sf|sourceforge).net/', url)
-    if m:
         yield UpstreamDatum(
-            "Archive", "SourceForge", "certain",
-            origin=origin)
-        if m.group(1) != "www":
-            yield UpstreamDatum(
-                "SourceForge-Project", m.group(1), "certain",
-                origin=origin)
-        return
-    if (url.startswith('https://pecl.php.net/package/')
-            or url.startswith('http://pecl.php.net/package/')):
-        yield UpstreamDatum('Pecl-URL', url, 'certain', origin=origin)
+            'Pecl-Package', pecl_package, 'certain', origin=origin)
 
 
 def guess_from_debian_watch(path, trust_package):
@@ -364,6 +359,8 @@ def guess_from_debian_control(path, trust_package):
         if 'Homepage' in source:
             yield UpstreamDatum('Homepage', source['Homepage'], 'certain')
         if 'XS-Go-Import-Path' in source:
+            yield UpstreamDatum(
+                'Go-Import-Path', source['XS-Go-Import-Path'], 'certain')
             yield (
                 UpstreamDatum(
                     'Repository',
@@ -446,7 +443,7 @@ def guess_from_debian_changelog(path, trust_package):
         if m:
             itp = int(m.group(1))
     if itp:
-        yield UpstreamDatum('Debian-ITP', str(itp), 'certain')
+        yield UpstreamDatum('Debian-ITP', itp, 'certain')
         try:
             import debianbts
         except ModuleNotFoundError as e:
@@ -1545,7 +1542,7 @@ def guess_from_travis_yml(path, trust_package):
 
         if 'go_import_path' in data:
             yield UpstreamDatum(
-                'XS-Go-Import-Path', str(data['go_import_path']), certainty='certain')
+                'Go-Import-Path', str(data['go_import_path']), certainty='certain')
 
 
 def guess_from_meta_yml(path, trust_package):
@@ -2858,7 +2855,7 @@ def extend_from_external_guesser(
 
 
 def extend_from_repology(upstream_metadata, minimum_certainty, source_package):
-    # The set of fields that sf can possibly provide:
+    # The set of fields that repology can possibly provide:
     repology_fields = ['Homepage', 'License', 'Summary', 'Download']
     certainty = 'confident'
 
@@ -2872,7 +2869,7 @@ def extend_from_repology(upstream_metadata, minimum_certainty, source_package):
         guess_from_repology(source_package))
 
 
-class NoSuchHackagePackage(Exception):
+class NoSuchPackage(Exception):
 
     def __init__(self, package):
         self.package = package
@@ -2888,22 +2885,10 @@ def guess_from_hackage(hackage_package):
             timeout=DEFAULT_URLLIB_TIMEOUT).read()
     except urllib.error.HTTPError as e:
         if e.code == 404:
-            raise NoSuchHackagePackage(hackage_package) from e
+            raise NoSuchPackage(hackage_package) from e
         raise
     return guess_from_cabal_lines(
         http_contents.decode('utf-8', 'surrogateescape').splitlines(True))
-
-
-def extend_from_hackage(upstream_metadata, hackage_package):
-    # The set of fields that sf can possibly provide:
-    hackage_fields = [
-        'Homepage', 'Name', 'Repository', 'Maintainer', 'Copyright',
-        'License', 'Bug-Database']
-    hackage_certainty = upstream_metadata['Archive'].certainty
-
-    return extend_from_external_guesser(
-        upstream_metadata, hackage_certainty, hackage_fields,
-        guess_from_hackage(hackage_package))
 
 
 def guess_from_crates_io(crate: str):
@@ -2920,160 +2905,134 @@ def guess_from_crates_io(crate: str):
         yield 'Summary', crate_data['description']
 
 
-class NoSuchCrate(Exception):
+class Forge:
+    """A Forge."""
 
-    def __init__(self, crate):
-        self.crate = crate
+    name: str
+    repository_browse_can_be_homepage: bool = True
 
+    @classmethod
+    def extend_metadata(cls, metadata, project, max_certainty):
+        raise NotImplementedError(cls.extend_metadata)
 
-def extend_from_crates_io(upstream_metadata, crate):
-    # The set of fields that crates.io can possibly provide:
-    crates_io_fields = [
-        'Homepage', 'Name', 'Repository', 'Version', 'Summary']
-    crates_io_certainty = upstream_metadata['Archive'].certainty
+    @classmethod
+    def bug_database_url_from_bug_submit_url(cls, parsed_url):
+        raise NotImplementedError(cls.bug_database_url_from_bug_submit_url)
 
-    return extend_from_external_guesser(
-        upstream_metadata, crates_io_certainty, crates_io_fields,
-        guess_from_crates_io(crate))
+    @classmethod
+    def check_bug_database_canonical(cls, parsed_url):
+        raise NotImplementedError(cls.check_bug_database_canonical)
 
+    @classmethod
+    def bug_submit_url_from_bug_database_url(cls, parsed_url):
+        raise NotImplementedError(cls.bug_submit_url_from_bug_database_url)
 
-def extend_from_sf(upstream_metadata, sf_project):
-    # The set of fields that sf can possibly provide:
-    sf_fields = ['Homepage', 'Name', 'Repository', 'Bug-Database']
-    sf_certainty = upstream_metadata['Archive'].certainty
+    @classmethod
+    def check_bug_submit_url_canonical(cls, url):
+        raise NotImplementedError(cls.check_bug_submit_url_canonical)
 
-    if 'Name' in upstream_metadata:
-        subproject = upstream_metadata['Name'].value
-    else:
-        subproject = None
+    @classmethod
+    def bug_database_from_issue_url(cls, parsed_url):
+        raise NotImplementedError(cls.bug_database_from_issue_url)
 
-    return extend_from_external_guesser(
-        upstream_metadata, sf_certainty, sf_fields,
-        guess_from_sf(sf_project, subproject=subproject))
+    @classmethod
+    def repo_url_from_merge_request_url(cls, parsed_url):
+        raise NotImplementedError(cls.repo_url_from_merge_request_url)
 
-
-def extend_from_pecl(upstream_metadata, pecl_url, certainty):
-    pecl_fields = ['Homepage', 'Repository', 'Bug-Database']
-
-    return extend_from_external_guesser(
-        upstream_metadata, certainty, pecl_fields,
-        guess_from_pecl_url(pecl_url))
-
-
-def extend_from_lp(upstream_metadata, minimum_certainty, package,
-                   distribution=None, suite=None):
-    # The set of fields that Launchpad can possibly provide:
-    lp_fields = ['Homepage', 'Repository', 'Name', 'Download']
-    lp_certainty = 'possible'
-
-    if certainty_sufficient(lp_certainty, minimum_certainty):
-        # Don't bother talking to launchpad if we're not
-        # speculating.
-        return
-
-    extend_from_external_guesser(
-        upstream_metadata, lp_certainty, lp_fields, guess_from_launchpad(
-            package, distribution=distribution, suite=suite))
+    @classmethod
+    def bug_database_url_from_repo_url(cls, parsed_url):
+        raise NotImplementedError(cls.bug_database_url_from_repo_url)
 
 
-def extend_from_aur(upstream_metadata, minimum_certainty, package):
-    # The set of fields that AUR can possibly provide:
-    aur_fields = ['Homepage', 'Repository']
-    aur_certainty = 'possible'
+class Launchpad(Forge):
 
-    if certainty_sufficient(aur_certainty, minimum_certainty):
-        # Don't bother talking to AUR if we're not speculating.
-        return
+    name = 'Launchpad'
 
-    extend_from_external_guesser(
-        upstream_metadata, aur_certainty, aur_fields, guess_from_aur(package))
-
-
-def extend_from_gobo(upstream_metadata, minimum_certainty, package):
-    # The set of fields that gobo can possibly provide:
-    gobo_fields = ['Homepage', 'Repository']
-    gobo_certainty = 'possible'
-
-    if certainty_sufficient(gobo_certainty, minimum_certainty):
-        # Don't bother talking to gobo if we're not speculating.
-        return
-
-    extend_from_external_guesser(
-        upstream_metadata, gobo_certainty, gobo_fields, guess_from_gobo(package))
-
-
-def extract_sf_project_name(url):
-    if isinstance(url, list):
+    @classmethod
+    def bug_database_url_from_bug_submit_url(cls, parsed_url):
+        if parsed_url.netloc != 'bugs.launchpad.net':
+            return None
+        path_elements = parsed_url.path.strip('/').split('/')
+        if len(path_elements) >= 1:
+            return urlunparse(
+                parsed_url._replace(path='/%s' % path_elements[0]))
         return None
-    m = re.fullmatch('https?://(.*).(sf|sourceforge).(net|io)/?', url)
-    if m:
-        return m.group(1)
-    m = re.match('https://sourceforge.net/(projects|p)/([^/]+)', url)
-    if m:
-        return m.group(2)
 
-
-def repo_url_from_merge_request_url(url):
-    parsed_url = urlparse(url)
-    if parsed_url.netloc == 'github.com':
+    @classmethod
+    def bug_submit_url_from_bug_database_url(cls, parsed_url):
+        if parsed_url.netloc != 'bugs.launchpad.net':
+            return None
         path_elements = parsed_url.path.strip('/').split('/')
-        if len(path_elements) > 2 and path_elements[2] == 'issues':
+        if len(path_elements) == 1:
             return urlunparse(
-                ('https', 'github.com', '/'.join(path_elements[:2]),
-                 None, None, None))
+                parsed_url._replace(path=parsed_url.path + '/+filebug'))
+        return None
+
+
+def find_forge(parsed_url) -> Optional[Type[Forge]]:
+    if parsed_url.netloc == 'sourceforge.net':
+        return SourceForge
+    if parsed_url.netloc == 'github.com':
+        return GitHub
+    if parsed_url.netloc.endswith('.launchpad.net'):
+        return Launchpad
     if is_gitlab_site(parsed_url.netloc):
-        path_elements = parsed_url.path.strip('/').split('/')
-        if (len(path_elements) > 2
-                and path_elements[-2] == 'merge_requests'
-                and path_elements[-1].isdigit()):
-            return urlunparse(
-                ('https', parsed_url.netloc, '/'.join(path_elements[:-2]),
-                 None, None, None))
-
-
-def bug_database_from_issue_url(url):
-    parsed_url = urlparse(url)
-    if parsed_url.netloc == 'github.com':
-        path_elements = parsed_url.path.strip('/').split('/')
-        if len(path_elements) > 2 and path_elements[2] == 'issues':
-            return urlunparse(
-                ('https', 'github.com', '/'.join(path_elements[:3]),
-                 None, None, None))
-    if is_gitlab_site(parsed_url.netloc):
-        path_elements = parsed_url.path.strip('/').split('/')
-        if (len(path_elements) > 2
-                and path_elements[-2] == 'issues'
-                and path_elements[-1].isdigit()):
-            return urlunparse(
-                ('https', parsed_url.netloc, '/'.join(path_elements[:-2]),
-                 None, None, None))
-
-
-def guess_bug_database_url_from_repo_url(url):
-    parsed_url = urlparse(url)
-    if parsed_url.netloc == 'github.com':
-        path = '/'.join(parsed_url.path.split('/')[:3])
-        if path.endswith('.git'):
-            path = path[:-4]
-        path = path + '/issues'
-        return urlunparse(
-            ('https', 'github.com', path,
-             None, None, None))
-    if is_gitlab_site(parsed_url.hostname):
-        path = '/'.join(parsed_url.path.split('/')[:3])
-        if path.endswith('.git'):
-            path = path[:-4]
-        path = path + '/issues'
-        return urlunparse(
-            ('https', parsed_url.hostname, path,
-             None, None, None))
+        return GitLab
     return None
 
 
-def bug_database_url_from_bug_submit_url(url):
-    parsed_url = urlparse(url)
-    path_elements = parsed_url.path.strip('/').split('/')
-    if parsed_url.netloc == 'github.com':
+class PackageRepository:
+
+    name: str
+
+    supported_fields: List[str]
+
+    @classmethod
+    def extend_metadata(cls, metadata, name, max_certainty):
+        return extend_from_external_guesser(
+            metadata, max_certainty, cls.supported_fields,
+            cls.guess_metadata(name))
+
+    @classmethod
+    def guess_metadata(cls, name):
+        raise NotImplementedError(cls.guess_metadata)
+
+
+class Hackage(PackageRepository):
+
+    name = 'Hackage'
+
+    # The set of fields that sf can possibly provide:
+    supported_fields = [
+        'Homepage', 'Name', 'Repository', 'Maintainer', 'Copyright',
+        'License', 'Bug-Database']
+
+    @classmethod
+    def guess_metadata(cls, name):
+        return guess_from_hackage(name)
+
+
+class CratesIo(PackageRepository):
+
+    name = 'crates.io'
+
+    # The set of fields that crates.io can possibly provide:
+    supported_fields = [
+        'Homepage', 'Name', 'Repository', 'Version', 'Summary']
+
+    @classmethod
+    def guess_metadata(cls, name):
+        return guess_from_crates_io(name)
+
+
+class GitHub(Forge):
+
+    name = 'GitHub'
+
+    @classmethod
+    def bug_database_url_from_bug_submit_url(cls, parsed_url):
+        assert parsed_url.hostname == 'github.com'
+        path_elements = parsed_url.path.strip('/').split('/')
         if len(path_elements) not in (3, 4):
             return None
         if path_elements[2] != 'issues':
@@ -3081,35 +3040,10 @@ def bug_database_url_from_bug_submit_url(url):
         return urlunparse(
             ('https', 'github.com', '/'.join(path_elements[:3]),
              None, None, None))
-    if parsed_url.netloc == 'bugs.launchpad.net':
-        if len(path_elements) >= 1:
-            return urlunparse(
-                parsed_url._replace(path='/%s' % path_elements[0]))
-    if is_gitlab_site(parsed_url.netloc):
-        if len(path_elements) < 2:
-            return None
-        if path_elements[-2] != 'issues':
-            return None
-        if path_elements[-1] == 'new':
-            path_elements.pop(-1)
-        return urlunparse(
-            parsed_url._replace(path='/'.join(path_elements)))
-    if parsed_url.hostname == 'sourceforge.net':
-        if len(path_elements) < 3:
-            return None
-        if path_elements[0] != 'p' or path_elements[2] != 'bugs':
-            return None
-        if len(path_elements) > 3:
-            path_elements.pop(-1)
-        return urlunparse(
-            parsed_url._replace(path='/'.join(path_elements)))
-    return None
 
-
-def bug_submit_url_from_bug_database_url(url):
-    parsed_url = urlparse(url)
-    path_elements = parsed_url.path.strip('/').split('/')
-    if parsed_url.netloc == 'github.com':
+    @classmethod
+    def bug_submit_url_from_bug_database_url(cls, parsed_url):
+        path_elements = parsed_url.path.strip('/').split('/')
         if len(path_elements) != 3:
             return None
         if path_elements[2] != 'issues':
@@ -3117,23 +3051,10 @@ def bug_submit_url_from_bug_database_url(url):
         return urlunparse(
             ('https', 'github.com', parsed_url.path + '/new',
              None, None, None))
-    if parsed_url.netloc == 'bugs.launchpad.net':
-        if len(path_elements) == 1:
-            return urlunparse(
-                parsed_url._replace(path=parsed_url.path + '/+filebug'))
-    if is_gitlab_site(parsed_url.netloc):
-        if len(path_elements) < 2:
-            return None
-        if path_elements[-1] != 'issues':
-            return None
-        return urlunparse(
-            parsed_url._replace(path=parsed_url.path.rstrip('/') + '/new'))
-    return None
 
-
-def check_bug_database_canonical(url: str) -> str:
-    parsed_url = urlparse(url)
-    if parsed_url.netloc == 'github.com':
+    @classmethod
+    def check_bug_database_canonical(cls, parsed_url):
+        url = urlunparse(parsed_url)
         path_elements = parsed_url.path.strip('/').split('/')
         if len(path_elements) < 3 or path_elements[2] != 'issues':
             raise InvalidUrl(url, "GitHub URL with missing path elements")
@@ -3157,7 +3078,72 @@ def check_bug_database_canonical(url: str) -> str:
         if data.get('archived', False):
             raise InvalidUrl(url, "GitHub project is archived")
         return urljoin(data['html_url'] + '/', 'issues')
-    if is_gitlab_site(parsed_url.netloc):
+
+    @classmethod
+    def check_bug_submit_url_canonical(cls, parsed_url):
+        path = '/'.join(parsed_url.path.strip('/').split('/')[:-1])
+        db_url = urlunparse(parsed_url._replace(path=path))
+        canonical_db_url = check_bug_database_canonical(db_url)
+        return urljoin(canonical_db_url + '/', "new")
+
+    @classmethod
+    def bug_database_from_issue_url(cls, parsed_url):
+        path_elements = parsed_url.path.strip('/').split('/')
+        if len(path_elements) > 2 and path_elements[2] == 'issues':
+            return urlunparse(
+                ('https', 'github.com', '/'.join(path_elements[:3]),
+                 None, None, None))
+        return None
+
+    @classmethod
+    def bug_database_url_from_repo_url(cls, parsed_url):
+        path = '/'.join(parsed_url.path.split('/')[:3])
+        if path.endswith('.git'):
+            path = path[:-4]
+        path = path + '/issues'
+        return urlunparse(
+            ('https', 'github.com', path,
+             None, None, None))
+
+    @classmethod
+    def repo_url_from_merge_request_url(cls, parsed_url):
+        path_elements = parsed_url.path.strip('/').split('/')
+        if len(path_elements) > 2 and path_elements[2] == 'issues':
+            return urlunparse(
+                ('https', 'github.com', '/'.join(path_elements[:2]),
+                 None, None, None))
+        return None
+
+
+class GitLab(Forge):
+
+    name = 'GitLab'
+
+    @classmethod
+    def bug_database_url_from_bug_submit_url(cls, parsed_url):
+        path_elements = parsed_url.path.strip('/').split('/')
+        if len(path_elements) < 2:
+            return None
+        if path_elements[-2] != 'issues':
+            return None
+        if path_elements[-1] == 'new':
+            path_elements.pop(-1)
+        return urlunparse(
+            parsed_url._replace(path='/'.join(path_elements)))
+
+    @classmethod
+    def bug_submit_url_from_bug_database_url(cls, parsed_url):
+        path_elements = parsed_url.path.strip('/').split('/')
+        if len(path_elements) < 2:
+            return None
+        if path_elements[-1] != 'issues':
+            return None
+        return urlunparse(
+            parsed_url._replace(path=parsed_url.path.rstrip('/') + '/new'))
+
+    @classmethod
+    def check_bug_database_canonical(cls, parsed_url):
+        url = urlunparse(parsed_url)
         path_elements = parsed_url.path.strip('/').split('/')
         if len(path_elements) < 3 or path_elements[-1] != 'issues':
             raise InvalidUrl(url, "GitLab URL with missing path elements")
@@ -3178,17 +3164,228 @@ def check_bug_database_canonical(url: str) -> str:
         if issues_enabled is True:
             return canonical_url
         return check_url_canonical(canonical_url)
-    raise UrlUnverifiable(url, "unsupported hoster")
 
-
-def check_bug_submit_url_canonical(url: str) -> str:
-    parsed_url = urlparse(url)
-    if parsed_url.netloc == 'github.com' or is_gitlab_site(parsed_url.netloc):
+    @classmethod
+    def check_bug_submit_url_canonical(cls, parsed_url):
         path = '/'.join(parsed_url.path.strip('/').split('/')[:-1])
         db_url = urlunparse(parsed_url._replace(path=path))
         canonical_db_url = check_bug_database_canonical(db_url)
         return urljoin(canonical_db_url + '/', "new")
-    raise UrlUnverifiable(url, "unsupported hoster")
+
+    @classmethod
+    def bug_database_from_issue_url(cls, parsed_url):
+        path_elements = parsed_url.path.strip('/').split('/')
+        if (len(path_elements) > 2
+                and path_elements[-2] == 'issues'
+                and path_elements[-1].isdigit()):
+            return urlunparse(
+                ('https', parsed_url.netloc, '/'.join(path_elements[:-2]),
+                 None, None, None))
+        return None
+
+    @classmethod
+    def bug_database_url_from_repo_url(cls, parsed_url):
+        path = '/'.join(parsed_url.path.split('/')[:3])
+        if path.endswith('.git'):
+            path = path[:-4]
+        path = path + '/issues'
+        return urlunparse(
+            ('https', parsed_url.hostname, path,
+             None, None, None))
+
+    @classmethod
+    def repo_url_from_merge_request_url(cls, parsed_url):
+        path_elements = parsed_url.path.strip('/').split('/')
+        if (len(path_elements) > 2
+                and path_elements[-2] == 'merge_requests'
+                and path_elements[-1].isdigit()):
+            return urlunparse(
+                ('https', parsed_url.netloc, '/'.join(path_elements[:-2]),
+                 None, None, None))
+        return None
+
+
+class SourceForge(Forge):
+
+    name = 'SourceForge'
+
+    supported_fields = [
+        'Homepage', 'Name', 'Repository', 'Bug-Database']
+
+    @classmethod
+    def extend_metadata(cls, metadata, project, max_certainty):
+        if 'Name' in metadata:
+            subproject = metadata['Name'].value
+        else:
+            subproject = None
+
+        return extend_from_external_guesser(
+            metadata, max_certainty, cls.supported_fields,
+            guess_from_sf(project, subproject=subproject))
+
+    @classmethod
+    def bug_database_url_from_bug_submit_url(cls, parsed_url):
+        path_elements = parsed_url.path.strip('/').split('/')
+        if len(path_elements) < 3:
+            return None
+        if path_elements[0] != 'p' or path_elements[2] != 'bugs':
+            return None
+        if len(path_elements) > 3:
+            path_elements.pop(-1)
+        return urlunparse(
+            parsed_url._replace(path='/'.join(path_elements)))
+
+
+class Pecl(PackageRepository):
+
+    name = 'Pecl'
+
+    supported_fields = ['Homepage', 'Repository', 'Bug-Database']
+
+    @classmethod
+    def guess_metadata(cls, name):
+        return guess_from_pecl_package(name)
+
+
+def extend_from_lp(upstream_metadata, minimum_certainty, package,
+                   distribution=None, suite=None):
+    # The set of fields that Launchpad can possibly provide:
+    lp_fields = ['Homepage', 'Repository', 'Name', 'Download']
+    lp_certainty = 'possible'
+
+    if certainty_sufficient(lp_certainty, minimum_certainty):
+        # Don't bother talking to launchpad if we're not
+        # speculating.
+        return
+
+    extend_from_external_guesser(
+        upstream_metadata, lp_certainty, lp_fields, guess_from_launchpad(
+            package, distribution=distribution, suite=suite))
+
+
+class ThirdPartyRepository:
+
+    supported_fields: List[str]
+    max_supported_certainty = 'possible'
+
+    @classmethod
+    def extend_metadata(cls, metadata, name, min_certainty):
+        if certainty_sufficient(cls.max_supported_certainty, min_certainty):
+            # Don't bother if we can't meet minimum certainty
+            return
+
+        extend_from_external_guesser(
+            metadata, cls.max_supported_certainty, cls.supported_fields,
+            cls.guess_metadata(name))
+
+        raise NotImplementedError(cls.extend_metadata)
+
+    @classmethod
+    def guess_metadata(cls, name):
+        raise NotImplementedError(cls.guess_metadata)
+
+
+class Aur(ThirdPartyRepository):
+
+    supported_fields = ['Homepage', 'Repository']
+    max_supported_certainty = 'possible'
+
+    @classmethod
+    def guess_metadata(cls, name):
+        return guess_from_aur(name)
+
+
+class Gobo(ThirdPartyRepository):
+
+    supported_fields = ['Homepage', 'Repository']
+    max_supported_certainty = 'possible'
+
+    @classmethod
+    def guess_metadata(cls, name):
+        return guess_from_gobo(name)
+
+
+def extract_sf_project_name(url):
+    if isinstance(url, list):
+        return None
+    m = re.match('https?://sourceforge.net/(projects|p)/([^/]+)', url)
+    if m:
+        return m.group(2)
+    m = re.fullmatch('https?://(.*).(sf|sourceforge).(net|io)/.*', url)
+    if m:
+        return m.group(1)
+
+
+def repo_url_from_merge_request_url(url):
+    parsed_url = urlparse(url)
+    forge = find_forge(parsed_url)
+    if forge:
+        try:
+            return forge.repo_url_from_merge_request_url(parsed_url)
+        except NotImplementedError:
+            return None
+    return None
+
+
+def bug_database_from_issue_url(url):
+    parsed_url = urlparse(url)
+    forge = find_forge(parsed_url)
+    if forge:
+        try:
+            return forge.bug_database_from_issue_url(parsed_url)
+        except NotImplementedError:
+            return None
+
+
+def guess_bug_database_url_from_repo_url(url):
+    parsed_url = urlparse(url)
+    forge = find_forge(parsed_url)
+    if forge:
+        return forge.bug_database_url_from_repo_url(parsed_url)
+    return None
+
+
+def bug_database_url_from_bug_submit_url(url):
+    parsed_url = urlparse(url)
+    forge = find_forge(parsed_url)
+    if forge:
+        return forge.bug_database_url_from_bug_submit_url(parsed_url)
+    return None
+
+
+def bug_submit_url_from_bug_database_url(url):
+    parsed_url = urlparse(url)
+    forge = find_forge(parsed_url)
+    if forge:
+        try:
+            return forge.bug_submit_url_from_bug_database_url(parsed_url)
+        except NotImplementedError:
+            return None
+    return None
+
+
+def check_bug_database_canonical(url: str) -> str:
+    parsed_url = urlparse(url)
+    forge = find_forge(parsed_url)
+    if forge:
+        try:
+            forge.check_bug_database_canonical(parsed_url)
+        except NotImplementedError:
+            raise UrlUnverifiable(
+                url, "forge does not support verifying bug database URL")
+    raise UrlUnverifiable(url, "unsupported forge")
+
+
+def check_bug_submit_url_canonical(url: str) -> str:
+    parsed_url = urlparse(url)
+    forge = find_forge(parsed_url)
+    if forge:
+        try:
+            return forge.check_bug_submit_url_canonical(parsed_url)
+        except NotImplementedError:
+            raise UrlUnverifiable(
+                url, "forge does not support verifying bug submit URL")
+    raise UrlUnverifiable(url, "unsupported forge")
 
 
 def _extrapolate_repository_from_homepage(upstream_metadata, net_access):
@@ -3328,7 +3525,8 @@ def _extrapolate_homepage_from_repository_browse(
     # Some hosting sites are commonly used as Homepage
     # TODO(jelmer): Maybe check that there is a README file that
     # can serve as index?
-    if parsed.netloc in ('github.com', ) or is_gitlab_site(parsed.netloc):
+    forge = find_forge(parsed)
+    if forge and forge.repository_browse_can_be_homepage:
         yield UpstreamDatum('Homepage', browse_url, 'possible')
 
 
@@ -3393,28 +3591,41 @@ def extend_upstream_metadata(upstream_metadata,
             and 'SourceForge-Project' in upstream_metadata
             and net_access):
         sf_project = upstream_metadata['SourceForge-Project'].value
+        sf_certainty = upstream_metadata['Archive'].certainty
         try:
-            extend_from_sf(upstream_metadata, sf_project)
-        except NoSuchSourceForgeProject:
+            SourceForge.extend_metadata(
+                upstream_metadata, sf_project, sf_certainty)
+        except NoSuchForgeProject:
             del upstream_metadata['SourceForge-Project']
 
     if (archive and archive.value == 'Hackage'
             and 'Hackage-Package' in upstream_metadata
             and net_access):
         hackage_package = upstream_metadata['Hackage-Package'].value
+        hackage_certainty = upstream_metadata['Archive'].certainty
+
         try:
-            extend_from_hackage(upstream_metadata, hackage_package)
-        except NoSuchHackagePackage:
+            Hackage.extend_metadata(upstream_metadata, hackage_package, hackage_certainty)
+        except NoSuchPackage:
             del upstream_metadata['Hackage-Package']
 
     if (archive and archive.value == 'crates.io'
             and 'Cargo-Crate' in upstream_metadata
             and net_access):
         crate = upstream_metadata['Cargo-Crate'].value
+        crates_io_certainty = upstream_metadata['Archive'].certainty
         try:
-            extend_from_crates_io(upstream_metadata, crate)
-        except NoSuchCrate:
+            CratesIo.extend_metadata(
+                upstream_metadata, crate, crates_io_certainty)
+        except NoSuchPackage:
             del upstream_metadata['Cargo-Crate']
+
+    if (archive and archive.value == 'Pecl'
+            and 'Pecl-Package' in upstream_metadata
+            and net_access):
+        pecl_package = upstream_metadata['Pecl-Package'].value
+        pecl_certainty = upstream_metadata['Archive'].certainty
+        Pecl.extend_metadata(upstream_metadata, pecl_package, pecl_certainty)
 
     if net_access and consult_external_directory:
         # TODO(jelmer): Don't assume debian/control exists
@@ -3428,12 +3639,9 @@ def extend_upstream_metadata(upstream_metadata,
             pass
         else:
             extend_from_lp(upstream_metadata, minimum_certainty, package)
-            extend_from_aur(upstream_metadata, minimum_certainty, package)
-            extend_from_gobo(upstream_metadata, minimum_certainty, package)
+            Aur.extend_metadata(upstream_metadata, package, minimum_certainty)
+            Gobo.extend_metadata(upstream_metadata, package, minimum_certainty)
             extend_from_repology(upstream_metadata, minimum_certainty, package)
-    pecl_url = upstream_metadata.get('Pecl-URL')
-    if net_access and pecl_url:
-        extend_from_pecl(upstream_metadata, pecl_url.value, pecl_url.certainty)
 
     _extrapolate_fields(
         upstream_metadata, net_access=net_access,
@@ -3663,21 +3871,8 @@ def parse_pkgbuild_variables(f):
     return variables
 
 
-def guess_from_pecl(package):
-    if not package.startswith('php-'):
-        return iter([])
-    php_package = package[4:]
-    url = 'https://pecl.php.net/packages/%s' % php_package.replace('-', '_')
-    data = dict(guess_from_pecl_url(url))
-    try:
-        data['Repository'] = guess_repo_from_url(
-            data['Repository-Browse'], net_access=True)
-    except KeyError:
-        pass
-    return data.items()
-
-
-def guess_from_pecl_url(url):
+def guess_from_pecl_package(package):
+    url = 'https://pecl.php.net/packages/%s' % package
     headers = {'User-Agent': USER_AGENT}
     try:
         f = urlopen(
