@@ -66,7 +66,7 @@ def warn_missing_dependency(path, module_name):
         path, module_name)
 
 
-class NoSuchSourceForgeProject(Exception):
+class NoSuchForgeProject(Exception):
 
     def __init__(self, project):
         self.project = project
@@ -79,7 +79,7 @@ def get_sf_metadata(project):
     except urllib.error.HTTPError as e:
         if e.code != 404:
             raise
-        raise NoSuchSourceForgeProject(project) from e
+        raise NoSuchForgeProject(project) from e
 
 
 class NoSuchRepologyProject(Exception):
@@ -3395,7 +3395,7 @@ def extend_upstream_metadata(upstream_metadata,
         sf_project = upstream_metadata['SourceForge-Project'].value
         try:
             extend_from_sf(upstream_metadata, sf_project)
-        except NoSuchSourceForgeProject:
+        except NoSuchForgeProject:
             del upstream_metadata['SourceForge-Project']
 
     if (archive and archive.value == 'Hackage'
