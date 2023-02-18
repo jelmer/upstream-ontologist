@@ -107,7 +107,7 @@ DATUM_TYPES = {
     'Documentation': str,
     'Keywords': list,
     'License': str,
-    'XS-Go-Import-Path': str,
+    'Go-Import-Path': str,
     'Summary': str,
     'Description': str,
     'Wiki': str,
@@ -117,7 +117,7 @@ DATUM_TYPES = {
     'Name': str,
     'Version': str,
     'Download': str,
-    'Pecl-URL': str,
+    'Pecl-Package': str,
     'Screenshots': list,
     'Contact': str,
     'Author': list,
@@ -127,6 +127,10 @@ DATUM_TYPES = {
     'Cargo-Crate': str,
     'API-Documentation': str,
     'Funding': str,
+    'GitHub-Project': str,
+
+    # We should possibly hide these:
+    'Debian-ITP': int,
 }
 
 
@@ -248,6 +252,13 @@ def guess_from_debian_rules(path, trust_package):
         yield UpstreamDatum("Download", upstream_url.decode(), "likely")
 
 
+def extract_pecl_package_name(url):
+    m = re.match('https?://pecl.php.net/package/(.*)', url)
+    if m:
+        return m.group(1)
+    return None
+
+
 def _metadata_from_url(url: str, origin=None):
     """Obtain metadata from a URL related to the project.
 
@@ -255,37 +266,21 @@ def _metadata_from_url(url: str, origin=None):
       url: The URL to inspect
       origin: Origin to report for metadata
     """
-    m = re.match('https?://www.(sf|sourceforge).net/projects/([^/]+)', url)
-    if m:
+    sf_project = extract_sf_project_name(url)
+    if sf_project:
         yield UpstreamDatum(
             "Archive", "SourceForge", "certain",
             origin=origin)
         yield UpstreamDatum(
-            "SourceForge-Project", m.group(2), "certain",
+            "SourceForge-Project", sf_project, "certain",
             origin=origin)
-    m = re.match('https?://(sf|sourceforge).net/([^/]+)', url)
-    if m:
+    pecl_package = extract_pecl_package_name(url)
+    if pecl_package:
         yield UpstreamDatum(
-            "Archive", "SourceForge", "certain",
+            "Archive", "Pecl", "certain",
             origin=origin)
-        if m.group(1) != "www":
-            yield UpstreamDatum(
-                "SourceForge-Project", m.group(2), "certain",
-                origin=origin)
-        return
-    m = re.match('https?://(.*).(sf|sourceforge).net/', url)
-    if m:
         yield UpstreamDatum(
-            "Archive", "SourceForge", "certain",
-            origin=origin)
-        if m.group(1) != "www":
-            yield UpstreamDatum(
-                "SourceForge-Project", m.group(1), "certain",
-                origin=origin)
-        return
-    if (url.startswith('https://pecl.php.net/package/')
-            or url.startswith('http://pecl.php.net/package/')):
-        yield UpstreamDatum('Pecl-URL', url, 'certain', origin=origin)
+            'Pecl-Package', pecl_package, 'certain', origin=origin)
 
 
 def guess_from_debian_watch(path, trust_package):
@@ -446,7 +441,7 @@ def guess_from_debian_changelog(path, trust_package):
         if m:
             itp = int(m.group(1))
     if itp:
-        yield UpstreamDatum('Debian-ITP', str(itp), 'certain')
+        yield UpstreamDatum('Debian-ITP', itp, 'certain')
         try:
             import debianbts
         except ModuleNotFoundError as e:
@@ -1545,7 +1540,7 @@ def guess_from_travis_yml(path, trust_package):
 
         if 'go_import_path' in data:
             yield UpstreamDatum(
-                'XS-Go-Import-Path', str(data['go_import_path']), certainty='certain')
+                'Go-Import-Path', str(data['go_import_path']), certainty='certain')
 
 
 def guess_from_meta_yml(path, trust_package):
@@ -2858,7 +2853,7 @@ def extend_from_external_guesser(
 
 
 def extend_from_repology(upstream_metadata, minimum_certainty, source_package):
-    # The set of fields that sf can possibly provide:
+    # The set of fields that repology can possibly provide:
     repology_fields = ['Homepage', 'License', 'Summary', 'Download']
     certainty = 'confident'
 
@@ -2872,7 +2867,7 @@ def extend_from_repology(upstream_metadata, minimum_certainty, source_package):
         guess_from_repology(source_package))
 
 
-class NoSuchHackagePackage(Exception):
+class NoSuchPackage(Exception):
 
     def __init__(self, package):
         self.package = package
@@ -2888,22 +2883,10 @@ def guess_from_hackage(hackage_package):
             timeout=DEFAULT_URLLIB_TIMEOUT).read()
     except urllib.error.HTTPError as e:
         if e.code == 404:
-            raise NoSuchHackagePackage(hackage_package) from e
+            raise NoSuchPackage(hackage_package) from e
         raise
     return guess_from_cabal_lines(
         http_contents.decode('utf-8', 'surrogateescape').splitlines(True))
-
-
-def extend_from_hackage(upstream_metadata, hackage_package):
-    # The set of fields that sf can possibly provide:
-    hackage_fields = [
-        'Homepage', 'Name', 'Repository', 'Maintainer', 'Copyright',
-        'License', 'Bug-Database']
-    hackage_certainty = upstream_metadata['Archive'].certainty
-
-    return extend_from_external_guesser(
-        upstream_metadata, hackage_certainty, hackage_fields,
-        guess_from_hackage(hackage_package))
 
 
 def guess_from_crates_io(crate: str):
@@ -2920,44 +2903,88 @@ def guess_from_crates_io(crate: str):
         yield 'Summary', crate_data['description']
 
 
-class NoSuchCrate(Exception):
+class Forge:
+    """A Forge."""
 
-    def __init__(self, crate):
-        self.crate = crate
+    name: str
 
-
-def extend_from_crates_io(upstream_metadata, crate):
-    # The set of fields that crates.io can possibly provide:
-    crates_io_fields = [
-        'Homepage', 'Name', 'Repository', 'Version', 'Summary']
-    crates_io_certainty = upstream_metadata['Archive'].certainty
-
-    return extend_from_external_guesser(
-        upstream_metadata, crates_io_certainty, crates_io_fields,
-        guess_from_crates_io(crate))
+    @classmethod
+    def extend_metadata(cls, metadata, project, max_certainty):
+        raise NotImplementedError(cls.extend_metadata)
 
 
-def extend_from_sf(upstream_metadata, sf_project):
+class PackageRepository:
+
+    name: str
+
+    supported_fields: List[str]
+
+    @classmethod
+    def extend_metadata(cls, metadata, name, max_certainty):
+        return extend_from_external_guesser(
+            metadata, max_certainty, cls.supported_fields,
+            cls.guess_metadata(name))
+
+    @classmethod
+    def guess_metadata(cls, name):
+        raise NotImplementedError(cls.guess_metadata)
+
+
+class Hackage(PackageRepository):
+
+    name = 'Hackage'
+
     # The set of fields that sf can possibly provide:
-    sf_fields = ['Homepage', 'Name', 'Repository', 'Bug-Database']
-    sf_certainty = upstream_metadata['Archive'].certainty
+    supported_fields = [
+        'Homepage', 'Name', 'Repository', 'Maintainer', 'Copyright',
+        'License', 'Bug-Database']
 
-    if 'Name' in upstream_metadata:
-        subproject = upstream_metadata['Name'].value
-    else:
-        subproject = None
-
-    return extend_from_external_guesser(
-        upstream_metadata, sf_certainty, sf_fields,
-        guess_from_sf(sf_project, subproject=subproject))
+    @classmethod
+    def guess_metadata(cls, name):
+        return guess_from_hackage(name)
 
 
-def extend_from_pecl(upstream_metadata, pecl_url, certainty):
-    pecl_fields = ['Homepage', 'Repository', 'Bug-Database']
+class CratesIo(PackageRepository):
 
-    return extend_from_external_guesser(
-        upstream_metadata, certainty, pecl_fields,
-        guess_from_pecl_url(pecl_url))
+    name = 'crates.io'
+
+    # The set of fields that crates.io can possibly provide:
+    supported_fields = [
+        'Homepage', 'Name', 'Repository', 'Version', 'Summary']
+
+    @classmethod
+    def guess_metadata(cls, name):
+        return guess_from_crates_io(name)
+
+
+class SourceForge(Forge):
+
+    name = 'SourceForge'
+
+    supported_fields = [
+        'Homepage', 'Name', 'Repository', 'Bug-Database']
+
+    @classmethod
+    def extend_metadata(cls, metadata, project, max_certainty):
+        if 'Name' in metadata:
+            subproject = metadata['Name'].value
+        else:
+            subproject = None
+
+        return extend_from_external_guesser(
+            metadata, max_certainty, cls.supported_fields,
+            guess_from_sf(project, subproject=subproject))
+
+
+class Pecl(PackageRepository):
+
+    name = 'Pecl'
+
+    supported_fields = ['Homepage', 'Repository', 'Bug-Database']
+
+    @classmethod
+    def guess_metadata(cls, name):
+        return guess_from_pecl_package(name)
 
 
 def extend_from_lp(upstream_metadata, minimum_certainty, package,
@@ -2976,41 +3003,57 @@ def extend_from_lp(upstream_metadata, minimum_certainty, package,
             package, distribution=distribution, suite=suite))
 
 
-def extend_from_aur(upstream_metadata, minimum_certainty, package):
-    # The set of fields that AUR can possibly provide:
-    aur_fields = ['Homepage', 'Repository']
-    aur_certainty = 'possible'
+class ThirdPartyRepository:
 
-    if certainty_sufficient(aur_certainty, minimum_certainty):
-        # Don't bother talking to AUR if we're not speculating.
-        return
+    supported_fields: List[str]
+    max_supported_certainty = 'possible'
 
-    extend_from_external_guesser(
-        upstream_metadata, aur_certainty, aur_fields, guess_from_aur(package))
+    @classmethod
+    def extend_metadata(cls, metadata, name, min_certainty):
+        if certainty_sufficient(cls.max_supported_certainty, min_certainty):
+            # Don't bother if we can't meet minimum certainty
+            return
+
+        extend_from_external_guesser(
+            metadata, cls.max_supported_certainty, cls.supported_fields,
+            cls.guess_metadata(name))
+
+        raise NotImplementedError(cls.extend_metadata)
+
+    @classmethod
+    def guess_metadata(cls, name):
+        raise NotImplementedError(cls.guess_metadata)
 
 
-def extend_from_gobo(upstream_metadata, minimum_certainty, package):
-    # The set of fields that gobo can possibly provide:
-    gobo_fields = ['Homepage', 'Repository']
-    gobo_certainty = 'possible'
+class Aur(ThirdPartyRepository):
 
-    if certainty_sufficient(gobo_certainty, minimum_certainty):
-        # Don't bother talking to gobo if we're not speculating.
-        return
+    supported_fields = ['Homepage', 'Repository']
+    max_supported_certainty = 'possible'
 
-    extend_from_external_guesser(
-        upstream_metadata, gobo_certainty, gobo_fields, guess_from_gobo(package))
+    @classmethod
+    def guess_metadata(cls, name):
+        return guess_from_aur(name)
+
+
+class Gobo(ThirdPartyRepository):
+
+    supported_fields = ['Homepage', 'Repository']
+    max_supported_certainty = 'possible'
+
+    @classmethod
+    def guess_metadata(cls, name):
+        return guess_from_gobo(name)
 
 
 def extract_sf_project_name(url):
     if isinstance(url, list):
         return None
-    m = re.fullmatch('https?://(.*).(sf|sourceforge).(net|io)/?', url)
-    if m:
-        return m.group(1)
-    m = re.match('https://sourceforge.net/(projects|p)/([^/]+)', url)
+    m = re.match('https?://sourceforge.net/(projects|p)/([^/]+)', url)
     if m:
         return m.group(2)
+    m = re.fullmatch('https?://(.*).(sf|sourceforge).(net|io)/.*', url)
+    if m:
+        return m.group(1)
 
 
 def repo_url_from_merge_request_url(url):
@@ -3393,8 +3436,10 @@ def extend_upstream_metadata(upstream_metadata,
             and 'SourceForge-Project' in upstream_metadata
             and net_access):
         sf_project = upstream_metadata['SourceForge-Project'].value
+        sf_certainty = upstream_metadata['Archive'].certainty
         try:
-            extend_from_sf(upstream_metadata, sf_project)
+            SourceForge.extend_metadata(
+                upstream_metadata, sf_project, sf_certainty)
         except NoSuchForgeProject:
             del upstream_metadata['SourceForge-Project']
 
@@ -3402,19 +3447,30 @@ def extend_upstream_metadata(upstream_metadata,
             and 'Hackage-Package' in upstream_metadata
             and net_access):
         hackage_package = upstream_metadata['Hackage-Package'].value
+        hackage_certainty = upstream_metadata['Archive'].certainty
+
         try:
-            extend_from_hackage(upstream_metadata, hackage_package)
-        except NoSuchHackagePackage:
+            Hackage.extend_metadata(upstream_metadata, hackage_package, hackage_certainty)
+        except NoSuchPackage:
             del upstream_metadata['Hackage-Package']
 
     if (archive and archive.value == 'crates.io'
             and 'Cargo-Crate' in upstream_metadata
             and net_access):
         crate = upstream_metadata['Cargo-Crate'].value
+        crates_io_certainty = upstream_metadata['Archive'].certainty
         try:
-            extend_from_crates_io(upstream_metadata, crate)
-        except NoSuchCrate:
+            CratesIo.extend_metadata(
+                upstream_metadata, crate, crates_io_certainty)
+        except NoSuchPackage:
             del upstream_metadata['Cargo-Crate']
+
+    if (archive and archive.value == 'Pecl'
+            and 'Pecl-Package' in upstream_metadata
+            and net_access):
+        pecl_package = upstream_metadata['Pecl-Package'].value
+        pecl_certainty = upstream_metadata['Archive'].certainty
+        Pecl.extend_metadata(upstream_metadata, pecl_package, pecl_certainty)
 
     if net_access and consult_external_directory:
         # TODO(jelmer): Don't assume debian/control exists
@@ -3428,12 +3484,9 @@ def extend_upstream_metadata(upstream_metadata,
             pass
         else:
             extend_from_lp(upstream_metadata, minimum_certainty, package)
-            extend_from_aur(upstream_metadata, minimum_certainty, package)
-            extend_from_gobo(upstream_metadata, minimum_certainty, package)
+            Aur.extend_metadata(upstream_metadata, package, minimum_certainty)
+            Gobo.extend_metadata(upstream_metadata, package, minimum_certainty)
             extend_from_repology(upstream_metadata, minimum_certainty, package)
-    pecl_url = upstream_metadata.get('Pecl-URL')
-    if net_access and pecl_url:
-        extend_from_pecl(upstream_metadata, pecl_url.value, pecl_url.certainty)
 
     _extrapolate_fields(
         upstream_metadata, net_access=net_access,
@@ -3663,21 +3716,8 @@ def parse_pkgbuild_variables(f):
     return variables
 
 
-def guess_from_pecl(package):
-    if not package.startswith('php-'):
-        return iter([])
-    php_package = package[4:]
-    url = 'https://pecl.php.net/packages/%s' % php_package.replace('-', '_')
-    data = dict(guess_from_pecl_url(url))
-    try:
-        data['Repository'] = guess_repo_from_url(
-            data['Repository-Browse'], net_access=True)
-    except KeyError:
-        pass
-    return data.items()
-
-
-def guess_from_pecl_url(url):
+def guess_from_pecl_package(package):
+    url = 'https://pecl.php.net/packages/%s' % package
     headers = {'User-Agent': USER_AGENT}
     try:
         f = urlopen(
