@@ -2891,20 +2891,6 @@ def guess_from_hackage(hackage_package):
         http_contents.decode('utf-8', 'surrogateescape').splitlines(True))
 
 
-def guess_from_crates_io(crate: str):
-    data = _load_json_url('https://crates.io/api/v1/crates/%s' % crate)
-    crate_data = data['crate']
-    yield 'Name', crate_data['name']
-    if crate_data.get('homepage'):
-        yield 'Homepage', crate_data['homepage']
-    if crate_data.get('repository'):
-        yield 'Repository', crate_data['repository']
-    if crate_data.get('newest_version'):
-        yield 'Version', crate_data['newest_version']
-    if crate_data.get('description'):
-        yield 'Summary', crate_data['description']
-
-
 class Forge:
     """A Forge."""
 
@@ -3021,8 +3007,23 @@ class CratesIo(PackageRepository):
         'Homepage', 'Name', 'Repository', 'Version', 'Summary']
 
     @classmethod
+    def _parse_crates_io(cls, data):
+        crate_data = data['crate']
+        yield 'Name', crate_data['name']
+        if crate_data.get('homepage'):
+            yield 'Homepage', crate_data['homepage']
+        if crate_data.get('repository'):
+            yield 'Repository', crate_data['repository']
+        if crate_data.get('newest_version'):
+            yield 'Version', crate_data['newest_version']
+        if crate_data.get('description'):
+            yield 'Summary', crate_data['description']
+
+    @classmethod
     def guess_metadata(cls, name):
-        return guess_from_crates_io(name)
+        data = _load_json_url('https://crates.io/api/v1/crates/%s' % name)
+        if data:
+            return cls._parse_crates_io(data)
 
 
 class GitHub(Forge):
