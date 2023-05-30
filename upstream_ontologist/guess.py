@@ -1175,21 +1175,7 @@ def url_from_cvs_co_command(command):
     return None
 
 
-def url_from_svn_co_command(command):
-    if command.endswith(b'\\'):
-        logger.warning(
-            'Ignoring command with line break: %s', command)
-        return None
-    import shlex
-    argv = shlex.split(command.decode('utf-8', 'surrogateescape'))
-    args = [arg for arg in argv if arg.strip()]
-    URL_SCHEMES = ['svn+ssh', 'http', 'https', 'svn']
-    for arg in args:
-        if any([arg.startswith('%s://' % scheme) for scheme in URL_SCHEMES]):
-            return arg
-    return None
-
-
+url_from_svn_co_command = _upstream_ontologist.url_from_svn_co_command
 url_from_git_clone_command = _upstream_ontologist.url_from_git_clone_command
 url_from_fossil_clone_command = _upstream_ontologist.url_from_fossil_clone_command
 

@@ -224,6 +224,75 @@ pub fn url_from_fossil_clone_command(command: &[u8]) -> Option<String> {
     }
 }
 
+/*
+pub fn url_from_cvs_co_command(command: &[u8]) -> Option<String> {
+    let command_str = match String::from_utf8(command.to_vec()) {
+        Ok(s) => s,
+        Err(_) => return None,
+    };
+    let argv: Vec<String> = shlex::split(command_str.as_str())?
+        .into_iter()
+        .filter(|arg| !arg.trim().is_empty())
+        .collect();
+    let mut args = argv;
+    let mut i = 0;
+    let mut cvsroot = None;
+    let mut module = None;
+    let mut command_seen = false;
+    args.remove(0);
+    while i < args.len() {
+        if args[i] == "-d" {
+            args.remove(i);
+            cvsroot = Some(&args[i][..]);
+            args.remove(i);
+            continue;
+        }
+        if args[i].starts_with("-d") {
+            cvsroot = Some(&args[i][2..]);
+            args.remove(i);
+            continue;
+        }
+        if command_seen && !args[i].starts_with('-') {
+            module = Some(args[i]);
+        } else if args[i] == "co" || args[i] == "checkout" {
+            command_seen = true;
+        }
+        args.remove(i);
+    }
+    if let Some(cvsroot) = cvsroot {
+        let url = cvs_to_url(&cvsroot);
+        if let Some(module) = module {
+            return Some(url.join(module));
+        }
+        return Some(url);
+    }
+    None
+}
+
+*/
+
+pub fn url_from_svn_co_command(command: &[u8]) -> Option<String> {
+    if command.ends_with(&[b'\\']) {
+        warn!("Ignoring command with line break: {:?}", command);
+        return None;
+    }
+    let command_str = match std::str::from_utf8(command) {
+        Ok(s) => s,
+        Err(_) => return None,
+    };
+    let argv: Vec<String> = shlex::split(command_str)?
+        .into_iter()
+        .filter(|arg| !arg.trim().is_empty())
+        .collect();
+    let args = argv;
+    let url_schemes = vec!["svn+ssh", "http", "https", "svn"];
+    args.into_iter().find(|arg| {
+        url_schemes
+            .iter()
+            .any(|scheme| arg.starts_with(&format!("{}://", scheme)))
+    })
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
