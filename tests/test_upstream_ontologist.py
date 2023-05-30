@@ -91,6 +91,7 @@ https://github.com/jelmer/dulwich/tags/dulwich-(.*).tar.gz
 class GuessFromPackageJsonTests(TestCaseInTempDir):
 
     def test_dummy(self):
+        self.maxDiff = None
         with open("package.json", "w") as f:
             f.write(
                 """\
@@ -114,14 +115,14 @@ class GuessFromPackageJsonTests(TestCaseInTempDir):
             )
         self.assertEqual(
             [
-                UpstreamDatum("Name", "mozillaeslintsetup", "certain"),
                 UpstreamDatum(
                     "Summary",
                     "This package file is for setup of ESLint.",
                     "certain",
-                    None,
+                    "package.json",
                 ),
-                UpstreamDatum("License", "MPL-2.0", "certain", None),
+                UpstreamDatum("License", "MPL-2.0", "certain", "package.json"),
+                UpstreamDatum("Name", "mozillaeslintsetup", "certain", "package.json"),
             ],
             list(guess_from_package_json("package.json", False)),
         )

@@ -829,71 +829,7 @@ def guess_from_composer_json(path, trust_package):
             logger.debug('Unknown field %s (%r) in composer.json', field, value)
 
 
-def guess_from_package_json(path, trust_package):  # noqa: C901
-    # see https://docs.npmjs.com/cli/v7/configuring-npm/package-json
-    with open(path) as f:
-        package = json.load(f)
-    for field, value in package.items():
-        if field == 'name':
-            yield UpstreamDatum('Name', value, 'certain')
-        elif field == 'homepage':
-            yield UpstreamDatum('Homepage', value, 'certain')
-        elif field == 'description':
-            yield UpstreamDatum('Summary', value, 'certain')
-        elif field == 'license':
-            yield UpstreamDatum('License', value, 'certain')
-        elif field == 'version':
-            yield UpstreamDatum('Version', value, 'certain')
-        elif field == 'repository':
-            if isinstance(value, dict):
-                repo_url = value.get('url')
-            elif isinstance(value, str):
-                repo_url = value
-            else:
-                repo_url = None
-            if repo_url:
-                parsed_url = urlparse(repo_url)
-                if parsed_url.scheme and parsed_url.netloc:
-                    yield UpstreamDatum(
-                        'Repository', repo_url, 'certain')
-                elif repo_url.startswith('github:'):
-                    # Some people seem to default to github. :(
-                    repo_url = 'https://github.com/' + repo_url.split(':', 1)[1]
-                    yield UpstreamDatum('Repository', repo_url, 'likely')
-                else:
-                    # Some people seem to default to github. :(
-                    repo_url = 'https://github.com/' + parsed_url.path
-                    yield UpstreamDatum(
-                        'Repository', repo_url, 'likely')
-        elif field == 'bugs':
-            if isinstance(value, dict):
-                url = value.get('url')
-                if url is None and value.get('email'):
-                    url = 'mailto:' + value['email']
-            else:
-                url = value
-            if url:
-                yield UpstreamDatum('Bug-Database', url, 'certain')
-        elif field == 'author':
-            if isinstance(value, dict):
-                yield UpstreamDatum(
-                    'Author', [Person(
-                        name=value.get('name'),
-                        url=value.get('url'),
-                        email=value.get('email'))],
-                    'confident')
-            elif isinstance(value, str):
-                yield UpstreamDatum(
-                    'Author', [Person.from_string(value)],
-                    'confident')
-            else:
-                logger.warning(
-                    'Unsupported type for author in package.json: %r',
-                    type(value))
-        elif field in ('dependencies', 'private', 'devDependencies', 'scripts'):
-            pass
-        else:
-            logger.debug('Unknown package.json field %s (%r)', field, value)
+guess_from_package_json = _upstream_ontologist.guess_from_package_json
 
 
 def xmlparse_simplify_namespaces(path, namespaces):

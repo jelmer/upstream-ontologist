@@ -1,11 +1,13 @@
-use log::warn;
+use log::{error, warn};
 use pyo3::prelude::*;
+use regex::Regex;
 use reqwest::header::HeaderMap;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use url::Url;
 
 lazy_static::lazy_static! {
     static ref USER_AGENT: String = String::from("upstream-ontologist/") + env!("CARGO_PKG_VERSION");
@@ -52,6 +54,81 @@ pub struct Person {
     pub url: Option<String>,
 }
 
+impl Default for Person {
+    fn default() -> Self {
+        Person {
+            name: None,
+            email: None,
+            url: None,
+        }
+    }
+}
+
+impl From<&str> for Person {
+    fn from(text: &str) -> Self {
+        let mut text = text.replace(" at ", "@");
+        text = text.replace(" -at- ", "@");
+        text = text.replace(" -dot- ", ".");
+        text = text.replace("[AT]", "@");
+
+        if text.contains('(') && text.ends_with(')') {
+            if let Some((p1, p2)) = text[..text.len() - 1].split_once('(') {
+                if p2.starts_with("https://") || p2.starts_with("http://") {
+                    let url = p2.to_string();
+                    if let Some((name, email)) = parseaddr(p1) {
+                        return Person {
+                            name: Some(name),
+                            email: Some(email),
+                            url: Some(url),
+                        };
+                    } else {
+                        return Person {
+                            name: Some(p1.to_string()),
+                            url: Some(url),
+                            ..Default::default()
+                        };
+                    }
+                } else if p2.contains('@') {
+                    return Person {
+                        name: Some(p1.to_string()),
+                        email: Some(p2.to_string()),
+                        ..Default::default()
+                    };
+                }
+                return Person {
+                    name: Some(text.to_string()),
+                    ..Default::default()
+                };
+            }
+        } else if text.contains('<') {
+            if let Some((name, email)) = parseaddr(text.as_str()) {
+                return Person {
+                    name: Some(name),
+                    email: Some(email),
+                    ..Default::default()
+                };
+            }
+        }
+
+        Person {
+            name: Some(text.to_string()),
+            ..Default::default()
+        }
+    }
+}
+
+fn parseaddr(text: &str) -> Option<(String, String)> {
+    let re = Regex::new(r"(.*?)\s*<([^<>]+)>").unwrap();
+    if let Some(captures) = re.captures(text) {
+        let name = captures.get(1).map(|m| m.as_str().trim().to_string());
+        let email = captures.get(2).map(|m| m.as_str().trim().to_string());
+        if let (Some(name), Some(email)) = (name, email) {
+            return Some((name, email));
+        }
+    }
+    None
+}
+
 impl FromPyObject<'_> for Person {
     fn extract(ob: &'_ PyAny) -> PyResult<Self> {
         let name = ob.getattr("name")?.extract::<Option<String>>()?;
@@ -88,8 +165,8 @@ pub struct UpstreamDatumWithMetadata {
 impl UpstreamDatum {
     pub fn field(&self) -> &'static str {
         match self {
-            UpstreamDatum::Summary(..) => "X-Summary",
-            UpstreamDatum::Description(..) => "X-Description",
+            UpstreamDatum::Summary(..) => "Summary",
+            UpstreamDatum::Description(..) => "Description",
             UpstreamDatum::Name(..) => "Name",
             UpstreamDatum::Homepage(..) => "Homepage",
             UpstreamDatum::Repository(..) => "Repository",
@@ -99,9 +176,9 @@ impl UpstreamDatum {
             UpstreamDatum::BugDatabase(..) => "Bug-Database",
             UpstreamDatum::BugSubmit(..) => "Bug-Submit",
             UpstreamDatum::Contact(..) => "Contact",
-            UpstreamDatum::CargoCrate(..) => "X-Cargo-Crate",
-            UpstreamDatum::SecurityMD(..) => "X-Security-MD",
-            UpstreamDatum::SecurityContact(..) => "X-Security-Contact",
+            UpstreamDatum::CargoCrate(..) => "Cargo-Crate",
+            UpstreamDatum::SecurityMD(..) => "Security-MD",
+            UpstreamDatum::SecurityContact(..) => "Security-Contact",
             UpstreamDatum::Version(..) => "Version",
         }
     }
@@ -378,6 +455,156 @@ pub fn guess_from_meson(
         }
     }
     results
+}
+
+pub fn guess_from_package_json(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+    // see https://docs.npmjs.com/cli/v7/configuring-npm/package-json
+    let file = std::fs::File::open(path).expect("Failed to open package.json");
+    let package: serde_json::Value =
+        serde_json::from_reader(file).expect("Failed to parse package.json");
+
+    let mut upstream_data: Vec<UpstreamDatumWithMetadata> = Vec::new();
+
+    for (field, value) in package.as_object().unwrap() {
+        match field.as_str() {
+            "name" => {
+                upstream_data.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Name(value.as_str().unwrap().to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some("package.json".to_string()),
+                });
+            }
+            "homepage" => {
+                upstream_data.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Homepage(value.as_str().unwrap().to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some("package.json".to_string()),
+                });
+            }
+            "description" => {
+                upstream_data.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Summary(value.as_str().unwrap().to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some("package.json".to_string()),
+                });
+            }
+            "license" => {
+                upstream_data.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::License(value.as_str().unwrap().to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some("package.json".to_string()),
+                });
+            }
+            "version" => {
+                upstream_data.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Version(value.as_str().unwrap().to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some("package.json".to_string()),
+                });
+            }
+            "repository" => {
+                let repo_url = if let Some(repo_url) = value.as_str() {
+                    Some(repo_url)
+                } else if let Some(repo) = value.as_object() {
+                    if let Some(repo_url) = repo.get("url") {
+                        repo_url.as_str()
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
+                if let Some(repo_url) = repo_url {
+                    match Url::parse(repo_url) {
+                        Ok(url) if url.scheme() == "github" => {
+                            // Some people seem to default to github. :(
+                            let repo_url = format!("https://github.com/{}", url.path());
+                            upstream_data.push(UpstreamDatumWithMetadata {
+                                datum: UpstreamDatum::Repository(repo_url.to_string()),
+                                certainty: Some(Certainty::Likely),
+                                origin: Some("package.json".to_string()),
+                            });
+                        }
+                        Err(e) if e == url::ParseError::RelativeUrlWithoutBase => {
+                            // Some people seem to default to github. :(
+                            let repo_url = format!("https://github.com/{}", repo_url);
+                            upstream_data.push(UpstreamDatumWithMetadata {
+                                datum: UpstreamDatum::Repository(repo_url.to_string()),
+                                certainty: Some(Certainty::Likely),
+                                origin: Some("package.json".to_string()),
+                            });
+                        }
+                        Ok(url) => {
+                            upstream_data.push(UpstreamDatumWithMetadata {
+                                datum: UpstreamDatum::Repository(url.to_string()),
+                                certainty: Some(Certainty::Certain),
+                                origin: Some("package.json".to_string()),
+                            });
+                        }
+                        Err(e) => {
+                            panic!("Failed to parse repository URL: {}", e);
+                        }
+                    }
+                }
+            }
+            "bugs" => {
+                if let Some(url) = value.as_str() {
+                    upstream_data.push(UpstreamDatumWithMetadata {
+                        datum: UpstreamDatum::BugDatabase(url.to_string()),
+                        certainty: Some(Certainty::Certain),
+                        origin: Some("package.json".to_string()),
+                    });
+                } else if let Some(email) = value.get("email").and_then(serde_json::Value::as_str) {
+                    let url = format!("mailto:{}", email);
+                    upstream_data.push(UpstreamDatumWithMetadata {
+                        datum: UpstreamDatum::BugDatabase(url.to_string()),
+                        certainty: Some(Certainty::Certain),
+                        origin: Some("package.json".to_string()),
+                    });
+                }
+            }
+            "author" => {
+                if let Some(author) = value.as_object() {
+                    let name = author
+                        .get("name")
+                        .and_then(serde_json::Value::as_str)
+                        .map(String::from);
+                    let url = author
+                        .get("url")
+                        .and_then(serde_json::Value::as_str)
+                        .map(String::from);
+                    let email = author
+                        .get("email")
+                        .and_then(serde_json::Value::as_str)
+                        .map(String::from);
+                    let person = Person { name, url, email };
+                    upstream_data.push(UpstreamDatumWithMetadata {
+                        datum: UpstreamDatum::Author(vec![person]),
+                        certainty: Some(Certainty::Confident),
+                        origin: Some("package.json".to_string()),
+                    });
+                } else if let Some(author) = value.as_str() {
+                    let person = Person::from(author);
+                    upstream_data.push(UpstreamDatumWithMetadata {
+                        datum: UpstreamDatum::Author(vec![person]),
+                        certainty: Some(Certainty::Confident),
+                        origin: Some("package.json".to_string()),
+                    });
+                } else {
+                    error!("Unsupported type for author in package.json: {:?}", value);
+                }
+            }
+            "dependencies" | "private" | "devDependencies" | "scripts" => {
+                // Do nothing, skip these fields
+            }
+            _ => {
+                error!("Unknown package.json field {} ({:?})", field, value);
+            }
+        }
+    }
+
+    upstream_data
 }
 
 pub fn debian_is_native(path: &Path) -> std::io::Result<Option<bool>> {
