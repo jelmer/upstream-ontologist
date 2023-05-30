@@ -340,12 +340,7 @@ def guess_from_debian_watch(path, trust_package):
                     "Hackage-Package", m.group(1), "certain", origin=path)
 
 
-def debian_is_native(path):
-    try:
-        with open(os.path.join(path, "source/format")) as f:
-            return (f.read().strip() == "3.0 (native)")
-    except FileNotFoundError:
-        return None
+debian_is_native = _upstream_ontologist.debian_is_native
 
 
 def guess_from_debian_control(path, trust_package):

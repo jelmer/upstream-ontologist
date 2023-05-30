@@ -61,10 +61,14 @@ fn upstream_datum_to_py(
 fn guess_from_meson(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
     let ret = upstream_ontologist::guess_from_meson(path.as_path(), trust_package);
 
-    Ok(ret
-        .into_iter()
+    ret.into_iter()
         .map(|x| upstream_datum_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()?)
+        .collect::<PyResult<Vec<PyObject>>>()
+}
+
+#[pyfunction]
+fn debian_is_native(path: PathBuf) -> PyResult<Option<bool>> {
+    Ok(upstream_ontologist::debian_is_native(path.as_path())?)
 }
 
 #[pymodule]
@@ -73,5 +77,6 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(url_from_fossil_clone_command))?;
     m.add_wrapped(wrap_pyfunction!(url_from_svn_co_command))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_meson))?;
+    m.add_wrapped(wrap_pyfunction!(debian_is_native))?;
     Ok(())
 }
