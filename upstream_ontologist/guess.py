@@ -32,7 +32,6 @@ from . import _upstream_ontologist
 from .vcs import (
     unsplit_vcs_url,
     browse_url_from_repo_url,
-    plausible_url as plausible_vcs_url,
     plausible_browse_url as plausible_vcs_browse_url,
     sanitize_url as sanitize_vcs_url,
     is_gitlab_site,
@@ -1192,28 +1191,7 @@ def url_from_svn_co_command(command):
 
 
 url_from_git_clone_command = _upstream_ontologist.url_from_git_clone_command
-
-
-def url_from_fossil_clone_command(command):
-    import shlex
-    argv = shlex.split(command.decode('utf-8', 'surrogateescape'))
-    args = [arg for arg in argv if arg.strip()]
-    i = 0
-    while i < len(args):
-        if not args[i].startswith('-'):
-            i += 1
-            continue
-        if '=' in args[i]:
-            del args[i]
-            continue
-        del args[i]
-    try:
-        url = args[2]
-    except IndexError:
-        url = args[0]
-    if plausible_vcs_url(url):
-        return url
-    return None
+url_from_fossil_clone_command = _upstream_ontologist.url_from_fossil_clone_command
 
 
 def guess_from_meson(path, trust_package):

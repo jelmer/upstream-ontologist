@@ -191,6 +191,39 @@ pub fn url_from_git_clone_command(command: &[u8]) -> Option<String> {
     }
 }
 
+pub fn url_from_fossil_clone_command(command: &[u8]) -> Option<String> {
+    let command_str = match String::from_utf8(command.to_vec()) {
+        Ok(s) => s,
+        Err(_) => return None,
+    };
+    let argv: Vec<String> = shlex::split(command_str.as_str())?
+        .into_iter()
+        .filter(|arg| !arg.trim().is_empty())
+        .collect();
+    let mut args = argv;
+    let mut i = 0;
+    while i < args.len() {
+        if !args[i].starts_with('-') {
+            i += 1;
+            continue;
+        }
+        if args[i].contains('=') {
+            args.remove(i);
+            continue;
+        }
+        args.remove(i);
+    }
+    let url = args
+        .get(2)
+        .cloned()
+        .unwrap_or_else(|| args.get(0).cloned().unwrap_or_default());
+    if vcs::plausible_url(&url) {
+        Some(url)
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
