@@ -2,6 +2,7 @@ use log::warn;
 use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::process::Command;
 
 pub mod vcs;
 
@@ -69,9 +70,32 @@ pub enum UpstreamDatum {
     Version(String),
 }
 
-pub struct UpstreamDatumMetadata {
+pub struct UpstreamDatumWithMetadata {
+    pub datum: UpstreamDatum,
     pub origin: Option<String>,
     pub certainty: Option<Certainty>,
+}
+
+impl UpstreamDatum {
+    pub fn field(&self) -> &'static str {
+        match self {
+            UpstreamDatum::Summary(..) => "X-Summary",
+            UpstreamDatum::Description(..) => "X-Description",
+            UpstreamDatum::Name(..) => "Name",
+            UpstreamDatum::Homepage(..) => "Homepage",
+            UpstreamDatum::Repository(..) => "Repository",
+            UpstreamDatum::RepositoryBrowse(..) => "Repository-Browse",
+            UpstreamDatum::License(..) => "License",
+            UpstreamDatum::Author(..) => "Author",
+            UpstreamDatum::BugDatabase(..) => "Bug-Database",
+            UpstreamDatum::BugSubmit(..) => "Bug-Submit",
+            UpstreamDatum::Contact(..) => "Contact",
+            UpstreamDatum::CargoCrate(..) => "X-Cargo-Crate",
+            UpstreamDatum::SecurityMD(..) => "X-Security-MD",
+            UpstreamDatum::SecurityContact(..) => "X-Security-Contact",
+            UpstreamDatum::Version(..) => "Version",
+        }
+    }
 }
 
 pub fn guess_upstream_metadata(
@@ -291,6 +315,60 @@ pub fn url_from_svn_co_command(command: &[u8]) -> Option<String> {
             .iter()
             .any(|scheme| arg.starts_with(&format!("{}://", scheme)))
     })
+}
+
+pub fn guess_from_meson(
+    path: &std::path::Path,
+    trust_package: bool,
+) -> Vec<UpstreamDatumWithMetadata> {
+    // TODO(jelmer): consider looking for a meson build directory to call "meson
+    // introspect" on
+    // TODO(jelmer): mesonbuild is python; consider using its internal functions to parse
+    // meson.build?
+
+    let mut command = Command::new("meson");
+    command.arg("introspect").arg("--projectinfo").arg(path);
+    let output = match command.output() {
+        Ok(output) => output,
+        Err(_) => {
+            warn!("meson not installed; skipping meson.build introspection");
+            return Vec::new();
+        }
+    };
+    if !output.status.success() {
+        warn!(
+            "meson failed to run; exited with code {}",
+            output.status.code().unwrap()
+        );
+        return Vec::new();
+    }
+    let project_info: serde_json::Value = match serde_json::from_slice(&output.stdout) {
+        Ok(value) => value,
+        Err(_) => {
+            warn!("Failed to parse meson project info");
+            return Vec::new();
+        }
+    };
+    let mut results = Vec::new();
+    if let Some(descriptive_name) = project_info.get("descriptive_name") {
+        if let Some(name) = descriptive_name.as_str() {
+            results.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Name(name.to_owned()),
+                certainty: Some(Certainty::Certain),
+                origin: Some("meson.build".to_owned()),
+            });
+        }
+    }
+    if let Some(version) = project_info.get("version") {
+        if let Some(version_str) = version.as_str() {
+            results.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Version(version_str.to_owned()),
+                certainty: Some(Certainty::Certain),
+                origin: Some("meson.build".to_owned()),
+            });
+        }
+    }
+    results
 }
 
 #[cfg(test)]

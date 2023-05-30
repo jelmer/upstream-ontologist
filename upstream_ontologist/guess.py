@@ -1178,27 +1178,7 @@ def url_from_cvs_co_command(command):
 url_from_svn_co_command = _upstream_ontologist.url_from_svn_co_command
 url_from_git_clone_command = _upstream_ontologist.url_from_git_clone_command
 url_from_fossil_clone_command = _upstream_ontologist.url_from_fossil_clone_command
-
-
-def guess_from_meson(path, trust_package):
-    import subprocess
-    # TODO(jelmer): consider looking for a meson build directory to call "meson
-    # introspect" on
-    # TODO(jelmer): mesonbuild is python; consider using its internal functions to parse
-    # meson.build?
-    try:
-        output = subprocess.check_output(['meson', 'introspect', '--projectinfo', path])
-    except FileNotFoundError:
-        logger.warning('meson not installed; skipping meson.build introspection')
-        return
-    except subprocess.CalledProcessError as e:
-        logger.warning('meson failed to run; exited with code %d', e.returncode)
-        return
-    project_info = json.loads(output)
-    if 'descriptive_name' in project_info:
-        yield UpstreamDatum('Name', project_info['descriptive_name'], 'certain')
-    if 'version' in project_info:
-        yield UpstreamDatum('Version', project_info['version'], 'certain')
+guess_from_meson = _upstream_ontologist.guess_from_meson
 
 
 def guess_from_pubspec_yaml(path, trust_package):
