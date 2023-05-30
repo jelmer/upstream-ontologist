@@ -39,6 +39,8 @@ from . import (
     UrlUnverifiable,
 )
 
+from ._upstream_ontologist import drop_vcs_in_scheme
+
 
 KNOWN_GITLAB_SITES = [
     "salsa.debian.org",
@@ -338,16 +340,6 @@ def fixup_rcp_style_git_repo_url(url: str) -> str:
     except ValueError:
         return url
     return repo_url
-
-
-def drop_vcs_in_scheme(url: str) -> str:
-    if url.startswith("git+http:") or url.startswith("git+https:"):
-        url = url[4:]
-    if url.startswith("hg+https:") or url.startswith("hg+http"):
-        url = url[3:]
-    if url.startswith("bzr+lp:") or url.startswith("bzr+http"):
-        url = url.split("+", 1)[1]
-    return url
 
 
 def fix_path_in_port(

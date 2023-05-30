@@ -16,6 +16,11 @@ fn url_from_svn_co_command(command: &[u8]) -> Option<String> {
     upstream_ontologist::url_from_svn_co_command(command)
 }
 
+#[pyfunction]
+fn drop_vcs_in_scheme(url: &str) -> &str {
+    upstream_ontologist::vcs::drop_vcs_in_scheme(url)
+}
+
 fn upstream_datum_to_py(
     py: Python,
     datum: upstream_ontologist::UpstreamDatumWithMetadata,
@@ -78,5 +83,6 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(url_from_svn_co_command))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_meson))?;
     m.add_wrapped(wrap_pyfunction!(debian_is_native))?;
+    m.add_wrapped(wrap_pyfunction!(drop_vcs_in_scheme))?;
     Ok(())
 }
