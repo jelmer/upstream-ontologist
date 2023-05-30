@@ -1,6 +1,9 @@
+use log::warn;
 use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
+
+pub mod vcs;
 
 #[derive(Debug, Ord, Eq, PartialOrd, PartialEq)]
 pub enum Certainty {
@@ -64,6 +67,11 @@ pub enum UpstreamDatum {
     SecurityMD(String),
     SecurityContact(String),
     Version(String),
+}
+
+pub struct UpstreamDatumMetadata {
+    pub origin: Option<String>,
+    pub certainty: Option<Certainty>,
 }
 
 pub fn guess_upstream_metadata(
@@ -130,6 +138,59 @@ pub fn guess_upstream_metadata(
     })
 }
 
+pub trait UpstreamDataProvider {
+    fn provide(
+        path: &std::path::Path,
+        trust_package: bool,
+    ) -> dyn Iterator<Item = (UpstreamDatum, Certainty)>;
+}
+
+pub fn url_from_git_clone_command(command: &[u8]) -> Option<String> {
+    if command.ends_with(&[b'\\']) {
+        warn!("Ignoring command with line break: {:?}", command);
+        return None;
+    }
+    let command_str = match String::from_utf8(command.to_vec()) {
+        Ok(s) => s,
+        Err(_) => {
+            warn!("Ignoring command with non-UTF-8: {:?}", command);
+            return None;
+        }
+    };
+    let argv: Vec<String> = shlex::split(command_str.as_str())?
+        .into_iter()
+        .filter(|arg| !arg.trim().is_empty())
+        .collect();
+    let mut args = argv;
+    let mut i = 0;
+    while i < args.len() {
+        if !args[i].starts_with('-') {
+            i += 1;
+            continue;
+        }
+        if args[i].contains('=') {
+            args.remove(i);
+            continue;
+        }
+        // arguments that take a parameter
+        if args[i] == "-b" || args[i] == "--depth" || args[i] == "--branch" {
+            args.remove(i);
+            args.remove(i);
+            continue;
+        }
+        args.remove(i);
+    }
+    let url = args
+        .get(2)
+        .cloned()
+        .unwrap_or_else(|| args.get(0).cloned().unwrap_or_default());
+    if vcs::plausible_url(&url) {
+        Some(url)
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -144,5 +205,13 @@ mod test {
             Some(true),
         )
         .unwrap();
+    }
+
+    #[test]
+    fn test_url_from_git_clone_command() {
+        assert_eq!(
+            url_from_git_clone_command(b"git clone https://github.com/foo/bar foo"),
+            Some("https://github.com/foo/bar".to_string())
+        );
     }
 }
