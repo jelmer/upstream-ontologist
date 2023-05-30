@@ -5,8 +5,14 @@ fn url_from_git_clone_command(command: &[u8]) -> Option<String> {
     upstream_ontologist::url_from_git_clone_command(command)
 }
 
+#[pyfunction]
+fn url_from_fossil_clone_command(command: &[u8]) -> Option<String> {
+    upstream_ontologist::url_from_fossil_clone_command(command)
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(url_from_git_clone_command))?;
+    m.add_wrapped(wrap_pyfunction!(url_from_fossil_clone_command))?;
     Ok(())
 }
