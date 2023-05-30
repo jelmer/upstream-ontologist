@@ -399,14 +399,14 @@ pub fn load_json_url(
 ) -> Result<serde_json::Value, reqwest::Error> {
     let timeout = timeout.unwrap_or(std::time::Duration::from_secs(DEFAULT_URLLIB_TIMEOUT));
     let mut headers = HeaderMap::new();
-    headers.insert("User-Agent", USER_AGENT.parse().unwrap());
-    headers.insert("Accept", "application/json".parse().unwrap());
+    headers.insert(reqwest::header::USER_AGENT, USER_AGENT.parse().unwrap());
+    headers.insert(reqwest::header::ACCEPT, "application/json".parse().unwrap());
 
     if let Some(hostname) = reqwest::Url::parse(http_url).unwrap().host_str() {
         if hostname == "github.com" || hostname == "raw.githubusercontent.com" {
             if let Ok(token) = std::env::var("GITHUB_TOKEN") {
                 headers.insert(
-                    "WWW-Authenticate",
+                    reqwest::header::WWW_AUTHENTICATE,
                     format!("Bearer {}", token).parse().unwrap(),
                 );
             }
