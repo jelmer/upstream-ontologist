@@ -1,10 +1,17 @@
 use log::warn;
 use pyo3::prelude::*;
+use reqwest::header::HeaderMap;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+lazy_static::lazy_static! {
+    static ref USER_AGENT: String = String::from("upstream-ontologist/") + env!("CARGO_PKG_VERSION");
+}
+// Too aggressive?
+const DEFAULT_URLLIB_TIMEOUT: u64 = 3;
 
 pub mod vcs;
 
@@ -384,6 +391,40 @@ pub fn debian_is_native(path: &Path) -> std::io::Result<Option<bool>> {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(e) => Err(e),
     }
+}
+
+pub fn load_json_url(
+    http_url: &str,
+    timeout: Option<std::time::Duration>,
+) -> Result<serde_json::Value, reqwest::Error> {
+    let timeout = timeout.unwrap_or(std::time::Duration::from_secs(DEFAULT_URLLIB_TIMEOUT));
+    let mut headers = HeaderMap::new();
+    headers.insert("User-Agent", USER_AGENT.parse().unwrap());
+    headers.insert("Accept", "application/json".parse().unwrap());
+
+    if let Some(hostname) = reqwest::Url::parse(http_url).unwrap().host_str() {
+        if hostname == "github.com" || hostname == "raw.githubusercontent.com" {
+            if let Ok(token) = std::env::var("GITHUB_TOKEN") {
+                headers.insert(
+                    "WWW-Authenticate",
+                    format!("Bearer {}", token).parse().unwrap(),
+                );
+            }
+        }
+    }
+
+    let client = reqwest::blocking::Client::builder()
+        .timeout(timeout)
+        .default_headers(headers)
+        .build()?;
+
+    let request = client.get(http_url).build()?;
+
+    let response = client.execute(request)?;
+
+    let json_contents: serde_json::Value = response.json()?;
+
+    Ok(json_contents)
 }
 
 #[cfg(test)]

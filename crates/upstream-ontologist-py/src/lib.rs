@@ -1,5 +1,8 @@
+use pyo3::import_exception;
 use pyo3::prelude::*;
 use std::path::PathBuf;
+
+import_exception!(urllib.error, HTTPError);
 
 #[pyfunction]
 fn url_from_git_clone_command(command: &[u8]) -> Option<String> {
@@ -81,6 +84,20 @@ fn unsplit_vcs_url(repo_url: &str, branch: Option<&str>, subpath: Option<&str>) 
     upstream_ontologist::vcs::unsplit_vcs_url(repo_url, branch, subpath)
 }
 
+#[pyfunction]
+fn load_json_url(http_url: &str, timeout: Option<u64>) -> PyResult<String> {
+    Ok(
+        upstream_ontologist::load_json_url(http_url, timeout.map(std::time::Duration::from_secs))
+            .map_err(|e| {
+                HTTPError::new_err((
+                    e.url().unwrap().as_str().to_string(),
+                    e.status().map(|x| x.as_u16()),
+                ))
+            })?
+            .to_string(),
+    )
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(url_from_git_clone_command))?;
@@ -90,5 +107,6 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(debian_is_native))?;
     m.add_wrapped(wrap_pyfunction!(drop_vcs_in_scheme))?;
     m.add_wrapped(wrap_pyfunction!(unsplit_vcs_url))?;
+    m.add_wrapped(wrap_pyfunction!(load_json_url))?;
     Ok(())
 }
