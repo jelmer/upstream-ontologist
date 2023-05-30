@@ -76,6 +76,11 @@ fn debian_is_native(path: PathBuf) -> PyResult<Option<bool>> {
     Ok(upstream_ontologist::debian_is_native(path.as_path())?)
 }
 
+#[pyfunction]
+fn unsplit_vcs_url(repo_url: &str, branch: Option<&str>, subpath: Option<&str>) -> String {
+    upstream_ontologist::vcs::unsplit_vcs_url(repo_url, branch, subpath)
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(url_from_git_clone_command))?;
@@ -84,5 +89,6 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_meson))?;
     m.add_wrapped(wrap_pyfunction!(debian_is_native))?;
     m.add_wrapped(wrap_pyfunction!(drop_vcs_in_scheme))?;
+    m.add_wrapped(wrap_pyfunction!(unsplit_vcs_url))?;
     Ok(())
 }

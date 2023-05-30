@@ -14,3 +14,14 @@ pub fn drop_vcs_in_scheme(mut url: &str) -> &str {
     }
     url
 }
+
+pub fn unsplit_vcs_url(repo_url: &str, branch: Option<&str>, subpath: Option<&str>) -> String {
+    let mut url = repo_url.to_string();
+    if let Some(branch_name) = branch {
+        url = format!("{} -b {}", url, branch_name);
+    }
+    if let Some(subpath_str) = subpath {
+        url = format!("{} [{}]", url, subpath_str);
+    }
+    url
+}

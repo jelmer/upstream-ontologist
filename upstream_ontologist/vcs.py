@@ -39,7 +39,10 @@ from . import (
     UrlUnverifiable,
 )
 
-from ._upstream_ontologist import drop_vcs_in_scheme
+from ._upstream_ontologist import (  # noqa: F401
+    drop_vcs_in_scheme,
+    unsplit_vcs_url,
+)
 
 
 KNOWN_GITLAB_SITES = [
@@ -62,25 +65,6 @@ def plausible_browse_url(url: str) -> bool:
 
 def plausible_url(url: str) -> bool:
     return ":" in url
-
-
-def unsplit_vcs_url(
-    repo_url: str, branch: Optional[str] = None, subpath: Optional[str] = None
-) -> str:
-    """Unsplit a Debian VCS URL.
-
-    Args:
-      repo_url: Repository URL
-      branch: Branch name
-      subpath: Subpath in the tree
-    Returns: full URL
-    """
-    url = repo_url
-    if branch:
-        url = "{} -b {}".format(url, branch)
-    if subpath:
-        url = "{} [{}]".format(url, subpath)
-    return url
 
 
 def probe_gitlab_host(hostname: str) -> bool:
