@@ -2,6 +2,37 @@ use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+#[derive(Debug, Ord, Eq, PartialOrd, PartialEq)]
+pub enum Certainty {
+    Certain,
+    Confident,
+    Likely,
+    Possible,
+}
+
+impl From<&str> for Certainty {
+    fn from(s: &str) -> Self {
+        match s {
+            "certain" => Certainty::Certain,
+            "confident" => Certainty::Confident,
+            "likely" => Certainty::Likely,
+            "possible" => Certainty::Possible,
+            _ => panic!("unknown certainty: {}", s),
+        }
+    }
+}
+
+impl ToString for Certainty {
+    fn to_string(&self) -> String {
+        match self {
+            Certainty::Certain => "certain".to_string(),
+            Certainty::Confident => "confident".to_string(),
+            Certainty::Likely => "likely".to_string(),
+            Certainty::Possible => "possible".to_string(),
+        }
+    }
+}
+
 pub struct Person {
     pub name: Option<String>,
     pub email: Option<String>,
