@@ -814,55 +814,7 @@ def xmlparse_simplify_namespaces(path, namespaces):
     return tree.root  # type: ignore
 
 
-def guess_from_package_xml(path, trust_package):
-    # https://pear.php.net/manual/en/guide.developers.package2.dependencies.php
-    import xml.etree.ElementTree as ET
-    try:
-        root = xmlparse_simplify_namespaces(path, [
-            'http://pear.php.net/dtd/package-2.0',
-            'http://pear.php.net/dtd/package-2.1'])
-    except ET.ParseError as e:
-        logger.warning('Unable to parse package.xml: %s', e)
-        return
-    assert root.tag == 'package', 'root tag is %r' % root.tag
-    leads = []
-    for el in root:
-        if el.tag == 'name':
-            yield UpstreamDatum('Name', el.text, 'certain')
-        elif el.tag == 'summary':
-            yield UpstreamDatum('Summary', el.text, 'certain')
-        elif el.tag == 'description':
-            yield UpstreamDatum('Description', el.text, 'certain')
-        elif el.tag == 'version':
-            release_tag = el.find('release')
-            if release_tag is not None:
-                yield UpstreamDatum('Version', release_tag.text, 'certain')
-        elif el.tag == 'license':
-            yield UpstreamDatum('License', el.text, 'certain')
-        elif el.tag == 'url':
-            if el.get('type') == 'repository':
-                yield UpstreamDatum(
-                    'Repository', el.text, 'certain')
-            if el.get('type') == 'bugtracker':
-                yield UpstreamDatum('Bug-Database', el.text, 'certain')
-        elif el.tag == 'lead':
-            leads.append(el)
-        elif el.tag in ('stability', 'dependencies', 'providesextension',
-                        'extsrcrelease', 'channel', 'notes', 'contents',
-                        'date', 'time'):
-            pass
-        else:
-            logger.debug('Unknown package.xml tag %s', el.tag)
-
-    for el in leads[:1]:
-        name_el = el.find('name')
-        email_el = el.find('email')
-        active_el = el.find('active')
-        if active_el is not None and active_el.text != 'yes':
-            continue
-        yield UpstreamDatum('Maintainer', Person(
-            name=name_el.text if name_el is not None else None,
-            email=email_el.text if email_el is not None else None), 'confident')
+guess_from_package_xml = _upstream_ontologist.guess_from_package_xml
 
 
 def guess_from_pod(contents):

@@ -8,6 +8,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use url::Url;
+use xmltree::{Element, XMLNode};
 
 lazy_static::lazy_static! {
     static ref USER_AGENT: String = String::from("upstream-ontologist/") + env!("CARGO_PKG_VERSION");
@@ -147,6 +148,7 @@ pub enum UpstreamDatum {
     Summary(String),
     License(String),
     Author(Vec<Person>),
+    Maintainer(Person),
     BugDatabase(String),
     BugSubmit(String),
     Contact(String),
@@ -182,6 +184,7 @@ impl UpstreamDatum {
             UpstreamDatum::SecurityContact(..) => "Security-Contact",
             UpstreamDatum::Version(..) => "Version",
             UpstreamDatum::Keywords(..) => "Keywords",
+            UpstreamDatum::Maintainer(..) => "Maintainer",
         }
     }
 }
@@ -753,6 +756,155 @@ pub fn guess_from_composer_json(
                 error!("Unknown field {} ({:?}) in composer.json", field, value);
             }
         }
+    }
+
+    upstream_data
+}
+
+fn xmlparse_simplify_namespaces(path: &Path, namespaces: &[&str]) -> Option<Element> {
+    let namespaces = namespaces
+        .iter()
+        .map(|ns| format!("{{{}{}}}", ns, ns))
+        .collect::<Vec<_>>();
+    let mut f = std::fs::File::open(path).unwrap();
+    let mut buf = Vec::new();
+    f.read_to_end(&mut buf).ok()?;
+    let mut tree = xmltree::Element::parse(std::io::Cursor::new(buf)).ok()?;
+    simplify_namespaces(&mut tree, &namespaces);
+    Some(tree)
+}
+
+fn simplify_namespaces(element: &mut Element, namespaces: &[String]) {
+    element.prefix = None;
+    if let Some(namespace) = namespaces.iter().find(|&ns| element.name.starts_with(ns)) {
+        element.name = element.name[namespace.len()..].to_string();
+    }
+    for child in &mut element.children {
+        if let XMLNode::Element(ref mut child_element) = child {
+            simplify_namespaces(child_element, namespaces);
+        }
+    }
+}
+
+pub fn guess_from_package_xml(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+    let namespaces = [
+        "http://pear.php.net/dtd/package-2.0",
+        "http://pear.php.net/dtd/package-2.1",
+    ];
+
+    let root = match xmlparse_simplify_namespaces(path, &namespaces) {
+        Some(root) => root,
+        None => {
+            eprintln!("Unable to parse package.xml");
+            return Vec::new();
+        }
+    };
+
+    assert_eq!(root.name, "package", "root tag is {:?}", root.name);
+
+    let mut upstream_data: Vec<UpstreamDatumWithMetadata> = Vec::new();
+    let mut leads: Vec<&Element> = Vec::new();
+
+    for child_element in &root.children {
+        if let XMLNode::Element(ref element) = child_element {
+            match element.name.as_str() {
+                "name" => {
+                    upstream_data.push(UpstreamDatumWithMetadata {
+                        datum: UpstreamDatum::Name(element.get_text().unwrap().to_string()),
+                        certainty: Some(Certainty::Certain),
+                        origin: Some("package.xml".to_string()),
+                    });
+                }
+                "summary" => {
+                    upstream_data.push(UpstreamDatumWithMetadata {
+                        datum: UpstreamDatum::Summary(element.get_text().unwrap().to_string()),
+                        certainty: Some(Certainty::Certain),
+                        origin: Some("package.xml".to_string()),
+                    });
+                }
+                "description" => {
+                    upstream_data.push(UpstreamDatumWithMetadata {
+                        datum: UpstreamDatum::Description(element.get_text().unwrap().to_string()),
+                        certainty: Some(Certainty::Certain),
+                        origin: Some("package.xml".to_string()),
+                    });
+                }
+                "version" => {
+                    if let Some(release_tag) = element.get_child("release") {
+                        upstream_data.push(UpstreamDatumWithMetadata {
+                            datum: UpstreamDatum::Version(
+                                release_tag.get_text().unwrap().to_string(),
+                            ),
+                            certainty: Some(Certainty::Certain),
+                            origin: Some("package.xml".to_string()),
+                        });
+                    }
+                }
+                "license" => {
+                    upstream_data.push(UpstreamDatumWithMetadata {
+                        datum: UpstreamDatum::License(element.get_text().unwrap().to_string()),
+                        certainty: Some(Certainty::Certain),
+                        origin: Some("package.xml".to_string()),
+                    });
+                }
+                "url" => {
+                    if let Some(url_type) = element.attributes.get("type") {
+                        match url_type.as_str() {
+                            "repository" => {
+                                upstream_data.push(UpstreamDatumWithMetadata {
+                                    datum: UpstreamDatum::Repository(
+                                        element.get_text().unwrap().to_string(),
+                                    ),
+                                    certainty: Some(Certainty::Certain),
+                                    origin: Some("package.xml".to_string()),
+                                });
+                            }
+                            "bugtracker" => {
+                                upstream_data.push(UpstreamDatumWithMetadata {
+                                    datum: UpstreamDatum::BugDatabase(
+                                        element.get_text().unwrap().to_string(),
+                                    ),
+                                    certainty: Some(Certainty::Certain),
+                                    origin: Some("package.xml".to_string()),
+                                });
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                "lead" => {
+                    leads.push(element);
+                }
+                "stability" | "dependencies" | "providesextension" | "extsrcrelease"
+                | "channel" | "notes" | "contents" | "date" | "time" => {
+                    // Do nothing, skip these fields
+                }
+                _ => {
+                    eprintln!("Unknown package.xml tag {}", element.name);
+                }
+            }
+        }
+    }
+
+    for lead_element in leads.iter().take(1) {
+        let name_el = lead_element.get_child("name");
+        let email_el = lead_element.get_child("email");
+        let active_el = lead_element.get_child("active");
+        if let Some(active_el) = active_el {
+            if active_el.get_text().as_deref() != Some("yes") {
+                continue;
+            }
+        }
+        let person = Person {
+            name: name_el.map(|el| el.get_text().unwrap().into_owned()),
+            email: email_el.map(|el| el.get_text().unwrap().into_owned()),
+            ..Default::default()
+        };
+        upstream_data.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Maintainer(person),
+            certainty: Some(Certainty::Confident),
+            origin: Some("package.xml".to_string()),
+        });
     }
 
     upstream_data
