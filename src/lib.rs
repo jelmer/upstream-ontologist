@@ -393,10 +393,19 @@ pub fn debian_is_native(path: &Path) -> std::io::Result<Option<bool>> {
     }
 }
 
+pub enum HTTPJSONError {
+    HTTPError(reqwest::Error),
+    Error {
+        url: reqwest::Url,
+        status: u16,
+        response: reqwest::blocking::Response,
+    },
+}
+
 pub fn load_json_url(
     http_url: &str,
     timeout: Option<std::time::Duration>,
-) -> Result<serde_json::Value, reqwest::Error> {
+) -> Result<serde_json::Value, HTTPJSONError> {
     let timeout = timeout.unwrap_or(std::time::Duration::from_secs(DEFAULT_URLLIB_TIMEOUT));
     let mut headers = HeaderMap::new();
     headers.insert(reqwest::header::USER_AGENT, USER_AGENT.parse().unwrap());
@@ -416,13 +425,25 @@ pub fn load_json_url(
     let client = reqwest::blocking::Client::builder()
         .timeout(timeout)
         .default_headers(headers)
-        .build()?;
+        .build()
+        .map_err(HTTPJSONError::HTTPError)?;
 
-    let request = client.get(http_url).build()?;
+    let request = client
+        .get(http_url)
+        .build()
+        .map_err(HTTPJSONError::HTTPError)?;
 
-    let response = client.execute(request)?;
+    let response = client.execute(request).map_err(HTTPJSONError::HTTPError)?;
 
-    let json_contents: serde_json::Value = response.json()?;
+    if !response.status().is_success() {
+        return Err(HTTPJSONError::Error {
+            url: response.url().clone(),
+            status: response.status().as_u16(),
+            response,
+        });
+    }
+
+    let json_contents: serde_json::Value = response.json().map_err(HTTPJSONError::HTTPError)?;
 
     Ok(json_contents)
 }

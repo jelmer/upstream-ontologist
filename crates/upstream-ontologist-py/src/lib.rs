@@ -1,3 +1,4 @@
+use pyo3::exceptions::PyRuntimeError;
 use pyo3::import_exception;
 use pyo3::prelude::*;
 use std::path::PathBuf;
@@ -88,11 +89,17 @@ fn unsplit_vcs_url(repo_url: &str, branch: Option<&str>, subpath: Option<&str>) 
 fn load_json_url(http_url: &str, timeout: Option<u64>) -> PyResult<String> {
     Ok(
         upstream_ontologist::load_json_url(http_url, timeout.map(std::time::Duration::from_secs))
-            .map_err(|e| {
-                HTTPError::new_err((
-                    e.url().unwrap().as_str().to_string(),
-                    e.status().map(|x| x.as_u16()),
-                ))
+            .map_err(|e| match e {
+                upstream_ontologist::HTTPJSONError::Error {
+                    url,
+                    status,
+                    response,
+                } => {
+                    HTTPError::new_err((url.as_str().to_string(), status, response.text().unwrap()))
+                }
+                upstream_ontologist::HTTPJSONError::HTTPError(e) => {
+                    PyRuntimeError::new_err(e.to_string())
+                }
             })?
             .to_string(),
     )
