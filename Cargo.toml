@@ -10,3 +10,10 @@ homepage = "https://github.com/jelmer/upstream-ontologist"
 
 [dependencies]
 pyo3 = { version = "0.18", features=["auto-initialize"]}
+log = "0.4"
+shlex = "1.1.0"
+
+[lib]
+
+[workspace]
+members = [ "crates/*" ]

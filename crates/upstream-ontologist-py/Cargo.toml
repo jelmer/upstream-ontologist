@@ -1,0 +1,15 @@
+[package]
+name = "upstream-ontologist-py"
+version = "0.0.0"
+authors = ["Jelmer Vernooĳ <jelmer@jelmer.uk>"]
+edition = "2018"
+license = "Apache-2.0"
+repository = "https://github.com/jelmer/upstream-ontologist.git"
+homepage = "https://github.com/jelmer/upstream-ontologist"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+upstream-ontologist = { path = "../.." }
+pyo3 = { version = ">=0.14", features = ["extension-module"] }
