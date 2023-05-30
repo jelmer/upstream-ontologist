@@ -800,35 +800,7 @@ def guess_from_setup_py(path, trust_package):  # noqa: C901
             'certain')
 
 
-def guess_from_composer_json(path, trust_package):
-    # https://getcomposer.org/doc/04-schema.md
-    with open(path) as f:
-        package = json.load(f)
-    for field, value in package.items():
-        if field == 'name':
-            yield UpstreamDatum('Name', value, 'certain')
-        elif field == 'homepage':
-            yield UpstreamDatum('Homepage', value, 'certain')
-        elif field == 'description':
-            yield UpstreamDatum('Summary', value, 'certain')
-        elif field == 'license':
-            yield UpstreamDatum('License', value, 'certain')
-        elif field == 'version':
-            yield UpstreamDatum('Version', value, 'certain')
-        elif field == 'type':
-            if value != 'project':
-                logger.debug('unexpected composer.json type: %r', value)
-        elif field == 'keywords':
-            yield UpstreamDatum('Keywords', value, 'certain')
-        elif field in (
-                'require', 'require-dev', 'autoload',
-                'autoload-dev', 'scripts', 'extra', 'config', 'prefer-stable',
-                'minimum-stability'):
-            pass
-        else:
-            logger.debug('Unknown field %s (%r) in composer.json', field, value)
-
-
+guess_from_composer_json = _upstream_ontologist.guess_from_composer_json
 guess_from_package_json = _upstream_ontologist.guess_from_package_json
 
 
