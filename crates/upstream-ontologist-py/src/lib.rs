@@ -1,9 +1,14 @@
+use pyo3::create_exception;
+use pyo3::exceptions::PyException;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::import_exception;
 use pyo3::prelude::*;
 use std::path::PathBuf;
+use upstream_ontologist::CanonicalizeError;
 
 import_exception!(urllib.error, HTTPError);
+create_exception!(upstream_ontologist, UnverifiableUrl, PyException);
+create_exception!(upstream_ontologist, InvalidUrl, PyException);
 
 #[pyfunction]
 fn url_from_git_clone_command(command: &[u8]) -> Option<String> {
@@ -106,8 +111,11 @@ fn unsplit_vcs_url(repo_url: &str, branch: Option<&str>, subpath: Option<&str>) 
 
 #[pyfunction]
 fn load_json_url(http_url: &str, timeout: Option<u64>) -> PyResult<String> {
+    let http_url = http_url
+        .parse::<reqwest::Url>()
+        .map_err(|e| PyRuntimeError::new_err(format!("{}: {}", e, http_url)))?;
     Ok(
-        upstream_ontologist::load_json_url(http_url, timeout.map(std::time::Duration::from_secs))
+        upstream_ontologist::load_json_url(&http_url, timeout.map(std::time::Duration::from_secs))
             .map_err(|e| match e {
                 upstream_ontologist::HTTPJSONError::Error {
                     url,
@@ -234,6 +242,124 @@ fn guess_from_meta_json(py: Python, path: PathBuf, trust_package: bool) -> PyRes
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
+#[pyclass(subclass)]
+struct Forge(Box<dyn upstream_ontologist::Forge>);
+
+#[pymethods]
+impl Forge {
+    #[getter]
+    fn name(&self) -> PyResult<String> {
+        Ok(self.0.name().to_string())
+    }
+
+    fn bug_database_url_from_bug_submit_url(&self, url: &str) -> PyResult<Option<String>> {
+        let url = url.parse().unwrap();
+        Ok(self
+            .0
+            .bug_database_url_from_bug_submit_url(&url)
+            .map(|x| x.to_string()))
+    }
+
+    fn bug_submit_url_from_bug_database_url(&self, url: &str) -> PyResult<Option<String>> {
+        let url = url.parse().unwrap();
+        Ok(self
+            .0
+            .bug_submit_url_from_bug_database_url(&url)
+            .map(|x| x.to_string()))
+    }
+
+    fn check_bug_database_canonical(&self, url: &str) -> PyResult<String> {
+        let url = url.parse().unwrap();
+        Ok(self
+            .0
+            .check_bug_database_canonical(&url)
+            .map_err(|e| match e {
+                CanonicalizeError::InvalidUrl(url, msg) => {
+                    InvalidUrl::new_err((url.to_string(), msg))
+                }
+                CanonicalizeError::Unverifiable(url, msg) => {
+                    UnverifiableUrl::new_err((url.to_string(), msg))
+                }
+                CanonicalizeError::RateLimited(url) => {
+                    UnverifiableUrl::new_err((url.to_string(), "rate limited"))
+                }
+            })?
+            .to_string())
+    }
+
+    fn check_bug_submit_url_canonical(&self, url: &str) -> PyResult<String> {
+        let url = url.parse().unwrap();
+        Ok(self
+            .0
+            .check_bug_submit_url_canonical(&url)
+            .map_err(|e| match e {
+                CanonicalizeError::InvalidUrl(url, msg) => {
+                    InvalidUrl::new_err((url.to_string(), msg))
+                }
+                CanonicalizeError::Unverifiable(url, msg) => {
+                    UnverifiableUrl::new_err((url.to_string(), msg))
+                }
+                CanonicalizeError::RateLimited(url) => {
+                    UnverifiableUrl::new_err((url.to_string(), "rate limited"))
+                }
+            })?
+            .to_string())
+    }
+
+    fn bug_database_from_issue_url(&self, url: &str) -> PyResult<Option<String>> {
+        let url = url.parse().unwrap();
+        Ok(self
+            .0
+            .bug_database_from_issue_url(&url)
+            .map(|x| x.to_string()))
+    }
+
+    fn bug_database_url_from_repo_url(&self, url: &str) -> PyResult<Option<String>> {
+        let url = url.parse().unwrap();
+        Ok(self
+            .0
+            .bug_database_url_from_repo_url(&url)
+            .map(|x| x.to_string()))
+    }
+
+    fn repo_url_from_merge_request_url(&self, url: &str) -> PyResult<Option<String>> {
+        let url = url.parse().unwrap();
+        Ok(self
+            .0
+            .repo_url_from_merge_request_url(&url)
+            .map(|x| x.to_string()))
+    }
+
+    #[getter]
+    fn repository_browse_can_be_homepage(&self) -> bool {
+        self.0.repository_browse_can_be_homepage()
+    }
+}
+
+#[pyclass(subclass,extends=Forge)]
+struct GitHub;
+
+#[pymethods]
+impl GitHub {
+    #[new]
+    fn new() -> (Self, Forge) {
+        let forge = upstream_ontologist::GitHub::new();
+        (Self, Forge(Box::new(forge)))
+    }
+}
+
+#[pyclass(subclass,extends=Forge)]
+struct GitLab;
+
+#[pymethods]
+impl GitLab {
+    #[new]
+    fn new() -> (Self, Forge) {
+        let forge = upstream_ontologist::GitLab::new();
+        (Self, Forge(Box::new(forge)))
+    }
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(url_from_git_clone_command))?;
@@ -255,5 +381,10 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_authors))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_metadata_json))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_meta_json))?;
+    m.add_class::<Forge>()?;
+    m.add_class::<GitHub>()?;
+    m.add_class::<GitLab>()?;
+    m.add("InvalidUrl", py.get_type::<InvalidUrl>())?;
+    m.add("UnverifiableUrl", py.get_type::<UnverifiableUrl>())?;
     Ok(())
 }

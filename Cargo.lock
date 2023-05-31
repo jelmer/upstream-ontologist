@@ -1112,6 +1112,7 @@ dependencies = [
  "configparser",
  "lazy_static",
  "log",
+ "percent-encoding",
  "pyo3",
  "regex",
  "reqwest",
@@ -1129,6 +1130,7 @@ name = "upstream-ontologist-py"
 version = "0.0.0"
 dependencies = [
  "pyo3",
+ "reqwest",
  "upstream-ontologist",
 ]
 

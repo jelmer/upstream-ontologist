@@ -23,7 +23,7 @@ import re
 import socket
 import urllib.error
 from typing import Optional, Iterable, List, Iterator, Any, Dict, Tuple, cast, Callable, Type
-from urllib.parse import quote, urlparse, urlunparse, urljoin
+from urllib.parse import urlparse, urlunparse, urljoin
 from urllib.request import urlopen, Request
 
 from . import _upstream_ontologist
@@ -2508,11 +2508,11 @@ def find_forge(parsed_url) -> Optional[Type[Forge]]:
     if parsed_url.netloc == 'sourceforge.net':
         return SourceForge
     if parsed_url.netloc == 'github.com':
-        return GitHub
+        return GitHub()
     if parsed_url.netloc.endswith('.launchpad.net'):
         return Launchpad
     if is_gitlab_site(parsed_url.netloc):
-        return GitLab
+        return GitLab()
     return None
 
 
@@ -2575,184 +2575,8 @@ class CratesIo(PackageRepository):
             return cls._parse_crates_io(data)
 
 
-class GitHub(Forge):
-
-    name = 'GitHub'
-
-    @classmethod
-    def bug_database_url_from_bug_submit_url(cls, parsed_url):
-        assert parsed_url.hostname == 'github.com'
-        path_elements = parsed_url.path.strip('/').split('/')
-        if len(path_elements) not in (3, 4):
-            return None
-        if path_elements[2] != 'issues':
-            return None
-        return urlunparse(
-            ('https', 'github.com', '/'.join(path_elements[:3]),
-             None, None, None))
-
-    @classmethod
-    def bug_submit_url_from_bug_database_url(cls, parsed_url):
-        path_elements = parsed_url.path.strip('/').split('/')
-        if len(path_elements) != 3:
-            return None
-        if path_elements[2] != 'issues':
-            return None
-        return urlunparse(
-            ('https', 'github.com', parsed_url.path + '/new',
-             None, None, None))
-
-    @classmethod
-    def check_bug_database_canonical(cls, parsed_url):
-        url = urlunparse(parsed_url)
-        path_elements = parsed_url.path.strip('/').split('/')
-        if len(path_elements) < 3 or path_elements[2] != 'issues':
-            raise InvalidUrl(url, "GitHub URL with missing path elements")
-        api_url = 'https://api.github.com/repos/{}/{}'.format(
-            path_elements[0], path_elements[1])
-        try:
-            data = _load_json_url(api_url)
-        except urllib.error.HTTPError as e:
-            if e.code == 404:
-                raise InvalidUrl(url, "Project does not exist") from e
-            if e.code == 403:
-                # Probably rate limited
-                logger.warning(
-                    'Unable to verify bug database URL %s: %s',
-                    url, e.reason)
-                raise UrlUnverifiable(url, "rate-limited by GitHub API") from e
-            raise
-        if not data['has_issues']:
-            raise InvalidUrl(
-                url, "GitHub project does not have issues enabled")
-        if data.get('archived', False):
-            raise InvalidUrl(url, "GitHub project is archived")
-        return urljoin(data['html_url'] + '/', 'issues')
-
-    @classmethod
-    def check_bug_submit_url_canonical(cls, parsed_url):
-        path = '/'.join(parsed_url.path.strip('/').split('/')[:-1])
-        db_url = urlunparse(parsed_url._replace(path=path))
-        canonical_db_url = check_bug_database_canonical(db_url)
-        return urljoin(canonical_db_url + '/', "new")
-
-    @classmethod
-    def bug_database_from_issue_url(cls, parsed_url):
-        path_elements = parsed_url.path.strip('/').split('/')
-        if len(path_elements) > 2 and path_elements[2] == 'issues':
-            return urlunparse(
-                ('https', 'github.com', '/'.join(path_elements[:3]),
-                 None, None, None))
-        return None
-
-    @classmethod
-    def bug_database_url_from_repo_url(cls, parsed_url):
-        path = '/'.join(parsed_url.path.split('/')[:3])
-        if path.endswith('.git'):
-            path = path[:-4]
-        path = path + '/issues'
-        return urlunparse(
-            ('https', 'github.com', path,
-             None, None, None))
-
-    @classmethod
-    def repo_url_from_merge_request_url(cls, parsed_url):
-        path_elements = parsed_url.path.strip('/').split('/')
-        if len(path_elements) > 2 and path_elements[2] == 'issues':
-            return urlunparse(
-                ('https', 'github.com', '/'.join(path_elements[:2]),
-                 None, None, None))
-        return None
-
-
-class GitLab(Forge):
-
-    name = 'GitLab'
-
-    @classmethod
-    def bug_database_url_from_bug_submit_url(cls, parsed_url):
-        path_elements = parsed_url.path.strip('/').split('/')
-        if len(path_elements) < 2:
-            return None
-        if path_elements[-2] != 'issues':
-            return None
-        if path_elements[-1] == 'new':
-            path_elements.pop(-1)
-        return urlunparse(
-            parsed_url._replace(path='/'.join(path_elements)))
-
-    @classmethod
-    def bug_submit_url_from_bug_database_url(cls, parsed_url):
-        path_elements = parsed_url.path.strip('/').split('/')
-        if len(path_elements) < 2:
-            return None
-        if path_elements[-1] != 'issues':
-            return None
-        return urlunparse(
-            parsed_url._replace(path=parsed_url.path.rstrip('/') + '/new'))
-
-    @classmethod
-    def check_bug_database_canonical(cls, parsed_url):
-        url = urlunparse(parsed_url)
-        path_elements = parsed_url.path.strip('/').split('/')
-        if len(path_elements) < 3 or path_elements[-1] != 'issues':
-            raise InvalidUrl(url, "GitLab URL with missing path elements")
-        api_url = 'https://{}/api/v4/projects/{}'.format(
-            parsed_url.netloc, quote('/'.join(path_elements[:-1]), safe=''))
-        try:
-            data = _load_json_url(api_url)
-        except urllib.error.HTTPError as e:
-            if e.code == 404:
-                raise InvalidUrl(url, "Project does not exist") from e
-            raise
-        # issues_enabled is only provided when the user is authenticated,
-        # so if we're not then we just fall back to checking the canonical URL
-        issues_enabled = data.get('issues_enabled')
-        if issues_enabled is False:
-            raise InvalidUrl(url, "Project does not have issues enabled")
-        canonical_url = urljoin(data['web_url'] + '/', '-/issues')
-        if issues_enabled is True:
-            return canonical_url
-        return check_url_canonical(canonical_url)
-
-    @classmethod
-    def check_bug_submit_url_canonical(cls, parsed_url):
-        path = '/'.join(parsed_url.path.strip('/').split('/')[:-1])
-        db_url = urlunparse(parsed_url._replace(path=path))
-        canonical_db_url = check_bug_database_canonical(db_url)
-        return urljoin(canonical_db_url + '/', "new")
-
-    @classmethod
-    def bug_database_from_issue_url(cls, parsed_url):
-        path_elements = parsed_url.path.strip('/').split('/')
-        if (len(path_elements) > 2
-                and path_elements[-2] == 'issues'
-                and path_elements[-1].isdigit()):
-            return urlunparse(
-                ('https', parsed_url.netloc, '/'.join(path_elements[:-2]),
-                 None, None, None))
-        return None
-
-    @classmethod
-    def bug_database_url_from_repo_url(cls, parsed_url):
-        path = '/'.join(parsed_url.path.split('/')[:3])
-        if path.endswith('.git'):
-            path = path[:-4]
-        path = path + '/issues'
-        return urlunparse(
-            ('https', parsed_url.hostname, path,
-             None, None, None))
-
-    @classmethod
-    def repo_url_from_merge_request_url(cls, parsed_url):
-        path_elements = parsed_url.path.strip('/').split('/')
-        if (len(path_elements) > 2
-                and path_elements[-2] == 'merge_requests'
-                and path_elements[-1].isdigit()):
-            return urlunparse(
-                ('https', parsed_url.netloc, '/'.join(path_elements[:-2]),
-                 None, None, None))
-        return None
+GitHub = _upstream_ontologist.GitHub
+GitLab = _upstream_ontologist.GitLab
 
 
 class SourceForge(Forge):
@@ -2774,7 +2598,8 @@ class SourceForge(Forge):
             guess_from_sf(project, subproject=subproject))
 
     @classmethod
-    def bug_database_url_from_bug_submit_url(cls, parsed_url):
+    def bug_database_url_from_bug_submit_url(cls, url):
+        parsed_url = urlparse(url)
         path_elements = parsed_url.path.strip('/').split('/')
         if len(path_elements) < 3:
             return None
@@ -2871,7 +2696,7 @@ def repo_url_from_merge_request_url(url):
     forge = find_forge(parsed_url)
     if forge:
         try:
-            return forge.repo_url_from_merge_request_url(parsed_url)
+            return forge.repo_url_from_merge_request_url(url)
         except NotImplementedError:
             return None
     return None
@@ -2882,7 +2707,7 @@ def bug_database_from_issue_url(url):
     forge = find_forge(parsed_url)
     if forge:
         try:
-            return forge.bug_database_from_issue_url(parsed_url)
+            return forge.bug_database_from_issue_url(url)
         except NotImplementedError:
             return None
 
@@ -2891,7 +2716,7 @@ def guess_bug_database_url_from_repo_url(url):
     parsed_url = urlparse(url)
     forge = find_forge(parsed_url)
     if forge:
-        return forge.bug_database_url_from_repo_url(parsed_url)
+        return forge.bug_database_url_from_repo_url(url)
     return None
 
 
@@ -2899,7 +2724,7 @@ def bug_database_url_from_bug_submit_url(url):
     parsed_url = urlparse(url)
     forge = find_forge(parsed_url)
     if forge:
-        return forge.bug_database_url_from_bug_submit_url(parsed_url)
+        return forge.bug_database_url_from_bug_submit_url(url)
     return None
 
 
@@ -2908,7 +2733,7 @@ def bug_submit_url_from_bug_database_url(url):
     forge = find_forge(parsed_url)
     if forge:
         try:
-            return forge.bug_submit_url_from_bug_database_url(parsed_url)
+            return forge.bug_submit_url_from_bug_database_url(url)
         except NotImplementedError:
             return None
     return None

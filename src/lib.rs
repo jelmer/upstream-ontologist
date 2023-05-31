@@ -1,7 +1,9 @@
 use log::{error, warn};
+use percent_encoding::utf8_percent_encode;
 use pyo3::prelude::*;
 use regex::Regex;
 use reqwest::header::HeaderMap;
+use reqwest::IntoUrl;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, Read};
@@ -635,6 +637,7 @@ pub fn debian_is_native(path: &Path) -> std::io::Result<Option<bool>> {
     }
 }
 
+#[derive(Debug)]
 pub enum HTTPJSONError {
     HTTPError(reqwest::Error),
     Error {
@@ -645,7 +648,7 @@ pub enum HTTPJSONError {
 }
 
 pub fn load_json_url(
-    http_url: &str,
+    http_url: &Url,
     timeout: Option<std::time::Duration>,
 ) -> Result<serde_json::Value, HTTPJSONError> {
     let timeout = timeout.unwrap_or(std::time::Duration::from_secs(DEFAULT_URLLIB_TIMEOUT));
@@ -653,7 +656,7 @@ pub fn load_json_url(
     headers.insert(reqwest::header::USER_AGENT, USER_AGENT.parse().unwrap());
     headers.insert(reqwest::header::ACCEPT, "application/json".parse().unwrap());
 
-    if let Some(hostname) = reqwest::Url::parse(http_url).unwrap().host_str() {
+    if let Some(hostname) = http_url.host_str() {
         if hostname == "github.com" || hostname == "raw.githubusercontent.com" {
             if let Ok(token) = std::env::var("GITHUB_TOKEN") {
                 headers.insert(
@@ -669,6 +672,8 @@ pub fn load_json_url(
         .default_headers(headers)
         .build()
         .map_err(HTTPJSONError::HTTPError)?;
+
+    let http_url: reqwest::Url = http_url.clone().into_string().parse().unwrap();
 
     let request = client
         .get(http_url)
@@ -1507,6 +1512,423 @@ pub fn guess_from_debian_patch(path: &Path, trust_package: bool) -> Vec<Upstream
 }
 
 */
+
+pub enum CanonicalizeError {
+    InvalidUrl(Url, String),
+    Unverifiable(Url, String),
+    RateLimited(Url),
+}
+
+pub fn check_url_canonical(url: &Url) -> Result<Url, CanonicalizeError> {
+    if url.scheme() != "http" && url.scheme() != "https" {
+        return Err(CanonicalizeError::Unverifiable(
+            url.clone(),
+            format!("Unsupported scheme {}", url.scheme()),
+        ));
+    }
+
+    let timeout = std::time::Duration::from_secs(DEFAULT_URLLIB_TIMEOUT);
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert(reqwest::header::USER_AGENT, USER_AGENT.parse().unwrap());
+    let client = reqwest::blocking::Client::builder()
+        .default_headers(headers)
+        .timeout(timeout)
+        .build()
+        .unwrap();
+
+    let response = client
+        .get(url.clone())
+        .send()
+        .map_err(|e| CanonicalizeError::Unverifiable(url.clone(), format!("HTTP error {}", e)))?;
+
+    match response.status() {
+        status if status.is_success() => Ok(response.url().clone()),
+        status if status == reqwest::StatusCode::TOO_MANY_REQUESTS => {
+            Err(CanonicalizeError::RateLimited(url.clone()))
+        }
+        status if status == reqwest::StatusCode::NOT_FOUND => Err(CanonicalizeError::InvalidUrl(
+            url.clone(),
+            format!("Not found: {}", response.status()),
+        )),
+        status if status.is_server_error() => Err(CanonicalizeError::Unverifiable(
+            url.clone(),
+            format!("Server down: {}", response.status()),
+        )),
+        _ => Err(CanonicalizeError::Unverifiable(
+            url.clone(),
+            format!("Unknown HTTP error {}", response.status()),
+        )),
+    }
+}
+
+fn with_path_segments(url: &Url, path_segments: &[&str]) -> Result<Url, ()> {
+    let mut url = url.clone();
+    url.path_segments_mut()?
+        .clear()
+        .extend(path_segments.iter());
+    Ok(url)
+}
+
+pub trait Forge: Send + Sync {
+    fn repository_browse_can_be_homepage(&self) -> bool;
+
+    fn name(&self) -> &'static str;
+
+    fn bug_database_url_from_bug_submit_url(&self, url: &Url) -> Option<Url>;
+
+    fn bug_submit_url_from_bug_database_url(&self, url: &Url) -> Option<Url>;
+
+    fn check_bug_database_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError>;
+
+    fn check_bug_submit_url_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError>;
+
+    fn bug_database_from_issue_url(&self, url: &Url) -> Option<Url>;
+
+    fn bug_database_url_from_repo_url(&self, url: &Url) -> Option<Url>;
+
+    fn repo_url_from_merge_request_url(&self, url: &Url) -> Option<Url>;
+}
+
+pub struct GitHub;
+
+impl GitHub {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Forge for GitHub {
+    fn name(&self) -> &'static str {
+        "GitHub"
+    }
+
+    fn repository_browse_can_be_homepage(&self) -> bool {
+        true
+    }
+
+    fn bug_database_url_from_bug_submit_url(&self, url: &Url) -> Option<Url> {
+        assert_eq!(url.host(), Some(url::Host::Domain("github.com")));
+        let path_elements = url.path_segments().unwrap().collect::<Vec<_>>();
+
+        if path_elements.len() != 3 && path_elements.len() != 4 {
+            return None;
+        }
+        if path_elements[2] != "issues" {
+            return None;
+        }
+
+        let mut url = url.clone();
+
+        url.set_scheme("https").unwrap();
+
+        Some(with_path_segments(&url, &path_elements[0..3]).unwrap())
+    }
+
+    fn bug_submit_url_from_bug_database_url(&self, url: &Url) -> Option<Url> {
+        assert_eq!(url.host(), Some(url::Host::Domain("github.com")));
+        let path_elements = url.path_segments().unwrap().collect::<Vec<_>>();
+
+        if path_elements.len() != 3 {
+            return None;
+        }
+        if path_elements[2] != "issues" {
+            return None;
+        }
+
+        let mut url = url.clone();
+        url.set_scheme("https").unwrap();
+        url.path_segments_mut().unwrap().push("new");
+        Some(url)
+    }
+
+    fn check_bug_database_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError> {
+        assert_eq!(url.host(), Some(url::Host::Domain("github.com")));
+        let path_elements = url.path_segments().unwrap().collect::<Vec<_>>();
+
+        if path_elements.len() != 3 {
+            return Err(CanonicalizeError::InvalidUrl(
+                url.clone(),
+                "GitHub URL with missing path elements".to_string(),
+            ));
+        }
+        if path_elements[2] != "issues" {
+            return Err(CanonicalizeError::InvalidUrl(
+                url.clone(),
+                "GitHub URL with missing path elements".to_string(),
+            ));
+        }
+
+        let api_url = Url::parse(&format!(
+            "https://api.github.com/repos/{}/{}",
+            path_elements[0], path_elements[1]
+        ))
+        .unwrap();
+
+        let response = match reqwest::blocking::get(api_url) {
+            Ok(response) => response,
+            Err(e) if e.status() == Some(reqwest::StatusCode::NOT_FOUND) => {
+                return Err(CanonicalizeError::InvalidUrl(
+                    url.clone(),
+                    format!("Project does not exist {}", e),
+                ));
+            }
+            Err(e) if e.status() == Some(reqwest::StatusCode::FORBIDDEN) => {
+                // Probably rate limited
+                warn!("Unable to verify bug database URL {}: {}", url, e);
+                return Err(CanonicalizeError::RateLimited(url.clone()));
+            }
+            Err(e) => {
+                return Err(CanonicalizeError::Unverifiable(
+                    url.clone(),
+                    format!("Unable to verify bug database URL: {}", e),
+                ));
+            }
+        };
+        let data = response.json::<serde_json::Value>().unwrap();
+
+        if data["has_issues"].as_bool() != Some(true) {
+            return Err(CanonicalizeError::InvalidUrl(
+                url.clone(),
+                "Project does not have issues enabled".to_string(),
+            ));
+        }
+
+        if data.get("archived").unwrap_or(&serde_json::Value::Null)
+            == &serde_json::Value::Bool(true)
+        {
+            return Err(CanonicalizeError::InvalidUrl(
+                url.clone(),
+                "Project is archived".to_string(),
+            ));
+        }
+
+        let mut url = Url::parse(data["html_url"].as_str().unwrap()).unwrap();
+
+        url.set_scheme("https").unwrap();
+        url.path_segments_mut().unwrap().push("issues");
+
+        Ok(url)
+    }
+
+    fn check_bug_submit_url_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError> {
+        let mut path_segments = url.path_segments().unwrap().collect::<Vec<_>>();
+        path_segments.pop();
+        let db_url = with_path_segments(url, &path_segments).unwrap();
+        let mut canonical_db_url = self.check_bug_database_canonical(&db_url)?;
+        canonical_db_url.set_scheme("https").unwrap();
+        canonical_db_url.path_segments_mut().unwrap().push("new");
+        Ok(canonical_db_url)
+    }
+
+    fn bug_database_from_issue_url(&self, url: &Url) -> Option<Url> {
+        let path_elements = url.path_segments().unwrap().collect::<Vec<_>>();
+        if path_elements.len() < 2 || path_elements[1] != "issues" {
+            return None;
+        }
+        let mut url = url.clone();
+        url.set_scheme("https").unwrap();
+        Some(with_path_segments(&url, &path_elements[0..3]).unwrap())
+    }
+
+    fn bug_database_url_from_repo_url(&self, url: &Url) -> Option<Url> {
+        let mut path = url
+            .path_segments()
+            .into_iter()
+            .take(2)
+            .flatten()
+            .collect::<Vec<&str>>();
+        path[1] = path[1].strip_suffix(".git").unwrap_or(path[1]);
+        path.push("issues");
+
+        let mut url = url.clone();
+        url.set_scheme("https").unwrap();
+        Some(with_path_segments(&url, path.as_slice()).unwrap())
+    }
+
+    fn repo_url_from_merge_request_url(&self, url: &Url) -> Option<Url> {
+        let path_elements = url.path_segments().unwrap().collect::<Vec<_>>();
+        if path_elements.len() < 2 || path_elements[1] != "issues" {
+            return None;
+        }
+        let mut url = url.clone();
+        url.set_scheme("https").unwrap();
+        Some(with_path_segments(&url, &path_elements[0..2]).unwrap())
+    }
+}
+
+static DEFAULT_ASCII_SET: percent_encoding::AsciiSet = percent_encoding::CONTROLS
+    .add(b'/')
+    .add(b'?')
+    .add(b'#')
+    .add(b'%');
+
+pub struct GitLab;
+
+impl GitLab {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Forge for GitLab {
+    fn name(&self) -> &'static str {
+        "GitLab"
+    }
+
+    fn repository_browse_can_be_homepage(&self) -> bool {
+        true
+    }
+
+    fn bug_database_url_from_bug_submit_url(&self, url: &Url) -> Option<Url> {
+        let mut path_elements = url.path_segments().unwrap().collect::<Vec<_>>();
+
+        if path_elements.len() < 2 {
+            return None;
+        }
+        if path_elements[path_elements.len() - 2] != "issues" {
+            return None;
+        }
+        if path_elements[path_elements.len() - 1] != "new" {
+            path_elements.pop();
+        }
+
+        Some(with_path_segments(url, &path_elements[0..path_elements.len() - 3]).unwrap())
+    }
+
+    fn bug_submit_url_from_bug_database_url(&self, url: &Url) -> Option<Url> {
+        let path_elements = url.path_segments().unwrap().collect::<Vec<_>>();
+
+        if path_elements.len() < 2 {
+            return None;
+        }
+        if path_elements[path_elements.len() - 1] != "issues" {
+            return None;
+        }
+
+        let mut url = url.clone();
+        url.path_segments_mut().unwrap().push("new");
+
+        Some(url)
+    }
+
+    fn check_bug_database_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError> {
+        let host = url.host().unwrap();
+        let mut path_elements = url.path_segments().unwrap().collect::<Vec<_>>();
+        if path_elements.len() < 2 || path_elements[path_elements.len() - 1] != "issues" {
+            return Err(CanonicalizeError::InvalidUrl(
+                url.clone(),
+                "GitLab URL with missing path elements".to_string(),
+            ));
+        }
+
+        path_elements.pop();
+
+        let proj = path_elements.join("/");
+        let proj_segment = utf8_percent_encode(proj.as_str(), &DEFAULT_ASCII_SET);
+        let api_url = Url::parse(&format!(
+            "https://{}/api/v4/projects/{}",
+            host, proj_segment
+        ))
+        .unwrap();
+        match load_json_url(&api_url, None) {
+            Ok(data) => {
+                // issues_enabled is only provided when the user is authenticated,
+                // so if we're not then we just fall back to checking the canonical URL
+                let issues_enabled = data
+                    .get("issues_enabled")
+                    .unwrap_or(&serde_json::Value::Null);
+                if issues_enabled.as_bool() == Some(false) {
+                    return Err(CanonicalizeError::InvalidUrl(
+                        url.clone(),
+                        "Project does not have issues enabled".to_string(),
+                    ));
+                }
+
+                let mut canonical_url = Url::parse(data["web_url"].as_str().unwrap()).unwrap();
+                canonical_url
+                    .path_segments_mut()
+                    .unwrap()
+                    .extend(&["-", "issues"]);
+                if issues_enabled.as_bool() == Some(true) {
+                    return Ok(canonical_url);
+                }
+
+                check_url_canonical(&canonical_url)
+            }
+            Err(HTTPJSONError::Error { status, .. })
+                if status == reqwest::StatusCode::NOT_FOUND =>
+            {
+                Err(CanonicalizeError::InvalidUrl(
+                    url.clone(),
+                    "Project not found".to_string(),
+                ))
+            }
+            Err(e) => Err(CanonicalizeError::Unverifiable(
+                url.clone(),
+                format!("Unable to verify bug database URL: {:?}", e),
+            )),
+        }
+    }
+
+    fn check_bug_submit_url_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError> {
+        let path_elements = url.path_segments().unwrap().collect::<Vec<_>>();
+        if path_elements.len() < 2 || path_elements[path_elements.len() - 2] != "issues" {
+            return Err(CanonicalizeError::InvalidUrl(
+                url.clone(),
+                "GitLab URL with missing path elements".to_string(),
+            ));
+        }
+
+        if path_elements[path_elements.len() - 1] != "new" {
+            return Err(CanonicalizeError::InvalidUrl(
+                url.clone(),
+                "GitLab URL with missing path elements".to_string(),
+            ));
+        }
+
+        let db_url = with_path_segments(url, &path_elements[0..path_elements.len() - 1]).unwrap();
+        let mut canonical_db_url = self.check_bug_database_canonical(&db_url)?;
+        canonical_db_url.path_segments_mut().unwrap().push("new");
+        Ok(canonical_db_url)
+    }
+
+    fn bug_database_from_issue_url(&self, url: &Url) -> Option<Url> {
+        let path_elements = url.path_segments().unwrap().collect::<Vec<_>>();
+        if path_elements.len() < 2
+            || path_elements[path_elements.len() - 2] != "issues"
+            || path_elements[path_elements.len() - 1]
+                .parse::<u32>()
+                .is_err()
+        {
+            return None;
+        }
+        Some(with_path_segments(url, &path_elements[0..path_elements.len() - 1]).unwrap())
+    }
+
+    fn bug_database_url_from_repo_url(&self, url: &Url) -> Option<Url> {
+        let mut url = url.clone();
+        let last = url.path_segments().unwrap().last().unwrap().to_string();
+        url.path_segments_mut()
+            .unwrap()
+            .pop()
+            .push(last.trim_end_matches(".git"))
+            .push("issues");
+        Some(url)
+    }
+
+    fn repo_url_from_merge_request_url(&self, url: &Url) -> Option<Url> {
+        let path_elements = url.path_segments().unwrap().collect::<Vec<_>>();
+        if path_elements.len() < 3
+            || path_elements[path_elements.len() - 2] != "merge_requests"
+            || path_elements[path_elements.len() - 1]
+                .parse::<u32>()
+                .is_err()
+        {
+            return None;
+        }
+        Some(with_path_segments(url, &path_elements[0..path_elements.len() - 2]).unwrap())
+    }
+}
 
 #[cfg(test)]
 mod test {
