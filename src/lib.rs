@@ -1471,6 +1471,43 @@ pub fn guess_from_meta_json(path: &Path, trust_package: bool) -> Vec<UpstreamDat
     upstream_data
 }
 
+/*
+pub fn guess_from_debian_patch(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+    let file = File::open(path).unwrap();
+    let reader = std::io::BufReader::new(file);
+
+    let mut upstream_data: Vec<UpstreamDatumWithMetadata> = Vec::new();
+
+    for line in reader.lines() {
+        if let Ok(line) = line {
+            if line.starts_with("Forwarded: ") {
+                let forwarded = line.splitn(2, ':').nth(1).unwrap().trim();
+                let forwarded_str = forwarded.to_string();
+
+                if let Some(bug_db) = bug_database_from_issue_url(&forwarded_str) {
+                    upstream_data.push(UpstreamDatumWithMetadata {
+                        datum: UpstreamDatum::BugDatabase(bug_db),
+                        certainty: Some(Certainty::Possible),
+                        origin: Some(path.to_string_lossy().to_string()),
+                    });
+                }
+
+                if let Some(repo_url) = repo_url_from_merge_request_url(&forwarded_str) {
+                    upstream_data.push(UpstreamDatumWithMetadata {
+                        datum: UpstreamDatum::Repository(repo_url),
+                        certainty: Some(Certainty::Possible),
+                        origin: Some(path.to_string_lossy().to_string()),
+                    });
+                }
+            }
+        }
+    }
+
+    upstream_data
+}
+
+*/
+
 #[cfg(test)]
 mod test {
     use super::*;
