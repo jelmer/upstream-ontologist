@@ -55,6 +55,7 @@ fn upstream_datum_to_py(
                 upstream_ontologist::UpstreamDatum::CargoCrate(c) => c.into_py(py),
                 upstream_ontologist::UpstreamDatum::Keywords(ks) => ks.into_py(py),
                 upstream_ontologist::UpstreamDatum::Copyright(c) => c.into_py(py),
+                upstream_ontologist::UpstreamDatum::Documentation(a) => a.into_py(py),
                 upstream_ontologist::UpstreamDatum::Maintainer(m) => {
                     PersonCls.call1((m.name, m.email, m.url))?.into_py(py)
                 }
@@ -189,6 +190,19 @@ fn guess_from_pod(py: Python, contents: &str) -> PyResult<Vec<PyObject>> {
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
+#[pyfunction]
+fn guess_from_pubspec_yaml(
+    py: Python,
+    path: PathBuf,
+    trust_package: bool,
+) -> PyResult<Vec<PyObject>> {
+    let ret = upstream_ontologist::guess_from_pubspec_yaml(path.as_path(), trust_package);
+
+    ret.into_iter()
+        .map(|x| upstream_datum_to_py(py, x))
+        .collect::<PyResult<Vec<PyObject>>>()
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(url_from_git_clone_command))?;
@@ -206,5 +220,6 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_perl_dist_name))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_perl_module))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_pod))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_pubspec_yaml))?;
     Ok(())
 }

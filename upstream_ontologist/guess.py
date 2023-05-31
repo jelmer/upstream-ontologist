@@ -934,38 +934,7 @@ url_from_svn_co_command = _upstream_ontologist.url_from_svn_co_command
 url_from_git_clone_command = _upstream_ontologist.url_from_git_clone_command
 url_from_fossil_clone_command = _upstream_ontologist.url_from_fossil_clone_command
 guess_from_meson = _upstream_ontologist.guess_from_meson
-
-
-def guess_from_pubspec_yaml(path, trust_package):
-    from ruamel.yaml import YAML
-    import ruamel.yaml.reader
-    import ruamel.yaml.parser
-    yaml = YAML(typ='safe', pure=True)
-    with open(path, 'rb') as f:
-        try:
-            data = yaml.load(f)
-        except ruamel.yaml.reader.ReaderError as e:
-            logger.warning('Unable to parse %s: %s', path, e)
-            return
-    for field in data:
-        if field == 'name':
-            yield UpstreamDatum('Name', data['name'], 'certain')
-        elif field == 'description':
-            yield UpstreamDatum('Description', data['description'], 'certain')
-        elif field == 'version':
-            yield UpstreamDatum('Version', data['version'], 'certain')
-        elif field == 'homepage':
-            yield UpstreamDatum('Homepage', data['homepage'], 'certain')
-        elif field == 'repository':
-            yield UpstreamDatum('Repository', data['repository'], 'certain')
-        elif field == 'documentation':
-            yield UpstreamDatum('Documentation', data['documentation'], 'certain')
-        elif field == 'issue_tracker':
-            yield UpstreamDatum('Bug-Database', data['issue_tracker'], 'certain')
-        elif field in ('environment', 'dependencies', 'dev_dependencies', 'flutter'):
-            pass
-        else:
-            logger.debug('Unknown field %s (%r) in pubspec.yml', field, data[field])
+guess_from_pubspec_yaml = _upstream_ontologist.guess_from_pubspec_yaml
 
 
 def guess_from_install(path, trust_package):  # noqa: C901
@@ -1997,7 +1966,7 @@ def guess_from_gemspec(path, trust_package=False):  # noqa: C901
                     val = parseval(rawval)
                 except ValueError:
                     continue
-                
+
                 if key == "name":
                     yield UpstreamDatum('Name', val, 'certain')
                 elif key == 'version':
