@@ -54,6 +54,7 @@ fn upstream_datum_to_py(
                 upstream_ontologist::UpstreamDatum::SecurityContact(s) => s.into_py(py),
                 upstream_ontologist::UpstreamDatum::CargoCrate(c) => c.into_py(py),
                 upstream_ontologist::UpstreamDatum::Keywords(ks) => ks.into_py(py),
+                upstream_ontologist::UpstreamDatum::Copyright(c) => c.into_py(py),
                 upstream_ontologist::UpstreamDatum::Maintainer(m) => {
                     PersonCls.call1((m.name, m.email, m.url))?.into_py(py)
                 }
@@ -148,6 +149,46 @@ fn guess_from_package_xml(
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
+#[pyfunction]
+fn guess_from_dist_ini(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
+    let ret = upstream_ontologist::guess_from_dist_ini(path.as_path(), trust_package);
+
+    ret.into_iter()
+        .map(|x| upstream_datum_to_py(py, x))
+        .collect::<PyResult<Vec<PyObject>>>()
+}
+
+#[pyfunction]
+fn guess_from_perl_dist_name(
+    py: Python,
+    path: PathBuf,
+    dist_name: &str,
+) -> PyResult<Vec<PyObject>> {
+    let ret = upstream_ontologist::guess_from_perl_dist_name(path.as_path(), dist_name);
+
+    ret.into_iter()
+        .map(|x| upstream_datum_to_py(py, x))
+        .collect::<PyResult<Vec<PyObject>>>()
+}
+
+#[pyfunction]
+fn guess_from_perl_module(py: Python, path: PathBuf) -> PyResult<Vec<PyObject>> {
+    let ret = upstream_ontologist::guess_from_perl_module(path.as_path());
+
+    ret.into_iter()
+        .map(|x| upstream_datum_to_py(py, x))
+        .collect::<PyResult<Vec<PyObject>>>()
+}
+
+#[pyfunction]
+fn guess_from_pod(py: Python, contents: &str) -> PyResult<Vec<PyObject>> {
+    let ret = upstream_ontologist::guess_from_pod(contents);
+
+    ret.into_iter()
+        .map(|x| upstream_datum_to_py(py, x))
+        .collect::<PyResult<Vec<PyObject>>>()
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(url_from_git_clone_command))?;
@@ -161,5 +202,9 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(load_json_url))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_composer_json))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_package_xml))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_dist_ini))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_perl_dist_name))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_perl_module))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_pod))?;
     Ok(())
 }

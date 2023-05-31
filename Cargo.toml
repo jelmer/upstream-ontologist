@@ -18,6 +18,8 @@ lazy_static = "1"
 regex = "1"
 url = "2"
 xmltree = "0.10"
+configparser = "3"
+rust-ini = "0.19"
 
 [lib]
 
