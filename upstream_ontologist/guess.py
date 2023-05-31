@@ -2060,34 +2060,7 @@ def guess_from_metadata_json(path, trust_package=False):
                 logger.debug('Unknown field %s (%r) in metadata.json', field, value)
 
 
-def guess_from_authors(path, trust_package=False):
-    authors = []
-    with open(path, 'rb') as f:
-        for line in f:
-            m = line.strip().decode('utf-8', 'surrogateescape')
-            if not m:
-                continue
-            if m.startswith('arch-tag: '):
-                continue
-            if m.endswith(':'):
-                continue
-            if m.startswith('$Id'):
-                continue
-            if m.startswith('*') or m.startswith('-'):
-                m = m[1:].strip()
-            if len(m) < 3:
-                continue
-            if m.endswith('.'):
-                continue
-            if ' for ' in m:
-                m = m.split(' for ')[0]
-            if not m[0].isalpha():
-                continue
-            if '<' not in m and line.startswith(b'\t'):
-                continue
-            if '<' in m or m.count(' ') < 5:
-                authors.append(Person.from_string(m))
-    yield UpstreamDatum('Author', authors, 'likely')
+guess_from_authors = _upstream_ontologist.guess_from_authors
 
 
 def _get_guessers(path, trust_package=False):  # noqa: C901

@@ -4,7 +4,7 @@ use regex::Regex;
 use reqwest::header::HeaderMap;
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::Read;
+use std::io::{BufRead, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use url::Url;
@@ -1187,6 +1187,59 @@ pub fn guess_from_pubspec_yaml(path: &Path, trust_package: bool) -> Vec<Upstream
     }
 
     upstream_data
+}
+
+pub fn guess_from_authors(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+    let file = File::open(path).unwrap();
+    let reader = std::io::BufReader::new(file);
+
+    let mut authors: Vec<Person> = Vec::new();
+
+    for line in reader.lines() {
+        if let Ok(line) = line {
+            let mut m = line.trim().to_string();
+            if m.is_empty() {
+                continue;
+            }
+            if m.starts_with("arch-tag: ") {
+                continue;
+            }
+            if m.ends_with(':') {
+                continue;
+            }
+            if m.starts_with("$Id") {
+                continue;
+            }
+            if m.starts_with('*') || m.starts_with('-') {
+                m = m[1..].trim().to_string();
+            }
+            if m.len() < 3 {
+                continue;
+            }
+            if m.ends_with('.') {
+                continue;
+            }
+            if m.contains(" for ") {
+                let parts: Vec<&str> = m.split(" for ").collect();
+                m = parts[0].to_string();
+            }
+            if !m.chars().next().unwrap().is_alphabetic() {
+                continue;
+            }
+            if !m.contains('<') && line.as_bytes().starts_with(b"\t") {
+                continue;
+            }
+            if m.contains('<') || m.matches(' ').count() < 5 {
+                authors.push(Person::from(m.as_str()));
+            }
+        }
+    }
+
+    vec![UpstreamDatumWithMetadata {
+        datum: UpstreamDatum::Author(authors),
+        certainty: Some(Certainty::Likely),
+        origin: Some(path.to_string_lossy().to_string()),
+    }]
 }
 
 #[cfg(test)]
