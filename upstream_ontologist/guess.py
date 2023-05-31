@@ -16,7 +16,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
 from functools import partial
-import json
 import logging
 import operator
 import os
@@ -1131,42 +1130,7 @@ def guess_from_debian_patch(path, trust_package):
                     yield UpstreamDatum('Repository', repo_url, 'possible')
 
 
-def guess_from_meta_json(path, trust_package):
-    with open(path) as f:
-        data = json.load(f)
-        if 'name' in data:
-            dist_name = data['name']
-            yield UpstreamDatum('Name', data['name'], 'certain')
-        else:
-            dist_name = None
-        if 'version' in data:
-            version = str(data['version'])
-            if version.startswith('v'):
-                version = version[1:]
-            yield UpstreamDatum('Version', version, 'certain')
-        if 'abstract' in data:
-            yield UpstreamDatum('Summary', data['abstract'], 'certain')
-        if 'resources' in data:
-            resources = data['resources']
-            if 'bugtracker' in resources and 'web' in resources['bugtracker']:
-                yield UpstreamDatum(
-                    "Bug-Database", resources["bugtracker"]["web"], 'certain')
-                # TODO(jelmer): Support resources["bugtracker"]["mailto"]
-            if 'homepage' in resources:
-                yield UpstreamDatum(
-                    "Homepage", resources["homepage"], 'certain')
-            if 'repository' in resources:
-                repo = resources['repository']
-                if 'url' in repo:
-                    yield UpstreamDatum(
-                        'Repository', repo["url"], 'certain')
-                if 'web' in repo:
-                    yield UpstreamDatum(
-                        'Repository-Browse', repo['web'], 'certain')
-
-    # Wild guess:
-    if dist_name:
-        yield from guess_from_perl_dist_name(path, dist_name)
+guess_from_meta_json = _upstream_ontologist.guess_from_meta_json
 
 
 def guess_from_travis_yml(path, trust_package):

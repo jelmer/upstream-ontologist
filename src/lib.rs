@@ -1375,6 +1375,102 @@ pub fn guess_from_metadata_json(
     upstream_data
 }
 
+pub fn guess_from_meta_json(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+    let mut file = File::open(path).unwrap();
+    let mut contents = String::new();
+    file.read_to_string(&mut contents).unwrap();
+
+    let data: serde_json::Map<String, serde_json::Value> = match serde_json::from_str(&contents) {
+        Ok(data) => data,
+        Err(e) => {
+            error!("Unable to parse {}: {}", path.display(), e);
+            return Vec::new();
+        }
+    };
+
+    let mut upstream_data: Vec<UpstreamDatumWithMetadata> = Vec::new();
+
+    if let Some(name) = data.get("name").and_then(serde_json::Value::as_str) {
+        upstream_data.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Name(name.to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.to_string_lossy().to_string()),
+        });
+    }
+
+    if let Some(version) = data.get("version").and_then(serde_json::Value::as_str) {
+        let version = version.strip_prefix('v').unwrap_or(version);
+        upstream_data.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Version(version.to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.to_string_lossy().to_string()),
+        });
+    }
+
+    if let Some(summary) = data.get("abstract").and_then(serde_json::Value::as_str) {
+        upstream_data.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Summary(summary.to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.to_string_lossy().to_string()),
+        });
+    }
+
+    if let Some(resources) = data.get("resources").and_then(serde_json::Value::as_object) {
+        if let Some(bugtracker) = resources
+            .get("bugtracker")
+            .and_then(serde_json::Value::as_object)
+        {
+            if let Some(web) = bugtracker.get("web").and_then(serde_json::Value::as_str) {
+                upstream_data.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::BugDatabase(web.to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(path.to_string_lossy().to_string()),
+                });
+                // TODO: Support resources["bugtracker"]["mailto"]
+            }
+        }
+
+        if let Some(homepage) = resources
+            .get("homepage")
+            .and_then(serde_json::Value::as_str)
+        {
+            upstream_data.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Homepage(homepage.to_string()),
+                certainty: Some(Certainty::Certain),
+                origin: Some(path.to_string_lossy().to_string()),
+            });
+        }
+
+        if let Some(repo) = resources
+            .get("repository")
+            .and_then(serde_json::Value::as_object)
+        {
+            if let Some(url) = repo.get("url").and_then(serde_json::Value::as_str) {
+                upstream_data.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Repository(url.to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(path.to_string_lossy().to_string()),
+                });
+            }
+
+            if let Some(web) = repo.get("web").and_then(serde_json::Value::as_str) {
+                upstream_data.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::RepositoryBrowse(web.to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(path.to_string_lossy().to_string()),
+                });
+            }
+        }
+    }
+
+    // Wild guess:
+    if let Some(dist_name) = data.get("name").and_then(serde_json::Value::as_str) {
+        upstream_data.extend(guess_from_perl_dist_name(path, dist_name));
+    }
+
+    upstream_data
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
