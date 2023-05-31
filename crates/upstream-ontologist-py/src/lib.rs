@@ -212,6 +212,19 @@ fn guess_from_authors(py: Python, path: PathBuf, trust_package: bool) -> PyResul
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
+#[pyfunction]
+fn guess_from_metadata_json(
+    py: Python,
+    path: PathBuf,
+    trust_package: bool,
+) -> PyResult<Vec<PyObject>> {
+    let ret = upstream_ontologist::guess_from_metadata_json(path.as_path(), trust_package);
+
+    ret.into_iter()
+        .map(|x| upstream_datum_to_py(py, x))
+        .collect::<PyResult<Vec<PyObject>>>()
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(url_from_git_clone_command))?;
@@ -231,5 +244,6 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_pod))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_pubspec_yaml))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_authors))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_metadata_json))?;
     Ok(())
 }

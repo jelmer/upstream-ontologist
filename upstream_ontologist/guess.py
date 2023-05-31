@@ -2027,37 +2027,7 @@ def guess_from_wscript(path, trust_package=False):
                 yield UpstreamDatum('Version', m.group(1).decode(), 'confident')
 
 
-def guess_from_metadata_json(path, trust_package=False):
-    with open(path) as f:
-        data = json.load(f)
-        for field, value in data.items():
-            if field == 'description' and value:
-                yield UpstreamDatum('Description', value, 'certain')
-            elif field == 'name':
-                yield UpstreamDatum('Name', data['name'], 'certain')
-            elif field == 'version':
-                yield UpstreamDatum('Version', str(value), 'certain')
-            elif field == 'url' and value:
-                yield UpstreamDatum('Homepage', value, 'certain')
-            elif field == 'license':
-                yield UpstreamDatum('License', value, 'certain')
-            elif field == 'source':
-                yield UpstreamDatum('Repository', value, 'certain')
-            elif field == 'summary':
-                yield UpstreamDatum('Summary', value, 'certain')
-            elif field == 'issues_url':
-                yield UpstreamDatum('Bug-Database', value, 'certain')
-            elif field == 'project_page':
-                yield UpstreamDatum('Homepage', value, 'likely')
-            elif field == 'author':
-                if isinstance(value, str):
-                    yield UpstreamDatum('Author', [Person.from_string(value)], 'likely')
-                else:
-                    yield UpstreamDatum('Author', [Person.from_string(v) for v in value], 'likely')
-            elif field in ('operatingsystem_support', 'requirements', 'dependencies'):
-                pass
-            else:
-                logger.debug('Unknown field %s (%r) in metadata.json', field, value)
+guess_from_metadata_json = _upstream_ontologist.guess_from_metadata_json
 
 
 guess_from_authors = _upstream_ontologist.guess_from_authors
