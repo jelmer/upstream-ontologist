@@ -161,6 +161,7 @@ pub enum UpstreamDatum {
     Keywords(Vec<String>),
     Copyright(String),
     Documentation(String),
+    GoImportPath(String),
 }
 
 pub struct UpstreamDatumWithMetadata {
@@ -191,6 +192,7 @@ impl UpstreamDatum {
             UpstreamDatum::Maintainer(..) => "Maintainer",
             UpstreamDatum::Copyright(..) => "Copyright",
             UpstreamDatum::Documentation(..) => "Documentation",
+            UpstreamDatum::GoImportPath(..) => "Go-Import-Path",
         }
     }
 }
@@ -1928,6 +1930,41 @@ impl Forge for GitLab {
         }
         Some(with_path_segments(url, &path_elements[0..path_elements.len() - 2]).unwrap())
     }
+}
+
+pub fn guess_from_travis_yml(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+    let mut file = match File::open(path) {
+        Ok(f) => f,
+        Err(_) => {
+            error!("Unable to open file: {}", path.display());
+            return vec![];
+        }
+    };
+
+    let mut contents = String::new();
+    if let Err(_) = file.read_to_string(&mut contents) {
+        error!("Unable to read file: {}", path.display());
+        return vec![];
+    }
+
+    let data: serde_yaml::Value = match serde_yaml::from_str(&contents) {
+        Ok(d) => d,
+        Err(e) => {
+            error!("Unable to parse YAML: {}", e);
+            return vec![];
+        }
+    };
+
+    if let Some(go_import_path) = data.get("go_import_path") {
+        let upstream_datum = UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::GoImportPath(go_import_path.as_str().unwrap().to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.to_string_lossy().to_string()),
+        };
+        return vec![upstream_datum];
+    }
+
+    vec![]
 }
 
 #[cfg(test)]

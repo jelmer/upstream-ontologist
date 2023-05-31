@@ -1131,24 +1131,7 @@ def guess_from_debian_patch(path, trust_package):
 
 
 guess_from_meta_json = _upstream_ontologist.guess_from_meta_json
-
-
-def guess_from_travis_yml(path, trust_package):
-    from ruamel.yaml import YAML
-    import ruamel.yaml.reader
-    import ruamel.yaml.parser
-    yaml = YAML(typ='safe', pure=True)
-
-    with open(path, 'rb') as f:
-        try:
-            data = yaml.load(f)
-        except ruamel.yaml.reader.ReaderError as e:
-            logger.warning('Unable to parse %s: %s', path, e)
-            return
-
-        if 'go_import_path' in data:
-            yield UpstreamDatum(
-                'Go-Import-Path', str(data['go_import_path']), certainty='certain')
+guess_from_travis_yml = _upstream_ontologist.guess_from_travis_yml
 
 
 def guess_from_meta_yml(path, trust_package):
