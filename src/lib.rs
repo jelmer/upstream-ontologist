@@ -1967,6 +1967,101 @@ pub fn guess_from_travis_yml(path: &Path, trust_package: bool) -> Vec<UpstreamDa
     vec![]
 }
 
+/// Guess upstream metadata from a META.yml file.
+///
+/// See http://module-build.sourceforge.net/META-spec-v1.4.html for the
+/// specification of the format.
+pub fn guess_from_meta_yml(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+    let mut file = match File::open(path) {
+        Ok(f) => f,
+        Err(_) => {
+            error!("Unable to open file: {}", path.display());
+            return vec![];
+        }
+    };
+
+    let mut contents = String::new();
+    if file.read_to_string(&mut contents).is_err() {
+        error!("Unable to read file: {}", path.display());
+        return vec![];
+    }
+
+    let data: serde_yaml::Value = match serde_yaml::from_str(&contents) {
+        Ok(d) => d,
+        Err(e) => {
+            error!("Unable to parse YAML: {}", e);
+            return vec![];
+        }
+    };
+
+    let mut upstream_data = Vec::new();
+
+    if let Some(name) = data.get("name") {
+        upstream_data.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Name(name.as_str().unwrap().to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.to_string_lossy().to_string()),
+        });
+    }
+
+    if let Some(license) = data.get("license") {
+        upstream_data.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::License(license.as_str().unwrap().to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.to_string_lossy().to_string()),
+        });
+    }
+
+    if let Some(version) = data.get("version") {
+        upstream_data.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Version(version.as_str().unwrap().to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.to_string_lossy().to_string()),
+        });
+    }
+
+    if let Some(resources) = data.get("resources") {
+        if let Some(bugtracker) = resources.get("bugtracker") {
+            upstream_data.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::BugDatabase(bugtracker.as_str().unwrap().to_string()),
+                certainty: Some(Certainty::Certain),
+                origin: Some(path.to_string_lossy().to_string()),
+            });
+        }
+
+        if let Some(homepage) = resources.get("homepage") {
+            upstream_data.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Homepage(homepage.as_str().unwrap().to_string()),
+                certainty: Some(Certainty::Certain),
+                origin: Some(path.to_string_lossy().to_string()),
+            });
+        }
+
+        if let Some(repository) = resources.get("repository") {
+            if let Some(url) = repository.get("url") {
+                upstream_data.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Repository(url.as_str().unwrap().to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(path.to_string_lossy().to_string()),
+                });
+            } else {
+                upstream_data.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Repository(repository.as_str().unwrap().to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(path.to_string_lossy().to_string()),
+                });
+            }
+        }
+    }
+
+    // Wild guess:
+    if let Some(dist_name) = data.get("name") {
+        upstream_data.extend(guess_from_perl_dist_name(path, dist_name.as_str().unwrap()));
+    }
+
+    upstream_data
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

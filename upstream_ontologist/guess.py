@@ -1132,58 +1132,7 @@ def guess_from_debian_patch(path, trust_package):
 
 guess_from_meta_json = _upstream_ontologist.guess_from_meta_json
 guess_from_travis_yml = _upstream_ontologist.guess_from_travis_yml
-
-
-def guess_from_meta_yml(path, trust_package):
-    """Guess upstream metadata from a META.yml file.
-
-    See http://module-build.sourceforge.net/META-spec-v1.4.html for the
-    specification of the format.
-    """
-    from ruamel.yaml import YAML
-    import ruamel.yaml.reader
-    import ruamel.yaml.parser
-    yaml = YAML(typ='safe', pure=True)
-    with open(path, 'rb') as f:
-        try:
-            data = yaml.load(f)
-        except ruamel.yaml.reader.ReaderError as e:
-            logger.warning('Unable to parse %s: %s', path, e)
-            return
-        except ruamel.yaml.parser.ParserError as e:
-            logger.warning('Unable to parse %s: %s', path, e)
-            return
-        if data is None:
-            # Empty file?
-            return
-        if 'name' in data:
-            dist_name = data['name']
-            yield UpstreamDatum('Name', data['name'], 'certain')
-        else:
-            dist_name = None
-        if data.get('license'):
-            yield UpstreamDatum('License', data['license'], 'certain')
-        if 'version' in data:
-            yield UpstreamDatum('Version', str(data['version']), 'certain')
-        if 'resources' in data:
-            resources = data['resources']
-            if 'bugtracker' in resources:
-                yield UpstreamDatum(
-                    'Bug-Database', resources['bugtracker'], 'certain')
-            if 'homepage' in resources:
-                yield UpstreamDatum(
-                    'Homepage', resources['homepage'], 'certain')
-            if 'repository' in resources:
-                if isinstance(resources['repository'], dict):
-                    url = resources['repository'].get('url')
-                else:
-                    url = resources['repository']
-                if url:
-                    yield UpstreamDatum(
-                        'Repository', url, 'certain')
-    # Wild guess:
-    if dist_name:
-        yield from guess_from_perl_dist_name(path, dist_name)
+guess_from_meta_yml = _upstream_ontologist.guess_from_meta_yml
 
 
 def guess_from_metainfo(path, trust_package):
