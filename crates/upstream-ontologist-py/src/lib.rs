@@ -413,6 +413,15 @@ fn guess_from_doap(py: Python, path: PathBuf, trust_package: bool) -> PyResult<V
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
+#[pyfunction]
+fn guess_from_opam(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
+    let ret = upstream_ontologist::guess_from_opam(path.as_path(), trust_package);
+
+    ret.into_iter()
+        .map(|x| upstream_datum_to_py(py, x))
+        .collect::<PyResult<Vec<PyObject>>>()
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -440,6 +449,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(metadata_from_itp_bug_body))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_metainfo))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_doap))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_opam))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;

@@ -1086,78 +1086,7 @@ guess_from_travis_yml = _upstream_ontologist.guess_from_travis_yml
 guess_from_meta_yml = _upstream_ontologist.guess_from_meta_yml
 guess_from_metainfo = _upstream_ontologist.guess_from_metainfo
 guess_from_doap = _upstream_ontologist.guess_from_doap
-
-
-def _yield_opam_fields(f):
-    in_field = None
-    val = None
-    field = None
-    for lineno, line in enumerate(f, 1):
-        if in_field and line.rstrip().endswith(in_field):
-            val += line[:-3]
-            in_field = False
-            yield field, val
-            continue
-        elif in_field:
-            val += line
-            continue
-
-        try:
-            (field, val) = line.rstrip().split(':', 1)
-        except ValueError:
-            logger.debug('Error parsing line %d: %r', lineno, line)
-            in_field = None
-            continue
-        val = val.lstrip()
-        if val.startswith('"""'):
-            val = val[3:]
-            if val.endswith('"""'):
-                yield field, val[:-3]
-                in_field = None
-            else:
-                in_field = '"""'
-        elif val.startswith('"'):
-            yield field, val[1:-1]
-            in_field = None
-        elif val.startswith('['):
-            val = val[1:]
-            if val.endswith(']'):
-                yield field, val[-1]
-                in_field = None
-            else:
-                in_field = ']'
-
-
-def guess_from_opam(path, trust_package=False):
-    # Documentation: https://opam.ocaml.org/doc/Manual.html#Package-definitions
-
-    with open(path) as f:
-        for key, value in _yield_opam_fields(f):
-            if key == 'maintainer':
-                yield UpstreamDatum('Maintainer', Person.from_string(value), 'confident')
-            elif key == 'license':
-                yield UpstreamDatum('License', value, 'confident')
-            elif key == 'homepage':
-                yield UpstreamDatum('Homepage', value, 'confident')
-            elif key in ('dev-repo', 'repository'):
-                yield UpstreamDatum('Repository', value, 'confident')
-            elif key == 'bug-reports':
-                yield UpstreamDatum('Bug-Database', value, 'confident')
-            elif key == 'synopsis':
-                yield UpstreamDatum('Summary', value, 'confident')
-            elif key == 'description':
-                yield UpstreamDatum('Description', value, 'confident')
-            elif key == 'doc':
-                yield UpstreamDatum('Documentation', value, 'confident')
-            elif key == 'version':
-                yield UpstreamDatum('Version', value, 'confident')
-            elif key == 'authors':
-                if isinstance(value, str):
-                    yield UpstreamDatum(
-                        'Author', [Person.from_string(value)], 'confident')
-                elif isinstance(value, list):
-                    yield UpstreamDatum(
-                        'Author', [Person.from_string(p) for p in value], 'confident')
+guess_from_opam = _upstream_ontologist.guess_from_opam
 
 
 def guess_from_nuspec(path, trust_package=False):
