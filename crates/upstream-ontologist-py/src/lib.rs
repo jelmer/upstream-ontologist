@@ -70,6 +70,9 @@ fn upstream_datum_to_py(
                     .map(|x| PersonCls.call1((x.name, x.email, x.url)))
                     .collect::<PyResult<Vec<&PyAny>>>()?
                     .into_py(py),
+                upstream_ontologist::UpstreamDatum::Wiki(w) => w.into_py(py),
+                upstream_ontologist::UpstreamDatum::Download(d) => d.into_py(py),
+                upstream_ontologist::UpstreamDatum::MailingList(m) => m.into_py(py),
             },
             datum.certainty.map(|x| x.to_string()),
             datum.origin,
@@ -401,8 +404,18 @@ fn guess_from_metainfo(py: Python, path: PathBuf, trust_package: bool) -> PyResu
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
+#[pyfunction]
+fn guess_from_doap(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
+    let ret = upstream_ontologist::guess_from_doap(path.as_path(), trust_package);
+
+    ret.into_iter()
+        .map(|x| upstream_datum_to_py(py, x))
+        .collect::<PyResult<Vec<PyObject>>>()
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
+    pyo3_log::init();
     m.add_wrapped(wrap_pyfunction!(url_from_git_clone_command))?;
     m.add_wrapped(wrap_pyfunction!(url_from_fossil_clone_command))?;
     m.add_wrapped(wrap_pyfunction!(url_from_svn_co_command))?;
@@ -426,6 +439,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_meta_yml))?;
     m.add_wrapped(wrap_pyfunction!(metadata_from_itp_bug_body))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_metainfo))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_doap))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;
