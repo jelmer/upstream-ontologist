@@ -383,6 +383,15 @@ fn guess_from_meta_yml(py: Python, path: PathBuf, trust_package: bool) -> PyResu
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
+#[pyfunction]
+fn metadata_from_itp_bug_body(py: Python, body: &str) -> PyResult<Vec<PyObject>> {
+    let ret = upstream_ontologist::metadata_from_itp_bug_body(body);
+
+    ret.into_iter()
+        .map(|x| upstream_datum_to_py(py, x))
+        .collect::<PyResult<Vec<PyObject>>>()
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(url_from_git_clone_command))?;
@@ -406,6 +415,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_meta_json))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_travis_yml))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_meta_yml))?;
+    m.add_wrapped(wrap_pyfunction!(metadata_from_itp_bug_body))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;

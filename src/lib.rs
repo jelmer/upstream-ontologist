@@ -1,4 +1,4 @@
-use log::{error, warn};
+use log::{debug, error, warn};
 use percent_encoding::utf8_percent_encode;
 use pyo3::prelude::*;
 use regex::Regex;
@@ -811,7 +811,7 @@ pub fn guess_from_package_xml(path: &Path, trust_package: bool) -> Vec<UpstreamD
     let root = match xmlparse_simplify_namespaces(path, &namespaces) {
         Some(root) => root,
         None => {
-            eprintln!("Unable to parse package.xml");
+            error!("Unable to parse package.xml");
             return Vec::new();
         }
     };
@@ -820,6 +820,8 @@ pub fn guess_from_package_xml(path: &Path, trust_package: bool) -> Vec<UpstreamD
 
     let mut upstream_data: Vec<UpstreamDatumWithMetadata> = Vec::new();
     let mut leads: Vec<&Element> = Vec::new();
+    let mut maintainers: Vec<&Element> = Vec::new();
+    let mut authors: Vec<&Element> = Vec::new();
 
     for child_element in &root.children {
         if let XMLNode::Element(ref element) = child_element {
@@ -891,33 +893,79 @@ pub fn guess_from_package_xml(path: &Path, trust_package: bool) -> Vec<UpstreamD
                 "lead" => {
                     leads.push(element);
                 }
+                "maintainer" => {
+                    maintainers.push(element);
+                }
+                "author" => {
+                    authors.push(element);
+                }
                 "stability" | "dependencies" | "providesextension" | "extsrcrelease"
                 | "channel" | "notes" | "contents" | "date" | "time" => {
                     // Do nothing, skip these fields
                 }
                 _ => {
-                    eprintln!("Unknown package.xml tag {}", element.name);
+                    error!("Unknown package.xml tag {}", element.name);
                 }
             }
         }
     }
 
     for lead_element in leads.iter().take(1) {
-        let name_el = lead_element.get_child("name");
-        let email_el = lead_element.get_child("email");
-        let active_el = lead_element.get_child("active");
+        let name_el = lead_element.get_child("name").unwrap().get_text();
+        let email_el = lead_element
+            .get_child("email")
+            .map(|s| s.get_text().unwrap());
+        let active_el = lead_element
+            .get_child("active")
+            .map(|s| s.get_text().unwrap());
         if let Some(active_el) = active_el {
-            if active_el.get_text().as_deref() != Some("yes") {
+            if active_el != "yes" {
                 continue;
             }
         }
         let person = Person {
-            name: name_el.map(|el| el.get_text().unwrap().into_owned()),
-            email: email_el.map(|el| el.get_text().unwrap().into_owned()),
+            name: name_el.map(|s| s.to_string()),
+            email: email_el.map(|s| s.to_string()),
             ..Default::default()
         };
         upstream_data.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Maintainer(person),
+            certainty: Some(Certainty::Confident),
+            origin: Some("package.xml".to_string()),
+        });
+    }
+
+    if maintainers.len() == 1 {
+        let maintainer_element = maintainers[0];
+        let name_el = maintainer_element.get_text().map(|s| s.into_owned());
+        let email_el = maintainer_element.attributes.get("email");
+        let person = Person {
+            name: name_el,
+            email: email_el.map(|s| s.to_string()),
+            ..Default::default()
+        };
+        upstream_data.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Maintainer(person),
+            certainty: Some(Certainty::Confident),
+            origin: Some("package.xml".to_string()),
+        });
+    }
+
+    if !authors.is_empty() {
+        let persons = authors
+            .iter()
+            .map(|author_element| {
+                let name_el = author_element.get_text().unwrap().into_owned();
+                let email_el = author_element.attributes.get("email");
+                Person {
+                    name: Some(name_el),
+                    email: email_el.map(|s| s.to_string()),
+                    ..Default::default()
+                }
+            })
+            .collect();
+        upstream_data.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Author(persons),
             certainty: Some(Certainty::Confident),
             origin: Some("package.xml".to_string()),
         });
@@ -2060,6 +2108,116 @@ pub fn guess_from_meta_yml(path: &Path, trust_package: bool) -> Vec<UpstreamDatu
     }
 
     upstream_data
+}
+
+pub fn metadata_from_itp_bug_body(body: &str) -> Vec<UpstreamDatumWithMetadata> {
+    let mut results: Vec<UpstreamDatumWithMetadata> = Vec::new();
+    // Skip first few lines with bug metadata (severity, owner, etc)
+    let mut line_iter = body.split_terminator('\n');
+    let mut next_line = line_iter.next();
+
+    while let Some(line) = next_line {
+        if next_line.is_none() {
+            return vec![];
+        }
+        next_line = line_iter.next();
+        if line.trim().is_empty() {
+            break;
+        }
+    }
+
+    while let Some(line) = next_line {
+        if next_line.is_none() {
+            return vec![];
+        }
+        if !line.is_empty() {
+            break;
+        }
+        next_line = line_iter.next();
+    }
+
+    while let Some(mut line) = next_line {
+        line = line.trim_start_matches('*').trim_start();
+
+        if line.is_empty() {
+            break;
+        }
+
+        match line.split_once(':') {
+            Some((key, value)) => {
+                let key = key.trim();
+                let value = value.trim();
+                match key {
+                    "Package name" => {
+                        results.push(UpstreamDatumWithMetadata {
+                            datum: UpstreamDatum::Name(value.to_string()),
+                            certainty: Some(Certainty::Confident),
+                            origin: None,
+                        });
+                    }
+                    "Version" => {
+                        results.push(UpstreamDatumWithMetadata {
+                            datum: UpstreamDatum::Version(value.to_string()),
+                            certainty: Some(Certainty::Possible),
+                            origin: None,
+                        });
+                    }
+                    "Upstream Author" if !value.is_empty() => {
+                        results.push(UpstreamDatumWithMetadata {
+                            datum: UpstreamDatum::Author(vec![Person::from(value)]),
+                            certainty: Some(Certainty::Confident),
+                            origin: None,
+                        });
+                    }
+                    "URL" => {
+                        results.push(UpstreamDatumWithMetadata {
+                            datum: UpstreamDatum::Homepage(value.to_string()),
+                            certainty: Some(Certainty::Confident),
+                            origin: None,
+                        });
+                    }
+                    "License" => {
+                        results.push(UpstreamDatumWithMetadata {
+                            datum: UpstreamDatum::License(value.to_string()),
+                            certainty: Some(Certainty::Confident),
+                            origin: None,
+                        });
+                    }
+                    "Description" => {
+                        results.push(UpstreamDatumWithMetadata {
+                            datum: UpstreamDatum::Summary(value.to_string()),
+                            certainty: Some(Certainty::Confident),
+                            origin: None,
+                        });
+                    }
+                    _ => {
+                        debug!("Unknown pseudo-header {} in ITP bug body", key);
+                    }
+                }
+            }
+            _ => {
+                debug!("Ignoring non-semi-field line {}", line);
+            }
+        }
+
+        next_line = line_iter.next();
+    }
+
+    let mut rest: Vec<String> = Vec::new();
+    for line in line_iter {
+        if line.trim() == "-- System Information:" {
+            break;
+        }
+        rest.push(line.to_string());
+    }
+
+    results.push(UpstreamDatumWithMetadata {
+        datum: UpstreamDatum::Description(rest.join("\n")),
+        certainty: Some(Certainty::Likely),
+        origin: None,
+    });
+
+    results
 }
 
 #[cfg(test)]

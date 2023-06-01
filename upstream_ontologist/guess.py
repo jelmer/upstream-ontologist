@@ -190,10 +190,11 @@ def known_bad_guess(datum: UpstreamDatum) -> bool:  # noqa: C901
     if datum.field == 'Author':
         assert isinstance(datum.value, list)
         for value in datum.value:
-            if 'Maintainer' in value.name:
-                return True
-            if 'Contributor' in value.name:
-                return True
+            if value.name is not None:
+                if 'Maintainer' in value.name:
+                    return True
+                if 'Contributor' in value.name:
+                    return True
     if datum.field == 'Name':
         assert isinstance(datum.value, str)
         if datum.value.lower() == 'package':
@@ -459,57 +460,7 @@ def guess_from_debian_changelog(path, trust_package):
                 yield from metadata_from_itp_bug_body(orig['body'])
 
 
-def metadata_from_itp_bug_body(body):  # noqa: C901
-    line_iter = iter(body.splitlines(False))
-    # Skip first few lines with bug metadata (severity, owner, etc)
-    line = next(line_iter)
-    while line.strip():
-        try:
-            line = next(line_iter)
-        except StopIteration:
-            return
-
-    while line == '':
-        try:
-            line = next(line_iter)
-        except StopIteration:
-            return
-
-    while line:
-        line = line.lstrip().lstrip('*').lstrip()
-        if line == '':
-            break
-        try:
-            key, value = line.split(':', 1)
-        except ValueError:
-            logger.debug('Ignoring non-semi-field line %r', line)
-        else:
-            key = key.strip()
-            value = value.strip()
-            if key == 'Package name':
-                yield UpstreamDatum('Name', value, 'confident')
-            elif key == 'Version':
-                # This data is almost certainly for an older version
-                yield UpstreamDatum('Version', value, 'possible')
-            elif key == 'Upstream Author' and value:
-                yield UpstreamDatum('Author', [Person.from_string(value)], 'confident')
-            elif key == 'URL':
-                yield UpstreamDatum('Homepage', value, 'confident')
-            elif key == 'License':
-                yield UpstreamDatum('License', value, 'confident')
-            elif key == 'Description':
-                yield UpstreamDatum('Summary', value, 'confident')
-            else:
-                logger.debug(f'Unknown pseudo-header {key} in ITP bug body')
-        line = next(line_iter)
-
-    rest = []
-    for line in line_iter:
-        if line.strip() == '-- System Information:':
-            break
-        rest.append(line)
-
-    yield UpstreamDatum('Description', '\n'.join(rest), 'likely')
+metadata_from_itp_bug_body = _upstream_ontologist.metadata_from_itp_bug_body
 
 
 def guess_from_python_metadata(pkg_info):
