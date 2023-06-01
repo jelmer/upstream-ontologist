@@ -2950,6 +2950,28 @@ pub fn guess_from_makefile_pl(path: &Path, trust_package: bool) -> Vec<UpstreamD
     results
 }
 
+// See https://golang.org/doc/modules/gomod-ref
+pub fn guess_from_go_mod(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+    let file = File::open(path).expect("Failed to open file");
+    let reader = BufReader::new(file);
+    let mut results = Vec::new();
+
+    for line in reader.lines() {
+        if let Ok(line) = line {
+            if line.starts_with("module ") {
+                let modname = line.trim().split_once(' ').unwrap().1;
+                results.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Name(modname.to_owned()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(path.to_string_lossy().to_string()),
+                });
+            }
+        }
+    }
+
+    results
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

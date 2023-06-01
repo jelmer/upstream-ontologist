@@ -1554,13 +1554,7 @@ def guess_from_security_md(name, path, trust_package=False):
     yield UpstreamDatum('Security-MD', name, 'certain')
 
 
-def guess_from_go_mod(path, trust_package=False):
-    # See https://golang.org/doc/modules/gomod-ref
-    with open(path, 'rb') as f:
-        for line in f:
-            if line.startswith(b'module '):
-                modname = line.strip().split(b' ', 1)[1]
-                yield UpstreamDatum('Name', modname.decode('utf-8'), 'certain')
+guess_from_go_mod = _upstream_ontologist.guess_from_go_mod 
 
 
 def guess_from_gemspec(path, trust_package=False):  # noqa: C901
