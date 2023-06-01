@@ -1140,65 +1140,8 @@ def guess_from_nuspec(path, trust_package=False):
         yield UpstreamDatum('Repository', unsplit_vcs_url(repo_url, branch), 'certain')
 
 
-def guess_from_cabal_lines(lines):  # noqa: C901
-    # TODO(jelmer): Perhaps use a standard cabal parser in Python?
-    # The current parser is not really correct, but good enough for our needs.
-    # https://www.haskell.org/cabal/release/cabal-1.10.1.0/doc/users-guide/
-    repo_url = None
-    repo_branch = None
-    repo_subpath = None
-
-    section = None
-    for line in lines:
-        if line.lstrip().startswith('--'):
-            # Comment
-            continue
-        if not line.strip():
-            section = None
-            continue
-        try:
-            (field, value) = line.split(':', 1)
-        except ValueError:
-            if not line.startswith(' '):
-                section = line.strip().lower()
-            continue
-        # The case of field names is not sigificant
-        field = field.lower()
-        value = value.strip()
-        if not field.startswith(' '):
-            if field == 'homepage':
-                yield 'Homepage', value
-            if field == 'bug-reports':
-                yield 'Bug-Database', value
-            if field == 'name':
-                yield 'Name', value
-            if field == 'maintainer':
-                yield 'Maintainer', Person.from_string(value)
-            if field == 'copyright':
-                yield 'Copyright', value
-            if field == 'license':
-                yield 'License', value
-            if field == 'author':
-                yield 'Author', Person.from_string(value)
-        else:
-            field = field.strip()
-            if section == 'source-repository head':
-                if field == 'location':
-                    repo_url = value
-                if field == 'branch':
-                    repo_branch = value
-                if field == 'subdir':
-                    repo_subpath = value
-    if repo_url:
-        yield (
-            'Repository',
-            unsplit_vcs_url(repo_url, repo_branch, repo_subpath))
-
-
-def guess_from_cabal(path, trust_package=False):
-    with open(path, encoding='utf-8') as f:
-        for name, value in guess_from_cabal_lines(f):
-            yield UpstreamDatum(name, value, 'certain', origin=path)
+guess_from_cabal = _upstream_ontologist.guess_from_cabal
+guess_from_cabal_lines = _upstream_ontologist.guess_from_cabal_lines
 
 
 def is_email_address(value: str) -> bool:

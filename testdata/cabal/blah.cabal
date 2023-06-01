@@ -5,7 +5,7 @@ License:        BSD3
 Author:         Angela Author
 Synopsis:       Small package with two programs
 Build-Type:     Simple
-Bug-Reports:    https://github.com/example/foo/issues
+Bug-Reports:    https://github.com/example/blah/issues
 
 Executable program1
   Build-Depends:  HUnit
