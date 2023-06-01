@@ -1646,20 +1646,8 @@ def guess_from_makefile_pl(path, trust_package=False):
         yield from guess_from_perl_dist_name(path, dist_name)
 
 
-def guess_from_wscript(path, trust_package=False):
-    with open(path, 'rb') as f:
-        for line in f:
-            m = re.fullmatch(b'APPNAME = [\'"](.*)[\'"]', line.rstrip(b'\n'))
-            if m:
-                yield UpstreamDatum('Name', m.group(1).decode(), 'confident')
-            m = re.fullmatch(b'VERSION = [\'"](.*)[\'"]', line.rstrip(b'\n'))
-            if m:
-                yield UpstreamDatum('Version', m.group(1).decode(), 'confident')
-
-
+guess_from_wscript = _upstream_ontologist.guess_from_wscript
 guess_from_metadata_json = _upstream_ontologist.guess_from_metadata_json
-
-
 guess_from_authors = _upstream_ontologist.guess_from_authors
 
 
