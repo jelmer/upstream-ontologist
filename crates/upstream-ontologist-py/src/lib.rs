@@ -422,6 +422,25 @@ fn guess_from_opam(py: Python, path: PathBuf, trust_package: bool) -> PyResult<V
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
+#[pyfunction]
+fn guess_from_pom_xml(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
+    let ret = upstream_ontologist::guess_from_pom_xml(path.as_path(), trust_package);
+
+    ret.into_iter()
+        .map(|x| upstream_datum_to_py(py, x))
+        .collect::<PyResult<Vec<PyObject>>>()
+}
+
+#[pyfunction]
+fn plausible_vcs_url(url: &str) -> PyResult<bool> {
+    Ok(upstream_ontologist::vcs::plausible_url(url))
+}
+
+#[pyfunction]
+fn plausible_vcs_browse_url(url: &str) -> PyResult<bool> {
+    Ok(upstream_ontologist::vcs::plausible_browse_url(url))
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -450,6 +469,9 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_metainfo))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_doap))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_opam))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_pom_xml))?;
+    m.add_wrapped(wrap_pyfunction!(plausible_vcs_url))?;
+    m.add_wrapped(wrap_pyfunction!(plausible_vcs_browse_url))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;

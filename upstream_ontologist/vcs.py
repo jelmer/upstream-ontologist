@@ -42,6 +42,8 @@ from . import (
 from ._upstream_ontologist import (  # noqa: F401
     drop_vcs_in_scheme,
     unsplit_vcs_url,
+    plausible_vcs_browse_url as plausible_browse_url,
+    plausible_vcs_url as plausible_url,
 )
 
 
@@ -57,14 +59,6 @@ KNOWN_HOSTING_SITES = [
 
 
 logger = logging.getLogger(__name__)
-
-
-def plausible_browse_url(url: str) -> bool:
-    return url.startswith("https://") or url.startswith("http://")
-
-
-def plausible_url(url: str) -> bool:
-    return ":" in url
 
 
 def probe_gitlab_host(hostname: str) -> bool:

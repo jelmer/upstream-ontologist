@@ -25,3 +25,12 @@ pub fn unsplit_vcs_url(repo_url: &str, branch: Option<&str>, subpath: Option<&st
     }
     url
 }
+
+pub fn plausible_browse_url(url: &str) -> bool {
+    if let Ok(url) = url::Url::parse(url) {
+        if url.scheme() == "https" || url.scheme() == "http" {
+            return true;
+        }
+    }
+    false
+}
