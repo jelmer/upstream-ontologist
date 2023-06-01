@@ -1630,22 +1630,7 @@ def guess_from_gemspec(path, trust_package=False):  # noqa: C901
                     path, line)
 
 
-def guess_from_makefile_pl(path, trust_package=False):
-    dist_name = None
-    with open(path, 'rb') as f:
-        for line in f:
-            m = re.fullmatch(br"name '([^'\"]+)';$", line.rstrip())
-            if m:
-                dist_name = m.group(1).decode()
-                yield UpstreamDatum('Name', dist_name, 'confident')
-            m = re.fullmatch(br"repository '([^'\"]+)';$", line.rstrip())
-            if m:
-                yield UpstreamDatum('Repository', m.group(1).decode(), 'confident')
-
-    if dist_name:
-        yield from guess_from_perl_dist_name(path, dist_name)
-
-
+guess_from_makefile_pl = _upstream_ontologist.guess_from_makefile_pl
 guess_from_wscript = _upstream_ontologist.guess_from_wscript
 guess_from_metadata_json = _upstream_ontologist.guess_from_metadata_json
 guess_from_authors = _upstream_ontologist.guess_from_authors

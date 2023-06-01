@@ -2913,6 +2913,43 @@ pub fn guess_from_wscript(path: &Path, trust_package: bool) -> Vec<UpstreamDatum
     results
 }
 
+pub fn guess_from_makefile_pl(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+    let mut dist_name = None;
+    let file = File::open(path).expect("Failed to open file");
+    let reader = BufReader::new(file);
+    let mut results = Vec::new();
+    let name_regex = Regex::new("name '([^'\"]+)';$").unwrap();
+    let repository_regex = Regex::new("repository '([^'\"]+)';$").unwrap();
+
+    for line in reader.lines() {
+        if let Ok(line) = line {
+            if let Some(captures) = name_regex.captures(&line) {
+                dist_name = Some(captures.get(1).unwrap().as_str().to_owned());
+                let name = dist_name.as_ref().unwrap().to_owned();
+                results.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Name(name),
+                    certainty: Some(Certainty::Confident),
+                    origin: Some(path.to_string_lossy().to_string()),
+                });
+            }
+            if let Some(captures) = repository_regex.captures(&line) {
+                let repository = captures.get(1).unwrap().as_str().to_owned();
+                results.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Repository(repository),
+                    certainty: Some(Certainty::Confident),
+                    origin: Some(path.to_string_lossy().to_string()),
+                });
+            }
+        }
+    }
+
+    if let Some(dist_name) = dist_name {
+        results.extend(guess_from_perl_dist_name(path, &dist_name));
+    }
+
+    results
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
