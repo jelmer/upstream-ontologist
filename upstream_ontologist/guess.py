@@ -1084,30 +1084,7 @@ def guess_from_debian_patch(path, trust_package):
 guess_from_meta_json = _upstream_ontologist.guess_from_meta_json
 guess_from_travis_yml = _upstream_ontologist.guess_from_travis_yml
 guess_from_meta_yml = _upstream_ontologist.guess_from_meta_yml
-
-
-def guess_from_metainfo(path, trust_package):
-    # See https://www.freedesktop.org/software/appstream/docs/chap-Metadata.html
-    from xml.etree import ElementTree
-    el = ElementTree.parse(path)
-    root = el.getroot()
-    for child in root:
-        if child.tag == 'id':
-            yield UpstreamDatum('Name', child.text, 'certain')
-        if child.tag == 'project_license':
-            yield UpstreamDatum('License', child.text, 'certain')
-        if child.tag == 'url':
-            urltype = child.attrib.get('type')
-            if urltype == 'homepage':
-                yield UpstreamDatum('Homepage', child.text, 'certain')
-            elif urltype == 'bugtracker':
-                yield UpstreamDatum('Bug-Database', child.text, 'certain')
-        if child.tag == 'description':
-            yield UpstreamDatum('Description', child.text, 'certain')
-        if child.tag == 'summary':
-            yield UpstreamDatum('Summary', child.text, 'certain')
-        if child.tag == 'name':
-            yield UpstreamDatum('Name', child.text, 'certain')
+guess_from_metainfo = _upstream_ontologist.guess_from_metainfo
 
 
 def guess_from_doap(path, trust_package):  # noqa: C901

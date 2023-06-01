@@ -2220,6 +2220,76 @@ pub fn metadata_from_itp_bug_body(body: &str) -> Vec<UpstreamDatumWithMetadata> 
     results
 }
 
+// See https://www.freedesktop.org/software/appstream/docs/chap-Metadata.html
+pub fn guess_from_metainfo(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+    let file = File::open(path).expect("Failed to open file");
+    let root = Element::parse(file).expect("Failed to parse XML");
+
+    let mut results: Vec<UpstreamDatumWithMetadata> = Vec::new();
+
+    for child in root.children {
+        let child = if let Some(element) = child.as_element() {
+            element
+        } else {
+            continue;
+        };
+        if child.name == "id" {
+            results.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Name(child.get_text().unwrap().to_string()),
+                certainty: Some(Certainty::Certain),
+                origin: Some(path.to_string_lossy().to_string()),
+            });
+        }
+        if child.name == "project_license" {
+            results.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::License(child.get_text().unwrap().to_string()),
+                certainty: Some(Certainty::Certain),
+                origin: Some(path.to_string_lossy().to_string()),
+            });
+        }
+        if child.name == "url" {
+            if let Some(urltype) = child.attributes.get("type") {
+                if urltype == "homepage" {
+                    results.push(UpstreamDatumWithMetadata {
+                        datum: UpstreamDatum::Homepage(child.get_text().unwrap().to_string()),
+                        certainty: Some(Certainty::Certain),
+                        origin: Some(path.to_string_lossy().to_string()),
+                    });
+                } else if urltype == "bugtracker" {
+                    results.push(UpstreamDatumWithMetadata {
+                        datum: UpstreamDatum::BugDatabase(child.get_text().unwrap().to_string()),
+                        certainty: Some(Certainty::Certain),
+                        origin: Some(path.to_string_lossy().to_string()),
+                    });
+                }
+            }
+        }
+        if child.name == "description" {
+            results.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Description(child.get_text().unwrap().to_string()),
+                certainty: Some(Certainty::Certain),
+                origin: Some(path.to_string_lossy().to_string()),
+            });
+        }
+        if child.name == "summary" {
+            results.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Summary(child.get_text().unwrap().to_string()),
+                certainty: Some(Certainty::Certain),
+                origin: Some(path.to_string_lossy().to_string()),
+            });
+        }
+        if child.name == "name" {
+            results.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Name(child.get_text().unwrap().to_string()),
+                certainty: Some(Certainty::Certain),
+                origin: Some(path.to_string_lossy().to_string()),
+            });
+        }
+    }
+
+    results
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
