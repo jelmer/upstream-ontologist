@@ -3,7 +3,7 @@ use percent_encoding::utf8_percent_encode;
 use pyo3::prelude::*;
 use regex::Regex;
 use reqwest::header::HeaderMap;
-use reqwest::IntoUrl;
+
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
@@ -51,21 +51,14 @@ impl ToString for Certainty {
     }
 }
 
+#[derive(Default)]
 pub struct Person {
     pub name: Option<String>,
     pub email: Option<String>,
     pub url: Option<String>,
 }
 
-impl Default for Person {
-    fn default() -> Self {
-        Person {
-            name: None,
-            email: None,
-            url: None,
-        }
-    }
-}
+
 
 impl From<&str> for Person {
     fn from(text: &str) -> Self {
@@ -114,7 +107,7 @@ impl From<&str> for Person {
         }
 
         Person {
-            name: Some(text.to_string()),
+            name: Some(text),
             ..Default::default()
         }
     }
@@ -429,7 +422,7 @@ pub fn url_from_svn_co_command(command: &[u8]) -> Option<String> {
 
 pub fn guess_from_meson(
     path: &std::path::Path,
-    trust_package: bool,
+    _trust_package: bool,
 ) -> Vec<UpstreamDatumWithMetadata> {
     // TODO(jelmer): consider looking for a meson build directory to call "meson
     // introspect" on
@@ -481,7 +474,7 @@ pub fn guess_from_meson(
     results
 }
 
-pub fn guess_from_package_json(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_package_json(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
     // see https://docs.npmjs.com/cli/v7/configuring-npm/package-json
     let file = std::fs::File::open(path).expect("Failed to open package.json");
     let package: serde_json::Value =
@@ -718,7 +711,7 @@ pub fn load_json_url(
 
 pub fn guess_from_composer_json(
     path: &Path,
-    trust_package: bool,
+    _trust_package: bool,
 ) -> Vec<UpstreamDatumWithMetadata> {
     // https://getcomposer.org/doc/04-schema.md
     let file = std::fs::File::open(path).expect("Failed to open composer.json");
@@ -821,7 +814,7 @@ fn simplify_namespaces(element: &mut Element, namespaces: &[String]) {
     }
 }
 
-pub fn guess_from_package_xml(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_package_xml(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
     let namespaces = [
         "http://pear.php.net/dtd/package-2.0",
         "http://pear.php.net/dtd/package-2.1",
@@ -1084,7 +1077,7 @@ pub fn guess_from_perl_dist_name(path: &Path, dist_name: &str) -> Vec<UpstreamDa
     }
 }
 
-pub fn guess_from_dist_ini(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_dist_ini(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
     let parser = match ini::Ini::load_from_file(path) {
         Err(e) => {
             error!("Error parsing dist.ini: {}", e);
@@ -1198,7 +1191,7 @@ struct Pubspec {
     issue_tracker: Option<String>,
 }
 
-pub fn guess_from_pubspec_yaml(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_pubspec_yaml(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
     let file = File::open(path).unwrap();
 
     let pubspec: Pubspec = match serde_yaml::from_reader(file) {
@@ -1264,7 +1257,7 @@ pub fn guess_from_pubspec_yaml(path: &Path, trust_package: bool) -> Vec<Upstream
     upstream_data
 }
 
-pub fn guess_from_authors(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_authors(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
     let file = File::open(path).unwrap();
     let reader = std::io::BufReader::new(file);
 
@@ -1319,7 +1312,7 @@ pub fn guess_from_authors(path: &Path, trust_package: bool) -> Vec<UpstreamDatum
 
 pub fn guess_from_metadata_json(
     path: &Path,
-    trust_package: bool,
+    _trust_package: bool,
 ) -> Vec<UpstreamDatumWithMetadata> {
     let mut file = File::open(path).unwrap();
     let mut contents = String::new();
@@ -1450,7 +1443,7 @@ pub fn guess_from_metadata_json(
     upstream_data
 }
 
-pub fn guess_from_meta_json(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_meta_json(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
     let mut file = File::open(path).unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
@@ -2000,7 +1993,7 @@ impl Forge for GitLab {
     }
 }
 
-pub fn guess_from_travis_yml(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_travis_yml(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
     let mut file = match File::open(path) {
         Ok(f) => f,
         Err(_) => {
@@ -2039,7 +2032,7 @@ pub fn guess_from_travis_yml(path: &Path, trust_package: bool) -> Vec<UpstreamDa
 ///
 /// See http://module-build.sourceforge.net/META-spec-v1.4.html for the
 /// specification of the format.
-pub fn guess_from_meta_yml(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_meta_yml(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
     let mut file = match File::open(path) {
         Ok(f) => f,
         Err(_) => {
@@ -2241,7 +2234,7 @@ pub fn metadata_from_itp_bug_body(body: &str) -> Vec<UpstreamDatumWithMetadata> 
 }
 
 // See https://www.freedesktop.org/software/appstream/docs/chap-Metadata.html
-pub fn guess_from_metainfo(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_metainfo(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
     let file = File::open(path).expect("Failed to open file");
     let root = Element::parse(file).expect("Failed to parse XML");
 
@@ -2311,7 +2304,7 @@ pub fn guess_from_metainfo(path: &Path, trust_package: bool) -> Vec<UpstreamDatu
 }
 
 // See https://github.com/ewilderj/doap
-pub fn guess_from_doap(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_doap(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
     let file = File::open(path).expect("Failed to open file");
     let doc = Element::parse(file).expect("Failed to parse XML");
     let mut root = &doc;
@@ -2553,7 +2546,7 @@ pub fn guess_from_doap(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWit
 }
 
 // Documentation: https://opam.ocaml.org/doc/Manual.html#Package-definitions
-pub fn guess_from_opam(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_opam(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
     use opam_file_rs::value::{OpamFileItem, OpamFileSection, ValueKind};
     let mut f = File::open(path).unwrap();
     let mut contents = String::new();
@@ -2747,7 +2740,7 @@ pub fn guess_from_opam(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWit
 }
 
 // Documentation: https://maven.apache.org/pom.html
-pub fn guess_from_pom_xml(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_pom_xml(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
     let file = File::open(path).expect("Failed to open file");
 
     let root = match Element::parse(file) {
@@ -2898,7 +2891,7 @@ pub fn guess_from_pom_xml(path: &Path, trust_package: bool) -> Vec<UpstreamDatum
     result
 }
 
-pub fn guess_from_wscript(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_wscript(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
     let file = File::open(path).expect("Failed to open file");
     let reader = BufReader::new(file);
     let mut results = Vec::new();
@@ -2929,7 +2922,7 @@ pub fn guess_from_wscript(path: &Path, trust_package: bool) -> Vec<UpstreamDatum
     results
 }
 
-pub fn guess_from_makefile_pl(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_makefile_pl(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
     let mut dist_name = None;
     let file = File::open(path).expect("Failed to open file");
     let reader = BufReader::new(file);
@@ -2967,7 +2960,7 @@ pub fn guess_from_makefile_pl(path: &Path, trust_package: bool) -> Vec<UpstreamD
 }
 
 // See https://golang.org/doc/modules/gomod-ref
-pub fn guess_from_go_mod(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_go_mod(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
     let file = File::open(path).expect("Failed to open file");
     let reader = BufReader::new(file);
     let mut results = Vec::new();
@@ -3081,7 +3074,7 @@ pub fn guess_from_cabal_lines(
         .collect()
 }
 
-pub fn guess_from_cabal(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_cabal(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
     let file = File::open(path).expect("Failed to open file");
     let reader = BufReader::new(file);
 
