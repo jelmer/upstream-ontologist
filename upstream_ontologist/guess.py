@@ -31,7 +31,6 @@ from . import _upstream_ontologist
 from .vcs import (
     unsplit_vcs_url,
     browse_url_from_repo_url,
-    plausible_browse_url as plausible_vcs_browse_url,
     sanitize_url as sanitize_vcs_url,
     is_gitlab_site,
     guess_repo_from_url,
@@ -1377,74 +1376,7 @@ def guess_from_poetry(poetry):
             logger.debug('Unknown field %s (%r) for poetry', key, value)
 
 
-def guess_from_pom_xml(path, trust_package=False):  # noqa: C901
-    # Documentation: https://maven.apache.org/pom.html
-
-    import xml.etree.ElementTree as ET
-    try:
-        root = xmlparse_simplify_namespaces(path, [
-            'http://maven.apache.org/POM/4.0.0'])
-    except ET.ParseError as e:
-        logger.warning('Unable to parse package.xml: %s', e)
-        return
-    assert root.tag == 'project', 'root tag is %r' % root.tag
-    name_tag = root.find('name')
-    if name_tag is not None and '$' not in name_tag.text:
-        yield UpstreamDatum('Name', name_tag.text, 'certain')
-    else:
-        artifact_id_tag = root.find('artifactId')
-        if artifact_id_tag is not None:
-            yield UpstreamDatum('Name', artifact_id_tag.text, 'possible')
-    description_tag = root.find('description')
-    if description_tag is not None and description_tag.text:
-        yield UpstreamDatum('Summary', description_tag.text, 'certain')
-    version_tag = root.find('version')
-    if version_tag is not None and '$' not in version_tag.text:
-        yield UpstreamDatum('Version', version_tag.text, 'certain')
-    licenses_tag = root.find('licenses')
-    if licenses_tag is not None:
-        licenses = []
-        for license_tag in licenses_tag.findall('license'):
-            name_tag = license_tag.find('name')
-            if name_tag is not None:
-                licenses.append(name_tag.text)
-    for scm_tag in root.findall('scm'):
-        url_tag = scm_tag.find('url')
-        if url_tag is not None:
-            if (url_tag.text.startswith('scm:')
-                    and url_tag.text.count(':') >= 3):
-                url = url_tag.text.split(':', 2)[2]
-            else:
-                url = url_tag.text
-            if plausible_vcs_browse_url(url):
-                yield UpstreamDatum('Repository-Browse', url, 'certain')
-        connection_tag = scm_tag.find('connection')
-        if connection_tag is not None:
-            connection = connection_tag.text
-            try:
-                (scm, provider, provider_specific) = connection.split(':', 2)
-            except ValueError:
-                logger.warning(
-                    'Invalid format for SCM connection: %s', connection)
-                continue
-            if scm != 'scm':
-                logger.warning(
-                    'SCM connection does not start with scm: prefix: %s',
-                    connection)
-                continue
-            yield UpstreamDatum(
-                'Repository', provider_specific, 'certain')
-    for issue_mgmt_tag in root.findall('issueManagement'):
-        url_tag = issue_mgmt_tag.find('url')
-        if url_tag is not None:
-            yield UpstreamDatum('Bug-Database', url_tag.text, 'certain')
-    url_tag = root.find('url')
-    if url_tag is not None:
-        if not url_tag.text.startswith('scm:'):
-            # Yeah, uh, not a URL.
-            pass
-        else:
-            yield UpstreamDatum('Homepage', url_tag.text, 'certain')
+guess_from_pom_xml = _upstream_ontologist.guess_from_pom_xml
 
 
 def guess_from_git_config(path, trust_package=False):

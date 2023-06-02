@@ -246,17 +246,16 @@ pub fn guess_upstream_metadata(
                 "Copyright" => UpstreamDatum::Copyright(value.extract::<String>(py).unwrap()),
                 "Keywords" => UpstreamDatum::Keywords(value.extract::<Vec<String>>(py).unwrap()),
                 "Contact" => UpstreamDatum::Contact(value.extract::<String>(py).unwrap()),
-                "X-Security-MD" => UpstreamDatum::SecurityMD(value.extract::<String>(py).unwrap()),
+                "Security-MD" => UpstreamDatum::SecurityMD(value.extract::<String>(py).unwrap()),
                 "Security-Contact" => {
                     UpstreamDatum::SecurityContact(value.extract::<String>(py).unwrap())
                 }
-                "Keywords" => UpstreamDatum::Keywords(value.extract::<Vec<String>>(py).unwrap()),
-                "X-Cargo-Crate" => UpstreamDatum::CargoCrate(value.extract::<String>(py).unwrap()),
-                "X-Description" => UpstreamDatum::Description(value.extract::<String>(py).unwrap()),
-                "X-Summary" => UpstreamDatum::Summary(value.extract::<String>(py).unwrap()),
-                "X-License" => UpstreamDatum::License(value.extract::<String>(py).unwrap()),
-                "X-Version" => UpstreamDatum::Version(value.extract::<String>(py).unwrap()),
-                "X-Author" => UpstreamDatum::Author(
+                "Cargo-Crate" => UpstreamDatum::CargoCrate(value.extract::<String>(py).unwrap()),
+                "Description" => UpstreamDatum::Description(value.extract::<String>(py).unwrap()),
+                "Summary" => UpstreamDatum::Summary(value.extract::<String>(py).unwrap()),
+                "License" => UpstreamDatum::License(value.extract::<String>(py).unwrap()),
+                "Version" => UpstreamDatum::Version(value.extract::<String>(py).unwrap()),
+                "Author" => UpstreamDatum::Author(
                     value
                         .extract::<Vec<Person>>(py)
                         .unwrap()
@@ -589,6 +588,20 @@ pub fn guess_from_package_json(path: &Path, trust_package: bool) -> Vec<Upstream
                     });
                 }
             }
+            "keywords" => {
+                if let Some(keywords) = value.as_array() {
+                    let keywords = keywords
+                        .iter()
+                        .filter_map(|keyword| keyword.as_str())
+                        .map(String::from)
+                        .collect();
+                    upstream_data.push(UpstreamDatumWithMetadata {
+                        datum: UpstreamDatum::Keywords(keywords),
+                        certainty: Some(Certainty::Certain),
+                        origin: Some("package.json".to_string()),
+                    });
+                }
+            }
             "author" => {
                 if let Some(author) = value.as_object() {
                     let name = author
@@ -620,7 +633,7 @@ pub fn guess_from_package_json(path: &Path, trust_package: bool) -> Vec<Upstream
                     error!("Unsupported type for author in package.json: {:?}", value);
                 }
             }
-            "dependencies" | "private" | "devDependencies" | "scripts" => {
+            "dependencies" | "private" | "devDependencies" | "scripts" | "files" | "main" => {
                 // Do nothing, skip these fields
             }
             _ => {
@@ -906,7 +919,8 @@ pub fn guess_from_package_xml(path: &Path, trust_package: bool) -> Vec<UpstreamD
                     authors.push(element);
                 }
                 "stability" | "dependencies" | "providesextension" | "extsrcrelease"
-                | "channel" | "notes" | "contents" | "date" | "time" => {
+                | "channel" | "notes" | "contents" | "date" | "time" | "depend" | "exec_depend"
+                | "buildtool_depend" => {
                     // Do nothing, skip these fields
                 }
                 _ => {
@@ -2732,6 +2746,7 @@ pub fn guess_from_opam(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWit
     results
 }
 
+// Documentation: https://maven.apache.org/pom.html
 pub fn guess_from_pom_xml(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
     let file = File::open(path).expect("Failed to open file");
 
@@ -2869,6 +2884,7 @@ pub fn guess_from_pom_xml(path: &Path, trust_package: bool) -> Vec<UpstreamDatum
         if let Some(url_tag) = root.get_child("url") {
             if let Some(url) = url_tag.get_text() {
                 if !url.starts_with("scm:") {
+                    eprintln!("Found url: {}", url);
                     result.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Homepage(url.into_owned()),
                         certainty: Some(Certainty::Certain),
