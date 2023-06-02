@@ -2563,28 +2563,7 @@ def verify_screenshots(urls: List[str]) -> Iterator[Tuple[str, Optional[bool]]]:
             yield url, True
 
 
-def check_url_canonical(url: str) -> str:
-    parsed_url = urlparse(url)
-    if parsed_url.scheme not in ('https', 'http'):
-        raise UrlUnverifiable(
-            url, "unable to check URL with scheme %s" % parsed_url.scheme)
-    headers = {'User-Agent': USER_AGENT}
-    try:
-        resp = urlopen(
-            Request(url, headers=headers),
-            timeout=DEFAULT_URLLIB_TIMEOUT)
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            raise InvalidUrl(url, "url not found") from e
-        if e.code == 429:
-            raise UrlUnverifiable(url, "rate-by") from e
-        if e.code == 503:
-            raise UrlUnverifiable(url, "server-down") from e
-        raise
-    except (socket.timeout, TimeoutError) as e:
-        raise UrlUnverifiable(url, 'timeout contacting') from e
-    else:
-        return resp.geturl()
+check_url_canonical = _upstream_ontologist.check_url_canonical
 
 
 def check_upstream_metadata(  # noqa: C901

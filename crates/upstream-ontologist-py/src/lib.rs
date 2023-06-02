@@ -5,6 +5,7 @@ use pyo3::import_exception;
 use pyo3::prelude::*;
 use std::path::PathBuf;
 use upstream_ontologist::CanonicalizeError;
+use url::Url;
 
 import_exception!(urllib.error, HTTPError);
 create_exception!(upstream_ontologist, UnverifiableUrl, PyException);
@@ -512,6 +513,21 @@ fn guess_from_aur(py: Python, package: &str) -> PyResult<Vec<PyObject>> {
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
+#[pyfunction]
+fn check_url_canonical(url: &str) -> PyResult<String> {
+    Ok(upstream_ontologist::check_url_canonical(
+        &Url::parse(url).map_err(|e| PyRuntimeError::new_err(format!("Invalid URL: {}", e)))?,
+    )
+    .map_err(|e| match e {
+        CanonicalizeError::InvalidUrl(u, m) => InvalidUrl::new_err((u.to_string(), m)),
+        CanonicalizeError::Unverifiable(u, m) => UnverifiableUrl::new_err((u.to_string(), m)),
+        CanonicalizeError::RateLimited(u) => {
+            UnverifiableUrl::new_err((u.to_string(), "Rate limited"))
+        }
+    })?
+    .to_string())
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -550,6 +566,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_cabal_lines))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_git_config))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_aur))?;
+    m.add_wrapped(wrap_pyfunction!(check_url_canonical))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;
