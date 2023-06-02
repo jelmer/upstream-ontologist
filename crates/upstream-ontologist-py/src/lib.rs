@@ -30,7 +30,7 @@ fn drop_vcs_in_scheme(url: &str) -> &str {
     upstream_ontologist::vcs::drop_vcs_in_scheme(url)
 }
 
-fn upstream_datum_to_py(
+fn upstream_datum_with_metadata_to_py(
     py: Python,
     datum: upstream_ontologist::UpstreamDatumWithMetadata,
 ) -> PyResult<PyObject> {
@@ -86,7 +86,7 @@ fn guess_from_meson(py: Python, path: PathBuf, trust_package: bool) -> PyResult<
     let ret = upstream_ontologist::guess_from_meson(path.as_path(), trust_package);
 
     ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
@@ -99,7 +99,7 @@ fn guess_from_package_json(
     let ret = upstream_ontologist::guess_from_package_json(path.as_path(), trust_package);
 
     ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
@@ -145,7 +145,7 @@ fn guess_from_composer_json(
     let ret = upstream_ontologist::guess_from_composer_json(path.as_path(), trust_package);
 
     ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
@@ -158,7 +158,7 @@ fn guess_from_package_xml(
     let ret = upstream_ontologist::guess_from_package_xml(path.as_path(), trust_package);
 
     ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
@@ -167,7 +167,7 @@ fn guess_from_dist_ini(py: Python, path: PathBuf, trust_package: bool) -> PyResu
     let ret = upstream_ontologist::guess_from_dist_ini(path.as_path(), trust_package);
 
     ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
@@ -180,7 +180,7 @@ fn guess_from_perl_dist_name(
     let ret = upstream_ontologist::guess_from_perl_dist_name(path.as_path(), dist_name);
 
     ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
@@ -189,7 +189,7 @@ fn guess_from_perl_module(py: Python, path: PathBuf) -> PyResult<Vec<PyObject>> 
     let ret = upstream_ontologist::guess_from_perl_module(path.as_path());
 
     ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
@@ -198,7 +198,7 @@ fn guess_from_pod(py: Python, contents: &str) -> PyResult<Vec<PyObject>> {
     let ret = upstream_ontologist::guess_from_pod(contents);
 
     ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
@@ -211,7 +211,7 @@ fn guess_from_pubspec_yaml(
     let ret = upstream_ontologist::guess_from_pubspec_yaml(path.as_path(), trust_package);
 
     ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
@@ -220,7 +220,7 @@ fn guess_from_authors(py: Python, path: PathBuf, trust_package: bool) -> PyResul
     let ret = upstream_ontologist::guess_from_authors(path.as_path(), trust_package);
 
     ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
@@ -233,7 +233,7 @@ fn guess_from_metadata_json(
     let ret = upstream_ontologist::guess_from_metadata_json(path.as_path(), trust_package);
 
     ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
@@ -242,7 +242,7 @@ fn guess_from_meta_json(py: Python, path: PathBuf, trust_package: bool) -> PyRes
     let ret = upstream_ontologist::guess_from_meta_json(path.as_path(), trust_package);
 
     ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
@@ -373,7 +373,7 @@ fn guess_from_travis_yml(
     let ret = upstream_ontologist::guess_from_travis_yml(path.as_path(), trust_package);
 
     ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
@@ -382,7 +382,7 @@ fn guess_from_meta_yml(py: Python, path: PathBuf, trust_package: bool) -> PyResu
     let ret = upstream_ontologist::guess_from_meta_yml(path.as_path(), trust_package);
 
     ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
@@ -391,7 +391,7 @@ fn metadata_from_itp_bug_body(py: Python, body: &str) -> PyResult<Vec<PyObject>>
     let ret = upstream_ontologist::metadata_from_itp_bug_body(body);
 
     ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
@@ -400,7 +400,7 @@ fn guess_from_metainfo(py: Python, path: PathBuf, trust_package: bool) -> PyResu
     let ret = upstream_ontologist::guess_from_metainfo(path.as_path(), trust_package);
 
     ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
@@ -409,7 +409,7 @@ fn guess_from_doap(py: Python, path: PathBuf, trust_package: bool) -> PyResult<V
     let ret = upstream_ontologist::guess_from_doap(path.as_path(), trust_package);
 
     ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
@@ -418,7 +418,7 @@ fn guess_from_opam(py: Python, path: PathBuf, trust_package: bool) -> PyResult<V
     let ret = upstream_ontologist::guess_from_opam(path.as_path(), trust_package);
 
     ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
@@ -427,7 +427,7 @@ fn guess_from_pom_xml(py: Python, path: PathBuf, trust_package: bool) -> PyResul
     let ret = upstream_ontologist::guess_from_pom_xml(path.as_path(), trust_package);
 
     ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
@@ -446,7 +446,7 @@ fn guess_from_wscript(py: Python, path: PathBuf, trust_package: bool) -> PyResul
     let ret = upstream_ontologist::guess_from_wscript(path.as_path(), trust_package);
 
     ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
@@ -459,7 +459,7 @@ fn guess_from_makefile_pl(
     let ret = upstream_ontologist::guess_from_makefile_pl(path.as_path(), trust_package);
 
     ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
@@ -468,7 +468,7 @@ fn guess_from_go_mod(py: Python, path: PathBuf, trust_package: bool) -> PyResult
     let ret = upstream_ontologist::guess_from_go_mod(path.as_path(), trust_package);
 
     ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
@@ -477,7 +477,7 @@ fn guess_from_cabal(py: Python, path: PathBuf, trust_package: bool) -> PyResult<
     let ret = upstream_ontologist::guess_from_cabal(path.as_path(), trust_package);
 
     ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
@@ -486,7 +486,7 @@ fn guess_from_cabal_lines(py: Python, lines: Vec<String>) -> PyResult<Vec<PyObje
     let ret = upstream_ontologist::guess_from_cabal_lines(lines.into_iter());
 
     ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
@@ -499,7 +499,16 @@ fn guess_from_git_config(
     let ret = upstream_ontologist::guess_from_git_config(path.as_path(), trust_package);
 
     ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
+        .collect::<PyResult<Vec<PyObject>>>()
+}
+
+#[pyfunction]
+fn guess_from_aur(py: Python, package: &str) -> PyResult<Vec<PyObject>> {
+    let ret = upstream_ontologist::guess_from_aur(package);
+
+    ret.into_iter()
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
@@ -540,6 +549,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_cabal))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_cabal_lines))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_git_config))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_aur))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;

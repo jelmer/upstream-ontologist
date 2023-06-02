@@ -25,6 +25,7 @@ serde = { version = "1.0", features=["derive"]}
 percent-encoding = "2"
 opam-file-rs = { version = "0.1"}
 gix-config = ">=0.20"
+html5ever = ">=0.26"
 
 [lib]
 

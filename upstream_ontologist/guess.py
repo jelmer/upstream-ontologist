@@ -2688,42 +2688,6 @@ def check_upstream_metadata(  # noqa: C901
         screenshots.value = newvalue
 
 
-def parse_pkgbuild_variables(f):
-    import shlex
-    variables = {}
-    keep = None
-    existing = None
-    for line in f:
-        if existing:
-            line = existing + line
-        if line.endswith(b'\\\n'):
-            existing = line[:-2]
-            continue
-        existing = None
-        if (line.startswith(b'\t') or line.startswith(b' ')
-                or line.startswith(b'#')):
-            continue
-        if keep:
-            keep = (keep[0], keep[1] + line)
-            if line.rstrip().endswith(b')'):
-                variables[keep[0].decode()] = shlex.split(
-                    keep[1].rstrip(b'\n').decode())
-                keep = None
-            continue
-        try:
-            (key, value) = line.split(b'=', 1)
-        except ValueError:
-            continue
-        if value.startswith(b'('):
-            if value.rstrip().endswith(b')'):
-                value = value.rstrip()[1:-1]
-            else:
-                keep = (key, value[1:])
-                continue
-        variables[key.decode()] = shlex.split(value.rstrip(b'\n').decode())
-    return variables
-
-
 def guess_from_pecl_package(package):
     url = 'https://pecl.php.net/packages/%s' % package
     headers = {'User-Agent': USER_AGENT}
@@ -2756,13 +2720,6 @@ def guess_from_pecl_package(package):
         tag = label_tag.parent.find('a')
         if isinstance(tag, Tag):
             yield 'Homepage', tag.attrs['href']
-
-
-def strip_vcs_prefixes(url):
-    for prefix in ['git', 'hg']:
-        if url.startswith(prefix + '+'):
-            return url[len(prefix) + 1:]
-    return url
 
 
 def guess_from_gobo(package: str):   # noqa: C901
@@ -2842,51 +2799,7 @@ def guess_from_gobo(package: str):   # noqa: C901
                 logger.warning('Unknown field %s in gobo Description', key)
 
 
-def guess_from_aur(package: str):
-    vcses = ['git', 'bzr', 'hg']
-    for vcs in vcses:
-        url = (
-            'https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=%s-%s' %
-            (package, vcs))
-        headers = {'User-Agent': USER_AGENT}
-        try:
-            f = urlopen(
-                Request(url, headers=headers),
-                timeout=DEFAULT_URLLIB_TIMEOUT)
-        except urllib.error.HTTPError as e:
-            if e.code != 404:
-                raise
-            continue
-        except (socket.timeout, TimeoutError):
-            logger.warning('timeout contacting aur, ignoring: %s', url)
-            continue
-        else:
-            break
-    else:
-        return
-
-    variables = parse_pkgbuild_variables(f)
-    for key, value in variables.items():
-        if key == 'url':
-            yield 'Homepage', value[0]
-        if key == 'source':
-            if not value:
-                continue
-            value = value[0]
-            if "${" in value:
-                for k, v in variables.items():
-                    value = value.replace('${%s}' % k, ' '.join(v))
-                    value = value.replace('$%s' % k, ' '.join(v))
-            try:
-                unique_name, url = value.split('::', 1)
-            except ValueError:
-                url = value
-            url = url.replace('#branch=', ',branch=')
-            if any([url.startswith(vcs + '+') for vcs in vcses]):
-                yield 'Repository', strip_vcs_prefixes(url)
-        if key == '_gitroot':
-            repo_url = value[0]
-            yield 'Repository', strip_vcs_prefixes(repo_url)
+guess_from_aur = _upstream_ontologist.guess_from_aur
 
 
 def guess_from_launchpad(package, distribution=None, suite=None):  # noqa: C901

@@ -1,3 +1,5 @@
+pub const VCSES: [&str; 3] = ["git", "bzr", "hg"];
+
 pub fn plausible_url(url: &str) -> bool {
     url.contains(':')
 }
@@ -33,4 +35,16 @@ pub fn plausible_browse_url(url: &str) -> bool {
         }
     }
     false
+}
+
+pub fn strip_vcs_prefixes(url: &str) -> &str {
+    let prefixes = ["git", "hg"];
+
+    for prefix in prefixes.iter() {
+        if url.starts_with(&format!("{}+", prefix)) {
+            return &url[prefix.len() + 1..];
+        }
+    }
+
+    url
 }
