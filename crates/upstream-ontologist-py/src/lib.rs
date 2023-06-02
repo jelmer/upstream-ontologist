@@ -490,6 +490,19 @@ fn guess_from_cabal_lines(py: Python, lines: Vec<String>) -> PyResult<Vec<PyObje
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
+#[pyfunction]
+fn guess_from_git_config(
+    py: Python,
+    path: PathBuf,
+    trust_package: bool,
+) -> PyResult<Vec<PyObject>> {
+    let ret = upstream_ontologist::guess_from_git_config(path.as_path(), trust_package);
+
+    ret.into_iter()
+        .map(|x| upstream_datum_to_py(py, x))
+        .collect::<PyResult<Vec<PyObject>>>()
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -526,6 +539,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_go_mod))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_cabal))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_cabal_lines))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_git_config))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;

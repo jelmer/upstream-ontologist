@@ -1377,37 +1377,7 @@ def guess_from_poetry(poetry):
 
 
 guess_from_pom_xml = _upstream_ontologist.guess_from_pom_xml
-
-
-def guess_from_git_config(path, trust_package=False):
-    # See https://git-scm.com/docs/git-config
-    from dulwich.config import ConfigFile
-
-    cfg = ConfigFile.from_path(path)
-    # If there's a remote named upstream, that's a plausible source..
-    try:
-        urlb = cfg.get((b'remote', b'upstream'), b'url')
-    except KeyError:
-        pass
-    else:
-        url = urlb.decode('utf-8')
-        if not url.startswith('../'):
-            yield UpstreamDatum('Repository', url, 'likely')
-
-    # It's less likely that origin is correct, but let's try anyway
-    # (with a lower certainty)
-    # Either way, it's probably incorrect if this is a packaging
-    # repository.
-    if not os.path.exists(
-            os.path.join(os.path.dirname(path), '..', 'debian')):
-        try:
-            urlb = cfg.get((b'remote', b'origin'), b'url')
-        except KeyError:
-            pass
-        else:
-            url = urlb.decode('utf-8')
-            if not url.startswith('../'):
-                yield UpstreamDatum('Repository', url, 'possible')
+guess_from_git_config = _upstream_ontologist.guess_from_git_config
 
 
 def guess_from_get_orig_source(path, trust_package=False):
@@ -1429,7 +1399,7 @@ def guess_from_security_md(name, path, trust_package=False):
     yield UpstreamDatum('Security-MD', name, 'certain')
 
 
-guess_from_go_mod = _upstream_ontologist.guess_from_go_mod 
+guess_from_go_mod = _upstream_ontologist.guess_from_go_mod
 
 
 def guess_from_gemspec(path, trust_package=False):  # noqa: C901
