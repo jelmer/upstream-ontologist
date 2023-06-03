@@ -528,6 +528,15 @@ fn check_url_canonical(url: &str) -> PyResult<String> {
     .to_string())
 }
 
+#[pyfunction]
+fn guess_from_environment(py: Python) -> PyResult<Vec<PyObject>> {
+    let ret = upstream_ontologist::guess_from_environment();
+
+    ret.into_iter()
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
+        .collect::<PyResult<Vec<PyObject>>>()
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -567,6 +576,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_git_config))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_aur))?;
     m.add_wrapped(wrap_pyfunction!(check_url_canonical))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_environment))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;

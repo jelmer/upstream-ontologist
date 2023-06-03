@@ -1261,12 +1261,7 @@ def guess_from_r_description(path, trust_package: bool = False):  # noqa: C901
                         yield UpstreamDatum('Repository', sanitize_vcs_url(repo_url), 'certain')
 
 
-def guess_from_environment():
-    try:
-        yield UpstreamDatum(
-            'Repository', os.environ['UPSTREAM_BRANCH_URL'], 'certain')
-    except KeyError:
-        pass
+guess_from_environment = _upstream_ontologist.guess_from_environment
 
 
 def guess_from_path(path):

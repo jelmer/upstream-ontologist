@@ -3265,6 +3265,18 @@ pub fn guess_from_aur(package: &str) -> Vec<UpstreamDatumWithMetadata> {
         .collect()
 }
 
+pub fn guess_from_environment() -> Vec<UpstreamDatumWithMetadata> {
+    let mut results = Vec::new();
+    if let Ok(url) = std::env::var("UPSTREAM_BRANCH_URL") {
+        results.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Repository(url),
+            certainty: Some(Certainty::Certain),
+            origin: Some("environment".to_string()),
+        });
+    }
+    results
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
