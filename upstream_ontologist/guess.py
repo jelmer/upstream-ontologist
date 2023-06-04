@@ -29,7 +29,6 @@ from urllib.request import urlopen, Request
 from . import _upstream_ontologist
 
 from .vcs import (
-    unsplit_vcs_url,
     browse_url_from_repo_url,
     sanitize_url as sanitize_vcs_url,
     is_gitlab_site,
@@ -1086,58 +1085,7 @@ guess_from_meta_yml = _upstream_ontologist.guess_from_meta_yml
 guess_from_metainfo = _upstream_ontologist.guess_from_metainfo
 guess_from_doap = _upstream_ontologist.guess_from_doap
 guess_from_opam = _upstream_ontologist.guess_from_opam
-
-
-def guess_from_nuspec(path, trust_package=False):
-    # Documentation: https://docs.microsoft.com/en-us/nuget/reference/nuspec
-
-    import xml.etree.ElementTree as ET
-    try:
-        root = xmlparse_simplify_namespaces(path, [
-            "http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd"])
-    except ET.ParseError as e:
-        logger.warning('Unable to parse nuspec: %s', e)
-        return
-    assert root.tag == 'package', 'root tag is %r' % root.tag
-    metadata = root.find('metadata')
-    if metadata is None:
-        return
-    version_tag = metadata.find('version')
-    if version_tag is not None:
-        yield UpstreamDatum('Version', version_tag.text, 'certain')
-    description_tag = metadata.find('description')
-    if description_tag is not None:
-        yield UpstreamDatum('Description', description_tag.text, 'certain')
-    authors_tag = metadata.find('authors')
-    if authors_tag is not None:
-        yield UpstreamDatum(
-            'Author',
-            [Person.from_string(p) for p in authors_tag.text.split(',')],
-            'certain')
-    project_url_tag = metadata.find('projectUrl')
-    if project_url_tag is not None:
-        repo_url = guess_repo_from_url(project_url_tag.text)
-        if repo_url:
-            yield UpstreamDatum('Repository', repo_url, 'confident')
-        yield UpstreamDatum('Homepage', project_url_tag.text, 'certain')
-    license_tag = metadata.find('license')
-    if license_tag is not None:
-        yield UpstreamDatum('License', license_tag.text, 'certain')
-    copyright_tag = metadata.find('copyright')
-    if copyright_tag is not None:
-        yield UpstreamDatum('Copyright', copyright_tag.text, 'certain')
-    title_tag = metadata.find('title')
-    if title_tag is not None:
-        yield UpstreamDatum('Name', title_tag.text, 'likely')
-    summary_tag = metadata.find('title')
-    if summary_tag is not None:
-        yield UpstreamDatum('Summary', summary_tag.text, 'certain')
-    repository_tag = metadata.find('repository')
-    if repository_tag is not None:
-        repo_url = repository_tag.get('url')
-        branch = repository_tag.get('branch')
-        yield UpstreamDatum('Repository', unsplit_vcs_url(repo_url, branch), 'certain')
-
+guess_from_nuspec = _upstream_ontologist.guess_from_nuspec
 
 guess_from_cabal = _upstream_ontologist.guess_from_cabal
 guess_from_cabal_lines = _upstream_ontologist.guess_from_cabal_lines

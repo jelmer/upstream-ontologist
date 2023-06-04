@@ -516,7 +516,7 @@ fn guess_from_aur(py: Python, package: &str) -> PyResult<Vec<PyObject>> {
 #[pyfunction]
 fn check_url_canonical(url: &str) -> PyResult<String> {
     Ok(upstream_ontologist::check_url_canonical(
-        &Url::parse(url).map_err(|e| PyRuntimeError::new_err(format!("Invalid URL: {}", e)))?,
+        &Url::parse(url).map_err(|e| InvalidUrl::new_err((url.to_string(), e.to_string())))?,
     )
     .map_err(|e| match e {
         CanonicalizeError::InvalidUrl(u, m) => InvalidUrl::new_err((u.to_string(), m)),
@@ -535,6 +535,62 @@ fn guess_from_environment(py: Python) -> PyResult<Vec<PyObject>> {
     ret.into_iter()
         .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
+}
+
+#[pyfunction]
+fn guess_from_nuspec(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
+    let ret = upstream_ontologist::guess_from_nuspec(path.as_path(), trust_package);
+
+    ret.into_iter()
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
+        .collect::<PyResult<Vec<PyObject>>>()
+}
+
+#[pyfunction]
+fn guess_repo_from_url(url: &str, net_access: Option<bool>) -> PyResult<Option<String>> {
+    let url = Url::parse(url);
+    if let Err(e) = url {
+        return Ok(None);
+    }
+
+    Ok(upstream_ontologist::vcs::guess_repo_from_url(
+        &url.unwrap(),
+        net_access,
+    ))
+}
+
+#[pyfunction]
+fn probe_gitlab_host(hostname: &str) -> bool {
+    upstream_ontologist::vcs::probe_gitlab_host(hostname)
+}
+
+#[pyfunction]
+fn is_gitlab_site(hostname: &str, net_access: Option<bool>) -> bool {
+    upstream_ontologist::vcs::is_gitlab_site(hostname, net_access)
+}
+
+#[pyfunction]
+fn check_repository_url_canonical(url: &str, version: Option<&str>) -> PyResult<String> {
+    Ok(upstream_ontologist::vcs::check_repository_url_canonical(
+        Url::parse(url).map_err(|e| PyRuntimeError::new_err(format!("Invalid URL: {}", e)))?,
+        version,
+    )
+    .map_err(|e| match e {
+        CanonicalizeError::InvalidUrl(u, m) => InvalidUrl::new_err((u.to_string(), m)),
+        CanonicalizeError::Unverifiable(u, m) => UnverifiableUrl::new_err((u.to_string(), m)),
+        CanonicalizeError::RateLimited(u) => {
+            UnverifiableUrl::new_err((u.to_string(), "Rate limited"))
+        }
+    })?
+    .to_string())
+}
+
+#[pyfunction]
+fn probe_upstream_branch_url(url: &str, version: Option<&str>) -> Option<bool> {
+    upstream_ontologist::vcs::probe_upstream_branch_url(
+        &Url::parse(url).expect("URL parsing failed"),
+        version,
+    )
 }
 
 #[pymodule]
@@ -577,6 +633,12 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_aur))?;
     m.add_wrapped(wrap_pyfunction!(check_url_canonical))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_environment))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_nuspec))?;
+    m.add_wrapped(wrap_pyfunction!(guess_repo_from_url))?;
+    m.add_wrapped(wrap_pyfunction!(probe_gitlab_host))?;
+    m.add_wrapped(wrap_pyfunction!(is_gitlab_site))?;
+    m.add_wrapped(wrap_pyfunction!(check_repository_url_canonical))?;
+    m.add_wrapped(wrap_pyfunction!(probe_upstream_branch_url))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;

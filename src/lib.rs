@@ -10,11 +10,9 @@ use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use url::Url;
-use xmltree::{Element, XMLNode};
 
-lazy_static::lazy_static! {
-    static ref USER_AGENT: String = String::from("upstream-ontologist/") + env!("CARGO_PKG_VERSION");
-}
+static USER_AGENT: &str = concat!("upstream-ontologist/", env!("CARGO_PKG_VERSION"));
+
 // Too aggressive?
 const DEFAULT_URLLIB_TIMEOUT: u64 = 3;
 
@@ -790,7 +788,7 @@ pub fn guess_from_composer_json(
     upstream_data
 }
 
-fn xmlparse_simplify_namespaces(path: &Path, namespaces: &[&str]) -> Option<Element> {
+fn xmlparse_simplify_namespaces(path: &Path, namespaces: &[&str]) -> Option<xmltree::Element> {
     let namespaces = namespaces
         .iter()
         .map(|ns| format!("{{{}{}}}", ns, ns))
@@ -803,7 +801,8 @@ fn xmlparse_simplify_namespaces(path: &Path, namespaces: &[&str]) -> Option<Elem
     Some(tree)
 }
 
-fn simplify_namespaces(element: &mut Element, namespaces: &[String]) {
+fn simplify_namespaces(element: &mut xmltree::Element, namespaces: &[String]) {
+    use xmltree::XMLNode;
     element.prefix = None;
     if let Some(namespace) = namespaces.iter().find(|&ns| element.name.starts_with(ns)) {
         element.name = element.name[namespace.len()..].to_string();
@@ -816,12 +815,13 @@ fn simplify_namespaces(element: &mut Element, namespaces: &[String]) {
 }
 
 pub fn guess_from_package_xml(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
-    let namespaces = [
+    use xmltree::{Element, XMLNode};
+    const NAMESPACES: &[&str] = &[
         "http://pear.php.net/dtd/package-2.0",
         "http://pear.php.net/dtd/package-2.1",
     ];
 
-    let root = match xmlparse_simplify_namespaces(path, &namespaces) {
+    let root = match xmlparse_simplify_namespaces(path, NAMESPACES) {
         Some(root) => root,
         None => {
             error!("Unable to parse package.xml");
@@ -1628,7 +1628,7 @@ pub fn check_url_canonical(url: &Url) -> Result<Url, CanonicalizeError> {
     }
 }
 
-fn with_path_segments(url: &Url, path_segments: &[&str]) -> Result<Url, ()> {
+pub fn with_path_segments(url: &Url, path_segments: &[&str]) -> Result<Url, ()> {
     let mut url = url.clone();
     url.path_segments_mut()?
         .clear()
@@ -2239,6 +2239,7 @@ pub fn metadata_from_itp_bug_body(body: &str) -> Vec<UpstreamDatumWithMetadata> 
 
 // See https://www.freedesktop.org/software/appstream/docs/chap-Metadata.html
 pub fn guess_from_metainfo(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+    use xmltree::Element;
     let file = File::open(path).expect("Failed to open file");
     let root = Element::parse(file).expect("Failed to parse XML");
 
@@ -2309,6 +2310,7 @@ pub fn guess_from_metainfo(path: &Path, _trust_package: bool) -> Vec<UpstreamDat
 
 // See https://github.com/ewilderj/doap
 pub fn guess_from_doap(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+    use xmltree::Element;
     let file = File::open(path).expect("Failed to open file");
     let doc = Element::parse(file).expect("Failed to parse XML");
     let mut root = &doc;
@@ -2745,6 +2747,7 @@ pub fn guess_from_opam(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWi
 
 // Documentation: https://maven.apache.org/pom.html
 pub fn guess_from_pom_xml(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+    use xmltree::Element;
     let file = File::open(path).expect("Failed to open file");
 
     let root = match Element::parse(file) {
@@ -3275,6 +3278,119 @@ pub fn guess_from_environment() -> Vec<UpstreamDatumWithMetadata> {
         });
     }
     results
+}
+
+// Documentation: https://docs.microsoft.com/en-us/nuget/reference/nuspec
+pub fn guess_from_nuspec(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+    const NAMESPACES: &[&str] = &["http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd"];
+    // XML parsing and other logic
+    let root = match xmlparse_simplify_namespaces(path, NAMESPACES) {
+        Some(root) => root,
+        None => {
+            warn!("Unable to parse nuspec");
+            return vec![];
+        }
+    };
+
+    assert_eq!(root.name, "package", "root tag is {}", root.name);
+    let metadata = root.get_child("metadata");
+    if metadata.is_none() {
+        return vec![];
+    }
+    let metadata = metadata.unwrap();
+
+    let mut result = Vec::new();
+
+    if let Some(version_tag) = metadata.get_child("version") {
+        result.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Version(version_tag.get_text().unwrap().into_owned()),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.to_string_lossy().to_string()),
+        });
+    }
+
+    if let Some(description_tag) = metadata.get_child("description") {
+        result.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Description(description_tag.get_text().unwrap().into_owned()),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.to_string_lossy().to_string()),
+        });
+    }
+
+    if let Some(authors_tag) = metadata.get_child("authors") {
+        let authors = authors_tag.get_text().unwrap();
+        let authors = authors.split(',').map(|p| Person::from(p)).collect();
+        result.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Author(authors),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.to_string_lossy().to_string()),
+        });
+    }
+
+    if let Some(project_url_tag) = metadata.get_child("projectUrl") {
+        let project_url = project_url_tag.get_text().unwrap();
+        let repo_url = vcs::guess_repo_from_url(&url::Url::parse(&project_url).unwrap(), None);
+        if let Some(repo_url) = repo_url {
+            result.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Repository(repo_url),
+                certainty: Some(Certainty::Confident),
+                origin: Some(path.to_string_lossy().to_string()),
+            });
+        }
+        result.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Homepage(project_url.into_owned()),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.to_string_lossy().to_string()),
+        });
+    }
+
+    if let Some(license_tag) = metadata.get_child("license") {
+        result.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::License(license_tag.get_text().unwrap().into_owned()),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.to_string_lossy().to_string()),
+        });
+    }
+
+    if let Some(copyright_tag) = metadata.get_child("copyright") {
+        result.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Copyright(copyright_tag.get_text().unwrap().into_owned()),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.to_string_lossy().to_string()),
+        });
+    }
+
+    if let Some(title_tag) = metadata.get_child("title") {
+        result.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Name(title_tag.get_text().unwrap().into_owned()),
+            certainty: Some(Certainty::Likely),
+            origin: Some(path.to_string_lossy().to_string()),
+        });
+    }
+
+    if let Some(summary_tag) = metadata.get_child("summary") {
+        result.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Summary(summary_tag.get_text().unwrap().into_owned()),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.to_string_lossy().to_string()),
+        });
+    }
+
+    if let Some(repository_tag) = metadata.get_child("repository") {
+        let repo_url = repository_tag.attributes.get("url").unwrap();
+        let branch = repository_tag.attributes.get("branch");
+        result.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Repository(vcs::unsplit_vcs_url(
+                repo_url,
+                branch.map(|s| s.as_str()),
+                None,
+            )),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.to_string_lossy().to_string()),
+        });
+    }
+
+    result
 }
 
 #[cfg(test)]
