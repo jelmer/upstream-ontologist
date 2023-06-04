@@ -2,7 +2,7 @@ Name: jekyll
 License: MIT
 Summary: A simple, blog aware, static site generator
 Description: Jekyll is a simple, blog aware, static site generator.
-Authors:
+Author:
 - !Person
   name: Tom Preston-Werner
 Homepage: http://github.com/jekyll/jekyll

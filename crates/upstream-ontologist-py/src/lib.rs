@@ -593,6 +593,15 @@ fn probe_upstream_branch_url(url: &str, version: Option<&str>) -> Option<bool> {
     )
 }
 
+#[pyfunction]
+fn guess_from_gemspec(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
+    let ret = upstream_ontologist::guess_from_gemspec(path.as_path(), trust_package);
+
+    ret.into_iter()
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
+        .collect::<PyResult<Vec<PyObject>>>()
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -639,6 +648,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(is_gitlab_site))?;
     m.add_wrapped(wrap_pyfunction!(check_repository_url_canonical))?;
     m.add_wrapped(wrap_pyfunction!(probe_upstream_branch_url))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_gemspec))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;

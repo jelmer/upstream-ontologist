@@ -1343,75 +1343,7 @@ def guess_from_security_md(name, path, trust_package=False):
 
 
 guess_from_go_mod = _upstream_ontologist.guess_from_go_mod
-
-
-def guess_from_gemspec(path, trust_package=False):  # noqa: C901
-    # TODO(jelmer): use a proper ruby wrapper instead?
-    with open(path) as f:
-        for line in f:
-            if line.startswith('#'):
-                continue
-            if not line.strip():
-                continue
-            if line in ('Gem::Specification.new do |s|\n', 'end\n'):
-                continue
-            if line.startswith('  s.'):
-                try:
-                    (key, rawval) = line[4:].split('=', 1)
-                except ValueError:
-                    continue
-                key = key.strip()
-
-                def parseval(v):
-                    v = v.strip()
-                    if v.startswith('"') and v.endswith('".freeze'):
-                        return v[1:-len('".freeze')]
-                    elif v.startswith('"') and v.endswith('"'):
-                        return v[1:-1]
-                    elif v.startswith("'") and v.endswith("'"):
-                        return v[1:-1]
-                    elif v.startswith("[") and v.endswith("]"):
-                        return [parseval(k) for k in v[1:-1].split(',')]
-                    else:
-                        raise ValueError
-                try:
-                    val = parseval(rawval)
-                except ValueError:
-                    continue
-
-                if key == "name":
-                    yield UpstreamDatum('Name', val, 'certain')
-                elif key == 'version':
-                    yield UpstreamDatum('Version', val, 'certain')
-                elif key == 'homepage':
-                    yield UpstreamDatum('Homepage', val, 'certain')
-                elif key == 'summary':
-                    yield UpstreamDatum('Summary', val, 'certain')
-                elif key == 'description':
-                    yield UpstreamDatum('Description', val, 'certain')
-                elif key == 'rubygems_version':
-                    pass
-                elif key == 'required_ruby_version':
-                    pass
-                elif key == 'license':
-                    yield UpstreamDatum('License', val, 'certain')
-                elif key == 'authors':
-                    yield UpstreamDatum('Authors', [Person.from_string(a) for a in val], 'certain')
-                elif key == 'email':
-                    # Should we assume this belongs to the maintainer? mailing list?
-                    pass
-                elif key == 'require_paths':
-                    pass
-                elif key in ('rdoc_options', 'extra_rdoc_options'):
-                    pass
-                else:
-                    logger.debug('unknown field %s (%r) in gemspec', key, val)
-            else:
-                logger.debug(
-                    'ignoring unparseable line in %s: %r',
-                    path, line)
-
-
+guess_from_gemspec = _upstream_ontologist.guess_from_gemspec
 guess_from_makefile_pl = _upstream_ontologist.guess_from_makefile_pl
 guess_from_wscript = _upstream_ontologist.guess_from_wscript
 guess_from_metadata_json = _upstream_ontologist.guess_from_metadata_json
