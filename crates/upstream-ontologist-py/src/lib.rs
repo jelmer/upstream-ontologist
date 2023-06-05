@@ -31,6 +31,49 @@ fn drop_vcs_in_scheme(url: &str) -> &str {
     upstream_ontologist::vcs::drop_vcs_in_scheme(url)
 }
 
+fn upstream_datum_to_py(
+    py: Python,
+    datum: upstream_ontologist::UpstreamDatum,
+) -> PyResult<(String, PyObject)> {
+    let m = PyModule::import(py, "upstream_ontologist.guess")?;
+    let PersonCls = m.getattr("Person")?;
+    Ok((
+        datum.field().to_string(),
+        match datum {
+            upstream_ontologist::UpstreamDatum::Name(n) => n.into_py(py),
+            upstream_ontologist::UpstreamDatum::Version(v) => v.into_py(py),
+            upstream_ontologist::UpstreamDatum::Contact(c) => c.into_py(py),
+            upstream_ontologist::UpstreamDatum::Summary(s) => s.into_py(py),
+            upstream_ontologist::UpstreamDatum::License(l) => l.into_py(py),
+            upstream_ontologist::UpstreamDatum::Homepage(h) => h.into_py(py),
+            upstream_ontologist::UpstreamDatum::Description(d) => d.into_py(py),
+            upstream_ontologist::UpstreamDatum::BugDatabase(b) => b.into_py(py),
+            upstream_ontologist::UpstreamDatum::BugSubmit(b) => b.into_py(py),
+            upstream_ontologist::UpstreamDatum::Repository(r) => r.into_py(py),
+            upstream_ontologist::UpstreamDatum::RepositoryBrowse(r) => r.into_py(py),
+            upstream_ontologist::UpstreamDatum::SecurityMD(s) => s.into_py(py),
+            upstream_ontologist::UpstreamDatum::SecurityContact(s) => s.into_py(py),
+            upstream_ontologist::UpstreamDatum::CargoCrate(c) => c.into_py(py),
+            upstream_ontologist::UpstreamDatum::Keywords(ks) => ks.into_py(py),
+            upstream_ontologist::UpstreamDatum::Copyright(c) => c.into_py(py),
+            upstream_ontologist::UpstreamDatum::Documentation(a) => a.into_py(py),
+            upstream_ontologist::UpstreamDatum::GoImportPath(ip) => ip.into_py(py),
+            upstream_ontologist::UpstreamDatum::Maintainer(m) => {
+                PersonCls.call1((m.name, m.email, m.url))?.into_py(py)
+            }
+            upstream_ontologist::UpstreamDatum::Author(a) => a
+                .into_iter()
+                .map(|x| PersonCls.call1((x.name, x.email, x.url)))
+                .collect::<PyResult<Vec<&PyAny>>>()?
+                .into_py(py),
+            upstream_ontologist::UpstreamDatum::Wiki(w) => w.into_py(py),
+            upstream_ontologist::UpstreamDatum::Download(d) => d.into_py(py),
+            upstream_ontologist::UpstreamDatum::MailingList(m) => m.into_py(py),
+            upstream_ontologist::UpstreamDatum::SourceForgeProject(m) => m.into_py(py),
+        },
+    ))
+}
+
 fn upstream_datum_with_metadata_to_py(
     py: Python,
     datum: upstream_ontologist::UpstreamDatumWithMetadata,
@@ -39,42 +82,11 @@ fn upstream_datum_with_metadata_to_py(
 
     let UpstreamDatumCls = m.getattr("UpstreamDatum")?;
 
-    let PersonCls = m.getattr("Person")?;
-
     {
+        let (field, py_datum) = upstream_datum_to_py(py, datum.datum)?;
         let datum = UpstreamDatumCls.call1((
-            datum.datum.field(),
-            match datum.datum {
-                upstream_ontologist::UpstreamDatum::Name(n) => n.into_py(py),
-                upstream_ontologist::UpstreamDatum::Version(v) => v.into_py(py),
-                upstream_ontologist::UpstreamDatum::Contact(c) => c.into_py(py),
-                upstream_ontologist::UpstreamDatum::Summary(s) => s.into_py(py),
-                upstream_ontologist::UpstreamDatum::License(l) => l.into_py(py),
-                upstream_ontologist::UpstreamDatum::Homepage(h) => h.into_py(py),
-                upstream_ontologist::UpstreamDatum::Description(d) => d.into_py(py),
-                upstream_ontologist::UpstreamDatum::BugDatabase(b) => b.into_py(py),
-                upstream_ontologist::UpstreamDatum::BugSubmit(b) => b.into_py(py),
-                upstream_ontologist::UpstreamDatum::Repository(r) => r.into_py(py),
-                upstream_ontologist::UpstreamDatum::RepositoryBrowse(r) => r.into_py(py),
-                upstream_ontologist::UpstreamDatum::SecurityMD(s) => s.into_py(py),
-                upstream_ontologist::UpstreamDatum::SecurityContact(s) => s.into_py(py),
-                upstream_ontologist::UpstreamDatum::CargoCrate(c) => c.into_py(py),
-                upstream_ontologist::UpstreamDatum::Keywords(ks) => ks.into_py(py),
-                upstream_ontologist::UpstreamDatum::Copyright(c) => c.into_py(py),
-                upstream_ontologist::UpstreamDatum::Documentation(a) => a.into_py(py),
-                upstream_ontologist::UpstreamDatum::GoImportPath(ip) => ip.into_py(py),
-                upstream_ontologist::UpstreamDatum::Maintainer(m) => {
-                    PersonCls.call1((m.name, m.email, m.url))?.into_py(py)
-                }
-                upstream_ontologist::UpstreamDatum::Author(a) => a
-                    .into_iter()
-                    .map(|x| PersonCls.call1((x.name, x.email, x.url)))
-                    .collect::<PyResult<Vec<&PyAny>>>()?
-                    .into_py(py),
-                upstream_ontologist::UpstreamDatum::Wiki(w) => w.into_py(py),
-                upstream_ontologist::UpstreamDatum::Download(d) => d.into_py(py),
-                upstream_ontologist::UpstreamDatum::MailingList(m) => m.into_py(py),
-            },
+            field,
+            py_datum,
             datum.certainty.map(|x| x.to_string()),
             datum.origin,
         ))?;
@@ -505,12 +517,12 @@ fn guess_from_git_config(
 }
 
 #[pyfunction]
-fn guess_from_aur(py: Python, package: &str) -> PyResult<Vec<PyObject>> {
+fn guess_from_aur(py: Python, package: &str) -> PyResult<Vec<(String, PyObject)>> {
     let ret = upstream_ontologist::guess_from_aur(package);
 
     ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+        .map(|x| upstream_datum_to_py(py, x))
+        .collect::<PyResult<Vec<_>>>()
 }
 
 #[pyfunction]
@@ -602,6 +614,25 @@ fn guess_from_gemspec(py: Python, path: PathBuf, trust_package: bool) -> PyResul
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
+#[pyfunction]
+fn guess_from_launchpad(
+    py: Python,
+    package: &str,
+    distribution: Option<&str>,
+    suite: Option<&str>,
+) -> PyResult<Vec<(String, PyObject)>> {
+    let ret = upstream_ontologist::guess_from_launchpad(package, distribution, suite);
+
+    if ret.is_none() {
+        return Ok(vec![]);
+    }
+
+    ret.unwrap()
+        .into_iter()
+        .map(|x| upstream_datum_to_py(py, x))
+        .collect::<PyResult<Vec<_>>>()
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -649,6 +680,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(check_repository_url_canonical))?;
     m.add_wrapped(wrap_pyfunction!(probe_upstream_branch_url))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_gemspec))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_launchpad))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;

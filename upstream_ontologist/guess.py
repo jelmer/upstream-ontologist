@@ -750,21 +750,7 @@ def guess_from_setup_py(path, trust_package):  # noqa: C901
 
 guess_from_composer_json = _upstream_ontologist.guess_from_composer_json
 guess_from_package_json = _upstream_ontologist.guess_from_package_json
-
-
-def xmlparse_simplify_namespaces(path, namespaces):
-    import xml.etree.ElementTree as ET
-    namespaces = ['{%s}' % ns for ns in namespaces]
-    tree = ET.iterparse(path)
-    for _, el in tree:
-        for namespace in namespaces:
-            el.tag = el.tag.replace(namespace, '')
-    return tree.root  # type: ignore
-
-
 guess_from_package_xml = _upstream_ontologist.guess_from_package_xml
-
-
 guess_from_pod = _upstream_ontologist.guess_from_pod
 guess_from_perl_module = _upstream_ontologist.guess_from_perl_module
 guess_from_perl_dist_name = _upstream_ontologist.guess_from_perl_dist_name
@@ -2654,99 +2640,7 @@ def guess_from_gobo(package: str):   # noqa: C901
 
 
 guess_from_aur = _upstream_ontologist.guess_from_aur
-
-
-def guess_from_launchpad(package, distribution=None, suite=None):  # noqa: C901
-    if distribution is None:
-        # Default to Ubuntu; it's got more fields populated.
-        distribution = 'ubuntu'
-    if suite is None:
-        if distribution == 'ubuntu':
-            from distro_info import UbuntuDistroInfo, DistroDataOutdated
-            ubuntu = UbuntuDistroInfo()
-            try:
-                suite = ubuntu.devel()
-            except DistroDataOutdated as e:
-                logger.warning('%s', str(e))
-                suite = ubuntu.all[-1]
-        elif distribution == 'debian':
-            suite = 'sid'
-    sourcepackage_url = (
-        'https://api.launchpad.net/devel/%(distribution)s/'
-        '%(suite)s/+source/%(package)s' % {
-            'package': package,
-            'suite': suite,
-            'distribution': distribution})
-    try:
-        sourcepackage_data = _load_json_url(sourcepackage_url)
-    except urllib.error.HTTPError as e:
-        if e.code != 404:
-            raise
-        return
-    except (socket.timeout, TimeoutError):
-        logger.warning('timeout contacting launchpad, ignoring')
-        return
-
-    productseries_url = sourcepackage_data.get('productseries_link')
-    if not productseries_url:
-        return
-    productseries_data = _load_json_url(productseries_url)
-    project_link = productseries_data['project_link']
-    project_data = _load_json_url(project_link)
-    if project_data.get('homepage_url'):
-        yield 'Homepage', project_data['homepage_url']
-    yield 'Name', project_data['display_name']
-    if project_data.get('sourceforge_project'):
-        yield ('SourceForge-Project', project_data['sourceforge_project'])
-    if project_data.get('wiki_url'):
-        yield ('Wiki', project_data['wiki_url'])
-    if project_data.get('summary'):
-        yield ('Summary', project_data['summary'])
-    if project_data.get('download_url'):
-        yield ('Download', project_data['download_url'])
-    if project_data['vcs'] == 'Bazaar':
-        branch_link = productseries_data.get('branch_link')
-        if branch_link:
-            try:
-                code_import_data = _load_json_url(
-                    branch_link + '/+code-import')
-                if code_import_data['url']:
-                    # Sometimes this URL is not set, e.g. for CVS repositories.
-                    yield 'Repository', code_import_data['url']
-            except urllib.error.HTTPError as e:
-                if e.code != 404:
-                    raise
-                if project_data['official_codehosting']:
-                    try:
-                        branch_data = _load_json_url(branch_link)
-                    except urllib.error.HTTPError as e:
-                        if e.code != 404:
-                            raise
-                        branch_data = None
-                    if branch_data:
-                        yield 'Archive', 'launchpad'
-                        yield 'Repository', branch_data['bzr_identity']
-                        yield 'Repository-Browse', branch_data['web_link']
-    elif project_data['vcs'] == 'Git':
-        repo_link = (
-            'https://api.launchpad.net/devel/+git?ws.op=getByPath&path=%s' %
-            project_data['name'])
-        repo_data = _load_json_url(repo_link)
-        if not repo_data:
-            return
-        code_import_link = repo_data.get('code_import_link')
-        if code_import_link:
-            code_import_data = _load_json_url(repo_data['code_import_link'])
-            if code_import_data['url']:
-                # Sometimes this URL is not set, e.g. for CVS repositories.
-                yield 'Repository', code_import_data['url']
-        else:
-            if project_data['official_codehosting']:
-                yield 'Archive', 'launchpad'
-                yield 'Repository', repo_data['git_https_url']
-                yield 'Repository-Browse', repo_data['web_link']
-    elif project_data.get('vcs') is not None:
-        raise AssertionError('unknown vcs: %r' % project_data['vcs'])
+guess_from_launchpad = _upstream_ontologist.guess_from_launchpad
 
 
 def fix_upstream_metadata(upstream_metadata: UpstreamMetadata):

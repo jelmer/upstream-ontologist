@@ -2068,6 +2068,7 @@ checksum = "e1766d682d402817b5ac4490b3c3002d91dfa0d22812f341609f97b08757359c"
 name = "upstream-ontologist"
 version = "0.1.35"
 dependencies = [
+ "chrono",
  "configparser",
  "distro-info",
  "gix-config",
