@@ -650,6 +650,13 @@ fn canonical_git_repo_url(url: &str, net_access: Option<bool>) -> PyResult<Strin
     Ok(upstream_ontologist::vcs::canonical_git_repo_url(&url, net_access).to_string())
 }
 
+#[pyfunction]
+fn find_public_repo_url(url: &str, net_access: Option<bool>) -> PyResult<Option<String>> {
+    Ok(upstream_ontologist::vcs::find_public_repo_url(
+        url, net_access,
+    ))
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -700,6 +707,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_launchpad))?;
     m.add_wrapped(wrap_pyfunction!(canonical_git_repo_url))?;
     m.add_wrapped(wrap_pyfunction!(browse_url_from_repo_url))?;
+    m.add_wrapped(wrap_pyfunction!(find_public_repo_url))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;

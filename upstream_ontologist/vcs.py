@@ -27,10 +27,10 @@ __all__ = [
     "check_repository_url_canonical",
     "unsplit_vcs_url",
     "browse_url_from_repo_url",
+    "find_public_repo_url",
 ]
 
 import logging
-import re
 from typing import Optional, Union, List, Tuple
 
 from urllib.parse import urlparse, urlunparse, ParseResult
@@ -47,6 +47,7 @@ from ._upstream_ontologist import (  # noqa: F401
     is_gitlab_site,
     probe_gitlab_host,
     browse_url_from_repo_url,
+    find_public_repo_url,
 )
 
 
@@ -128,49 +129,6 @@ def find_secure_repo_url(
         return urlunparse(parsed_repo_url)
 
     # Can't find a secure URI :(
-    return None
-
-
-def find_public_repo_url(repo_url: str) -> Optional[str]:
-    parsed = urlparse(repo_url)
-    if not parsed.scheme and not parsed.hostname and ':' in parsed.path:
-        m = re.match('^(?P<user>[^@:/]+@)?(?P<host>[^/:]+):(?P<path>.*)$',
-                     repo_url)
-        if m:
-            host = m.group('host')
-            path = m.group('path')
-            if host == 'github.com' or is_gitlab_site(host):
-                return urlunparse(("https", "github.com", path, None, None, None))
-
-    parsed = urlparse(repo_url)
-    revised_url = None
-    if parsed.hostname == "github.com":
-        if parsed.scheme in ("https", "http", "git"):
-            return repo_url
-        revised_url = urlunparse(("https", "github.com", parsed.path, None, None, None))
-    if parsed.hostname and is_gitlab_site(parsed.hostname):
-        # Not sure if gitlab even support plain http?
-        if parsed.scheme in ("https", "http"):
-            return repo_url
-        if parsed.scheme == "ssh":
-            revised_url = urlunparse(
-                ("https", parsed.hostname, parsed.path, None, None, None)
-            )
-    if parsed.hostname in (
-        "code.launchpad.net",
-        "bazaar.launchpad.net",
-        "git.launchpad.net",
-    ):
-        if parsed.scheme.startswith("http") or parsed.scheme == "lp":
-            return repo_url
-        if parsed.scheme in ("ssh", "bzr+ssh"):
-            revised_url = urlunparse(
-                ("https", parsed.hostname, parsed.path, None, None, None)
-            )
-
-    if revised_url:
-        return revised_url
-
     return None
 
 

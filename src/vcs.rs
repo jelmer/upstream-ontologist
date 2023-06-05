@@ -725,3 +725,70 @@ pub fn browse_url_from_repo_url(
     }
     None
 }
+
+pub fn find_public_repo_url(repo_url: &str, net_access: Option<bool>) -> Option<String> {
+    use regex::Regex;
+    let parsed = match Url::parse(repo_url) {
+        Ok(parsed) => parsed,
+        Err(_) => {
+            if repo_url.contains(':') {
+                let re = Regex::new(r"^(?P<user>[^@:/]+@)?(?P<host>[^/:]+):(?P<path>.*)$").unwrap();
+                if let Some(captures) = re.captures(repo_url) {
+                    let host = captures.name("host").unwrap().as_str();
+                    let path = captures.name("path").unwrap().as_str();
+                    if host == "github.com" || is_gitlab_site(host, net_access) {
+                        return Some(format!("https://{}/{}", host, path));
+                    }
+                }
+            }
+            return None;
+        }
+    };
+
+    let revised_url: Option<String>;
+    match parsed.host_str() {
+        Some("github.com") => {
+            if ["https", "http", "git"].contains(&parsed.scheme()) {
+                return Some(repo_url.to_string());
+            }
+            revised_url = Some(
+                Url::parse("https://github.com")
+                    .unwrap()
+                    .join(parsed.path())
+                    .unwrap()
+                    .to_string(),
+            );
+        }
+        Some(hostname) if is_gitlab_site(hostname, net_access) => {
+            if ["https", "http"].contains(&parsed.scheme()) {
+                return Some(repo_url.to_string());
+            }
+            if parsed.scheme() == "ssh" {
+                revised_url = Some(format!(
+                    "https://{}{}",
+                    parsed.host_str().unwrap(),
+                    parsed.path(),
+                ));
+            } else {
+                revised_url = None;
+            }
+        }
+        Some("code.launchpad.net") | Some("bazaar.launchpad.net") | Some("git.launchpad.net") => {
+            if parsed.scheme().starts_with("http") || parsed.scheme() == "lp" {
+                return Some(repo_url.to_string());
+            }
+            if ["ssh", "bzr+ssh"].contains(&parsed.scheme()) {
+                revised_url = Some(format!(
+                    "https://{}{}",
+                    parsed.host_str().unwrap(),
+                    parsed.path()
+                ));
+            } else {
+                revised_url = None;
+            }
+        }
+        _ => revised_url = None,
+    }
+
+    revised_url
+}
