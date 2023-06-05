@@ -25,6 +25,7 @@ __all__ = [
     "guess_repo_from_url",
     "probe_upstream_branch_url",
     "check_repository_url_canonical",
+    "unsplit_vcs_url",
 ]
 
 import logging
@@ -35,6 +36,7 @@ from urllib.parse import urlparse, urlunparse, ParseResult
 
 from ._upstream_ontologist import (  # noqa: F401
     drop_vcs_in_scheme,
+    canonical_git_repo_url,
     unsplit_vcs_url,
     plausible_vcs_browse_url as plausible_browse_url,
     plausible_vcs_url as plausible_url,
@@ -212,15 +214,6 @@ def find_secure_repo_url(
 
     # Can't find a secure URI :(
     return None
-
-
-def canonical_git_repo_url(repo_url: str) -> str:
-    parsed_url = urlparse(repo_url)
-    if is_gitlab_site(parsed_url.netloc) or parsed_url.netloc in ["github.com"]:
-        if not parsed_url.path.rstrip("/").endswith(".git"):
-            parsed_url = parsed_url._replace(path=parsed_url.path.rstrip("/") + ".git")
-        return urlunparse(parsed_url)
-    return repo_url
 
 
 def find_public_repo_url(repo_url: str) -> Optional[str]:

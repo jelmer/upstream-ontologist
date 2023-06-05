@@ -583,3 +583,16 @@ pub fn guess_repo_from_url(url: &url::Url, net_access: Option<bool>) -> Option<S
         }
     }
 }
+
+pub fn canonical_git_repo_url(repo_url: &Url, net_access: Option<bool>) -> Url {
+    if let Some(hostname) = repo_url.host_str() {
+        if (is_gitlab_site(hostname, net_access) || hostname == "github.com")
+            && !repo_url.path().ends_with(".git")
+        {
+            let mut url = repo_url.clone();
+            url.set_path(&(url.path().to_owned() + ".git"));
+            return url;
+        }
+    }
+    repo_url.clone()
+}
