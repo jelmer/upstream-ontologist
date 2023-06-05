@@ -596,3 +596,132 @@ pub fn canonical_git_repo_url(repo_url: &Url, net_access: Option<bool>) -> Url {
     }
     repo_url.clone()
 }
+
+pub fn browse_url_from_repo_url(
+    url: &str,
+    branch: Option<&str>,
+    subpath: Option<&str>,
+    net_access: Option<bool>,
+) -> Option<String> {
+    if let Ok(parsed_url) = Url::parse(url) {
+        if parsed_url.host_str() == Some("github.com") {
+            let mut path = parsed_url
+                .path_segments()
+                .unwrap()
+                .take(3)
+                .collect::<Vec<&str>>()
+                .join("/");
+            if path.ends_with(".git") {
+                path = path[..path.len() - 4].to_string();
+            }
+            if subpath.is_some() || branch.is_some() {
+                path.push_str(&format!("/tree/{}", branch.unwrap_or("HEAD")));
+            }
+            if let Some(subpath_str) = subpath {
+                path.push_str(&format!("/{}", subpath_str));
+            }
+            return Some(
+                Url::parse("https://github.com")
+                    .unwrap()
+                    .join(&path)
+                    .unwrap()
+                    .to_string(),
+            );
+        } else if parsed_url.host_str() == Some("gopkg.in") {
+            let mut els = parsed_url
+                .path_segments()
+                .unwrap()
+                .take(3)
+                .collect::<Vec<&str>>();
+            if els.len() != 2 {
+                return None;
+            }
+            if let Some(version) = els[2].strip_prefix(".v") {
+                els[2] = "";
+                let mut path = els.join("/");
+                path.push_str(&format!("/tree/{}", version));
+                if let Some(subpath_str) = subpath {
+                    path.push_str(&format!("/{}", subpath_str));
+                }
+                return Some(
+                    Url::parse("https://github.com")
+                        .unwrap()
+                        .join(&path)
+                        .unwrap()
+                        .to_string(),
+                );
+            }
+        } else if parsed_url.host_str() == Some("code.launchpad.net")
+            || parsed_url.host_str() == Some("launchpad.net")
+        {
+            let mut path = parsed_url.path().to_string();
+            if let Some(subpath_str) = subpath {
+                path.push_str(&format!("/view/head:{}", subpath_str));
+                return Some(
+                    Url::parse(format!("https://bazaar.launchpad.net{}", path).as_str())
+                        .unwrap()
+                        .to_string(),
+                );
+            } else {
+                return Some(
+                    Url::parse(format!("https://code.launchpad.net{}", path).as_str())
+                        .unwrap()
+                        .to_string(),
+                );
+            }
+        } else if parsed_url.host_str() == Some("svn.apache.org") {
+            let path_elements = parsed_url
+                .path_segments()
+                .map(|segments| segments.into_iter().collect::<Vec<&str>>())
+                .unwrap_or_else(Vec::new);
+            if path_elements.len() >= 2 && path_elements[0] == "repos" && path_elements[1] == "asf"
+            {
+                let mut path_elements = path_elements.into_iter().skip(1).collect::<Vec<&str>>();
+                path_elements[0] = "viewvc";
+                if let Some(subpath_str) = subpath {
+                    path_elements.push(subpath_str);
+                }
+                return Some(
+                    Url::parse(
+                        format!("https://svn.apache.org{}", path_elements.join("/")).as_str(),
+                    )
+                    .unwrap()
+                    .to_string(),
+                );
+            }
+        } else if parsed_url.host_str() == Some("git.savannah.gnu.org")
+            || parsed_url.host_str() == Some("git.sv.gnu.org")
+        {
+            let mut path_elements = parsed_url.path_segments().unwrap().collect::<Vec<&str>>();
+            if parsed_url.scheme() == "https" && path_elements.first() == Some(&"git") {
+                path_elements.remove(0);
+            }
+            path_elements.insert(0, "cgit");
+            if let Some(subpath_str) = subpath {
+                path_elements.push("tree");
+                path_elements.push(subpath_str);
+            }
+            return Some(
+                Url::parse(
+                    format!("https://git.savannah.gnu.org{}", path_elements.join("/")).as_str(),
+                )
+                .unwrap()
+                .to_string(),
+            );
+        } else if is_gitlab_site(parsed_url.host_str().unwrap(), net_access) {
+            let mut path = parsed_url.path().to_string();
+            if path.ends_with(".git") {
+                path = path[..path.len() - 4].to_string();
+            }
+            if let Some(subpath_str) = subpath {
+                path.push_str(&format!("/-/blob/HEAD/{}", subpath_str));
+            }
+            return Some(
+                Url::parse(format!("https://{}{}", parsed_url.host_str().unwrap(), path).as_str())
+                    .unwrap()
+                    .to_string(),
+            );
+        }
+    }
+    None
+}

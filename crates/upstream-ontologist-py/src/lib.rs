@@ -634,6 +634,16 @@ fn guess_from_launchpad(
 }
 
 #[pyfunction]
+fn browse_url_from_repo_url(
+    url: &str,
+    branch: Option<&str>,
+    subpath: Option<&str>,
+    net_access: Option<bool>,
+) -> Option<String> {
+    upstream_ontologist::vcs::browse_url_from_repo_url(url, branch, subpath, net_access)
+}
+
+#[pyfunction]
 fn canonical_git_repo_url(url: &str, net_access: Option<bool>) -> PyResult<String> {
     let url =
         Url::parse(url).map_err(|e| PyRuntimeError::new_err(format!("Invalid URL: {}", e)))?;
@@ -689,6 +699,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_gemspec))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_launchpad))?;
     m.add_wrapped(wrap_pyfunction!(canonical_git_repo_url))?;
+    m.add_wrapped(wrap_pyfunction!(browse_url_from_repo_url))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;

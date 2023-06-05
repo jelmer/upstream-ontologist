@@ -26,6 +26,7 @@ __all__ = [
     "probe_upstream_branch_url",
     "check_repository_url_canonical",
     "unsplit_vcs_url",
+    "browse_url_from_repo_url",
 ]
 
 import logging
@@ -45,6 +46,7 @@ from ._upstream_ontologist import (  # noqa: F401
     guess_repo_from_url,
     is_gitlab_site,
     probe_gitlab_host,
+    browse_url_from_repo_url,
 )
 
 
@@ -56,93 +58,6 @@ KNOWN_GITLAB_SITES = [
 
 
 logger = logging.getLogger(__name__)
-
-
-def browse_url_from_repo_url(  # noqa: C901
-        url: str, *, branch: Optional[str] = None,
-        subpath: Optional[str] = None) -> Optional[str]:
-    if isinstance(url, list):
-        return None
-    parsed_url = urlparse(url)
-    if parsed_url.netloc == "github.com":
-        path = "/".join(parsed_url.path.split("/")[:3])
-        if path.endswith(".git"):
-            path = path[:-4]
-        if subpath is not None or branch is not None:
-            path += "/tree/%s" % (branch or "HEAD")
-        if subpath is not None:
-            path += "/" + subpath
-        return urlunparse(("https", "github.com", path, None, None, None))
-    elif parsed_url.hostname == 'gopkg.in':
-        els = parsed_url.path.split("/")[:3]
-        if len(els) != 2:
-            return None
-        try:
-            els[-1], version = els[-1].split('.v', 1)
-        except ValueError:
-            els[-1] = els[-1]
-            version = "HEAD"
-        els.extend(['tree', version])
-        path = "/".join(els)
-        if subpath is not None:
-            path += "/" + subpath
-        return urlunparse(("https", "github.com", path, None, None, None))
-    elif parsed_url.netloc in ("code.launchpad.net", "launchpad.net"):
-        if subpath is not None:
-            path = parsed_url.path + "/view/head:/" + subpath
-            return urlunparse(
-                (
-                    "https",
-                    "bazaar.launchpad.net",
-                    path,
-                    parsed_url.query,
-                    parsed_url.params,
-                    parsed_url.fragment,
-                )
-            )
-        else:
-            return urlunparse(
-                (
-                    "https",
-                    "code.launchpad.net",
-                    parsed_url.path,
-                    parsed_url.query,
-                    parsed_url.params,
-                    parsed_url.fragment,
-                )
-            )
-    elif parsed_url.netloc == "svn.apache.org":
-        path_elements = parsed_url.path.strip("/").split("/")
-        if path_elements[:2] != ["repos", "asf"]:
-            return None
-        path_elements.pop(0)
-        path_elements[0] = "viewvc"
-        if subpath is not None:
-            path_elements.append(subpath)
-        return urlunparse(
-            ("https", parsed_url.netloc, "/".join(path_elements), None, None, None)
-        )
-    elif parsed_url.hostname in ("git.savannah.gnu.org", "git.sv.gnu.org"):
-        path_elements = parsed_url.path.strip("/").split("/")
-        if parsed_url.scheme == "https" and path_elements[0] == "git":
-            path_elements.pop(0)
-        # Why cgit and not gitweb?
-        path_elements.insert(0, "cgit")
-        if subpath is not None:
-            path_elements.append("tree")
-            path_elements.append(subpath)
-        return urlunparse(
-            ("https", parsed_url.netloc, "/".join(path_elements), None, None, None)
-        )
-    elif is_gitlab_site(parsed_url.netloc):
-        path = parsed_url.path
-        if path.endswith(".git"):
-            path = path[:-4]
-        if subpath is not None:
-            path += "/-/blob/HEAD/" + subpath
-        return urlunparse(("https", parsed_url.netloc, path, None, None, None))
-
-    return None
 
 
 SECURE_SCHEMES = ["https", "git+ssh", "bzr+ssh", "hg+ssh", "ssh", "svn+ssh"]
