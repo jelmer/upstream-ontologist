@@ -1072,68 +1072,9 @@ guess_from_metainfo = _upstream_ontologist.guess_from_metainfo
 guess_from_doap = _upstream_ontologist.guess_from_doap
 guess_from_opam = _upstream_ontologist.guess_from_opam
 guess_from_nuspec = _upstream_ontologist.guess_from_nuspec
-
 guess_from_cabal = _upstream_ontologist.guess_from_cabal
 guess_from_cabal_lines = _upstream_ontologist.guess_from_cabal_lines
-
-
-def is_email_address(value: str) -> bool:
-    return '@' in value or ' (at) ' in value
-
-
-def guess_from_configure(path, trust_package=False):
-    if os.path.isdir(path):
-        return
-    with open(path, 'rb') as f:
-        for line in f:
-            if b'=' not in line:
-                continue
-            (key, value) = line.strip().split(b'=', 1)
-            if b' ' in key:
-                continue
-            if b'$' in value:
-                continue
-            value = value.strip()
-            if value.startswith(b"'") and value.endswith(b"'"):
-                value = value[1:-1]
-            if not value:
-                continue
-            if key == b'PACKAGE_NAME':
-                yield UpstreamDatum(
-                    'Name', value.decode(), 'certain', './configure')
-            elif key == b'PACKAGE_TARNAME':
-                yield UpstreamDatum(
-                    'Name', value.decode(), 'certain', './configure')
-            elif key == b'PACKAGE_VERSION':
-                yield UpstreamDatum(
-                    'Version', value.decode(), 'certain', './configure')
-            elif key == b'PACKAGE_BUGREPORT':
-                if value in (b'BUG-REPORT-ADDRESS', ):
-                    certainty = 'invalid'
-                elif is_email_address(value.decode()):
-                    # Downgrade the trustworthiness of this field for most
-                    # upstreams if it contains an e-mail address. Most
-                    # upstreams seem to just set this to some random address,
-                    # and then forget about it.
-                    certainty = 'possible'
-                elif b'mailing list' in value:
-                    # Downgrade the trustworthiness of this field if
-                    # it contains a mailing list
-                    certainty = 'possible'
-                else:
-                    parsed_url = urlparse(value.decode())
-                    if parsed_url.path.strip('/'):
-                        certainty = 'certain'
-                    else:
-                        # It seems unlikely that the bug submit URL lives at
-                        # the root.
-                        certainty = 'possible'
-                if certainty != 'invalid':
-                    yield UpstreamDatum(
-                        'Bug-Submit', value.decode(), certainty, './configure')
-            elif key == b'PACKAGE_URL':
-                yield UpstreamDatum(
-                    'Homepage', value.decode(), 'certain', './configure')
+guess_from_configure = _upstream_ontologist.guess_from_configure
 
 
 def guess_from_r_description(path, trust_package: bool = False):  # noqa: C901

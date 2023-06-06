@@ -657,6 +657,15 @@ fn find_public_repo_url(url: &str, net_access: Option<bool>) -> PyResult<Option<
     ))
 }
 
+#[pyfunction]
+fn guess_from_configure(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
+    let ret = upstream_ontologist::guess_from_configure(path.as_path(), trust_package);
+
+    ret.into_iter()
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
+        .collect::<PyResult<Vec<PyObject>>>()
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -708,6 +717,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(canonical_git_repo_url))?;
     m.add_wrapped(wrap_pyfunction!(browse_url_from_repo_url))?;
     m.add_wrapped(wrap_pyfunction!(find_public_repo_url))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_configure))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;
