@@ -1,6 +1,7 @@
 use crate::with_path_segments;
 use log::{debug, warn};
 use pyo3::prelude::*;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use url::Url;
 

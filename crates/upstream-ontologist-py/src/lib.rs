@@ -58,6 +58,8 @@ fn upstream_datum_to_py(
             upstream_ontologist::UpstreamDatum::Copyright(c) => c.into_py(py),
             upstream_ontologist::UpstreamDatum::Documentation(a) => a.into_py(py),
             upstream_ontologist::UpstreamDatum::GoImportPath(ip) => ip.into_py(py),
+            upstream_ontologist::UpstreamDatum::Archive(a) => a.into_py(py),
+            upstream_ontologist::UpstreamDatum::Demo(d) => d.into_py(py),
             upstream_ontologist::UpstreamDatum::Maintainer(m) => {
                 PersonCls.call1((m.name, m.email, m.url))?.into_py(py)
             }
@@ -675,6 +677,19 @@ fn parse_python_url(py: Python, url: &str) -> PyResult<Vec<PyObject>> {
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
+#[pyfunction]
+pub fn guess_from_r_description(
+    py: Python,
+    path: PathBuf,
+    trust_package: bool,
+) -> PyResult<Vec<PyObject>> {
+    let ret = upstream_ontologist::guess_from_r_description(path.as_path(), trust_package);
+
+    ret.into_iter()
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
+        .collect::<PyResult<Vec<PyObject>>>()
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -728,6 +743,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(find_public_repo_url))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_configure))?;
     m.add_wrapped(wrap_pyfunction!(parse_python_url))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_r_description))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;

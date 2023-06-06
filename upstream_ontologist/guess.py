@@ -126,6 +126,7 @@ DATUM_TYPES = {
     'API-Documentation': str,
     'Funding': str,
     'GitHub-Project': str,
+    'Demo': str,
 
     # We should possibly hide these:
     'Debian-ITP': int,
@@ -1071,67 +1072,7 @@ guess_from_nuspec = _upstream_ontologist.guess_from_nuspec
 guess_from_cabal = _upstream_ontologist.guess_from_cabal
 guess_from_cabal_lines = _upstream_ontologist.guess_from_cabal_lines
 guess_from_configure = _upstream_ontologist.guess_from_configure
-
-
-def guess_from_r_description(path, trust_package: bool = False):  # noqa: C901
-    import textwrap
-    # See https://r-pkgs.org/description.html
-    with open(path, 'rb') as f:
-        # TODO(jelmer): use rfc822 instead?
-        from debian.deb822 import Deb822
-
-        description = Deb822(f)
-        if 'Package' in description:
-            yield UpstreamDatum('Name', description['Package'], 'certain')
-        if 'Repository' in description:
-            yield UpstreamDatum(
-                'Archive', description['Repository'], 'certain')
-        if 'BugReports' in description:
-            yield UpstreamDatum(
-                'Bug-Database', description['BugReports'], 'certain')
-        if description.get('Version'):
-            yield UpstreamDatum('Version', description['Version'], 'certain')
-        if 'License' in description:
-            yield UpstreamDatum('License', description['License'], 'certain')
-        if 'Title' in description:
-            yield UpstreamDatum('Summary', description['Title'], 'certain')
-        if 'Description' in description:
-            lines = description['Description'].splitlines(True)
-            if lines:
-                reflowed = lines[0] + textwrap.dedent(''.join(lines[1:]))
-                yield UpstreamDatum('Description', reflowed, 'certain')
-        if 'Maintainer' in description:
-            yield UpstreamDatum(
-                'Maintainer', Person.from_string(description['Maintainer']), 'certain')
-        if 'URL' in description:
-            entries = [entry.strip()
-                       for entry in re.split('[\n,]', description['URL'])]
-            urls = []
-            for entry in entries:
-                m = re.match('([^ ]+) \\((.*)\\)', entry)
-                if m:
-                    url = m.group(1)
-                    label = m.group(2)
-                else:
-                    url = entry
-                    label = None
-                urls.append((label, url))
-            if len(urls) == 1:
-                yield UpstreamDatum('Homepage', urls[0][1], 'possible')
-            for label, url in urls:
-                parsed_url = urlparse(url)
-                if parsed_url.hostname == 'bioconductor.org':
-                    yield UpstreamDatum('Archive', 'Bioconductor', 'confident')
-                if label and label.lower() in ('devel', 'repository'):
-                    yield UpstreamDatum('Repository', sanitize_vcs_url(url), 'certain')
-                elif label and label.lower() in ('homepage', ):
-                    yield UpstreamDatum('Homepage', url, 'certain')
-                else:
-                    repo_url = guess_repo_from_url(url)
-                    if repo_url:
-                        yield UpstreamDatum('Repository', sanitize_vcs_url(repo_url), 'certain')
-
-
+guess_from_r_description = _upstream_ontologist.guess_from_r_description
 guess_from_environment = _upstream_ontologist.guess_from_environment
 
 
