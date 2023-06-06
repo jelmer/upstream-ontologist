@@ -22,8 +22,8 @@ import os
 import re
 import socket
 import urllib.error
-from typing import Optional, Iterable, List, Iterator, Any, Dict, Tuple, cast, Callable, Type
-from urllib.parse import urlparse, urlunparse, urljoin
+from typing import Optional, Iterable, List, Iterator, Any, Dict, Tuple, cast, Callable
+from urllib.parse import urlparse
 from urllib.request import urlopen, Request
 
 from . import _upstream_ontologist
@@ -460,6 +460,7 @@ def guess_from_debian_changelog(path, trust_package):
 
 
 metadata_from_itp_bug_body = _upstream_ontologist.metadata_from_itp_bug_body
+extract_sf_project_name = _upstream_ontologist.extract_sf_project_name
 
 
 def guess_from_python_metadata(pkg_info):
@@ -1471,103 +1472,6 @@ def _possible_fields_missing(upstream_metadata, fields, field_certainty):
         return False
 
 
-def _sf_git_extract_url(page):
-    try:
-        from bs4 import BeautifulSoup, Tag
-    except ModuleNotFoundError:
-        logger.warning(
-            'Not scanning sourceforge page, since python3-bs4 is missing')
-        return None
-    bs = BeautifulSoup(page, features='lxml')
-    el = bs.find(id='access_url')
-    if el is None or not isinstance(el, Tag):
-        return None
-    value = el.get('value')
-    if value is None:
-        return None
-    access_command = value.split(' ')  # type: ignore
-    if access_command[:2] != ['git', 'clone']:
-        return None
-    return access_command[2]
-
-
-def guess_from_sf(sf_project: str, subproject: Optional[str] = None):  # noqa: C901
-    try:
-        data = get_sf_metadata(sf_project)
-    except (socket.timeout, TimeoutError):
-        logger.warning(
-            'timeout contacting sourceforge, ignoring: %s',
-            sf_project)
-        return
-    except urllib.error.URLError as e:
-        logger.warning(
-            'Unable to retrieve sourceforge project metadata: %s: %s',
-            sf_project, e)
-        return
-
-    if data.get('name'):
-        yield 'Name', data['name']
-    if data.get('external_homepage'):
-        yield 'Homepage', data['external_homepage']
-    if data.get('preferred_support_url'):
-        try:
-            canonical_url = check_bug_database_canonical(data['preferred_support_url'])
-        except UrlUnverifiable:
-            yield 'Bug-Database', data['preferred_support_url']
-        except InvalidUrl as e:
-            logger.debug(
-                'Ignoring invalid preferred_support_url %s: %s',
-                e.url, e.reason)
-        else:
-            yield 'Bug-Database', canonical_url
-    # In theory there are screenshots linked from the sourceforge project that
-    # we can use, but if there are multiple "subprojects" then it will be
-    # unclear which one they belong to.
-    # TODO(jelmer): What about cvs and bzr?
-    VCS_NAMES = ['hg', 'git', 'svn', 'cvs', 'bzr']
-    vcs_tools = [
-        (tool['name'], tool.get('mount_label'), tool['url'])
-        for tool in data.get('tools', []) if tool['name'] in VCS_NAMES]
-    if len(vcs_tools) > 1:
-        # Try to filter out some irrelevant stuff
-        vcs_tools = [tool for tool in vcs_tools
-                     if tool[2].strip('/').rsplit('/')[-1] not in ['www', 'homepage']]
-    if len(vcs_tools) > 1 and subproject:
-        new_vcs_tools = [
-            tool for tool in vcs_tools
-            if tool[1] == subproject]
-        if len(new_vcs_tools) > 0:
-            vcs_tools = new_vcs_tools
-    # if both vcs and another tool appear, then assume cvs is old.
-    if len(vcs_tools) > 1 and 'cvs' in [t[0] for t in vcs_tools]:
-        vcs_tools = [v for v in vcs_tools if v[0] != 'cvs']
-    if len(vcs_tools) == 1:
-        (kind, _label, url) = vcs_tools[0]
-        if kind == 'git':
-            url = urljoin('https://sourceforge.net/', url)
-            headers = {'User-Agent': USER_AGENT, 'Accept': 'text/html'}
-            with urlopen(
-                    Request(url, headers=headers),
-                    timeout=DEFAULT_URLLIB_TIMEOUT) as resp:
-                url = _sf_git_extract_url(resp.read())
-        elif kind == 'svn':
-            url = urljoin('https://svn.code.sf.net/', url)
-        elif kind == 'hg':
-            url = urljoin('https://hg.code.sf.net/', url)
-        elif kind == 'cvs':
-            url = 'cvs+pserver://anonymous@{}.cvs.sourceforge.net/cvsroot/{}'.format(
-                sf_project, url.strip('/').rsplit('/')[-2])
-        elif kind == 'bzr':
-            # TODO(jelmer)
-            url = None
-        else:
-            raise KeyError(kind)
-        if url is not None:
-            yield 'Repository', url
-    elif len(vcs_tools) > 1:
-        logger.warning('multiple possible VCS URLs found: %r', vcs_tools)
-
-
 def guess_from_repology(repology_project):
     try:
         metadata = get_repology_metadata(repology_project)
@@ -1657,82 +1561,6 @@ def guess_from_hackage(hackage_package):
         http_contents.decode('utf-8', 'surrogateescape').splitlines(True))
 
 
-class Forge:
-    """A Forge."""
-
-    name: str
-    repository_browse_can_be_homepage: bool = True
-
-    @classmethod
-    def extend_metadata(cls, metadata, project, max_certainty):
-        raise NotImplementedError(cls.extend_metadata)
-
-    @classmethod
-    def bug_database_url_from_bug_submit_url(cls, parsed_url):
-        raise NotImplementedError(cls.bug_database_url_from_bug_submit_url)
-
-    @classmethod
-    def check_bug_database_canonical(cls, parsed_url):
-        raise NotImplementedError(cls.check_bug_database_canonical)
-
-    @classmethod
-    def bug_submit_url_from_bug_database_url(cls, parsed_url):
-        raise NotImplementedError(cls.bug_submit_url_from_bug_database_url)
-
-    @classmethod
-    def check_bug_submit_url_canonical(cls, url):
-        raise NotImplementedError(cls.check_bug_submit_url_canonical)
-
-    @classmethod
-    def bug_database_from_issue_url(cls, parsed_url):
-        raise NotImplementedError(cls.bug_database_from_issue_url)
-
-    @classmethod
-    def repo_url_from_merge_request_url(cls, parsed_url):
-        raise NotImplementedError(cls.repo_url_from_merge_request_url)
-
-    @classmethod
-    def bug_database_url_from_repo_url(cls, parsed_url):
-        raise NotImplementedError(cls.bug_database_url_from_repo_url)
-
-
-class Launchpad(Forge):
-
-    name = 'Launchpad'
-
-    @classmethod
-    def bug_database_url_from_bug_submit_url(cls, parsed_url):
-        if parsed_url.netloc != 'bugs.launchpad.net':
-            return None
-        path_elements = parsed_url.path.strip('/').split('/')
-        if len(path_elements) >= 1:
-            return urlunparse(
-                parsed_url._replace(path='/%s' % path_elements[0]))
-        return None
-
-    @classmethod
-    def bug_submit_url_from_bug_database_url(cls, parsed_url):
-        if parsed_url.netloc != 'bugs.launchpad.net':
-            return None
-        path_elements = parsed_url.path.strip('/').split('/')
-        if len(path_elements) == 1:
-            return urlunparse(
-                parsed_url._replace(path=parsed_url.path + '/+filebug'))
-        return None
-
-
-def find_forge(parsed_url) -> Optional[Type[Forge]]:
-    if parsed_url.netloc == 'sourceforge.net':
-        return SourceForge
-    if parsed_url.netloc == 'github.com':
-        return GitHub()
-    if parsed_url.netloc.endswith('.launchpad.net'):
-        return Launchpad
-    if is_gitlab_site(parsed_url.netloc):
-        return GitLab()
-    return None
-
-
 class PackageRepository:
 
     name: str
@@ -1794,38 +1622,8 @@ class CratesIo(PackageRepository):
 
 GitHub = _upstream_ontologist.GitHub
 GitLab = _upstream_ontologist.GitLab
-
-
-class SourceForge(Forge):
-
-    name = 'SourceForge'
-
-    supported_fields = [
-        'Homepage', 'Name', 'Repository', 'Bug-Database']
-
-    @classmethod
-    def extend_metadata(cls, metadata, project, max_certainty):
-        if 'Name' in metadata:
-            subproject = metadata['Name'].value
-        else:
-            subproject = None
-
-        return extend_from_external_guesser(
-            metadata, max_certainty, cls.supported_fields,
-            guess_from_sf(project, subproject=subproject))
-
-    @classmethod
-    def bug_database_url_from_bug_submit_url(cls, url):
-        parsed_url = urlparse(url)
-        path_elements = parsed_url.path.strip('/').split('/')
-        if len(path_elements) < 3:
-            return None
-        if path_elements[0] != 'p' or path_elements[2] != 'bugs':
-            return None
-        if len(path_elements) > 3:
-            path_elements.pop(-1)
-        return urlunparse(
-            parsed_url._replace(path='/'.join(path_elements)))
+SourceForge = _upstream_ontologist.SourceForge
+Launchpad = _upstream_ontologist.Launchpad
 
 
 class Pecl(PackageRepository):
@@ -1897,87 +1695,14 @@ class Gobo(ThirdPartyRepository):
         return guess_from_gobo(name)
 
 
-def extract_sf_project_name(url):
-    if isinstance(url, list):
-        return None
-    m = re.match('https?://sourceforge.net/(projects|p)/([^/]+)', url)
-    if m:
-        return m.group(2)
-    m = re.fullmatch('https?://(.*).(sf|sourceforge).(net|io)/.*', url)
-    if m:
-        return m.group(1)
-
-
-def repo_url_from_merge_request_url(url):
-    parsed_url = urlparse(url)
-    forge = find_forge(parsed_url)
-    if forge:
-        try:
-            return forge.repo_url_from_merge_request_url(url)
-        except NotImplementedError:
-            return None
-    return None
-
-
-def bug_database_from_issue_url(url):
-    parsed_url = urlparse(url)
-    forge = find_forge(parsed_url)
-    if forge:
-        try:
-            return forge.bug_database_from_issue_url(url)
-        except NotImplementedError:
-            return None
-
-
-def guess_bug_database_url_from_repo_url(url):
-    parsed_url = urlparse(url)
-    forge = find_forge(parsed_url)
-    if forge:
-        return forge.bug_database_url_from_repo_url(url)
-    return None
-
-
-def bug_database_url_from_bug_submit_url(url):
-    parsed_url = urlparse(url)
-    forge = find_forge(parsed_url)
-    if forge:
-        return forge.bug_database_url_from_bug_submit_url(url)
-    return None
-
-
-def bug_submit_url_from_bug_database_url(url):
-    parsed_url = urlparse(url)
-    forge = find_forge(parsed_url)
-    if forge:
-        try:
-            return forge.bug_submit_url_from_bug_database_url(url)
-        except NotImplementedError:
-            return None
-    return None
-
-
-def check_bug_database_canonical(url: str) -> str:
-    parsed_url = urlparse(url)
-    forge = find_forge(parsed_url)
-    if forge:
-        try:
-            forge.check_bug_database_canonical(parsed_url)
-        except NotImplementedError:
-            raise UrlUnverifiable(
-                url, "forge does not support verifying bug database URL")
-    raise UrlUnverifiable(url, "unsupported forge")
-
-
-def check_bug_submit_url_canonical(url: str) -> str:
-    parsed_url = urlparse(url)
-    forge = find_forge(parsed_url)
-    if forge:
-        try:
-            return forge.check_bug_submit_url_canonical(parsed_url)
-        except NotImplementedError:
-            raise UrlUnverifiable(
-                url, "forge does not support verifying bug submit URL")
-    raise UrlUnverifiable(url, "unsupported forge")
+find_forge = _upstream_ontologist.find_forge
+repo_url_from_merge_request_url = _upstream_ontologist.repo_url_from_merge_request_url
+bug_database_from_issue_url = _upstream_ontologist.bug_database_from_issue_url
+guess_bug_database_url_from_repo_url = _upstream_ontologist.guess_bug_database_url_from_repo_url
+bug_database_url_from_bug_submit_url = _upstream_ontologist.bug_database_url_from_bug_submit_url
+bug_submit_url_from_bug_database_url = _upstream_ontologist.bug_submit_url_from_bug_database_url
+check_bug_database_canonical = _upstream_ontologist.check_bug_database_canonical
+check_bug_submit_url_canonical = _upstream_ontologist.check_bug_submit_url_canonical
 
 
 def _extrapolate_repository_from_homepage(upstream_metadata, net_access):
@@ -2113,11 +1838,10 @@ def _extrapolate_contact_from_maintainer(upstream_metadata, net_access):
 def _extrapolate_homepage_from_repository_browse(
         upstream_metadata, net_access):
     browse_url = upstream_metadata['Repository-Browse'].value
-    parsed = urlparse(browse_url)
     # Some hosting sites are commonly used as Homepage
     # TODO(jelmer): Maybe check that there is a README file that
     # can serve as index?
-    forge = find_forge(parsed)
+    forge = find_forge(browse_url)
     if forge and forge.repository_browse_can_be_homepage:
         yield UpstreamDatum('Homepage', browse_url, 'possible')
 

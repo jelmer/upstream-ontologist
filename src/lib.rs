@@ -18,7 +18,7 @@ const DEFAULT_URLLIB_TIMEOUT: u64 = 3;
 
 pub mod vcs;
 
-#[derive(Debug, Ord, Eq, PartialOrd, PartialEq)]
+#[derive(Clone, Copy, Debug, Ord, Eq, PartialOrd, PartialEq)]
 pub enum Certainty {
     Certain,
     Confident,
@@ -49,7 +49,7 @@ impl ToString for Certainty {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Debug)]
 pub struct Person {
     pub name: Option<String>,
     pub email: Option<String>,
@@ -130,6 +130,7 @@ impl FromPyObject<'_> for Person {
     }
 }
 
+#[derive(Clone, Debug)]
 pub enum UpstreamDatum {
     Name(String),
     Homepage(String),
@@ -159,6 +160,7 @@ pub enum UpstreamDatum {
     Demo(String),
 }
 
+#[derive(Clone)]
 pub struct UpstreamDatumWithMetadata {
     pub datum: UpstreamDatum,
     pub origin: Option<String>,
@@ -1656,19 +1658,47 @@ pub trait Forge: Send + Sync {
 
     fn name(&self) -> &'static str;
 
-    fn bug_database_url_from_bug_submit_url(&self, url: &Url) -> Option<Url>;
+    fn bug_database_url_from_bug_submit_url(&self, url: &Url) -> Option<Url> {
+        None
+    }
 
-    fn bug_submit_url_from_bug_database_url(&self, url: &Url) -> Option<Url>;
+    fn bug_submit_url_from_bug_database_url(&self, url: &Url) -> Option<Url> {
+        None
+    }
 
-    fn check_bug_database_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError>;
+    fn check_bug_database_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError> {
+        Err(CanonicalizeError::Unverifiable(
+            url.clone(),
+            "Not implemented".to_string(),
+        ))
+    }
 
-    fn check_bug_submit_url_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError>;
+    fn check_bug_submit_url_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError> {
+        Err(CanonicalizeError::Unverifiable(
+            url.clone(),
+            "Not implemented".to_string(),
+        ))
+    }
 
-    fn bug_database_from_issue_url(&self, url: &Url) -> Option<Url>;
+    fn bug_database_from_issue_url(&self, url: &Url) -> Option<Url> {
+        None
+    }
 
-    fn bug_database_url_from_repo_url(&self, url: &Url) -> Option<Url>;
+    fn bug_database_url_from_repo_url(&self, url: &Url) -> Option<Url> {
+        None
+    }
 
-    fn repo_url_from_merge_request_url(&self, url: &Url) -> Option<Url>;
+    fn repo_url_from_merge_request_url(&self, url: &Url) -> Option<Url> {
+        None
+    }
+
+    fn extend_metadata(
+        &self,
+        metadata: &mut Vec<UpstreamDatumWithMetadata>,
+        project: &str,
+        max_certainty: Certainty,
+    ) {
+    }
 }
 
 pub struct GitHub;
@@ -4002,6 +4032,434 @@ pub fn guess_from_r_description(
     }
 
     results
+}
+
+fn find_datum<'a>(
+    metadata: &'a [UpstreamDatumWithMetadata],
+    field: &str,
+) -> Option<&'a UpstreamDatumWithMetadata> {
+    metadata.iter().find(|d| d.datum.field() == field)
+}
+
+fn set_datum(metadata: &mut Vec<UpstreamDatumWithMetadata>, datum: UpstreamDatumWithMetadata) {
+    if let Some(idx) = metadata
+        .iter()
+        .position(|d| d.datum.field() == datum.datum.field())
+    {
+        metadata[idx] = datum;
+    } else {
+        metadata.push(datum);
+    }
+}
+
+fn update_from_guesses(
+    metadata: &mut Vec<UpstreamDatumWithMetadata>,
+    new_items: Vec<UpstreamDatumWithMetadata>,
+) -> Vec<UpstreamDatumWithMetadata> {
+    let mut changed = vec![];
+    for datum in new_items {
+        let current_datum = find_datum(metadata, datum.datum.field());
+        if current_datum.is_none() || datum.certainty < current_datum.unwrap().certainty {
+            changed.push(datum.clone());
+            set_datum(metadata, datum);
+        }
+    }
+    changed
+}
+
+fn possible_fields_missing(
+    upstream_metadata: &[UpstreamDatumWithMetadata],
+    fields: &[&str],
+    field_certainty: Certainty,
+) -> bool {
+    for field in fields {
+        match find_datum(upstream_metadata, field) {
+            Some(datum) if datum.certainty != Some(Certainty::Certain) => return true,
+            _ => return true,
+        }
+    }
+    false
+}
+
+fn extend_from_external_guesser(
+    metadata: &mut Vec<UpstreamDatumWithMetadata>,
+    max_certainty: Certainty,
+    supported_fields: &[&str],
+    new_items: impl Fn() -> Vec<UpstreamDatum>,
+) {
+    if !possible_fields_missing(metadata, supported_fields, max_certainty) {
+        return;
+    }
+
+    let new_items = new_items()
+        .into_iter()
+        .map(|item| UpstreamDatumWithMetadata {
+            datum: item,
+            certainty: Some(max_certainty),
+            origin: None,
+        })
+        .collect();
+
+    update_from_guesses(metadata, new_items);
+}
+
+pub struct SourceForge;
+
+impl SourceForge {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Forge for SourceForge {
+    fn name(&self) -> &'static str {
+        "SourceForge"
+    }
+    fn repository_browse_can_be_homepage(&self) -> bool {
+        false
+    }
+
+    fn bug_database_url_from_bug_submit_url(&self, url: &Url) -> Option<Url> {
+        let mut segments = url.path_segments()?;
+        if segments.next() != Some("p") {
+            return None;
+        }
+        let project = segments.next()?;
+        if segments.next() != Some("bugs") {
+            return None;
+        }
+        with_path_segments(&url, &["p", project, "bugs"]).ok()
+    }
+
+    fn extend_metadata(
+        &self,
+        metadata: &mut Vec<UpstreamDatumWithMetadata>,
+        project: &str,
+        max_certainty: Certainty,
+    ) {
+        let subproject = find_datum(metadata, "Name").map_or(None, |f| match f.datum {
+            UpstreamDatum::Name(ref name) => Some(name.to_string()),
+            _ => None,
+        });
+
+        extend_from_external_guesser(
+            metadata,
+            max_certainty,
+            &["Homepage", "Name", "Repository", "Bug-Database"],
+            || guess_from_sf(project, subproject.as_deref()),
+        )
+    }
+}
+
+pub struct Launchpad;
+
+impl Launchpad {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Forge for Launchpad {
+    fn name(&self) -> &'static str {
+        "launchpad"
+    }
+
+    fn repository_browse_can_be_homepage(&self) -> bool {
+        false
+    }
+    fn bug_database_url_from_bug_submit_url(&self, url: &Url) -> Option<Url> {
+        if url.host_str()? != "bugs.launchpad.net" {
+            return None;
+        }
+
+        let mut segments = url.path_segments()?;
+        let project = segments.next()?;
+
+        with_path_segments(&url, &[project]).ok()
+    }
+
+    fn bug_submit_url_from_bug_database_url(&self, url: &Url) -> Option<Url> {
+        if url.host_str()? != "bugs.launchpad.net" {
+            return None;
+        }
+
+        let mut segments = url.path_segments()?;
+        let project = segments.next()?;
+
+        with_path_segments(&url, &[project, "+filebug"]).ok()
+    }
+}
+
+pub fn find_forge(url: &Url, net_access: Option<bool>) -> Option<Box<dyn Forge>> {
+    if url.host_str()? == "sourceforge.net" {
+        return Some(Box::new(SourceForge::new()));
+    }
+
+    if url.host_str()?.ends_with(".launchpad.net") {
+        return Some(Box::new(Launchpad::new()));
+    }
+
+    if url.host_str()? == "github.com" {
+        return Some(Box::new(GitHub::new()));
+    }
+
+    if vcs::is_gitlab_site(url.host_str()?, net_access) {
+        return Some(Box::new(GitLab::new()));
+    }
+
+    None
+}
+
+pub fn check_bug_database_canonical(
+    url: &Url,
+    net_access: Option<bool>,
+) -> Result<Url, CanonicalizeError> {
+    if let Some(forge) = find_forge(url, net_access) {
+        forge
+            .bug_database_url_from_bug_submit_url(url)
+            .ok_or(CanonicalizeError::Unverifiable(
+                url.clone(),
+                "no bug database URL found".to_string(),
+            ))
+    } else {
+        Err(CanonicalizeError::Unverifiable(
+            url.clone(),
+            "unknown forge".to_string(),
+        ))
+    }
+}
+
+pub fn bug_submit_url_from_bug_database_url(url: &Url, net_access: Option<bool>) -> Option<Url> {
+    if let Some(forge) = find_forge(url, net_access) {
+        forge.bug_submit_url_from_bug_database_url(url)
+    } else {
+        None
+    }
+}
+
+pub fn bug_database_url_from_bug_submit_url(url: &Url, net_access: Option<bool>) -> Option<Url> {
+    if let Some(forge) = find_forge(url, net_access) {
+        forge.bug_database_url_from_bug_submit_url(url)
+    } else {
+        None
+    }
+}
+
+pub fn guess_bug_database_url_from_repo_url(url: &Url, net_access: Option<bool>) -> Option<Url> {
+    if let Some(forge) = find_forge(url, net_access) {
+        forge.bug_database_url_from_repo_url(url)
+    } else {
+        None
+    }
+}
+
+pub fn repo_url_from_merge_request_url(url: &Url, net_access: Option<bool>) -> Option<Url> {
+    if let Some(forge) = find_forge(url, net_access) {
+        forge.repo_url_from_merge_request_url(url)
+    } else {
+        None
+    }
+}
+
+pub fn bug_database_from_issue_url(url: &Url, net_access: Option<bool>) -> Option<Url> {
+    if let Some(forge) = find_forge(url, net_access) {
+        forge.bug_database_from_issue_url(url)
+    } else {
+        None
+    }
+}
+
+pub fn check_bug_submit_url_canonical(
+    url: &Url,
+    net_access: Option<bool>,
+) -> Result<Url, CanonicalizeError> {
+    if let Some(forge) = find_forge(url, net_access) {
+        forge
+            .bug_submit_url_from_bug_database_url(url)
+            .ok_or(CanonicalizeError::Unverifiable(
+                url.clone(),
+                "no bug submit URL found".to_string(),
+            ))
+    } else {
+        Err(CanonicalizeError::Unverifiable(
+            url.clone(),
+            "unknown forge".to_string(),
+        ))
+    }
+}
+
+fn sf_git_extract_url(page: &str) -> Option<String> {
+    use select::document::Document;
+    use select::predicate::Attr;
+
+    let soup = Document::from(page);
+
+    let el = soup.find(Attr("id", "access_url")).next();
+    if el.is_none() {
+        return None;
+    }
+
+    let el = el.unwrap();
+    if el.attr("value").is_none() {
+        return None;
+    }
+
+    let value = el.attr("value").unwrap();
+    let access_command: Vec<&str> = value.split(' ').collect();
+    if access_command.len() < 3 || access_command[..2] != ["git", "clone"] {
+        return None;
+    }
+
+    Some(access_command[2].to_string())
+}
+
+fn get_sf_metadata(project: &str) -> Option<serde_json::Value> {
+    let url = format!("https://sourceforge.net/rest/p/{}", project);
+    match load_json_url(&Url::parse(url.as_str()).unwrap(), None) {
+        Ok(data) => Some(data),
+        Err(HTTPJSONError::Error { status, .. }) if status == reqwest::StatusCode::NOT_FOUND => {
+            None
+        }
+        r => panic!("Unexpected result from {}: {:?}", url, r),
+    }
+}
+
+fn guess_from_sf(sf_project: &str, subproject: Option<&str>) -> Vec<UpstreamDatum> {
+    let mut results = Vec::new();
+    match get_sf_metadata(sf_project) {
+        Some(data) => {
+            if let Some(name) = data.get("name") {
+                results.push(UpstreamDatum::Name(name.to_string()));
+            }
+            if let Some(external_homepage) = data.get("external_homepage") {
+                results.push(UpstreamDatum::Homepage(external_homepage.to_string()));
+            }
+            if let Some(preferred_support_url) = data.get("preferred_support_url") {
+                let preferred_support_url = Url::parse(preferred_support_url.as_str().unwrap())
+                    .expect("preferred_support_url is not a valid URL");
+                match check_bug_database_canonical(&preferred_support_url, Some(true)) {
+                    Ok(canonical_url) => {
+                        results.push(UpstreamDatum::BugDatabase(canonical_url.to_string()));
+                    }
+                    Err(_) => {
+                        results.push(UpstreamDatum::BugDatabase(
+                            preferred_support_url.to_string(),
+                        ));
+                    }
+                }
+            }
+
+            let vcs_names = ["hg", "git", "svn", "cvs", "bzr"];
+            let mut vcs_tools: Vec<(&str, Option<&str>, &str)> =
+                data.get("tools").map_or_else(Vec::new, |tools| {
+                    tools
+                        .as_array()
+                        .unwrap()
+                        .into_iter()
+                        .filter(|tool| {
+                            vcs_names.contains(&tool.get("name").unwrap().as_str().unwrap())
+                        })
+                        .map(|tool| {
+                            (
+                                tool.get("name").map_or("", |n| n.as_str().unwrap()),
+                                tool.get("mount_label").map(|l| l.as_str().unwrap()),
+                                tool.get("url").map_or("", |u| u.as_str().unwrap()),
+                            )
+                        })
+                        .collect::<Vec<(&str, Option<&str>, &str)>>()
+                });
+
+            if vcs_tools.len() > 1 {
+                vcs_tools.retain(|tool| {
+                    if let Some(url) = tool.2.strip_suffix("/") {
+                        !["www", "homepage"].contains(&url.rsplit('/').next().unwrap_or(""))
+                    } else {
+                        true
+                    }
+                });
+            }
+
+            if vcs_tools.len() > 1 && subproject.is_some() {
+                let new_vcs_tools: Vec<(&str, Option<&str>, &str)> = vcs_tools
+                    .iter()
+                    .filter(|tool| tool.1 == subproject)
+                    .cloned()
+                    .collect();
+                if !new_vcs_tools.is_empty() {
+                    vcs_tools = new_vcs_tools;
+                }
+            }
+
+            if vcs_tools.iter().any(|tool| tool.0 == "cvs") {
+                vcs_tools.retain(|tool| tool.0 != "cvs");
+            }
+
+            if vcs_tools.len() == 1 {
+                let (kind, _, url) = vcs_tools[0];
+                match kind {
+                    "git" => {
+                        let mut url = format!("https://sourceforge.net/{}", url);
+                        let client = reqwest::blocking::Client::new();
+                        let mut response = client
+                            .head(&url)
+                            .header("User-Agent", USER_AGENT)
+                            .send()
+                            .unwrap();
+                        let url = sf_git_extract_url(&response.text().unwrap());
+                        if let Some(url) = url {
+                            results.push(UpstreamDatum::Repository(url));
+                        }
+                    }
+                    "svn" => {
+                        let url = format!("https://svn.code.sf.net/{}", url);
+                        results.push(UpstreamDatum::Repository(url));
+                    }
+                    "hg" => {
+                        let url = format!("https://hg.code.sf.net/{}", url);
+                        results.push(UpstreamDatum::Repository(url));
+                    }
+                    "cvs" => {
+                        let url = format!(
+                            "cvs+pserver://anonymous@{}.cvs.sourceforge.net/cvsroot/{}",
+                            sf_project,
+                            url.strip_suffix("/")
+                                .unwrap_or("")
+                                .rsplit('/')
+                                .nth(1)
+                                .unwrap_or("")
+                        );
+                        results.push(UpstreamDatum::Repository(url));
+                    }
+                    "bzr" => {
+                        // TODO: Implement Bazaar (BZR) handling
+                    }
+                    _ => {
+                        panic!("Unknown VCS kind: {}", kind);
+                    }
+                }
+            } else if vcs_tools.len() > 1 {
+                warn!("Multiple possible VCS URLs found");
+            }
+        }
+        None => {
+            debug!("No SourceForge metadata found for {}", sf_project);
+        }
+    }
+    results
+}
+
+pub fn extract_sf_project_name(url: &str) -> Option<String> {
+    let projects_regex = Regex::new(r"https?://sourceforge\.net/(projects|p)/([^/]+)").unwrap();
+    if let Some(captures) = projects_regex.captures(url) {
+        return captures.get(2).map(|m| m.as_str().to_string());
+    }
+
+    let sf_regex = Regex::new(r"https?://(.*).(sf|sourceforge).(net|io)/.*").unwrap();
+    if let Some(captures) = sf_regex.captures(url) {
+        return captures.get(1).map(|m| m.as_str().to_string());
+    }
+
+    None
 }
 
 #[cfg(test)]

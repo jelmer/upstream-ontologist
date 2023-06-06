@@ -379,6 +379,30 @@ impl GitLab {
     }
 }
 
+#[pyclass(subclass,extends=Forge)]
+struct Launchpad;
+
+#[pymethods]
+impl Launchpad {
+    #[new]
+    fn new() -> (Self, Forge) {
+        let forge = upstream_ontologist::Launchpad::new();
+        (Self, Forge(Box::new(forge)))
+    }
+}
+
+#[pyclass(subclass,extends=Forge)]
+struct SourceForge;
+
+#[pymethods]
+impl SourceForge {
+    #[new]
+    fn new() -> (Self, Forge) {
+        let forge = upstream_ontologist::SourceForge::new();
+        (Self, Forge(Box::new(forge)))
+    }
+}
+
 #[pyfunction]
 fn guess_from_travis_yml(
     py: Python,
@@ -690,6 +714,91 @@ pub fn guess_from_r_description(
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
+#[pyfunction]
+fn find_forge(url: &str, net_access: Option<bool>) -> Option<Forge> {
+    let url = Url::parse(url).ok()?;
+
+    let forge = upstream_ontologist::find_forge(&url, net_access);
+
+    if let Some(forge) = forge {
+        Some(Forge(forge))
+    } else {
+        None
+    }
+}
+
+#[pyfunction]
+fn repo_url_from_merge_request_url(url: &str, net_access: Option<bool>) -> Option<String> {
+    let url = Url::parse(url).ok()?;
+    upstream_ontologist::repo_url_from_merge_request_url(&url, net_access).map(|x| x.to_string())
+}
+
+#[pyfunction]
+fn bug_database_from_issue_url(url: &str, net_access: Option<bool>) -> Option<String> {
+    let url = Url::parse(url).ok()?;
+    upstream_ontologist::bug_database_from_issue_url(&url, net_access).map(|x| x.to_string())
+}
+
+#[pyfunction]
+fn guess_bug_database_url_from_repo_url(url: &str, net_access: Option<bool>) -> Option<String> {
+    let url = Url::parse(url).ok()?;
+    upstream_ontologist::guess_bug_database_url_from_repo_url(&url, net_access)
+        .map(|x| x.to_string())
+}
+
+#[pyfunction]
+fn bug_database_url_from_bug_submit_url(url: &str, net_access: Option<bool>) -> Option<String> {
+    let url = Url::parse(url).ok()?;
+    upstream_ontologist::bug_database_url_from_bug_submit_url(&url, net_access)
+        .map(|x| x.to_string())
+}
+
+#[pyfunction]
+fn bug_submit_url_from_bug_database_url(url: &str, net_access: Option<bool>) -> Option<String> {
+    let url = Url::parse(url).ok()?;
+    upstream_ontologist::bug_submit_url_from_bug_database_url(&url, net_access)
+        .map(|x| x.to_string())
+}
+
+#[pyfunction]
+fn check_bug_database_canonical(url: &str, net_access: Option<bool>) -> PyResult<String> {
+    let url =
+        Url::parse(url).map_err(|e| PyRuntimeError::new_err(format!("Invalid URL: {}", e)))?;
+    upstream_ontologist::check_bug_database_canonical(&url, net_access)
+        .map_err(|e| match e {
+            CanonicalizeError::InvalidUrl(url, msg) => InvalidUrl::new_err((url.to_string(), msg)),
+            CanonicalizeError::Unverifiable(url, msg) => {
+                UnverifiableUrl::new_err((url.to_string(), msg))
+            }
+            CanonicalizeError::RateLimited(url) => {
+                UnverifiableUrl::new_err((url.to_string(), "rate limited"))
+            }
+        })
+        .map(|x| x.to_string())
+}
+
+#[pyfunction]
+fn check_bug_submit_url_canonical(url: &str, net_access: Option<bool>) -> PyResult<String> {
+    let url =
+        Url::parse(url).map_err(|e| PyRuntimeError::new_err(format!("Invalid URL: {}", e)))?;
+    upstream_ontologist::check_bug_submit_url_canonical(&url, net_access)
+        .map_err(|e| match e {
+            CanonicalizeError::InvalidUrl(url, msg) => InvalidUrl::new_err((url.to_string(), msg)),
+            CanonicalizeError::Unverifiable(url, msg) => {
+                UnverifiableUrl::new_err((url.to_string(), msg))
+            }
+            CanonicalizeError::RateLimited(url) => {
+                UnverifiableUrl::new_err((url.to_string(), "rate limited"))
+            }
+        })
+        .map(|x| x.to_string())
+}
+
+#[pyfunction]
+fn extract_sf_project_name(url: &str) -> Option<String> {
+    upstream_ontologist::extract_sf_project_name(url)
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -744,9 +853,20 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_configure))?;
     m.add_wrapped(wrap_pyfunction!(parse_python_url))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_r_description))?;
+    m.add_wrapped(wrap_pyfunction!(find_forge))?;
+    m.add_wrapped(wrap_pyfunction!(repo_url_from_merge_request_url))?;
+    m.add_wrapped(wrap_pyfunction!(bug_database_from_issue_url))?;
+    m.add_wrapped(wrap_pyfunction!(guess_bug_database_url_from_repo_url))?;
+    m.add_wrapped(wrap_pyfunction!(bug_database_url_from_bug_submit_url))?;
+    m.add_wrapped(wrap_pyfunction!(bug_submit_url_from_bug_database_url))?;
+    m.add_wrapped(wrap_pyfunction!(check_bug_database_canonical))?;
+    m.add_wrapped(wrap_pyfunction!(check_bug_submit_url_canonical))?;
+    m.add_wrapped(wrap_pyfunction!(extract_sf_project_name))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;
+    m.add_class::<Launchpad>()?;
+    m.add_class::<SourceForge>()?;
     m.add("InvalidUrl", py.get_type::<InvalidUrl>())?;
     m.add("UnverifiableUrl", py.get_type::<UnverifiableUrl>())?;
     Ok(())
