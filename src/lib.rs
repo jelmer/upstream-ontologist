@@ -3814,6 +3814,23 @@ pub fn guess_from_configure(
     results
 }
 
+pub fn parse_python_url(url: &str) -> Vec<UpstreamDatumWithMetadata> {
+    let repo = vcs::guess_repo_from_url(&url::Url::parse(url).unwrap(), None);
+    if let Some(repo) = repo {
+        return vec![UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Repository(repo),
+            certainty: Some(Certainty::Likely),
+            origin: None,
+        }];
+    }
+
+    vec![UpstreamDatumWithMetadata {
+        datum: UpstreamDatum::Homepage(url.to_string()),
+        certainty: Some(Certainty::Likely),
+        origin: None,
+    }]
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

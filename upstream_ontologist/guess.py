@@ -579,11 +579,7 @@ def guess_from_setup_cfg(path, trust_package):
                 logger.debug('Unknown setup.cfg field %s (%r)', field, value)
 
 
-def parse_python_url(url):
-    repo = guess_repo_from_url(url)
-    if repo:
-        yield UpstreamDatum('Repository', repo, 'likely')
-    yield UpstreamDatum('Homepage', url, 'likely')
+parse_python_url = _upstream_ontologist.parse_python_url
 
 
 def guess_from_setup_py_executed(path):
