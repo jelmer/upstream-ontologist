@@ -702,12 +702,21 @@ fn parse_python_url(py: Python, url: &str) -> PyResult<Vec<PyObject>> {
 }
 
 #[pyfunction]
-pub fn guess_from_r_description(
+fn guess_from_r_description(
     py: Python,
     path: PathBuf,
     trust_package: bool,
 ) -> PyResult<Vec<PyObject>> {
     let ret = upstream_ontologist::guess_from_r_description(path.as_path(), trust_package);
+
+    ret.into_iter()
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
+        .collect::<PyResult<Vec<PyObject>>>()
+}
+
+#[pyfunction]
+fn guess_from_cargo(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
+    let ret = upstream_ontologist::guess_from_cargo(path.as_path(), trust_package);
 
     ret.into_iter()
         .map(|x| upstream_datum_with_metadata_to_py(py, x))
@@ -862,6 +871,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(check_bug_database_canonical))?;
     m.add_wrapped(wrap_pyfunction!(check_bug_submit_url_canonical))?;
     m.add_wrapped(wrap_pyfunction!(extract_sf_project_name))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_cargo))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;

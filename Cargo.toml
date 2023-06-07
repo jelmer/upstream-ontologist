@@ -31,6 +31,7 @@ select = "0.6"
 chrono = "0.4"
 mailparse = "0.14"
 textwrap = ">=0.16"
+toml = ">=0.5"
 
 [lib]
 

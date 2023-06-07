@@ -1087,49 +1087,7 @@ def guess_from_path(path):
         yield UpstreamDatum('Name', basename, 'possible')
 
 
-def guess_from_cargo(path, trust_package):
-    # see https://doc.rust-lang.org/cargo/reference/manifest.html
-    try:
-        from tomlkit import loads
-        from tomlkit.exceptions import ParseError
-    except ModuleNotFoundError as e:
-        warn_missing_dependency(path, e.name)
-        return
-    try:
-        with open(path) as f:
-            cargo = loads(f.read())
-    except FileNotFoundError:
-        return
-    except ParseError as e:
-        logger.warning('Error parsing toml file %s: %s', path, e)
-        return
-    try:
-        package = cargo['package']
-    except KeyError:
-        pass
-    else:
-        for field, value in package.items():  # type: ignore
-            if field == 'name':
-                yield UpstreamDatum('Name', str(value), 'certain')
-                yield UpstreamDatum('Cargo-Crate', str(value), 'certain')
-            elif field == 'description':
-                yield UpstreamDatum('Summary', str(value), 'certain')
-            elif field == 'homepage':
-                yield UpstreamDatum('Homepage', str(value), 'certain')
-            elif field == 'license':
-                yield UpstreamDatum('License', str(value), 'certain')
-            elif field == 'repository':
-                yield UpstreamDatum('Repository', str(value), 'certain')
-            elif field == 'version':
-                yield UpstreamDatum('Version', str(value), 'confident')
-            elif field == 'authors':
-                yield UpstreamDatum(
-                    'Author',
-                    [Person.from_string(author) for author in value], 'confident')
-            elif field in ('edition', 'default-run'):
-                pass
-            else:
-                logger.debug('Unknown Cargo field %s (%r)', field, value)
+guess_from_cargo = _upstream_ontologist.guess_from_cargo
 
 
 def guess_from_pyproject_toml(path, trust_package):
