@@ -86,15 +86,7 @@ class NoSuchRepologyProject(Exception):
         self.project = project
 
 
-def get_repology_metadata(srcname, repo='debian_unstable'):
-    url = ('https://repology.org/tools/project-by?repo=%s&name_type=srcname'
-           '&target_page=api_v1_project&name=%s' % (repo, srcname))
-    try:
-        return _load_json_url(url)
-    except urllib.error.HTTPError as e:
-        if e.code != 404:
-            raise
-        raise NoSuchRepologyProject(srcname) from e
+get_repology_metadata = _upstream_ontologist.get_repology_metadata
 
 
 DATUM_TYPES = {

@@ -2229,6 +2229,7 @@ dependencies = [
  "pyo3",
  "pyo3-log",
  "reqwest",
+ "serde_json",
  "upstream-ontologist",
  "url",
 ]

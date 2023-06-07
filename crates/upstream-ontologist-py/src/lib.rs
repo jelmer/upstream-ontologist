@@ -3,6 +3,8 @@ use pyo3::exceptions::PyException;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::import_exception;
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use upstream_ontologist::CanonicalizeError;
 use url::Url;
@@ -10,6 +12,7 @@ use url::Url;
 import_exception!(urllib.error, HTTPError);
 create_exception!(upstream_ontologist, UnverifiableUrl, PyException);
 create_exception!(upstream_ontologist, InvalidUrl, PyException);
+create_exception!(upstream_ontologist, NoSuchRepologyProject, PyException);
 
 #[pyfunction]
 fn url_from_git_clone_command(command: &[u8]) -> Option<String> {
@@ -129,12 +132,35 @@ fn unsplit_vcs_url(repo_url: &str, branch: Option<&str>, subpath: Option<&str>) 
     upstream_ontologist::vcs::unsplit_vcs_url(repo_url, branch, subpath)
 }
 
+fn json_to_py(py: Python, data: serde_json::Value) -> PyResult<PyObject> {
+    match data {
+        serde_json::Value::Null => Ok(py.None()),
+        serde_json::Value::Bool(b) => Ok(b.into_py(py)),
+        serde_json::Value::Number(i) => Ok(i.as_i64().unwrap().into_py(py)),
+        serde_json::Value::String(s) => Ok(s.into_py(py)),
+        serde_json::Value::Array(a) => Ok(a
+            .into_iter()
+            .map(|x| json_to_py(py, x))
+            .collect::<PyResult<Vec<PyObject>>>()?
+            .into_py(py)),
+        serde_json::Value::Object(o) => Ok(PyDict::from_sequence(
+            py,
+            o.into_iter()
+                .map(|(k, v)| Ok((k.into_py(py), json_to_py(py, v)?)))
+                .collect::<PyResult<Vec<_>>>()?
+                .into_py(py),
+        )?
+        .into_py(py)),
+    }
+}
+
 #[pyfunction]
-fn load_json_url(http_url: &str, timeout: Option<u64>) -> PyResult<String> {
+fn load_json_url(py: Python, http_url: &str, timeout: Option<u64>) -> PyResult<PyObject> {
     let http_url = http_url
         .parse::<reqwest::Url>()
         .map_err(|e| PyRuntimeError::new_err(format!("{}: {}", e, http_url)))?;
-    Ok(
+    Ok(json_to_py(
+        py,
         upstream_ontologist::load_json_url(&http_url, timeout.map(std::time::Duration::from_secs))
             .map_err(|e| match e {
                 upstream_ontologist::HTTPJSONError::Error {
@@ -147,9 +173,8 @@ fn load_json_url(http_url: &str, timeout: Option<u64>) -> PyResult<String> {
                 upstream_ontologist::HTTPJSONError::HTTPError(e) => {
                     PyRuntimeError::new_err(e.to_string())
                 }
-            })?
-            .to_string(),
-    )
+            })?,
+    )?)
 }
 
 #[pyfunction]
@@ -822,6 +847,17 @@ fn metadata_from_url(py: Python, url: &str, origin: Option<&str>) -> PyResult<Ve
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
+#[pyfunction]
+fn get_repology_metadata(py: Python, name: &str, distro: Option<&str>) -> PyResult<PyObject> {
+    let ret = upstream_ontologist::get_repology_metadata(name, distro);
+
+    if ret.is_none() {
+        return Ok(py.None());
+    }
+
+    Ok(json_to_py(py, ret.unwrap())?)
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -888,6 +924,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_cargo))?;
     m.add_wrapped(wrap_pyfunction!(extract_pecl_package_name))?;
     m.add_wrapped(wrap_pyfunction!(metadata_from_url))?;
+    m.add_wrapped(wrap_pyfunction!(get_repology_metadata))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;
@@ -895,5 +932,9 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<SourceForge>()?;
     m.add("InvalidUrl", py.get_type::<InvalidUrl>())?;
     m.add("UnverifiableUrl", py.get_type::<UnverifiableUrl>())?;
+    m.add(
+        "NoSuchRepologyProject",
+        py.get_type::<NoSuchRepologyProject>(),
+    )?;
     Ok(())
 }

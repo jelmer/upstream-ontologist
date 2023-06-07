@@ -4596,6 +4596,24 @@ pub fn metadata_from_url(url: &str, origin: Option<&str>) -> Vec<UpstreamDatumWi
     results
 }
 
+pub fn get_repology_metadata(srcname: &str, repo: Option<&str>) -> Option<serde_json::Value> {
+    let repo = repo.unwrap_or("debian_unstable");
+    let url = format!(
+        "https://repology.org/tools/project-by?repo={}&name_type=srcname'
+           '&target_page=api_v1_project&name={}",
+        repo, srcname
+    );
+
+    match load_json_url(&Url::parse(url.as_str()).unwrap(), None) {
+        Ok(json) => Some(json),
+        Err(HTTPJSONError::Error { status, .. }) if status == 404 => None,
+        Err(e) => {
+            debug!("Failed to load repology metadata: {:?}", e);
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
