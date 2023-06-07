@@ -252,11 +252,7 @@ def guess_from_debian_rules(path, trust_package):
         yield UpstreamDatum("Download", upstream_url.decode(), "likely")
 
 
-def extract_pecl_package_name(url):
-    m = re.match('https?://pecl.php.net/package/(.*)', url)
-    if m:
-        return m.group(1)
-    return None
+extract_pecl_package_name = _upstream_ontologist.extract_pecl_package_name
 
 
 def _metadata_from_url(url: str, origin=None):

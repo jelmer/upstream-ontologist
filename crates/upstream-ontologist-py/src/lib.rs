@@ -808,6 +808,11 @@ fn extract_sf_project_name(url: &str) -> Option<String> {
     upstream_ontologist::extract_sf_project_name(url)
 }
 
+#[pyfunction]
+fn extract_pecl_package_name(url: &str) -> Option<String> {
+    upstream_ontologist::extract_pecl_package_name(url)
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -872,6 +877,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(check_bug_submit_url_canonical))?;
     m.add_wrapped(wrap_pyfunction!(extract_sf_project_name))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_cargo))?;
+    m.add_wrapped(wrap_pyfunction!(extract_pecl_package_name))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;

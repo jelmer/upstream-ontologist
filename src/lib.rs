@@ -4553,6 +4553,14 @@ pub fn guess_from_cargo(
     results
 }
 
+pub fn extract_pecl_package_name(url: &str) -> Option<String> {
+    let pecl_regex = Regex::new(r"https?://pecl\.php\.net/package/(.*)").unwrap();
+    if let Some(captures) = pecl_regex.captures(url) {
+        return captures.get(1).map(|m| m.as_str().to_string());
+    }
+    None
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
