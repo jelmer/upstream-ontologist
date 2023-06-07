@@ -253,30 +253,7 @@ def guess_from_debian_rules(path, trust_package):
 
 
 extract_pecl_package_name = _upstream_ontologist.extract_pecl_package_name
-
-
-def _metadata_from_url(url: str, origin=None):
-    """Obtain metadata from a URL related to the project.
-
-    Args:
-      url: The URL to inspect
-      origin: Origin to report for metadata
-    """
-    sf_project = extract_sf_project_name(url)
-    if sf_project:
-        yield UpstreamDatum(
-            "Archive", "SourceForge", "certain",
-            origin=origin)
-        yield UpstreamDatum(
-            "SourceForge-Project", sf_project, "certain",
-            origin=origin)
-    pecl_package = extract_pecl_package_name(url)
-    if pecl_package:
-        yield UpstreamDatum(
-            "Archive", "Pecl", "certain",
-            origin=origin)
-        yield UpstreamDatum(
-            'Pecl-Package', pecl_package, 'certain', origin=origin)
+_metadata_from_url = _upstream_ontologist.metadata_from_url
 
 
 def guess_from_debian_watch(path, trust_package):

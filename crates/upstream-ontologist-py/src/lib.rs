@@ -72,6 +72,7 @@ fn upstream_datum_to_py(
             upstream_ontologist::UpstreamDatum::Download(d) => d.into_py(py),
             upstream_ontologist::UpstreamDatum::MailingList(m) => m.into_py(py),
             upstream_ontologist::UpstreamDatum::SourceForgeProject(m) => m.into_py(py),
+            upstream_ontologist::UpstreamDatum::PeclPackage(p) => p.into_py(py),
         },
     ))
 }
@@ -813,6 +814,14 @@ fn extract_pecl_package_name(url: &str) -> Option<String> {
     upstream_ontologist::extract_pecl_package_name(url)
 }
 
+#[pyfunction]
+fn metadata_from_url(py: Python, url: &str, origin: Option<&str>) -> PyResult<Vec<PyObject>> {
+    upstream_ontologist::metadata_from_url(url, origin)
+        .into_iter()
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
+        .collect::<PyResult<Vec<PyObject>>>()
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -878,6 +887,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(extract_sf_project_name))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_cargo))?;
     m.add_wrapped(wrap_pyfunction!(extract_pecl_package_name))?;
+    m.add_wrapped(wrap_pyfunction!(metadata_from_url))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;

@@ -158,6 +158,7 @@ pub enum UpstreamDatum {
     SourceForgeProject(String),
     Archive(String),
     Demo(String),
+    PeclPackage(String),
 }
 
 #[derive(Clone)]
@@ -196,6 +197,7 @@ impl UpstreamDatum {
             UpstreamDatum::SourceForgeProject(..) => "SourceForge-Project",
             UpstreamDatum::Archive(..) => "Archive",
             UpstreamDatum::Demo(..) => "Demo",
+            UpstreamDatum::PeclPackage(..) => "Pecl-Package",
         }
     }
 }
@@ -254,6 +256,7 @@ pub fn guess_upstream_metadata(
                 "Version" => UpstreamDatum::Version(value.extract::<String>(py).unwrap()),
                 "Demo" => UpstreamDatum::Demo(value.extract::<String>(py).unwrap()),
                 "Archive" => UpstreamDatum::Archive(value.extract::<String>(py).unwrap()),
+                "Pecl-Package" => UpstreamDatum::PeclPackage(value.extract::<String>(py).unwrap()),
                 "Author" => UpstreamDatum::Author(
                     value
                         .extract::<Vec<Person>>(py)
@@ -4559,6 +4562,38 @@ pub fn extract_pecl_package_name(url: &str) -> Option<String> {
         return captures.get(1).map(|m| m.as_str().to_string());
     }
     None
+}
+
+/// Obtain metadata from a URL related to the project
+pub fn metadata_from_url(url: &str, origin: Option<&str>) -> Vec<UpstreamDatumWithMetadata> {
+    let mut results = Vec::new();
+    if let Some(sf_project) = extract_sf_project_name(url) {
+        results.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::SourceForgeProject(sf_project),
+            certainty: Some(Certainty::Certain),
+            origin: origin.map(|s| s.to_string()),
+        });
+        results.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Archive("SourceForge".to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: origin.map(|s| s.to_string()),
+        });
+    }
+
+    if let Some(pecl_package) = extract_pecl_package_name(url) {
+        results.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::PeclPackage(pecl_package),
+            certainty: Some(Certainty::Certain),
+            origin: origin.map(|s| s.to_string()),
+        });
+        results.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Archive("Pecl".to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: origin.map(|s| s.to_string()),
+        });
+    }
+
+    results
 }
 
 #[cfg(test)]
