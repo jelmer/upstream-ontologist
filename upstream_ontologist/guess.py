@@ -1121,15 +1121,7 @@ def guess_from_get_orig_source(path, trust_package=False):
                     yield UpstreamDatum('Repository', url, certainty)
 
 
-# https://docs.github.com/en/free-pro-team@latest/github/\
-# managing-security-vulnerabilities/adding-a-security-policy-to-your-repository
-def guess_from_security_md(name, path, trust_package=False):
-    if path.startswith('./'):
-        path = path[2:]
-    # TODO(jelmer): scan SECURITY.md for email addresses/URLs with instructions
-    yield UpstreamDatum('Security-MD', name, 'certain')
-
-
+guess_from_security_md = _upstream_ontologist.guess_from_security_md
 guess_from_go_mod = _upstream_ontologist.guess_from_go_mod
 guess_from_gemspec = _upstream_ontologist.guess_from_gemspec
 guess_from_makefile_pl = _upstream_ontologist.guess_from_makefile_pl

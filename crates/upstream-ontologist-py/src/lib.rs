@@ -858,6 +858,19 @@ fn get_repology_metadata(py: Python, name: &str, distro: Option<&str>) -> PyResu
     Ok(json_to_py(py, ret.unwrap())?)
 }
 
+#[pyfunction]
+fn guess_from_security_md(
+    py: Python,
+    name: &str,
+    path: PathBuf,
+    trust_package: bool,
+) -> PyResult<Vec<PyObject>> {
+    upstream_ontologist::guess_from_security_md(name, path.as_path(), trust_package)
+        .into_iter()
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
+        .collect()
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -925,6 +938,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(extract_pecl_package_name))?;
     m.add_wrapped(wrap_pyfunction!(metadata_from_url))?;
     m.add_wrapped(wrap_pyfunction!(get_repology_metadata))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_security_md))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;
