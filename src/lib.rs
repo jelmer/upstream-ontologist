@@ -200,6 +200,38 @@ impl UpstreamDatum {
             UpstreamDatum::PeclPackage(..) => "Pecl-Package",
         }
     }
+
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            UpstreamDatum::Name(s) => Some(s),
+            UpstreamDatum::Homepage(s) => Some(s),
+            UpstreamDatum::Repository(s) => Some(s),
+            UpstreamDatum::RepositoryBrowse(s) => Some(s),
+            UpstreamDatum::Description(s) => Some(s),
+            UpstreamDatum::Summary(s) => Some(s),
+            UpstreamDatum::License(s) => Some(s),
+            UpstreamDatum::BugDatabase(s) => Some(s),
+            UpstreamDatum::BugSubmit(s) => Some(s),
+            UpstreamDatum::Contact(s) => Some(s),
+            UpstreamDatum::CargoCrate(s) => Some(s),
+            UpstreamDatum::SecurityMD(s) => Some(s),
+            UpstreamDatum::SecurityContact(s) => Some(s),
+            UpstreamDatum::Version(s) => Some(s),
+            UpstreamDatum::Documentation(s) => Some(s),
+            UpstreamDatum::GoImportPath(s) => Some(s),
+            UpstreamDatum::Download(s) => Some(s),
+            UpstreamDatum::Wiki(s) => Some(s),
+            UpstreamDatum::MailingList(s) => Some(s),
+            UpstreamDatum::SourceForgeProject(s) => Some(s),
+            UpstreamDatum::Archive(s) => Some(s),
+            UpstreamDatum::Demo(s) => Some(s),
+            UpstreamDatum::PeclPackage(s) => Some(s),
+            UpstreamDatum::Author(..) => None,
+            UpstreamDatum::Maintainer(..) => None,
+            UpstreamDatum::Keywords(..) => None,
+            UpstreamDatum::Copyright(c) => Some(c),
+        }
+    }
 }
 
 pub fn guess_upstream_metadata(
@@ -4316,7 +4348,7 @@ fn sf_git_extract_url(page: &str) -> Option<String> {
     Some(access_command[2].to_string())
 }
 
-fn get_sf_metadata(project: &str) -> Option<serde_json::Value> {
+pub fn get_sf_metadata(project: &str) -> Option<serde_json::Value> {
     let url = format!("https://sourceforge.net/rest/p/{}", project);
     match load_json_url(&Url::parse(url.as_str()).unwrap(), None) {
         Ok(data) => Some(data),
@@ -4327,7 +4359,7 @@ fn get_sf_metadata(project: &str) -> Option<serde_json::Value> {
     }
 }
 
-fn guess_from_sf(sf_project: &str, subproject: Option<&str>) -> Vec<UpstreamDatum> {
+pub fn guess_from_sf(sf_project: &str, subproject: Option<&str>) -> Vec<UpstreamDatum> {
     let mut results = Vec::new();
     match get_sf_metadata(sf_project) {
         Some(data) => {

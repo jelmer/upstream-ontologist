@@ -13,6 +13,7 @@ import_exception!(urllib.error, HTTPError);
 create_exception!(upstream_ontologist, UnverifiableUrl, PyException);
 create_exception!(upstream_ontologist, InvalidUrl, PyException);
 create_exception!(upstream_ontologist, NoSuchRepologyProject, PyException);
+create_exception!(upstream_ontologist, NoSuchForgeProject, PyException);
 
 #[pyfunction]
 fn url_from_git_clone_command(command: &[u8]) -> Option<String> {
@@ -871,6 +872,15 @@ fn guess_from_security_md(
         .collect()
 }
 
+#[pyfunction]
+fn get_sf_metadata(project: &str) -> PyResult<PyObject> {
+    if let Some(ret) = upstream_ontologist::get_sf_metadata(project) {
+        Python::with_gil(|py| Ok(json_to_py(py, ret)?))
+    } else {
+        return Err(NoSuchForgeProject::new_err((project.to_string(),)));
+    }
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -939,6 +949,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(metadata_from_url))?;
     m.add_wrapped(wrap_pyfunction!(get_repology_metadata))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_security_md))?;
+    m.add_wrapped(wrap_pyfunction!(get_sf_metadata))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;
@@ -950,5 +961,6 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
         "NoSuchRepologyProject",
         py.get_type::<NoSuchRepologyProject>(),
     )?;
+    m.add("NoSuchForgeProject", py.get_type::<NoSuchForgeProject>())?;
     Ok(())
 }

@@ -64,28 +64,9 @@ def warn_missing_dependency(path, module_name):
         path, module_name)
 
 
-class NoSuchForgeProject(Exception):
-
-    def __init__(self, project):
-        self.project = project
-
-
-def get_sf_metadata(project):
-    url = 'https://sourceforge.net/rest/p/%s' % project
-    try:
-        return _load_json_url(url)
-    except urllib.error.HTTPError as e:
-        if e.code != 404:
-            raise
-        raise NoSuchForgeProject(project) from e
-
-
-class NoSuchRepologyProject(Exception):
-
-    def __init__(self, project):
-        self.project = project
-
-
+get_sf_metadata = _upstream_ontologist.get_sf_metadata
+NoSuchForgeProject = _upstream_ontologist.NoSuchForgeProject
+NoSuchRepologyProject = _upstream_ontologist.NoSuchRepologyProject
 get_repology_metadata = _upstream_ontologist.get_repology_metadata
 
 
