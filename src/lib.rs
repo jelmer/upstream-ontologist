@@ -234,6 +234,32 @@ impl UpstreamDatum {
     }
 }
 
+pub struct UpstreamMetadata(Vec<UpstreamDatumWithMetadata>);
+
+impl UpstreamMetadata {
+    pub fn new() -> Self {
+        UpstreamMetadata(Vec::new())
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &UpstreamDatumWithMetadata> {
+        self.0.iter()
+    }
+
+    pub fn get_field(&self, field: &str) -> Option<&UpstreamDatumWithMetadata> {
+        self.0.iter().find(|d| d.datum.field() == field)
+    }
+
+    pub fn has_field(&self, field: &str) -> bool {
+        self.get_field(field).is_some()
+    }
+}
+
+impl From<Vec<UpstreamDatumWithMetadata>> for UpstreamMetadata {
+    fn from(v: Vec<UpstreamDatumWithMetadata>) -> Self {
+        UpstreamMetadata(v)
+    }
+}
+
 pub fn guess_upstream_metadata(
     path: PathBuf,
     trust_package: Option<bool>,
@@ -1319,43 +1345,41 @@ pub fn guess_from_authors(path: &Path, _trust_package: bool) -> Vec<UpstreamDatu
 
     let mut authors: Vec<Person> = Vec::new();
 
-    for line in reader.lines() {
-        if let Ok(line) = line {
-            let mut m = line.trim().to_string();
-            if m.is_empty() {
-                continue;
-            }
-            if m.starts_with("arch-tag: ") {
-                continue;
-            }
-            if m.ends_with(':') {
-                continue;
-            }
-            if m.starts_with("$Id") {
-                continue;
-            }
-            if m.starts_with('*') || m.starts_with('-') {
-                m = m[1..].trim().to_string();
-            }
-            if m.len() < 3 {
-                continue;
-            }
-            if m.ends_with('.') {
-                continue;
-            }
-            if m.contains(" for ") {
-                let parts: Vec<&str> = m.split(" for ").collect();
-                m = parts[0].to_string();
-            }
-            if !m.chars().next().unwrap().is_alphabetic() {
-                continue;
-            }
-            if !m.contains('<') && line.as_bytes().starts_with(b"\t") {
-                continue;
-            }
-            if m.contains('<') || m.matches(' ').count() < 5 {
-                authors.push(Person::from(m.as_str()));
-            }
+    for line in reader.lines().flatten() {
+        let mut m = line.trim().to_string();
+        if m.is_empty() {
+            continue;
+        }
+        if m.starts_with("arch-tag: ") {
+            continue;
+        }
+        if m.ends_with(':') {
+            continue;
+        }
+        if m.starts_with("$Id") {
+            continue;
+        }
+        if m.starts_with('*') || m.starts_with('-') {
+            m = m[1..].trim().to_string();
+        }
+        if m.len() < 3 {
+            continue;
+        }
+        if m.ends_with('.') {
+            continue;
+        }
+        if m.contains(" for ") {
+            let parts: Vec<&str> = m.split(" for ").collect();
+            m = parts[0].to_string();
+        }
+        if !m.chars().next().unwrap().is_alphabetic() {
+            continue;
+        }
+        if !m.contains('<') && line.as_bytes().starts_with(b"\t") {
+            continue;
+        }
+        if m.contains('<') || m.matches(' ').count() < 5 {
+            authors.push(Person::from(m.as_str()));
         }
     }
 
