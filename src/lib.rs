@@ -3937,6 +3937,7 @@ pub fn parse_python_url(url: &str) -> Vec<UpstreamDatumWithMetadata> {
 }
 
 // See https://r-pkgs.org/description.html
+#[cfg(feature = "r-description")]
 pub fn guess_from_r_description(
     path: &std::path::Path,
     trust_package: bool,

@@ -29,17 +29,18 @@ html5ever = ">=0.26"
 distro-info = { version = "0.3", optional = true }
 select = "0.6"
 chrono = "0.4"
-mailparse = "0.14"
 textwrap = ">=0.16"
 toml = { version = ">=0.5", optional = true }
+mailparse = { version = "0.14", optional = true }
 
 [features]
-default = ["git-config", "launchpad", "opam", "dist-ini"]
+default = ["git-config", "launchpad", "opam", "dist-ini", "cargo", "r-description"]
 git-config = ["dep:gix-config"]
 launchpad = ["dep:distro-info"]
 opam = ["dep:opam-file-rs"]
 dist-ini = ["dep:rust-ini"]
 cargo = ["dep:toml"]
+r-description = ["dep:mailparse"]
 
 [lib]
 
