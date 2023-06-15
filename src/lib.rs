@@ -2656,6 +2656,7 @@ pub fn guess_from_doap(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWi
 }
 
 // Documentation: https://opam.ocaml.org/doc/Manual.html#Package-definitions
+#[cfg(feature = "opam")]
 pub fn guess_from_opam(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
     use opam_file_rs::value::{OpamFileItem, OpamFileSection, ValueKind};
     let mut f = File::open(path).unwrap();

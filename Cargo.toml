@@ -23,7 +23,7 @@ rust-ini = "0.19"
 serde_yaml = "0.8"
 serde = { version = "1.0", features=["derive"]}
 percent-encoding = "2"
-opam-file-rs = { version = "0.1"}
+opam-file-rs = { version = "0.1", optional = true }
 gix-config = { version = ">=0.20", optional = true }
 html5ever = ">=0.26"
 distro-info = { version = "0.3", optional = true }
@@ -34,9 +34,10 @@ textwrap = ">=0.16"
 toml = ">=0.5"
 
 [features]
-default = ["git-config", "launchpad"]
+default = ["git-config", "launchpad", "opam"]
 git-config = ["dep:gix-config"]
 launchpad = ["dep:distro-info"]
+opam = ["dep:opam-file-rs"]
 
 [lib]
 
