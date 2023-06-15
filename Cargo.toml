@@ -24,9 +24,9 @@ serde_yaml = "0.8"
 serde = { version = "1.0", features=["derive"]}
 percent-encoding = "2"
 opam-file-rs = { version = "0.1"}
-gix-config = { version = ">=0.20", optional=true}
+gix-config = { version = ">=0.20", optional = true }
 html5ever = ">=0.26"
-distro-info = "0.3"
+distro-info = { version = "0.3", optional = true }
 select = "0.6"
 chrono = "0.4"
 mailparse = "0.14"
@@ -34,8 +34,9 @@ textwrap = ">=0.16"
 toml = ">=0.5"
 
 [features]
-default = ["git-config"]
+default = ["git-config", "launchpad"]
 git-config = ["dep:gix-config"]
+launchpad = ["dep:distro-info"]
 
 [lib]
 

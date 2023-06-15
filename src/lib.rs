@@ -3620,6 +3620,7 @@ pub fn guess_from_gemspec(path: &Path, trust_package: bool) -> Vec<UpstreamDatum
     results
 }
 
+#[cfg(feature = "launchpad")]
 pub fn guess_from_launchpad(
     package: &str,
     distribution: Option<&str>,
