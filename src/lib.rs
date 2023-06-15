@@ -4525,6 +4525,7 @@ pub fn extract_sf_project_name(url: &str) -> Option<String> {
     None
 }
 
+#[cfg(feature = "cargo")]
 pub fn guess_from_cargo(
     path: &std::path::Path,
     trust_package: bool,
