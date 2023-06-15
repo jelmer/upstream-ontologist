@@ -3195,6 +3195,7 @@ pub fn guess_from_cabal(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumW
     )
 }
 
+#[cfg(feature = "git-config")]
 pub fn guess_from_git_config(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
     let config_file = gix_config::File::from_path_no_includes(path, gix_config::Source::Local)
         .expect("Failed to open git config");
