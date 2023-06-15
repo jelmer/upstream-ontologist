@@ -1156,6 +1156,7 @@ pub fn guess_from_perl_dist_name(path: &Path, dist_name: &str) -> Vec<UpstreamDa
     }
 }
 
+#[cfg(feature = "dist-ini")]
 pub fn guess_from_dist_ini(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
     let parser = match ini::Ini::load_from_file(path) {
         Err(e) => {

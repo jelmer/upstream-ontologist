@@ -19,7 +19,7 @@ regex = "1"
 url = "2"
 xmltree = "0.10"
 configparser = "3"
-rust-ini = "0.19"
+rust-ini = { version = "0.19", optional = true }
 serde_yaml = "0.8"
 serde = { version = "1.0", features=["derive"]}
 percent-encoding = "2"
@@ -34,10 +34,11 @@ textwrap = ">=0.16"
 toml = ">=0.5"
 
 [features]
-default = ["git-config", "launchpad", "opam"]
+default = ["git-config", "launchpad", "opam", "dist-ini"]
 git-config = ["dep:gix-config"]
 launchpad = ["dep:distro-info"]
 opam = ["dep:opam-file-rs"]
+dist-ini = ["dep:rust-ini"]
 
 [lib]
 
