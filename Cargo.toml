@@ -9,7 +9,7 @@ repository = "https://github.com/jelmer/upstream-ontologist.git"
 homepage = "https://github.com/jelmer/upstream-ontologist"
 
 [dependencies]
-pyo3 = { version = "0.18", features=["auto-initialize"]}
+pyo3 = { version = "0.19", features=["auto-initialize"]}
 log = "0.4"
 shlex = "1.1.0"
 serde_json = "1.0"
