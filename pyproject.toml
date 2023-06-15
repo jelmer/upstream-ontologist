@@ -15,7 +15,6 @@ module = [
     "pysimplesoap.*",
     "debianbts.*",
     "setuptools.*",
-    "distro_info.*",
     "pcre.*",
     "lxml.*",
     # Not available on Mac OS X
