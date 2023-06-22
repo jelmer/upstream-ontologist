@@ -948,18 +948,7 @@ guess_from_cabal_lines = _upstream_ontologist.guess_from_cabal_lines
 guess_from_configure = _upstream_ontologist.guess_from_configure
 guess_from_r_description = _upstream_ontologist.guess_from_r_description
 guess_from_environment = _upstream_ontologist.guess_from_environment
-
-
-def guess_from_path(path):
-    basename = os.path.basename(os.path.abspath(path))
-    m = re.fullmatch('(.*)-([0-9.]+)', basename)
-    if m:
-        yield UpstreamDatum('Name', m.group(1), 'possible')
-        yield UpstreamDatum('Version', m.group(2), 'possible')
-    else:
-        yield UpstreamDatum('Name', basename, 'possible')
-
-
+guess_from_path = _upstream_ontologist.guess_from_path
 guess_from_cargo = _upstream_ontologist.guess_from_cargo
 
 
@@ -1175,7 +1164,7 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
             [(p, guess_from_debian_patch) for p in debian_patches])
 
     yield 'environment', guess_from_environment()
-    yield 'path', guess_from_path(path)
+    yield 'path', guess_from_path(path, trust_package)
 
     for relpath, guesser in CANDIDATES:
         abspath = os.path.join(path, relpath)

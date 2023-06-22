@@ -4803,6 +4803,37 @@ pub fn guess_from_security_md(
     results
 }
 
+pub fn guess_from_path(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+    let basename = path.file_name().and_then(|s| s.to_str());
+    let mut ret = Vec::new();
+    if let Some(basename_str) = basename {
+        let re = Regex::new(r"(.*)-([0-9.]+)").unwrap();
+        if let Some(captures) = re.captures(basename_str) {
+            if let Some(name) = captures.get(1) {
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Name(name.as_str().to_string()),
+                    certainty: Some(Certainty::Possible),
+                    origin: Some(path.display().to_string()),
+                });
+            }
+            if let Some(version) = captures.get(2) {
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Version(version.as_str().to_string()),
+                    certainty: Some(Certainty::Possible),
+                    origin: Some(path.display().to_string()),
+                });
+            }
+        } else {
+            ret.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Name(basename_str.to_string()),
+                certainty: Some(Certainty::Possible),
+                origin: Some(path.display().to_string()),
+            });
+        }
+    }
+    ret
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

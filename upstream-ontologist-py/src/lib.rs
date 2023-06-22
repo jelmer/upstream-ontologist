@@ -951,6 +951,14 @@ fn guess_from_debian_patch(
         .collect()
 }
 
+#[pyfunction]
+fn guess_from_path(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
+    upstream_ontologist::guess_from_path(path.as_path(), trust_package)
+        .into_iter()
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
+        .collect()
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -1021,6 +1029,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_security_md))?;
     m.add_wrapped(wrap_pyfunction!(get_sf_metadata))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_debian_patch))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_path))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;
