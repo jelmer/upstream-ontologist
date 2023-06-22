@@ -1,3 +1,4 @@
+use log::debug;
 use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::exceptions::PyRuntimeError;
@@ -157,6 +158,7 @@ fn json_to_py(py: Python, data: serde_json::Value) -> PyResult<PyObject> {
 
 #[pyfunction]
 fn load_json_url(py: Python, http_url: &str, timeout: Option<u64>) -> PyResult<PyObject> {
+    debug!("Loading JSON from {}", http_url);
     let http_url = http_url
         .parse::<reqwest::Url>()
         .map_err(|e| PyRuntimeError::new_err(format!("{}: {}", e, http_url)))?;

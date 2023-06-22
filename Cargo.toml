@@ -45,4 +45,4 @@ r-description = ["dep:mailparse"]
 [lib]
 
 [workspace]
-members = [ "crates/*" ]
+members = [ "upstream-ontologist-py" ]

@@ -11,9 +11,10 @@ homepage = "https://github.com/jelmer/upstream-ontologist"
 crate-type = ["cdylib"]
 
 [dependencies]
-upstream-ontologist = { path = "../.." }
+upstream-ontologist = { path = ".." }
 pyo3 = { version = ">=0.14", features = ["extension-module"] }
 pyo3-log = "0.8"
 reqwest = "0.11"
 url = "2.2"
 serde_json = "1"
+log = "0.4"
