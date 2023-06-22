@@ -159,6 +159,7 @@ pub enum UpstreamDatum {
     Archive(String),
     Demo(String),
     PeclPackage(String),
+    Funding(String),
 }
 
 #[derive(Clone)]
@@ -166,6 +167,13 @@ pub struct UpstreamDatumWithMetadata {
     pub datum: UpstreamDatum,
     pub origin: Option<String>,
     pub certainty: Option<Certainty>,
+}
+
+fn known_bad_url(value: &str) -> bool {
+    if value.contains("${") {
+        return true;
+    }
+    false
 }
 
 impl UpstreamDatum {
@@ -198,6 +206,7 @@ impl UpstreamDatum {
             UpstreamDatum::Archive(..) => "Archive",
             UpstreamDatum::Demo(..) => "Demo",
             UpstreamDatum::PeclPackage(..) => "Pecl-Package",
+            UpstreamDatum::Funding(..) => "Funding",
         }
     }
 
@@ -230,7 +239,110 @@ impl UpstreamDatum {
             UpstreamDatum::Maintainer(..) => None,
             UpstreamDatum::Keywords(..) => None,
             UpstreamDatum::Copyright(c) => Some(c),
+            UpstreamDatum::Funding(f) => Some(f),
         }
+    }
+
+    pub fn known_bad_guess(&self) -> bool {
+        match self {
+            UpstreamDatum::BugDatabase(s) | UpstreamDatum::BugSubmit(s) => {
+                if known_bad_url(s) {
+                    return true;
+                }
+                let url = match Url::parse(s) {
+                    Ok(url) => url,
+                    Err(_) => return false,
+                };
+                if url.host_str() == Some("bugzilla.gnome.org") {
+                    return true;
+                }
+                if url.host_str() == Some("bugs.freedesktop.org") {
+                    return true;
+                }
+                if url.path().ends_with("/sign_in") {
+                    return true;
+                }
+            }
+            UpstreamDatum::Repository(s) => {
+                if known_bad_url(s) {
+                    return true;
+                }
+                let url = match Url::parse(s) {
+                    Ok(url) => url,
+                    Err(_) => return false,
+                };
+                if url.host_str() == Some("anongit.kde.org") {
+                    return true;
+                }
+                if url.host_str() == Some("git.gitorious.org") {
+                    return true;
+                }
+                if url.path().ends_with("/sign_in") {
+                    return true;
+                }
+            }
+            UpstreamDatum::Homepage(s) => {
+                let url = match Url::parse(s) {
+                    Ok(url) => url,
+                    Err(_) => return false,
+                };
+
+                if url.host_str() == Some("pypi.org") {
+                    return true;
+                }
+                if url.host_str() == Some("rubygems.org") {
+                    return true;
+                }
+            }
+            UpstreamDatum::RepositoryBrowse(s) => {
+                if known_bad_url(s) {
+                    return true;
+                }
+                let url = match Url::parse(s) {
+                    Ok(url) => url,
+                    Err(_) => return false,
+                };
+                if url.host_str() == Some("cgit.kde.org") {
+                    return true;
+                }
+                if url.path().ends_with("/sign_in") {
+                    return true;
+                }
+            }
+            UpstreamDatum::Author(authors) => {
+                for a in authors {
+                    if let Some(name) = &a.name {
+                        let lc = name.to_lowercase();
+                        if lc.contains("unknown") {
+                            return true;
+                        }
+                        if lc.contains("maintainer") {
+                            return true;
+                        }
+                        if lc.contains("contributor") {
+                            return true;
+                        }
+                    }
+                }
+            }
+            UpstreamDatum::Name(s) => {
+                let lc = s.to_lowercase();
+                if lc.contains("unknown") {
+                    return true;
+                }
+                if lc == "package" {
+                    return true;
+                }
+            }
+            UpstreamDatum::Version(s) => {
+                let lc = s.to_lowercase();
+                if ["devel", "unknown"].contains(&lc.as_str()) {
+                    return true;
+                }
+            }
+            _ => {}
+        }
+        false
     }
 }
 

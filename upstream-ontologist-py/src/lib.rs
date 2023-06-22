@@ -7,7 +7,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use upstream_ontologist::CanonicalizeError;
+use upstream_ontologist::{CanonicalizeError, Person, UpstreamDatum, UpstreamDatumWithMetadata};
 use url::Url;
 
 import_exception!(urllib.error, HTTPError);
@@ -36,55 +36,51 @@ fn drop_vcs_in_scheme(url: &str) -> &str {
     upstream_ontologist::vcs::drop_vcs_in_scheme(url)
 }
 
-fn upstream_datum_to_py(
-    py: Python,
-    datum: upstream_ontologist::UpstreamDatum,
-) -> PyResult<(String, PyObject)> {
+fn upstream_datum_to_py(py: Python, datum: UpstreamDatum) -> PyResult<(String, PyObject)> {
     let m = PyModule::import(py, "upstream_ontologist.guess")?;
     let PersonCls = m.getattr("Person")?;
     Ok((
         datum.field().to_string(),
         match datum {
-            upstream_ontologist::UpstreamDatum::Name(n) => n.into_py(py),
-            upstream_ontologist::UpstreamDatum::Version(v) => v.into_py(py),
-            upstream_ontologist::UpstreamDatum::Contact(c) => c.into_py(py),
-            upstream_ontologist::UpstreamDatum::Summary(s) => s.into_py(py),
-            upstream_ontologist::UpstreamDatum::License(l) => l.into_py(py),
-            upstream_ontologist::UpstreamDatum::Homepage(h) => h.into_py(py),
-            upstream_ontologist::UpstreamDatum::Description(d) => d.into_py(py),
-            upstream_ontologist::UpstreamDatum::BugDatabase(b) => b.into_py(py),
-            upstream_ontologist::UpstreamDatum::BugSubmit(b) => b.into_py(py),
-            upstream_ontologist::UpstreamDatum::Repository(r) => r.into_py(py),
-            upstream_ontologist::UpstreamDatum::RepositoryBrowse(r) => r.into_py(py),
-            upstream_ontologist::UpstreamDatum::SecurityMD(s) => s.into_py(py),
-            upstream_ontologist::UpstreamDatum::SecurityContact(s) => s.into_py(py),
-            upstream_ontologist::UpstreamDatum::CargoCrate(c) => c.into_py(py),
-            upstream_ontologist::UpstreamDatum::Keywords(ks) => ks.into_py(py),
-            upstream_ontologist::UpstreamDatum::Copyright(c) => c.into_py(py),
-            upstream_ontologist::UpstreamDatum::Documentation(a) => a.into_py(py),
-            upstream_ontologist::UpstreamDatum::GoImportPath(ip) => ip.into_py(py),
-            upstream_ontologist::UpstreamDatum::Archive(a) => a.into_py(py),
-            upstream_ontologist::UpstreamDatum::Demo(d) => d.into_py(py),
-            upstream_ontologist::UpstreamDatum::Maintainer(m) => {
-                PersonCls.call1((m.name, m.email, m.url))?.into_py(py)
-            }
-            upstream_ontologist::UpstreamDatum::Author(a) => a
+            UpstreamDatum::Name(n) => n.into_py(py),
+            UpstreamDatum::Version(v) => v.into_py(py),
+            UpstreamDatum::Contact(c) => c.into_py(py),
+            UpstreamDatum::Summary(s) => s.into_py(py),
+            UpstreamDatum::License(l) => l.into_py(py),
+            UpstreamDatum::Homepage(h) => h.into_py(py),
+            UpstreamDatum::Description(d) => d.into_py(py),
+            UpstreamDatum::BugDatabase(b) => b.into_py(py),
+            UpstreamDatum::BugSubmit(b) => b.into_py(py),
+            UpstreamDatum::Repository(r) => r.into_py(py),
+            UpstreamDatum::RepositoryBrowse(r) => r.into_py(py),
+            UpstreamDatum::SecurityMD(s) => s.into_py(py),
+            UpstreamDatum::SecurityContact(s) => s.into_py(py),
+            UpstreamDatum::CargoCrate(c) => c.into_py(py),
+            UpstreamDatum::Keywords(ks) => ks.into_py(py),
+            UpstreamDatum::Copyright(c) => c.into_py(py),
+            UpstreamDatum::Documentation(a) => a.into_py(py),
+            UpstreamDatum::GoImportPath(ip) => ip.into_py(py),
+            UpstreamDatum::Archive(a) => a.into_py(py),
+            UpstreamDatum::Demo(d) => d.into_py(py),
+            UpstreamDatum::Maintainer(m) => PersonCls.call1((m.name, m.email, m.url))?.into_py(py),
+            UpstreamDatum::Author(a) => a
                 .into_iter()
                 .map(|x| PersonCls.call1((x.name, x.email, x.url)))
                 .collect::<PyResult<Vec<&PyAny>>>()?
                 .into_py(py),
-            upstream_ontologist::UpstreamDatum::Wiki(w) => w.into_py(py),
-            upstream_ontologist::UpstreamDatum::Download(d) => d.into_py(py),
-            upstream_ontologist::UpstreamDatum::MailingList(m) => m.into_py(py),
-            upstream_ontologist::UpstreamDatum::SourceForgeProject(m) => m.into_py(py),
-            upstream_ontologist::UpstreamDatum::PeclPackage(p) => p.into_py(py),
+            UpstreamDatum::Wiki(w) => w.into_py(py),
+            UpstreamDatum::Download(d) => d.into_py(py),
+            UpstreamDatum::MailingList(m) => m.into_py(py),
+            UpstreamDatum::SourceForgeProject(m) => m.into_py(py),
+            UpstreamDatum::PeclPackage(p) => p.into_py(py),
+            UpstreamDatum::Funding(p) => p.into_py(py),
         },
     ))
 }
 
 fn upstream_datum_with_metadata_to_py(
     py: Python,
-    datum: upstream_ontologist::UpstreamDatumWithMetadata,
+    datum: UpstreamDatumWithMetadata,
 ) -> PyResult<PyObject> {
     let m = PyModule::import(py, "upstream_ontologist.guess")?;
 
@@ -883,6 +879,66 @@ fn get_sf_metadata(project: &str) -> PyResult<PyObject> {
     }
 }
 
+fn py_to_person(py: Python, obj: PyObject) -> PyResult<Person> {
+    let name = obj.getattr(py, "name")?.extract::<Option<String>>(py)?;
+    let email = obj.getattr(py, "email")?.extract::<Option<String>>(py)?;
+    let url = obj.getattr(py, "url")?.extract::<Option<String>>(py)?;
+
+    Ok(Person { name, email, url })
+}
+
+fn py_to_upstream_datum(py: Python, obj: PyObject) -> PyResult<UpstreamDatum> {
+    let field = obj.getattr(py, "field")?.extract::<String>(py)?;
+
+    let val = obj.getattr(py, "value")?;
+
+    match field.as_str() {
+        "Name" => Ok(UpstreamDatum::Name(val.extract::<String>(py)?)),
+        "Version" => Ok(UpstreamDatum::Version(val.extract::<String>(py)?)),
+        "Homepage" => Ok(UpstreamDatum::Homepage(val.extract::<String>(py)?)),
+        "Bug-Database" => Ok(UpstreamDatum::BugDatabase(val.extract::<String>(py)?)),
+        "Bug-Submit" => Ok(UpstreamDatum::BugSubmit(val.extract::<String>(py)?)),
+        "Contact" => Ok(UpstreamDatum::Contact(val.extract::<String>(py)?)),
+        "Repository" => Ok(UpstreamDatum::Repository(val.extract::<String>(py)?)),
+        "Repository-Browse" => Ok(UpstreamDatum::RepositoryBrowse(val.extract::<String>(py)?)),
+        "License" => Ok(UpstreamDatum::License(val.extract::<String>(py)?)),
+        "Description" => Ok(UpstreamDatum::Description(val.extract::<String>(py)?)),
+        "Summary" => Ok(UpstreamDatum::Summary(val.extract::<String>(py)?)),
+        "Cargo-Crate" => Ok(UpstreamDatum::CargoCrate(val.extract::<String>(py)?)),
+        "Security-MD" => Ok(UpstreamDatum::SecurityMD(val.extract::<String>(py)?)),
+        "Security-Contact" => Ok(UpstreamDatum::SecurityContact(val.extract::<String>(py)?)),
+        "Version" => Ok(UpstreamDatum::Version(val.extract::<String>(py)?)),
+        "Keywords" => Ok(UpstreamDatum::Keywords(val.extract::<Vec<String>>(py)?)),
+        "Copyright" => Ok(UpstreamDatum::Copyright(val.extract::<String>(py)?)),
+        "Documentation" => Ok(UpstreamDatum::Documentation(val.extract::<String>(py)?)),
+        "Go-Import-Path" => Ok(UpstreamDatum::GoImportPath(val.extract::<String>(py)?)),
+        "Download" => Ok(UpstreamDatum::Download(val.extract::<String>(py)?)),
+        "Wiki" => Ok(UpstreamDatum::Wiki(val.extract::<String>(py)?)),
+        "MailingList" => Ok(UpstreamDatum::MailingList(val.extract::<String>(py)?)),
+        "Funding" => Ok(UpstreamDatum::Funding(val.extract::<String>(py)?)),
+        "SourceForge-Project" => Ok(UpstreamDatum::SourceForgeProject(
+            val.extract::<String>(py)?,
+        )),
+        "Archive" => Ok(UpstreamDatum::Archive(val.extract::<String>(py)?)),
+        "Demo" => Ok(UpstreamDatum::Demo(val.extract::<String>(py)?)),
+        "Pecl-Package" => Ok(UpstreamDatum::PeclPackage(val.extract::<String>(py)?)),
+        "Author" => Ok(UpstreamDatum::Author(
+            val.extract::<Vec<PyObject>>(py)?
+                .into_iter()
+                .map(|x| py_to_person(py, x))
+                .collect::<PyResult<Vec<Person>>>()?,
+        )),
+        "Maintainer" => Ok(UpstreamDatum::Maintainer(py_to_person(py, val)?)),
+        _ => Err(PyRuntimeError::new_err(format!("Unknown field: {}", field))),
+    }
+}
+
+#[pyfunction]
+fn known_bad_guess(py: Python, datum: PyObject) -> PyResult<bool> {
+    let datum = py_to_upstream_datum(py, datum)?;
+    Ok(datum.known_bad_guess())
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -964,5 +1020,6 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
         py.get_type::<NoSuchRepologyProject>(),
     )?;
     m.add("NoSuchForgeProject", py.get_type::<NoSuchForgeProject>())?;
+    m.add_wrapped(wrap_pyfunction!(known_bad_guess))?;
     Ok(())
 }

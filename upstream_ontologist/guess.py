@@ -106,12 +106,6 @@ DATUM_TYPES = {
 }
 
 
-def known_bad_url(value):
-    if '${' in value:
-        return True
-    return False
-
-
 def known_bad_guess(datum: UpstreamDatum) -> bool:  # noqa: C901
     try:
         expected_type = DATUM_TYPES[datum.field]
@@ -123,61 +117,7 @@ def known_bad_guess(datum: UpstreamDatum) -> bool:  # noqa: C901
             'filtering out bad value %r for %s',
             datum.value, datum.field)
         return True
-    if datum.field in ('Bug-Submit', 'Bug-Database'):
-        assert isinstance(datum.value, str)
-        if known_bad_url(datum.value):
-            return True
-        parsed_url = urlparse(datum.value)
-        if parsed_url.hostname == 'bugzilla.gnome.org':
-            return True
-        if parsed_url.hostname == 'bugs.freedesktop.org':
-            return True
-        if parsed_url.path.endswith('/sign_in'):
-            return True
-    if datum.field == 'Repository':
-        assert isinstance(datum.value, str)
-        if known_bad_url(datum.value):
-            return True
-        parsed_url = urlparse(datum.value)
-        if parsed_url.hostname == 'anongit.kde.org':
-            return True
-        if parsed_url.hostname == 'git.gitorious.org':
-            return True
-        if parsed_url.path.endswith('/sign_in'):
-            return True
-    if datum.field == 'Homepage':
-        assert isinstance(datum.value, str)
-        parsed_url = urlparse(datum.value)
-        if parsed_url.hostname in ('pypi.org', 'rubygems.org'):
-            return True
-    if datum.field == 'Repository-Browse':
-        assert isinstance(datum.value, str)
-        if known_bad_url(datum.value):
-            return True
-        parsed_url = urlparse(datum.value)
-        if parsed_url.hostname == 'cgit.kde.org':
-            return True
-        if parsed_url.path.endswith('/sign_in'):
-            return True
-    if datum.field == 'Author':
-        assert isinstance(datum.value, list)
-        for value in datum.value:
-            if value.name is not None:
-                if 'Maintainer' in value.name:
-                    return True
-                if 'Contributor' in value.name:
-                    return True
-    if datum.field == 'Name':
-        assert isinstance(datum.value, str)
-        if datum.value.lower() == 'package':
-            return True
-    if datum.field == 'Version':
-        assert isinstance(datum.value, str)
-        if datum.value.lower() in ('devel', ):
-            return True
-    if isinstance(datum.value, str) and datum.value.strip().lower() == 'unknown':
-        return True
-    return False
+    return _upstream_ontologist.known_bad_guess(datum)
 
 
 def filter_bad_guesses(
