@@ -1732,42 +1732,39 @@ pub fn guess_from_meta_json(path: &Path, _trust_package: bool) -> Vec<UpstreamDa
     upstream_data
 }
 
-/*
 pub fn guess_from_debian_patch(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
     let file = File::open(path).unwrap();
     let reader = std::io::BufReader::new(file);
 
+    let net_access = None;
+
     let mut upstream_data: Vec<UpstreamDatumWithMetadata> = Vec::new();
 
-    for line in reader.lines() {
-        if let Ok(line) = line {
-            if line.starts_with("Forwarded: ") {
-                let forwarded = line.splitn(2, ':').nth(1).unwrap().trim();
-                let forwarded_str = forwarded.to_string();
+    for line in reader.lines().flatten() {
+        if line.starts_with("Forwarded: ") {
+            let forwarded = line.split_once(':').unwrap().1.trim();
+            let forwarded = Url::parse(forwarded).unwrap();
 
-                if let Some(bug_db) = bug_database_from_issue_url(&forwarded_str) {
-                    upstream_data.push(UpstreamDatumWithMetadata {
-                        datum: UpstreamDatum::BugDatabase(bug_db),
-                        certainty: Some(Certainty::Possible),
-                        origin: Some(path.to_string_lossy().to_string()),
-                    });
-                }
+            if let Some(bug_db) = bug_database_from_issue_url(&forwarded, net_access) {
+                upstream_data.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::BugDatabase(bug_db.to_string()),
+                    certainty: Some(Certainty::Possible),
+                    origin: Some(path.to_string_lossy().to_string()),
+                });
+            }
 
-                if let Some(repo_url) = repo_url_from_merge_request_url(&forwarded_str) {
-                    upstream_data.push(UpstreamDatumWithMetadata {
-                        datum: UpstreamDatum::Repository(repo_url),
-                        certainty: Some(Certainty::Possible),
-                        origin: Some(path.to_string_lossy().to_string()),
-                    });
-                }
+            if let Some(repo_url) = repo_url_from_merge_request_url(&forwarded, net_access) {
+                upstream_data.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Repository(repo_url.to_string()),
+                    certainty: Some(Certainty::Possible),
+                    origin: Some(path.to_string_lossy().to_string()),
+                });
             }
         }
     }
 
     upstream_data
 }
-
-*/
 
 pub enum CanonicalizeError {
     InvalidUrl(Url, String),

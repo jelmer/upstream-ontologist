@@ -935,20 +935,7 @@ def guess_from_readme(path, trust_package):  # noqa: C901
         yield UpstreamDatum('Repository', urls[0], 'possible')
 
 
-def guess_from_debian_patch(path, trust_package):
-    with open(path, 'rb') as f:
-        for line in f:
-            if line.startswith(b'Forwarded: '):
-                forwarded = line.split(b':', 1)[1].strip()
-                bug_db = bug_database_from_issue_url(forwarded.decode('utf-8'))
-                if bug_db:
-                    yield UpstreamDatum('Bug-Database', bug_db, 'possible')
-                repo_url = repo_url_from_merge_request_url(
-                    forwarded.decode('utf-8'))
-                if repo_url:
-                    yield UpstreamDatum('Repository', repo_url, 'possible')
-
-
+guess_from_debian_patch = _upstream_ontologist.guess_from_debian_patch
 guess_from_meta_json = _upstream_ontologist.guess_from_meta_json
 guess_from_travis_yml = _upstream_ontologist.guess_from_travis_yml
 guess_from_meta_yml = _upstream_ontologist.guess_from_meta_yml
