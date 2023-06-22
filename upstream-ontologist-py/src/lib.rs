@@ -971,6 +971,18 @@ fn readme_skip_paragraph(py: Python, para: &str) -> PyResult<(bool, Vec<PyObject
     Ok((skip, para))
 }
 
+#[pyfunction]
+fn guess_from_pyproject_toml(
+    py: Python,
+    path: PathBuf,
+    trust_package: bool,
+) -> PyResult<Vec<PyObject>> {
+    upstream_ontologist::guess_from_pyproject_toml(path.as_path(), trust_package)
+        .into_iter()
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
+        .collect()
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -1042,6 +1054,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(get_sf_metadata))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_debian_patch))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_path))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_pyproject_toml))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;

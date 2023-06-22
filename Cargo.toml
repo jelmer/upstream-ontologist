@@ -32,15 +32,17 @@ chrono = "0.4"
 textwrap = ">=0.16"
 toml = { version = ">=0.5", optional = true }
 mailparse = { version = "0.14", optional = true }
+pyproject-toml = { version = "0.6", optional = true }
 
 [features]
-default = ["git-config", "launchpad", "opam", "dist-ini", "cargo", "r-description"]
+default = ["git-config", "launchpad", "opam", "dist-ini", "cargo", "r-description", "pyproject-toml"]
 git-config = ["dep:gix-config"]
 launchpad = ["dep:distro-info"]
 opam = ["dep:opam-file-rs"]
 dist-ini = ["dep:rust-ini"]
 cargo = ["dep:toml"]
 r-description = ["dep:mailparse"]
+pyproject-toml = ["dep:pyproject-toml"]
 
 [lib]
 

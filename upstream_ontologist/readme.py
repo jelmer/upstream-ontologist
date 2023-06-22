@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 _skip_paragraph = _upstream_ontologist.readme.skip_paragraph
 
 
-def _skip_paragraph_block(para: str):  # noqa: C901
+def _skip_paragraph_block(para):  # noqa: C901
     (skip, extra_metadata) = _skip_paragraph(para.get_text())
     if skip:
         return (True, extra_metadata)

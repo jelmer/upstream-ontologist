@@ -950,59 +950,7 @@ guess_from_r_description = _upstream_ontologist.guess_from_r_description
 guess_from_environment = _upstream_ontologist.guess_from_environment
 guess_from_path = _upstream_ontologist.guess_from_path
 guess_from_cargo = _upstream_ontologist.guess_from_cargo
-
-
-def guess_from_pyproject_toml(path, trust_package):
-    try:
-        from tomlkit import loads
-        from tomlkit.exceptions import ParseError
-    except ModuleNotFoundError as e:
-        warn_missing_dependency(path, e.name)
-        return
-    try:
-        with open(path) as f:
-            pyproject = loads(f.read())
-    except FileNotFoundError:
-        return
-    except ParseError as e:
-        logger.warning('Error parsing toml file %s: %s', path, e)
-        return
-    try:
-        poetry = pyproject['tool']['poetry']  # type: ignore
-    except KeyError:
-        pass
-    else:
-        yield from guess_from_poetry(poetry)
-
-
-def guess_from_poetry(poetry):
-    for key, value in poetry.items():
-        if key == 'version':
-            yield UpstreamDatum('Version', str(value), 'certain')
-        elif key == 'description':
-            yield UpstreamDatum('Summary', str(value), 'certain')
-        elif key == 'license':
-            yield UpstreamDatum('License', str(value), 'certain')
-        elif key == 'repository':
-            yield UpstreamDatum('Repository', str(value), 'certain')
-        elif key == 'name':
-            yield UpstreamDatum('Name', str(value), 'certain')
-        elif key == 'urls':
-            yield from parse_python_project_urls(value)
-        elif key == 'keywords':
-            yield UpstreamDatum('Keywords', [str(x) for x in value], 'certain')
-        elif key == 'authors':
-            yield UpstreamDatum('Author', [Person.from_string(x) for x in value], 'certain')
-        elif key == 'homepage':
-            yield UpstreamDatum('Homepage', str(value), 'certain')
-        elif key == 'documentation':
-            yield UpstreamDatum('Documentation', str(value), 'certain')
-        elif key in ('packages', 'readme', 'classifiers', 'dependencies',
-                     'dev-dependencies', 'scripts'):
-            pass
-        else:
-            logger.debug('Unknown field %s (%r) for poetry', key, value)
-
+guess_from_pyproject_toml = _upstream_ontologist.guess_from_pyproject_toml
 
 guess_from_pom_xml = _upstream_ontologist.guess_from_pom_xml
 guess_from_git_config = _upstream_ontologist.guess_from_git_config
