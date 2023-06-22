@@ -23,105 +23,19 @@ import re
 from typing import Optional, Tuple, Iterable, List
 from urllib.parse import urlparse
 
-from . import UpstreamDatum
+from . import UpstreamDatum, _upstream_ontologist
 
 
 logger = logging.getLogger(__name__)
 
 
-def _skip_paragraph(para, metadata):  # noqa: C901
-    if re.match(r'See .* for more (details|information)\.', para):
-        return True
-    if re.match(r'See .* for instructions', para):
-        return True
-    if re.match(r'Please refer .*\.', para):
-        return True
-    m = re.match(r'It is licensed under (.*)', para)
-    if m:
-        metadata.append(UpstreamDatum('License', m.group(1), 'possible'))
-        return True
-    m = re.match(r'License: (.*)', para, re.I)
-    if m:
-        metadata.append(UpstreamDatum('License', m.group(1), 'likely'))
-        return True
-    m = re.match('(Home page|homepage_url|Main website|Website|Homepage): (.*)', para, re.I)
-    if m:
-        url = m.group(2)
-        if url.startswith('<') and url.endswith('>'):
-            url = url[1:-1]
-        metadata.append(UpstreamDatum('Homepage', url, 'likely'))
-        return True
-    m = re.match('More documentation .* at http.*', para)
-    if m:
-        return True
-    m = re.match('Documentation (can be found|is hosted|is available) (at|on) ([^ ]+)', para)
-    if m:
-        metadata.append(UpstreamDatum('Documentation', m.group(3), 'likely'))
-        return True
-    m = re.match(r'Documentation for (.*)\s+(can\s+be\s+found|is\s+hosted)\s+(at|on)\s+([^ ]+)', para)
-    if m:
-        metadata.append(UpstreamDatum('Name', m.group(1), 'possible'))
-        metadata.append(UpstreamDatum('Documentation', m.group(4), 'likely'))
-        return True
-    if re.match(r'Documentation[, ].*found.*(at|on).*\.', para, re.S):
-        return True
-    m = re.match('See (http.*|gopkg.in.*|github.com.*)', para)
-    if m:
-        return True
-    m = re.match('Available on (.*)', para)
-    if m:
-        return True
-    m = re.match(
-        r'This software is freely distributable under the (.*) license.*',
-        para)
-    if m:
-        metadata.append(UpstreamDatum('License', m.group(1), 'likely'))
-        return True
-    m = re.match(r'This .* is hosted at .*', para)
-    if m:
-        return True
-    m = re.match(r'This code has been developed by .*', para)
-    if m:
-        return True
-    if para.startswith('Download and install using:'):
-        return True
-    m = re.match('Bugs should be reported by .*', para)
-    if m:
-        return True
-    m = re.match(r'The bug tracker can be found at (http[^ ]+[^.])', para)
-    if m:
-        metadata.append(UpstreamDatum('Bug-Database', m.group(1), 'likely'))
-        return True
-    m = re.match(r'Copyright (\(c\) |)(.*)', para)
-    if m:
-        metadata.append(UpstreamDatum('Copyright', m.group(2), 'possible'))
-        return True
-    if re.match('You install .*', para):
-        return True
-    if re.match('This .* is free software; .*', para):
-        return True
-    m = re.match('Please report any bugs(.*) to <(.*)>', para)
-    if m:
-        metadata.append(UpstreamDatum('Bugs-Submit', m.group(2), 'possible'))
-        return True
-    if re.match('Share and Enjoy', para, re.I):
-        return True
-    lines = para.splitlines(False)
-    if lines and lines[0].strip() in ('perl Makefile.PL', 'make', './configure'):
-        return True
-    if re.match('For further information, .*', para):
-        return True
-    if re.match('Further information .*', para):
-        return True
-    m = re.match(r'A detailed Changelog can be found.*:\s+(http.*)', para, re.I)
-    if m:
-        metadata.append(UpstreamDatum('Changelog', m.group(1), 'possible'))
-        return True
+_skip_paragraph = _upstream_ontologist.readme.skip_paragraph
 
 
-def _skip_paragraph_block(para, metadata):  # noqa: C901
-    if _skip_paragraph(para.get_text(), metadata):
-        return True
+def _skip_paragraph_block(para: str):  # noqa: C901
+    (skip, extra_metadata) = _skip_paragraph(para.get_text())
+    if skip:
+        return (True, extra_metadata)
     for c in para.children:
         if isinstance(c, str) and not c.strip():
             continue
@@ -135,47 +49,47 @@ def _skip_paragraph_block(para, metadata):  # noqa: C901
             else:
                 name = None
             if name in ('CRAN', 'CRAN_Status_Badge', 'CRAN_Logs_Badge'):
-                metadata.append(UpstreamDatum('Archive', 'CRAN', 'confident'))
+                extra_metadata.append(UpstreamDatum('Archive', 'CRAN', 'confident'))
             elif name == 'Gitter':
                 parsed_url = urlparse(c.get('href'))
-                metadata.append(UpstreamDatum(
+                extra_metadata.append(UpstreamDatum(
                     'Repository',
                     'https://github.com/%s' % '/'.join(parsed_url.path.strip('/').split('/')[:2]),
                     'confident'))
             elif name and name.lower() == 'build status':
                 parsed_url = urlparse(c.get('href'))
                 if parsed_url.hostname == 'travis-ci.org':
-                    metadata.append(UpstreamDatum(
+                    extra_metadata.append(UpstreamDatum(
                         'Repository',
                         'https://github.com/%s' % '/'.join(parsed_url.path.strip('/').split('/')[:2]),
                         'confident'))
             elif name and name.lower() == 'documentation':
-                metadata.append(UpstreamDatum(
+                extra_metadata.append(UpstreamDatum(
                     'Documentation', c.get('href'), 'confident'))
             elif name and name.lower() == 'api docs':
-                metadata.append(UpstreamDatum(
+                extra_metadata.append(UpstreamDatum(
                     'API-Documentation', c.get('href'), 'confident'))
             elif name and name.lower() == 'downloads':
-                metadata.append(UpstreamDatum(
+                extra_metadata.append(UpstreamDatum(
                     'Download', c.get('href'), 'confident'))
             elif name and name.lower() == 'crates.io':
                 href = c.get('href')
                 if href.startswith('https://crates.io/crates/'):
-                    metadata.append(UpstreamDatum(
+                    extra_metadata.append(UpstreamDatum(
                         'Cargo-Crate', href.rsplit('/')[-1], 'confident'))
             elif name:
                 m = re.match('(.*) License', name)
                 if m:
-                    metadata.append(UpstreamDatum('License', m.group(1), 'likely'))
+                    extra_metadata.append(UpstreamDatum('License', m.group(1), 'likely'))
                 else:
                     logger.debug('Unhandled field %r in README', name)
             continue
         break
     else:
-        return True
+        return (True, extra_metadata)
     if para.get_text() == '':
-        return True
-    return False
+        return (True, extra_metadata)
+    return (False, [])
 
 
 def render(el):
@@ -259,7 +173,9 @@ def _extract_paragraphs(children, metadata):
                     continue
                 else:
                     break
-            if _skip_paragraph_block(el, metadata):
+            (skip, extra_metadata) = _skip_paragraph_block(el)
+            metadata.extend(extra_metadata)
+            if skip:
                 if len(paragraphs) > 0:
                     break
                 else:
@@ -439,7 +355,9 @@ def description_from_readme_plain(text: str) -> Tuple[Optional[str], Iterable[Up
         if not para:
             continue
         line = '\n'.join(para)
-        if _skip_paragraph(line, metadata):
+        (skip, extra_metadata) = _skip_paragraph(line)
+        metadata.extend(extra_metadata)
+        if skip:
             continue
         output.append(line + '\n')
     if len(output) > 30:

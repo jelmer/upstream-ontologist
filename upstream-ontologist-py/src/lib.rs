@@ -74,6 +74,7 @@ fn upstream_datum_to_py(py: Python, datum: UpstreamDatum) -> PyResult<(String, P
             UpstreamDatum::SourceForgeProject(m) => m.into_py(py),
             UpstreamDatum::PeclPackage(p) => p.into_py(py),
             UpstreamDatum::Funding(p) => p.into_py(py),
+            UpstreamDatum::Changelog(c) => c.into_py(py),
         },
     ))
 }
@@ -929,6 +930,7 @@ fn py_to_upstream_datum(py: Python, obj: PyObject) -> PyResult<UpstreamDatum> {
                 .collect::<PyResult<Vec<Person>>>()?,
         )),
         "Maintainer" => Ok(UpstreamDatum::Maintainer(py_to_person(py, val)?)),
+        "Changelog" => Ok(UpstreamDatum::Changelog(val.extract::<String>(py)?)),
         _ => Err(PyRuntimeError::new_err(format!("Unknown field: {}", field))),
     }
 }
@@ -957,6 +959,16 @@ fn guess_from_path(py: Python, path: PathBuf, trust_package: bool) -> PyResult<V
         .into_iter()
         .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect()
+}
+
+#[pyfunction(name = "skip_paragraph")]
+fn readme_skip_paragraph(py: Python, para: &str) -> PyResult<(bool, Vec<PyObject>)> {
+    let (skip, para) = upstream_ontologist::readme::skip_paragraph(para);
+    let para = para
+        .into_iter()
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
+        .collect::<PyResult<Vec<PyObject>>>()?;
+    Ok((skip, para))
 }
 
 #[pymodule]
@@ -1043,5 +1055,8 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     )?;
     m.add("NoSuchForgeProject", py.get_type::<NoSuchForgeProject>())?;
     m.add_wrapped(wrap_pyfunction!(known_bad_guess))?;
+    let readmem = PyModule::new(py, "readme")?;
+    readmem.add_wrapped(wrap_pyfunction!(readme_skip_paragraph))?;
+    m.add_submodule(readmem)?;
     Ok(())
 }

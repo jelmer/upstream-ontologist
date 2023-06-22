@@ -16,6 +16,7 @@ static USER_AGENT: &str = concat!("upstream-ontologist/", env!("CARGO_PKG_VERSIO
 // Too aggressive?
 const DEFAULT_URLLIB_TIMEOUT: u64 = 3;
 
+pub mod readme;
 pub mod vcs;
 
 #[derive(Clone, Copy, Debug, Ord, Eq, PartialOrd, PartialEq)]
@@ -160,6 +161,7 @@ pub enum UpstreamDatum {
     Demo(String),
     PeclPackage(String),
     Funding(String),
+    Changelog(String),
 }
 
 #[derive(Clone)]
@@ -207,6 +209,7 @@ impl UpstreamDatum {
             UpstreamDatum::Demo(..) => "Demo",
             UpstreamDatum::PeclPackage(..) => "Pecl-Package",
             UpstreamDatum::Funding(..) => "Funding",
+            UpstreamDatum::Changelog(..) => "Changelog",
         }
     }
 
@@ -240,6 +243,7 @@ impl UpstreamDatum {
             UpstreamDatum::Keywords(..) => None,
             UpstreamDatum::Copyright(c) => Some(c),
             UpstreamDatum::Funding(f) => Some(f),
+            UpstreamDatum::Changelog(c) => Some(c),
         }
     }
 
