@@ -7,7 +7,9 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use upstream_ontologist::{CanonicalizeError, Person, UpstreamDatum, UpstreamDatumWithMetadata};
+use upstream_ontologist::{
+    py_to_upstream_datum, CanonicalizeError, Person, UpstreamDatum, UpstreamDatumWithMetadata,
+};
 use url::Url;
 
 import_exception!(urllib.error, HTTPError);
@@ -880,64 +882,9 @@ fn get_sf_metadata(project: &str) -> PyResult<PyObject> {
     }
 }
 
-fn py_to_person(py: Python, obj: PyObject) -> PyResult<Person> {
-    let name = obj.getattr(py, "name")?.extract::<Option<String>>(py)?;
-    let email = obj.getattr(py, "email")?.extract::<Option<String>>(py)?;
-    let url = obj.getattr(py, "url")?.extract::<Option<String>>(py)?;
-
-    Ok(Person { name, email, url })
-}
-
-fn py_to_upstream_datum(py: Python, obj: PyObject) -> PyResult<UpstreamDatum> {
-    let field = obj.getattr(py, "field")?.extract::<String>(py)?;
-
-    let val = obj.getattr(py, "value")?;
-
-    match field.as_str() {
-        "Name" => Ok(UpstreamDatum::Name(val.extract::<String>(py)?)),
-        "Version" => Ok(UpstreamDatum::Version(val.extract::<String>(py)?)),
-        "Homepage" => Ok(UpstreamDatum::Homepage(val.extract::<String>(py)?)),
-        "Bug-Database" => Ok(UpstreamDatum::BugDatabase(val.extract::<String>(py)?)),
-        "Bug-Submit" => Ok(UpstreamDatum::BugSubmit(val.extract::<String>(py)?)),
-        "Contact" => Ok(UpstreamDatum::Contact(val.extract::<String>(py)?)),
-        "Repository" => Ok(UpstreamDatum::Repository(val.extract::<String>(py)?)),
-        "Repository-Browse" => Ok(UpstreamDatum::RepositoryBrowse(val.extract::<String>(py)?)),
-        "License" => Ok(UpstreamDatum::License(val.extract::<String>(py)?)),
-        "Description" => Ok(UpstreamDatum::Description(val.extract::<String>(py)?)),
-        "Summary" => Ok(UpstreamDatum::Summary(val.extract::<String>(py)?)),
-        "Cargo-Crate" => Ok(UpstreamDatum::CargoCrate(val.extract::<String>(py)?)),
-        "Security-MD" => Ok(UpstreamDatum::SecurityMD(val.extract::<String>(py)?)),
-        "Security-Contact" => Ok(UpstreamDatum::SecurityContact(val.extract::<String>(py)?)),
-        "Version" => Ok(UpstreamDatum::Version(val.extract::<String>(py)?)),
-        "Keywords" => Ok(UpstreamDatum::Keywords(val.extract::<Vec<String>>(py)?)),
-        "Copyright" => Ok(UpstreamDatum::Copyright(val.extract::<String>(py)?)),
-        "Documentation" => Ok(UpstreamDatum::Documentation(val.extract::<String>(py)?)),
-        "Go-Import-Path" => Ok(UpstreamDatum::GoImportPath(val.extract::<String>(py)?)),
-        "Download" => Ok(UpstreamDatum::Download(val.extract::<String>(py)?)),
-        "Wiki" => Ok(UpstreamDatum::Wiki(val.extract::<String>(py)?)),
-        "MailingList" => Ok(UpstreamDatum::MailingList(val.extract::<String>(py)?)),
-        "Funding" => Ok(UpstreamDatum::Funding(val.extract::<String>(py)?)),
-        "SourceForge-Project" => Ok(UpstreamDatum::SourceForgeProject(
-            val.extract::<String>(py)?,
-        )),
-        "Archive" => Ok(UpstreamDatum::Archive(val.extract::<String>(py)?)),
-        "Demo" => Ok(UpstreamDatum::Demo(val.extract::<String>(py)?)),
-        "Pecl-Package" => Ok(UpstreamDatum::PeclPackage(val.extract::<String>(py)?)),
-        "Author" => Ok(UpstreamDatum::Author(
-            val.extract::<Vec<PyObject>>(py)?
-                .into_iter()
-                .map(|x| py_to_person(py, x))
-                .collect::<PyResult<Vec<Person>>>()?,
-        )),
-        "Maintainer" => Ok(UpstreamDatum::Maintainer(py_to_person(py, val)?)),
-        "Changelog" => Ok(UpstreamDatum::Changelog(val.extract::<String>(py)?)),
-        _ => Err(PyRuntimeError::new_err(format!("Unknown field: {}", field))),
-    }
-}
-
 #[pyfunction]
 fn known_bad_guess(py: Python, datum: PyObject) -> PyResult<bool> {
-    let datum = py_to_upstream_datum(py, datum)?;
+    let datum = py_to_upstream_datum(py, &datum)?;
     Ok(datum.known_bad_guess())
 }
 
@@ -990,6 +937,14 @@ fn guess_from_package_yaml(
     trust_package: bool,
 ) -> PyResult<Vec<PyObject>> {
     upstream_ontologist::guess_from_package_yaml(path.as_path(), trust_package)
+        .into_iter()
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
+        .collect()
+}
+
+#[pyfunction]
+fn guess_from_pkg_info(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
+    upstream_ontologist::guess_from_pkg_info(path.as_path(), trust_package)
         .into_iter()
         .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect()
@@ -1068,6 +1023,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_path))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_pyproject_toml))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_package_yaml))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_pkg_info))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;

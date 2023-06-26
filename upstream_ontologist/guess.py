@@ -347,48 +347,7 @@ def guess_from_debian_changelog(path, trust_package):
 
 metadata_from_itp_bug_body = _upstream_ontologist.metadata_from_itp_bug_body
 extract_sf_project_name = _upstream_ontologist.extract_sf_project_name
-
-
-def guess_from_python_metadata(pkg_info):
-    for field, value in pkg_info.items():
-        if field == 'Name':
-            yield UpstreamDatum('Name', value, 'certain')
-        elif field == 'Version':
-            yield UpstreamDatum('Version', value, 'certain')
-        elif field == 'Home-page':
-            yield UpstreamDatum('Homepage', value, 'certain')
-        elif field == 'Project-URL':
-            url_type, url = value.split(', ')
-            yield from parse_python_project_urls({url_type: url})
-        elif field == 'Summary':
-            yield UpstreamDatum('Summary', value, 'certain')
-        elif field == 'Author':
-            author_email = pkg_info.get('Author-email')
-            author = Person(value, author_email)
-            yield UpstreamDatum('Author', [author], 'certain')
-        elif field == 'License':
-            yield UpstreamDatum('License', value, 'certain')
-        elif field == 'Download-URL':
-            yield UpstreamDatum('Download', value, 'certain')
-        elif field in ('Author-email', 'Classifier', 'Requires-Python',
-                       'License-File', 'Metadata-Version',
-                       'Provides-Extra', 'Description-Content-Type'):
-            pass
-        else:
-            logger.debug('Unknown PKG-INFO field %s (%r)', field, value)
-    yield from parse_python_long_description(
-        pkg_info.get_payload(), pkg_info.get_content_type())
-
-
-def guess_from_pkg_info(path, trust_package):
-    """Get the metadata from a PKG-INFO file."""
-    from email.parser import Parser
-    try:
-        with open(path) as f:
-            pkg_info = Parser().parse(f)
-    except FileNotFoundError:
-        return
-    yield from guess_from_python_metadata(pkg_info)
+guess_from_pkg_info = _upstream_ontologist.guess_from_pkg_info
 
 
 def parse_python_long_description(long_description, content_type) -> Iterator[UpstreamDatum]:

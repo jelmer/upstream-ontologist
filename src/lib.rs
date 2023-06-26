@@ -1,8 +1,10 @@
 use log::{debug, error, warn};
 use percent_encoding::utf8_percent_encode;
+use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use regex::Regex;
 use reqwest::header::HeaderMap;
+use std::str::FromStr;
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -27,14 +29,15 @@ pub enum Certainty {
     Possible,
 }
 
-impl From<&str> for Certainty {
-    fn from(s: &str) -> Self {
+impl FromStr for Certainty {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "certain" => Certainty::Certain,
-            "confident" => Certainty::Confident,
-            "likely" => Certainty::Likely,
-            "possible" => Certainty::Possible,
-            _ => panic!("unknown certainty: {}", s),
+            "certain" => Ok(Certainty::Certain),
+            "confident" => Ok(Certainty::Confident),
+            "likely" => Ok(Certainty::Likely),
+            "possible" => Ok(Certainty::Possible),
+            _ => Err(format!("unknown certainty: {}", s)),
         }
     }
 }
@@ -3902,7 +3905,7 @@ pub fn guess_from_launchpad(
                         }
                     }
                 } else {
-                    panic!("unknown vcs: {:?}", vcs);
+                    error!("unknown vcs: {:?}", vcs);
                 }
             }
 
@@ -4615,7 +4618,7 @@ pub fn guess_from_sf(sf_project: &str, subproject: Option<&str>) -> Vec<Upstream
                         // TODO: Implement Bazaar (BZR) handling
                     }
                     _ => {
-                        panic!("Unknown VCS kind: {}", kind);
+                        error!("Unknown VCS kind: {}", kind);
                     }
                 }
             } else if vcs_tools.len() > 1 {
@@ -5065,7 +5068,7 @@ pub fn guess_from_pyproject_toml(
             match license {
                 pyproject_toml::License::String(license) => {
                     ret.push(UpstreamDatumWithMetadata {
-                        datum: UpstreamDatum::License(license.to_string()),
+                        datum: UpstreamDatum::License(license),
                         certainty: Some(Certainty::Certain),
                         origin: Some(path.display().to_string()),
                     });
@@ -5223,4 +5226,255 @@ mod test {
             Some("https://github.com/foo/bar".to_string())
         );
     }
+}
+
+pub fn guess_from_pkg_info(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+    let contents = std::fs::read(path).unwrap();
+    let dist = python_pkginfo::Metadata::parse(contents.as_slice()).unwrap();
+
+    let mut ret = vec![];
+
+    ret.push(UpstreamDatumWithMetadata {
+        datum: UpstreamDatum::Name(dist.name),
+        certainty: Some(Certainty::Certain),
+        origin: Some(path.display().to_string()),
+    });
+
+    ret.push(UpstreamDatumWithMetadata {
+        datum: UpstreamDatum::Version(dist.version),
+        certainty: Some(Certainty::Certain),
+        origin: Some(path.display().to_string()),
+    });
+
+    if let Some(homepage) = dist.home_page {
+        ret.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Homepage(homepage),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.display().to_string()),
+        });
+    }
+
+    if let Some(summary) = dist.summary {
+        ret.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Summary(summary),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.display().to_string()),
+        });
+    }
+
+    if let Some(description) = dist.description {
+        ret.extend(parse_python_long_description(
+            description.as_str(),
+            dist.description_content_type.as_deref(),
+        ));
+    }
+
+    ret.extend(parse_python_project_urls(
+        dist.project_urls
+            .iter()
+            .map(|k| k.split_once(", ").unwrap())
+            .map(|(k, v)| (k.to_string(), v.to_string())),
+    ));
+
+    if dist.author.is_some() || dist.author_email.is_some() {
+        ret.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Author(vec![Person {
+                name: dist.author,
+                email: dist.author_email,
+                url: None,
+            }]),
+
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.display().to_string()),
+        });
+    }
+
+    if dist.maintainer.is_some() || dist.maintainer_email.is_some() {
+        ret.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Maintainer(Person {
+                name: dist.maintainer,
+                email: dist.maintainer_email,
+                url: None,
+            }),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.display().to_string()),
+        });
+    }
+
+    if let Some(license) = dist.license {
+        ret.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::License(license),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.display().to_string()),
+        });
+    }
+
+    if let Some(keywords) = dist.keywords {
+        ret.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Keywords(keywords.split(", ").map(|s| s.to_string()).collect()),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.display().to_string()),
+        });
+    }
+
+    if let Some(download_url) = dist.download_url {
+        ret.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Download(download_url),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.display().to_string()),
+        });
+    }
+
+    ret
+}
+
+pub fn py_to_person(py: Python, obj: PyObject) -> PyResult<Person> {
+    let name = obj.getattr(py, "name")?.extract::<Option<String>>(py)?;
+    let email = obj.getattr(py, "email")?.extract::<Option<String>>(py)?;
+    let url = obj.getattr(py, "url")?.extract::<Option<String>>(py)?;
+
+    Ok(Person { name, email, url })
+}
+
+pub fn py_to_upstream_datum(py: Python, obj: &PyObject) -> PyResult<UpstreamDatum> {
+    let field = obj.getattr(py, "field")?.extract::<String>(py)?;
+
+    let val = obj.getattr(py, "value")?;
+
+    match field.as_str() {
+        "Name" => Ok(UpstreamDatum::Name(val.extract::<String>(py)?)),
+        "Version" => Ok(UpstreamDatum::Version(val.extract::<String>(py)?)),
+        "Homepage" => Ok(UpstreamDatum::Homepage(val.extract::<String>(py)?)),
+        "Bug-Database" => Ok(UpstreamDatum::BugDatabase(val.extract::<String>(py)?)),
+        "Bug-Submit" => Ok(UpstreamDatum::BugSubmit(val.extract::<String>(py)?)),
+        "Contact" => Ok(UpstreamDatum::Contact(val.extract::<String>(py)?)),
+        "Repository" => Ok(UpstreamDatum::Repository(val.extract::<String>(py)?)),
+        "Repository-Browse" => Ok(UpstreamDatum::RepositoryBrowse(val.extract::<String>(py)?)),
+        "License" => Ok(UpstreamDatum::License(val.extract::<String>(py)?)),
+        "Description" => Ok(UpstreamDatum::Description(val.extract::<String>(py)?)),
+        "Summary" => Ok(UpstreamDatum::Summary(val.extract::<String>(py)?)),
+        "Cargo-Crate" => Ok(UpstreamDatum::CargoCrate(val.extract::<String>(py)?)),
+        "Security-MD" => Ok(UpstreamDatum::SecurityMD(val.extract::<String>(py)?)),
+        "Security-Contact" => Ok(UpstreamDatum::SecurityContact(val.extract::<String>(py)?)),
+        "Keywords" => Ok(UpstreamDatum::Keywords(val.extract::<Vec<String>>(py)?)),
+        "Copyright" => Ok(UpstreamDatum::Copyright(val.extract::<String>(py)?)),
+        "Documentation" => Ok(UpstreamDatum::Documentation(val.extract::<String>(py)?)),
+        "Go-Import-Path" => Ok(UpstreamDatum::GoImportPath(val.extract::<String>(py)?)),
+        "Download" => Ok(UpstreamDatum::Download(val.extract::<String>(py)?)),
+        "Wiki" => Ok(UpstreamDatum::Wiki(val.extract::<String>(py)?)),
+        "MailingList" => Ok(UpstreamDatum::MailingList(val.extract::<String>(py)?)),
+        "Funding" => Ok(UpstreamDatum::Funding(val.extract::<String>(py)?)),
+        "SourceForge-Project" => Ok(UpstreamDatum::SourceForgeProject(
+            val.extract::<String>(py)?,
+        )),
+        "Archive" => Ok(UpstreamDatum::Archive(val.extract::<String>(py)?)),
+        "Demo" => Ok(UpstreamDatum::Demo(val.extract::<String>(py)?)),
+        "Pecl-Package" => Ok(UpstreamDatum::PeclPackage(val.extract::<String>(py)?)),
+        "Author" => Ok(UpstreamDatum::Author(
+            val.extract::<Vec<PyObject>>(py)?
+                .into_iter()
+                .map(|x| py_to_person(py, x))
+                .collect::<PyResult<Vec<Person>>>()?,
+        )),
+        "Maintainer" => Ok(UpstreamDatum::Maintainer(py_to_person(py, val)?)),
+        "Changelog" => Ok(UpstreamDatum::Changelog(val.extract::<String>(py)?)),
+        _ => Err(PyRuntimeError::new_err(format!("Unknown field: {}", field))),
+    }
+}
+
+pub fn py_to_upstream_datum_with_metadata(
+    py: Python,
+    obj: PyObject,
+) -> PyResult<UpstreamDatumWithMetadata> {
+    let datum = py_to_upstream_datum(py, &obj)?;
+
+    let origin = obj.getattr(py, "origin")?.extract::<Option<String>>(py)?;
+
+    let certainty = obj
+        .getattr(py, "certainty")?
+        .extract::<Option<String>>(py)?;
+
+    Ok(UpstreamDatumWithMetadata {
+        datum,
+        certainty: certainty.map(|s| s.parse().unwrap()),
+        origin,
+    })
+}
+
+fn parse_python_long_description(
+    long_description: &str,
+    content_type: Option<&str>,
+) -> Vec<UpstreamDatumWithMetadata> {
+    if long_description.is_empty() {
+        return vec![];
+    }
+    let content_type = content_type.unwrap_or("text/plain");
+    let mut content_type = content_type.split(';').next().unwrap();
+    if long_description.contains("-*-restructuredtext-*-") {
+        content_type = "text/restructured-text";
+    }
+
+    let mut ret = vec![];
+    match content_type {
+        "text/plain" => {
+            let lines = long_description.split('\n').collect::<Vec<_>>();
+            if lines.len() > 30 {
+                return vec![];
+            }
+            ret.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Description(long_description.to_string()),
+                certainty: Some(Certainty::Possible),
+                origin: None,
+            });
+        }
+        "text/restructured-text" | "text/x-rst" => Python::with_gil(|py| {
+            let readme_mod = Python::import(py, "upstream_ontologist.readme").unwrap();
+            let (description, extra_md): (Option<String>, Vec<PyObject>) = readme_mod
+                .call_method1("description_from_readme_rst", (long_description,))
+                .unwrap()
+                .extract()
+                .unwrap();
+
+            if let Some(description) = description {
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Description(description),
+                    certainty: Some(Certainty::Possible),
+                    origin: Some("python long description (restructuredText)".to_string()),
+                });
+            }
+            ret.extend(
+                extra_md
+                    .into_iter()
+                    .map(|m| py_to_upstream_datum_with_metadata(py, m))
+                    .collect::<PyResult<Vec<_>>>()
+                    .unwrap(),
+            );
+        }),
+        "text/markdown" => Python::with_gil(|py| {
+            let readme_mod = Python::import(py, "upstream_ontologist.readme").unwrap();
+            let (description, extra_md): (Option<String>, Vec<PyObject>) = readme_mod
+                .call_method1("description_from_readme_md", (long_description,))
+                .unwrap()
+                .extract()
+                .unwrap();
+            if let Some(description) = description {
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Description(description),
+                    certainty: Some(Certainty::Possible),
+                    origin: Some("python long description (markdown)".to_string()),
+                });
+            }
+            ret.extend(
+                extra_md
+                    .into_iter()
+                    .map(|m| py_to_upstream_datum_with_metadata(py, m))
+                    .collect::<PyResult<Vec<_>>>()
+                    .unwrap(),
+            );
+        }),
+        _ => {
+            warn!("Unknown content type: {}", content_type);
+        }
+    }
+    ret
 }

@@ -33,9 +33,10 @@ textwrap = ">=0.16"
 toml = { version = ">=0.5", optional = true }
 mailparse = { version = "0.14", optional = true }
 pyproject-toml = { version = "0.6", optional = true }
+python-pkginfo = { version = ">=0.5", optional = true }
 
 [features]
-default = ["git-config", "launchpad", "opam", "dist-ini", "cargo", "r-description", "pyproject-toml"]
+default = ["git-config", "launchpad", "opam", "dist-ini", "cargo", "r-description", "pyproject-toml", "python-pkginfo"]
 git-config = ["dep:gix-config"]
 launchpad = ["dep:distro-info"]
 opam = ["dep:opam-file-rs"]
@@ -43,6 +44,7 @@ dist-ini = ["dep:rust-ini"]
 cargo = ["dep:toml"]
 r-description = ["dep:mailparse"]
 pyproject-toml = ["dep:pyproject-toml"]
+python-pkginfo = ["dep:python-pkginfo"]
 
 [lib]
 
