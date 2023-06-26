@@ -973,6 +973,7 @@ guess_from_makefile_pl = _upstream_ontologist.guess_from_makefile_pl
 guess_from_wscript = _upstream_ontologist.guess_from_wscript
 guess_from_metadata_json = _upstream_ontologist.guess_from_metadata_json
 guess_from_authors = _upstream_ontologist.guess_from_authors
+guess_from_package_yaml = _upstream_ontologist.guess_from_package_yaml
 
 
 def _get_guessers(path, trust_package=False):  # noqa: C901
@@ -985,6 +986,7 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
         ('package.json', guess_from_package_json),
         ('composer.json', guess_from_composer_json),
         ('package.xml', guess_from_package_xml),
+        ('package.yaml', guess_from_package_yaml),
         ('dist.ini', guess_from_dist_ini),
         ('debian/copyright', guess_from_debian_copyright),
         ('META.json', guess_from_meta_json),

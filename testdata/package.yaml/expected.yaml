@@ -1,0 +1,17 @@
+Name: css-text
+Version: 0.1.2.2
+Summary: CSS parser and renderer
+License: MIT
+Homepage: https://github.com/yesodweb/css-text
+Bug-Submit: https://github.com/yesodweb/css-text/issues/new
+Bug-Database: https://github.com/yesodweb/css-text/issues
+Repository: https://github.com/yesodweb/css-text.git
+Repository-Browse: https://github.com/yesodweb/css-text
+Contact: Greg Weber <greg@gregweber.info>
+Maintainer: !Person
+  name: Greg Weber
+  email: greg@gregweber.info
+Author:
+ - !Person
+   name: Michael Snoyman
+   email: michael@snoyman.com
