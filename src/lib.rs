@@ -707,60 +707,6 @@ fn simplify_namespaces(element: &mut xmltree::Element, namespaces: &[String]) {
     }
 }
 
-pub fn guess_from_authors(
-    path: &Path,
-    _trust_package: bool,
-) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
-    let file = File::open(path)?;
-    let reader = std::io::BufReader::new(file);
-
-    let mut authors: Vec<Person> = Vec::new();
-
-    for line in reader.lines().flatten() {
-        let mut m = line.trim().to_string();
-        if m.is_empty() {
-            continue;
-        }
-        if m.starts_with("arch-tag: ") {
-            continue;
-        }
-        if m.ends_with(':') {
-            continue;
-        }
-        if m.starts_with("$Id") {
-            continue;
-        }
-        if m.starts_with('*') || m.starts_with('-') {
-            m = m[1..].trim().to_string();
-        }
-        if m.len() < 3 {
-            continue;
-        }
-        if m.ends_with('.') {
-            continue;
-        }
-        if m.contains(" for ") {
-            let parts: Vec<&str> = m.split(" for ").collect();
-            m = parts[0].to_string();
-        }
-        if !m.chars().next().unwrap().is_alphabetic() {
-            continue;
-        }
-        if !m.contains('<') && line.as_bytes().starts_with(b"\t") {
-            continue;
-        }
-        if m.contains('<') || m.matches(' ').count() < 5 {
-            authors.push(Person::from(m.as_str()));
-        }
-    }
-
-    Ok(vec![UpstreamDatumWithMetadata {
-        datum: UpstreamDatum::Author(authors),
-        certainty: Some(Certainty::Likely),
-        origin: Some(path.to_string_lossy().to_string()),
-    }])
-}
-
 pub fn guess_from_metadata_json(
     path: &Path,
     _trust_package: bool,
@@ -1627,7 +1573,8 @@ fn possible_fields_missing(
     for field in fields {
         match find_datum(upstream_metadata, field) {
             Some(datum) if datum.certainty != Some(Certainty::Certain) => return true,
-            _ => return true,
+            None => return true,
+            _ => (),
         }
     }
     false
@@ -1680,7 +1627,7 @@ impl Forge for SourceForge {
         if segments.next() != Some("bugs") {
             return None;
         }
-        with_path_segments(&url, &["p", project, "bugs"]).ok()
+        with_path_segments(url, &["p", project, "bugs"]).ok()
     }
 
     fn extend_metadata(
@@ -1727,7 +1674,7 @@ impl Forge for Launchpad {
         let mut segments = url.path_segments()?;
         let project = segments.next()?;
 
-        with_path_segments(&url, &[project]).ok()
+        with_path_segments(url, &[project]).ok()
     }
 
     fn bug_submit_url_from_bug_database_url(&self, url: &Url) -> Option<Url> {
@@ -1738,7 +1685,7 @@ impl Forge for Launchpad {
         let mut segments = url.path_segments()?;
         let project = segments.next()?;
 
-        with_path_segments(&url, &[project, "+filebug"]).ok()
+        with_path_segments(url, &[project, "+filebug"]).ok()
     }
 }
 
@@ -1847,14 +1794,10 @@ fn sf_git_extract_url(page: &str) -> Option<String> {
     let soup = Document::from(page);
 
     let el = soup.find(Attr("id", "access_url")).next();
-    if el.is_none() {
-        return None;
-    }
+    el?;
 
     let el = el.unwrap();
-    if el.attr("value").is_none() {
-        return None;
-    }
+    el.attr("value")?;
 
     let value = el.attr("value").unwrap();
     let access_command: Vec<&str> = value.split(' ').collect();
@@ -1907,7 +1850,7 @@ pub fn guess_from_sf(sf_project: &str, subproject: Option<&str>) -> Vec<Upstream
                     tools
                         .as_array()
                         .unwrap()
-                        .into_iter()
+                        .iter()
                         .filter(|tool| {
                             vcs_names.contains(&tool.get("name").unwrap().as_str().unwrap())
                         })
@@ -1923,7 +1866,7 @@ pub fn guess_from_sf(sf_project: &str, subproject: Option<&str>) -> Vec<Upstream
 
             if vcs_tools.len() > 1 {
                 vcs_tools.retain(|tool| {
-                    if let Some(url) = tool.2.strip_suffix("/") {
+                    if let Some(url) = tool.2.strip_suffix('/') {
                         !["www", "homepage"].contains(&url.rsplit('/').next().unwrap_or(""))
                     } else {
                         true
@@ -1950,10 +1893,10 @@ pub fn guess_from_sf(sf_project: &str, subproject: Option<&str>) -> Vec<Upstream
                 let (kind, _, url) = vcs_tools[0];
                 match kind {
                     "git" => {
-                        let mut url = format!("https://sourceforge.net/{}", url);
+                        let url = format!("https://sourceforge.net/{}", url);
                         let client = reqwest::blocking::Client::new();
-                        let mut response = client
-                            .head(&url)
+                        let response = client
+                            .head(url)
                             .header("User-Agent", USER_AGENT)
                             .send()
                             .unwrap();
@@ -1974,7 +1917,7 @@ pub fn guess_from_sf(sf_project: &str, subproject: Option<&str>) -> Vec<Upstream
                         let url = format!(
                             "cvs+pserver://anonymous@{}.cvs.sourceforge.net/cvsroot/{}",
                             sf_project,
-                            url.strip_suffix("/")
+                            url.strip_suffix('/')
                                 .unwrap_or("")
                                 .rsplit('/')
                                 .nth(1)
@@ -2070,24 +2013,6 @@ pub fn get_repology_metadata(srcname: &str, repo: Option<&str>) -> Option<serde_
             None
         }
     }
-}
-
-// https://docs.github.com/en/free-pro-team@latest/github/\
-// managing-security-vulnerabilities/adding-a-security-policy-to-your-repository
-pub fn guess_from_security_md(
-    name: &str,
-    path: &std::path::Path,
-    trust_package: bool,
-) -> Vec<UpstreamDatumWithMetadata> {
-    let path = path.strip_prefix("./").unwrap_or(path);
-    let mut results = Vec::new();
-    // TODO(jelmer): scan SECURITY.md for email addresses/URLs with instructions
-    results.push(UpstreamDatumWithMetadata {
-        datum: UpstreamDatum::SecurityMD(name.to_string()),
-        certainty: Some(Certainty::Certain),
-        origin: Some(path.to_string_lossy().to_string()),
-    });
-    results
 }
 
 pub fn guess_from_path(
