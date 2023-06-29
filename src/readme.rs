@@ -1,27 +1,24 @@
 use crate::{Certainty, UpstreamDatum, UpstreamDatumWithMetadata};
-use regex::Regex;
+use lazy_regex::regex;
 
 pub fn skip_paragraph(para: &str) -> (bool, Vec<UpstreamDatumWithMetadata>) {
     let mut ret = Vec::<UpstreamDatumWithMetadata>::new();
-    let re = Regex::new(r"(?ms)^See .* for more (details|information)\.").unwrap();
+    let re = regex!(r"(?ms)^See .* for more (details|information)\.");
     if re.is_match(para) {
         return (true, ret);
     }
 
-    let re = Regex::new(r"(?ms)^See .* for instructions").unwrap();
+    let re = regex!(r"(?ms)^See .* for instructions");
     if re.is_match(para) {
         return (true, ret);
     }
 
-    let re = Regex::new(r"(?ms)^Please refer .*\.").unwrap();
+    let re = regex!(r"(?ms)^Please refer .*\.");
     if re.is_match(para) {
         return (true, ret);
     }
 
-    if let Some(m) = Regex::new(r"(?ms)^It is licensed under (.*)")
-        .unwrap()
-        .captures(para)
-    {
+    if let Some(m) = regex!(r"(?ms)^It is licensed under (.*)").captures(para) {
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::License(m.get(1).unwrap().as_str().to_string()),
             certainty: Some(Certainty::Possible),
@@ -30,7 +27,7 @@ pub fn skip_paragraph(para: &str) -> (bool, Vec<UpstreamDatumWithMetadata>) {
         return (true, ret);
     }
 
-    if let Some(m) = Regex::new(r"(?ms)^License: (.*)").unwrap().captures(para) {
+    if let Some(m) = regex!(r"(?ms)^License: (.*)").captures(para) {
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::License(m.get(1).unwrap().as_str().to_string()),
             certainty: Some(Certainty::Likely),
@@ -40,9 +37,7 @@ pub fn skip_paragraph(para: &str) -> (bool, Vec<UpstreamDatumWithMetadata>) {
     }
 
     if let Some(m) =
-        Regex::new(r"(?ms)^(Home page|homepage_url|Main website|Website|Homepage): (.*)")
-            .unwrap()
-            .captures(para)
+        regex!(r"(?ms)^(Home page|homepage_url|Main website|Website|Homepage): (.*)").captures(para)
     {
         let mut url = m.get(2).unwrap().as_str().to_string();
         if url.starts_with('<') && url.ends_with('>') {
@@ -56,16 +51,12 @@ pub fn skip_paragraph(para: &str) -> (bool, Vec<UpstreamDatumWithMetadata>) {
         return (true, ret);
     }
 
-    if Regex::new(r"(?ms)^More documentation .* at http.*")
-        .unwrap()
-        .is_match(para)
-    {
+    if regex!(r"(?ms)^More documentation .* at http.*").is_match(para) {
         return (true, ret);
     }
 
     if let Some(m) =
-        Regex::new(r"(?ms)^Documentation (can be found|is hosted|is available) (at|on) ([^ ]+)")
-            .unwrap()
+        regex!(r"(?ms)^Documentation (can be found|is hosted|is available) (at|on) ([^ ]+)")
             .captures(para)
     {
         ret.push(UpstreamDatumWithMetadata {
@@ -76,11 +67,9 @@ pub fn skip_paragraph(para: &str) -> (bool, Vec<UpstreamDatumWithMetadata>) {
         return (true, ret);
     }
 
-    if let Some(m) = Regex::new(
-        r"(?ms)^Documentation for (.*)\s+(can\s+be\s+found|is\s+hosted)\s+(at|on)\s+([^ ]+)",
-    )
-    .unwrap()
-    .captures(para)
+    if let Some(m) =
+        regex!(r"(?ms)^Documentation for (.*)\s+(can\s+be\s+found|is\s+hosted)\s+(at|on)\s+([^ ]+)")
+            .captures(para)
     {
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Name(m.get(1).unwrap().as_str().to_string()),
@@ -95,31 +84,20 @@ pub fn skip_paragraph(para: &str) -> (bool, Vec<UpstreamDatumWithMetadata>) {
         return (true, ret);
     }
 
-    if Regex::new(r"(?ms)^Documentation[, ].*found.*(at|on).*\.")
-        .unwrap()
-        .is_match(para)
-    {
+    if regex!(r"(?ms)^Documentation[, ].*found.*(at|on).*\.").is_match(para) {
         return (true, ret);
     }
 
-    if Regex::new(r"(?ms)^See (http.*|gopkg.in.*|github.com.*)")
-        .unwrap()
-        .is_match(para)
-    {
+    if regex!(r"(?ms)^See (http.*|gopkg.in.*|github.com.*)").is_match(para) {
         return (true, ret);
     }
 
-    if Regex::new(r"(?ms)^Available on (.*)")
-        .unwrap()
-        .is_match(para)
-    {
+    if regex!(r"(?ms)^Available on (.*)").is_match(para) {
         return (true, ret);
     }
 
-    if let Some(m) =
-        Regex::new(r"(?ms)^This software is freely distributable under the (.*) license.*")
-            .unwrap()
-            .captures(para)
+    if let Some(m) = regex!(r"(?ms)^This software is freely distributable under the (.*) license.*")
+        .captures(para)
     {
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::License(m.get(1).unwrap().as_str().to_string()),
@@ -129,17 +107,11 @@ pub fn skip_paragraph(para: &str) -> (bool, Vec<UpstreamDatumWithMetadata>) {
         return (true, ret);
     }
 
-    if Regex::new(r"(?ms)^This .* is hosted at .*")
-        .unwrap()
-        .is_match(para)
-    {
+    if regex!(r"(?ms)^This .* is hosted at .*").is_match(para) {
         return (true, ret);
     }
 
-    if Regex::new(r"(?ms)^This code has been developed by .*")
-        .unwrap()
-        .is_match(para)
-    {
+    if regex!(r"(?ms)^This code has been developed by .*").is_match(para) {
         return (true, ret);
     }
 
@@ -147,16 +119,11 @@ pub fn skip_paragraph(para: &str) -> (bool, Vec<UpstreamDatumWithMetadata>) {
         return (true, ret);
     }
 
-    if Regex::new(r"(?ms)^Bugs should be reported by .*")
-        .unwrap()
-        .is_match(para)
-    {
+    if regex!(r"(?ms)^Bugs should be reported by .*").is_match(para) {
         return (true, ret);
     }
 
-    if let Some(m) = Regex::new(r"(?ms)^The bug tracker can be found at (http[^ ]+[^.])")
-        .unwrap()
-        .captures(para)
+    if let Some(m) = regex!(r"(?ms)^The bug tracker can be found at (http[^ ]+[^.])").captures(para)
     {
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::BugDatabase(m.get(1).unwrap().as_str().to_string()),
@@ -166,10 +133,7 @@ pub fn skip_paragraph(para: &str) -> (bool, Vec<UpstreamDatumWithMetadata>) {
         return (true, ret);
     }
 
-    if let Some(m) = Regex::new(r"(?ms)^Copyright (\(c\) |)(.*)")
-        .unwrap()
-        .captures(para)
-    {
+    if let Some(m) = regex!(r"(?ms)^Copyright (\(c\) |)(.*)").captures(para) {
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Copyright(m.get(2).unwrap().as_str().to_string()),
             certainty: Some(Certainty::Possible),
@@ -178,21 +142,15 @@ pub fn skip_paragraph(para: &str) -> (bool, Vec<UpstreamDatumWithMetadata>) {
         return (true, ret);
     }
 
-    if Regex::new(r"(?ms)^You install .*").unwrap().is_match(para) {
+    if regex!(r"(?ms)^You install .*").is_match(para) {
         return (true, ret);
     }
 
-    if Regex::new(r"(?ms)^This .* is free software; .*")
-        .unwrap()
-        .is_match(para)
-    {
+    if regex!(r"(?ms)^This .* is free software; .*").is_match(para) {
         return (true, ret);
     }
 
-    if let Some(m) = Regex::new(r"(?ms)^Please report any bugs(.*) to <(.*)>")
-        .unwrap()
-        .captures(para)
-    {
+    if let Some(m) = regex!(r"(?ms)^Please report any bugs(.*) to <(.*)>").captures(para) {
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::BugDatabase(m.get(2).unwrap().as_str().to_string()),
             certainty: Some(Certainty::Possible),
@@ -201,7 +159,7 @@ pub fn skip_paragraph(para: &str) -> (bool, Vec<UpstreamDatumWithMetadata>) {
         return (true, ret);
     }
 
-    if Regex::new(r"(?ms)^Share and Enjoy").unwrap().is_match(para) {
+    if regex!(r"(?ms)^Share and Enjoy").is_match(para) {
         return (true, ret);
     }
 
@@ -210,23 +168,15 @@ pub fn skip_paragraph(para: &str) -> (bool, Vec<UpstreamDatumWithMetadata>) {
         return (true, ret);
     }
 
-    if Regex::new(r"(?ms)^For further information, .*")
-        .unwrap()
-        .is_match(para)
-    {
+    if regex!(r"(?ms)^For further information, .*").is_match(para) {
         return (true, ret);
     }
 
-    if Regex::new(r"(?ms)^Further information .*")
-        .unwrap()
-        .is_match(para)
-    {
+    if regex!(r"(?ms)^Further information .*").is_match(para) {
         return (true, ret);
     }
 
-    if let Some(m) = Regex::new(r"(?ms)^A detailed ChangeLog can be found.*:\s+(http.*)")
-        .unwrap()
-        .captures(para)
+    if let Some(m) = regex!(r"(?ms)^A detailed ChangeLog can be found.*:\s+(http.*)").captures(para)
     {
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Changelog(m.get(1).unwrap().as_str().to_string()),

@@ -1079,7 +1079,10 @@ def _get_guessers(path, trust_package=False):  # noqa: C901
         abspath = os.path.join(path, relpath)
         if not os.path.exists(abspath):
             continue
-        yield relpath, guesser(abspath, trust_package)
+        try:
+            yield relpath, guesser(abspath, trust_package)
+        except _upstream_ontologist.ParseError as err:
+            logging.debug('Parse Error in %s: %s', relpath, err)
 
 
 def guess_upstream_metadata_items(

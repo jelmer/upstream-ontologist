@@ -1,4 +1,5 @@
 use crate::with_path_segments;
+use lazy_regex::regex;
 use log::{debug, warn};
 use pyo3::prelude::*;
 use std::borrow::Cow;
@@ -728,12 +729,11 @@ pub fn browse_url_from_repo_url(
 }
 
 pub fn find_public_repo_url(repo_url: &str, net_access: Option<bool>) -> Option<String> {
-    use regex::Regex;
     let parsed = match Url::parse(repo_url) {
         Ok(parsed) => parsed,
         Err(_) => {
             if repo_url.contains(':') {
-                let re = Regex::new(r"^(?P<user>[^@:/]+@)?(?P<host>[^/:]+):(?P<path>.*)$").unwrap();
+                let re = regex!(r"^(?P<user>[^@:/]+@)?(?P<host>[^/:]+):(?P<path>.*)$");
                 if let Some(captures) = re.captures(repo_url) {
                     let host = captures.name("host").unwrap().as_str();
                     let path = captures.name("path").unwrap().as_str();

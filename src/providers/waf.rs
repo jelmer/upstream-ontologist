@@ -1,5 +1,5 @@
 use crate::{Certainty, UpstreamDatum, UpstreamDatumWithMetadata};
-use regex::Regex;
+use lazy_regex::regex;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
@@ -8,8 +8,8 @@ pub fn guess_from_wscript(path: &Path, _trust_package: bool) -> Vec<UpstreamDatu
     let file = File::open(path).expect("Failed to open file");
     let reader = BufReader::new(file);
     let mut results = Vec::new();
-    let appname_regex = Regex::new("APPNAME = [\'\"](.*)[\'\"]").unwrap();
-    let version_regex = Regex::new("VERSION = [\'\"](.*)[\'\"]").unwrap();
+    let appname_regex = regex!("APPNAME = [\'\"](.*)[\'\"]");
+    let version_regex = regex!("VERSION = [\'\"](.*)[\'\"]");
 
     for line in reader.lines() {
         if let Ok(line) = line {

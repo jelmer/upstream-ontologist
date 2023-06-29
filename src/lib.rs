@@ -1,8 +1,8 @@
+use lazy_regex::regex;
 use log::{debug, error, warn};
 use percent_encoding::utf8_percent_encode;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
-use regex::Regex;
 use reqwest::header::HeaderMap;
 use std::str::FromStr;
 
@@ -114,7 +114,7 @@ impl From<&str> for Person {
 }
 
 fn parseaddr(text: &str) -> Option<(String, String)> {
-    let re = Regex::new(r"(.*?)\s*<([^<>]+)>").unwrap();
+    let re = regex!(r"(.*?)\s*<([^<>]+)>");
     if let Some(captures) = re.captures(text) {
         let name = captures.get(1).map(|m| m.as_str().trim().to_string());
         let email = captures.get(2).map(|m| m.as_str().trim().to_string());
@@ -2001,12 +2001,12 @@ pub fn guess_from_sf(sf_project: &str, subproject: Option<&str>) -> Vec<Upstream
 }
 
 pub fn extract_sf_project_name(url: &str) -> Option<String> {
-    let projects_regex = Regex::new(r"https?://sourceforge\.net/(projects|p)/([^/]+)").unwrap();
+    let projects_regex = regex!(r"https?://sourceforge\.net/(projects|p)/([^/]+)");
     if let Some(captures) = projects_regex.captures(url) {
         return captures.get(2).map(|m| m.as_str().to_string());
     }
 
-    let sf_regex = Regex::new(r"https?://(.*).(sf|sourceforge).(net|io)/.*").unwrap();
+    let sf_regex = regex!(r"https?://(.*).(sf|sourceforge).(net|io)/.*");
     if let Some(captures) = sf_regex.captures(url) {
         return captures.get(1).map(|m| m.as_str().to_string());
     }
@@ -2015,7 +2015,7 @@ pub fn extract_sf_project_name(url: &str) -> Option<String> {
 }
 
 pub fn extract_pecl_package_name(url: &str) -> Option<String> {
-    let pecl_regex = Regex::new(r"https?://pecl\.php\.net/package/(.*)").unwrap();
+    let pecl_regex = regex!(r"https?://pecl\.php\.net/package/(.*)");
     if let Some(captures) = pecl_regex.captures(url) {
         return captures.get(1).map(|m| m.as_str().to_string());
     }
@@ -2090,11 +2090,14 @@ pub fn guess_from_security_md(
     results
 }
 
-pub fn guess_from_path(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_path(
+    path: &Path,
+    trust_package: bool,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let basename = path.file_name().and_then(|s| s.to_str());
     let mut ret = Vec::new();
     if let Some(basename_str) = basename {
-        let re = Regex::new(r"(.*)-([0-9.]+)").unwrap();
+        let re = regex!(r"(.*)-([0-9.]+)");
         if let Some(captures) = re.captures(basename_str) {
             if let Some(name) = captures.get(1) {
                 ret.push(UpstreamDatumWithMetadata {
@@ -2118,7 +2121,7 @@ pub fn guess_from_path(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWit
             });
         }
     }
-    ret
+    Ok(ret)
 }
 
 #[cfg(test)]
@@ -2222,6 +2225,7 @@ pub fn py_to_upstream_datum_with_metadata(
 pub enum ProviderError {
     ParseError(String),
     IoError(std::io::Error),
+    Other(String),
 }
 
 impl From<std::io::Error> for ProviderError {

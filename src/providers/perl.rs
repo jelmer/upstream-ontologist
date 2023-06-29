@@ -1,13 +1,15 @@
-use crate::{Certainty, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{Certainty, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
+use lazy_regex::regex;
 use log::error;
-use regex::Regex;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-pub fn guess_from_pod(contents: &str) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_pod(
+    contents: &str,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut by_header: HashMap<String, String> = HashMap::new();
     let mut inheader: Option<String> = None;
 
@@ -26,16 +28,13 @@ pub fn guess_from_pod(contents: &str) -> Vec<UpstreamDatumWithMetadata> {
 
     if let Some(description) = by_header.get("DESCRIPTION") {
         let mut description = description.trim_start_matches('\n').to_string();
-        description = Regex::new(r"[FXZSCBI]\\<([^>]+)>")
-            .unwrap()
+        description = regex!(r"[FXZSCBI]\\<([^>]+)>")
             .replace_all(&description, "$1")
             .into_owned();
-        description = Regex::new(r"L\\<([^\|]+)\|([^\\>]+)\\>")
-            .unwrap()
+        description = regex!(r"L\\<([^\|]+)\|([^\\>]+)\\>")
             .replace_all(&description, "$2")
             .into_owned();
-        description = Regex::new(r"L\\<([^\\>]+)\\>")
-            .unwrap()
+        description = regex!(r"L\\<([^\\>]+)\\>")
             .replace_all(&description, "$1")
             .into_owned();
 
@@ -70,42 +69,48 @@ pub fn guess_from_pod(contents: &str) -> Vec<UpstreamDatumWithMetadata> {
         }
     }
 
-    upstream_data
+    Ok(upstream_data)
 }
 
-pub fn guess_from_perl_module(path: &Path) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_perl_module(
+    path: &Path,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     match Command::new("perldoc").arg("-u").arg(path).output() {
         Ok(output) => guess_from_pod(&String::from_utf8_lossy(&output.stdout)),
-        Err(_) => {
-            error!("Error running perldoc, skipping.");
-            Vec::new()
-        }
+        Err(e) => Err(ProviderError::Other(format!(
+            "Error running perldoc: {}",
+            e.to_string()
+        ))),
     }
 }
 
-pub fn guess_from_perl_dist_name(path: &Path, dist_name: &str) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_perl_dist_name(
+    path: &Path,
+    dist_name: &str,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mod_path = PathBuf::from(format!(
         "{}/lib/{}.pm",
-        std::path::Path::new(path).parent().unwrap().display(),
+        std::path::Path::new(path)
+            .parent()
+            .expect("parent")
+            .display(),
         dist_name.replace('-', "/")
     ));
 
     if mod_path.exists() {
         guess_from_perl_module(mod_path.as_path())
     } else {
-        Vec::new()
+        Ok(Vec::new())
     }
 }
 
 #[cfg(feature = "dist-ini")]
-pub fn guess_from_dist_ini(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
-    let parser = match ini::Ini::load_from_file(path) {
-        Err(e) => {
-            error!("Error parsing dist.ini: {}", e);
-            return Vec::new();
-        }
-        Ok(parser) => parser,
-    };
+pub fn guess_from_dist_ini(
+    path: &Path,
+    _trust_package: bool,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    let parser = ini::Ini::load_from_file(path)
+        .map_err(|e| ProviderError::ParseError(format!("Error parsing dist.ini: {}", e)))?;
 
     let dist_name = parser
         .get_from::<&str>(None, "name")
@@ -195,24 +200,22 @@ pub fn guess_from_dist_ini(path: &Path, _trust_package: bool) -> Vec<UpstreamDat
     }
 
     if let Some(dist_name) = parser.get_from::<&str>(None, "name") {
-        upstream_data.extend(guess_from_perl_dist_name(path, dist_name));
+        upstream_data.extend(guess_from_perl_dist_name(path, dist_name)?);
     }
 
-    upstream_data
+    Ok(upstream_data)
 }
 
-pub fn guess_from_meta_json(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
-    let mut file = File::open(path).unwrap();
+pub fn guess_from_meta_json(
+    path: &Path,
+    _trust_package: bool,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    let mut file = File::open(path)?;
     let mut contents = String::new();
-    file.read_to_string(&mut contents).unwrap();
+    file.read_to_string(&mut contents)?;
 
-    let data: serde_json::Map<String, serde_json::Value> = match serde_json::from_str(&contents) {
-        Ok(data) => data,
-        Err(e) => {
-            error!("Unable to parse {}: {}", path.display(), e);
-            return Vec::new();
-        }
-    };
+    let data: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&contents)
+        .map_err(|e| ProviderError::ParseError(format!("Error parsing META.json: {}", e)))?;
 
     let mut upstream_data: Vec<UpstreamDatumWithMetadata> = Vec::new();
 
@@ -291,63 +294,58 @@ pub fn guess_from_meta_json(path: &Path, _trust_package: bool) -> Vec<UpstreamDa
 
     // Wild guess:
     if let Some(dist_name) = data.get("name").and_then(serde_json::Value::as_str) {
-        upstream_data.extend(guess_from_perl_dist_name(path, dist_name));
+        upstream_data.extend(guess_from_perl_dist_name(path, dist_name)?);
     }
 
-    upstream_data
+    Ok(upstream_data)
 }
 
 /// Guess upstream metadata from a META.yml file.
 ///
 /// See http://module-build.sourceforge.net/META-spec-v1.4.html for the
 /// specification of the format.
-pub fn guess_from_meta_yml(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
-    let mut file = match File::open(path) {
-        Ok(f) => f,
-        Err(_) => {
-            error!("Unable to open file: {}", path.display());
-            return vec![];
-        }
-    };
+pub fn guess_from_meta_yml(
+    path: &Path,
+    _trust_package: bool,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    let mut file = File::open(path)?;
 
     let mut contents = String::new();
-    if file.read_to_string(&mut contents).is_err() {
-        error!("Unable to read file: {}", path.display());
-        return vec![];
-    }
+    file.read_to_string(&mut contents)?;
 
-    let data: serde_yaml::Value = match serde_yaml::from_str(&contents) {
-        Ok(d) => d,
-        Err(e) => {
-            error!("Unable to parse YAML: {}", e);
-            return vec![];
-        }
-    };
+    let data: serde_yaml::Value = serde_yaml::from_str(&contents)
+        .map_err(|e| ProviderError::ParseError(format!("Error parsing META.yml: {}", e)))?;
 
     let mut upstream_data = Vec::new();
 
     if let Some(name) = data.get("name") {
-        upstream_data.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::Name(name.as_str().unwrap().to_string()),
-            certainty: Some(Certainty::Certain),
-            origin: Some(path.to_string_lossy().to_string()),
-        });
+        if let Some(name) = name.as_str() {
+            upstream_data.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Name(name.to_string()),
+                certainty: Some(Certainty::Certain),
+                origin: Some(path.to_string_lossy().to_string()),
+            });
+        }
     }
 
     if let Some(license) = data.get("license") {
-        upstream_data.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::License(license.as_str().unwrap().to_string()),
-            certainty: Some(Certainty::Certain),
-            origin: Some(path.to_string_lossy().to_string()),
-        });
+        if let Some(license) = license.as_str() {
+            upstream_data.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::License(license.to_string()),
+                certainty: Some(Certainty::Certain),
+                origin: Some(path.to_string_lossy().to_string()),
+            });
+        }
     }
 
     if let Some(version) = data.get("version") {
-        upstream_data.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::Version(version.as_str().unwrap().to_string()),
-            certainty: Some(Certainty::Certain),
-            origin: Some(path.to_string_lossy().to_string()),
-        });
+        if let Some(version) = version.as_str() {
+            upstream_data.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Version(version.to_string()),
+                certainty: Some(Certainty::Certain),
+                origin: Some(path.to_string_lossy().to_string()),
+            });
+        }
     }
 
     if let Some(resources) = data.get("resources") {
@@ -386,19 +384,24 @@ pub fn guess_from_meta_yml(path: &Path, _trust_package: bool) -> Vec<UpstreamDat
 
     // Wild guess:
     if let Some(dist_name) = data.get("name") {
-        upstream_data.extend(guess_from_perl_dist_name(path, dist_name.as_str().unwrap()));
+        if let Some(dist_name) = dist_name.as_str() {
+            upstream_data.extend(guess_from_perl_dist_name(path, dist_name)?);
+        }
     }
 
-    upstream_data
+    Ok(upstream_data)
 }
 
-pub fn guess_from_makefile_pl(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_makefile_pl(
+    path: &Path,
+    _trust_package: bool,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut dist_name = None;
-    let file = File::open(path).expect("Failed to open file");
+    let file = File::open(path)?;
     let reader = BufReader::new(file);
     let mut results = Vec::new();
-    let name_regex = Regex::new("name '([^'\"]+)';$").unwrap();
-    let repository_regex = Regex::new("repository '([^'\"]+)';$").unwrap();
+    let name_regex = regex!("name '([^'\"]+)';$");
+    let repository_regex = regex!("repository '([^'\"]+)';$");
 
     for line in reader.lines().flatten() {
         if let Some(captures) = name_regex.captures(&line) {
@@ -421,8 +424,8 @@ pub fn guess_from_makefile_pl(path: &Path, _trust_package: bool) -> Vec<Upstream
     }
 
     if let Some(dist_name) = dist_name {
-        results.extend(guess_from_perl_dist_name(path, &dist_name));
+        results.extend(guess_from_perl_dist_name(path, &dist_name)?);
     }
 
-    results
+    Ok(results)
 }
