@@ -707,8 +707,11 @@ fn simplify_namespaces(element: &mut xmltree::Element, namespaces: &[String]) {
     }
 }
 
-pub fn guess_from_authors(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
-    let file = File::open(path).unwrap();
+pub fn guess_from_authors(
+    path: &Path,
+    _trust_package: bool,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    let file = File::open(path)?;
     let reader = std::io::BufReader::new(file);
 
     let mut authors: Vec<Person> = Vec::new();
@@ -751,26 +754,25 @@ pub fn guess_from_authors(path: &Path, _trust_package: bool) -> Vec<UpstreamDatu
         }
     }
 
-    vec![UpstreamDatumWithMetadata {
+    Ok(vec![UpstreamDatumWithMetadata {
         datum: UpstreamDatum::Author(authors),
         certainty: Some(Certainty::Likely),
         origin: Some(path.to_string_lossy().to_string()),
-    }]
+    }])
 }
 
 pub fn guess_from_metadata_json(
     path: &Path,
     _trust_package: bool,
-) -> Vec<UpstreamDatumWithMetadata> {
-    let mut file = File::open(path).unwrap();
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    let mut file = File::open(path)?;
     let mut contents = String::new();
-    file.read_to_string(&mut contents).unwrap();
+    file.read_to_string(&mut contents)?;
 
     let data: serde_json::Map<String, serde_json::Value> = match serde_json::from_str(&contents) {
         Ok(data) => data,
         Err(e) => {
-            error!("Unable to parse {}: {}", path.display(), e);
-            return Vec::new();
+            return Err(ProviderError::ParseError(e.to_string()));
         }
     };
 
@@ -868,10 +870,21 @@ pub fn guess_from_metadata_json(
                         origin: Some(path.to_string_lossy().to_string()),
                     });
                 } else if let Some(author_values) = value.as_array() {
-                    let authors: Vec<Person> = author_values
+                    let authors: Vec<Person> = match author_values
                         .iter()
-                        .map(|v| Person::from(v.as_str().unwrap()))
-                        .collect();
+                        .map(|v| {
+                            Ok::<Person, &str>(Person::from(
+                                v.as_str().ok_or("Author value is not a string")?,
+                            ))
+                        })
+                        .collect::<std::result::Result<Vec<_>, _>>()
+                    {
+                        Ok(authors) => authors,
+                        Err(e) => {
+                            warn!("Error parsing author array: {}", e);
+                            continue;
+                        }
+                    };
                     upstream_data.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Author(authors),
                         certainty: Some(Certainty::Likely),
@@ -888,7 +901,7 @@ pub fn guess_from_metadata_json(
         }
     }
 
-    upstream_data
+    Ok(upstream_data)
 }
 
 pub enum CanonicalizeError {
@@ -907,12 +920,15 @@ pub fn check_url_canonical(url: &Url) -> Result<Url, CanonicalizeError> {
 
     let timeout = std::time::Duration::from_secs(DEFAULT_URLLIB_TIMEOUT);
     let mut headers = reqwest::header::HeaderMap::new();
-    headers.insert(reqwest::header::USER_AGENT, USER_AGENT.parse().unwrap());
+    headers.insert(
+        reqwest::header::USER_AGENT,
+        USER_AGENT.parse().expect("valid user agent"),
+    );
     let client = reqwest::blocking::Client::builder()
         .default_headers(headers)
         .timeout(timeout)
         .build()
-        .unwrap();
+        .map_err(|e| CanonicalizeError::Unverifiable(url.clone(), format!("HTTP error {}", e)))?;
 
     let response = client
         .get(url.clone())
@@ -1025,7 +1041,7 @@ impl Forge for GitHub {
 
         let mut url = url.clone();
 
-        url.set_scheme("https").unwrap();
+        url.set_scheme("https").expect("valid scheme");
 
         Some(with_path_segments(&url, &path_elements[0..3]).unwrap())
     }
@@ -1042,7 +1058,7 @@ impl Forge for GitHub {
         }
 
         let mut url = url.clone();
-        url.set_scheme("https").unwrap();
+        url.set_scheme("https").expect("valid scheme");
         url.path_segments_mut().unwrap().push("new");
         Some(url)
     }
@@ -1090,7 +1106,12 @@ impl Forge for GitHub {
                 ));
             }
         };
-        let data = response.json::<serde_json::Value>().unwrap();
+        let data = response.json::<serde_json::Value>().map_err(|e| {
+            CanonicalizeError::Unverifiable(
+                url.clone(),
+                format!("Unable to verify bug database URL: {}", e),
+            )
+        })?;
 
         if data["has_issues"].as_bool() != Some(true) {
             return Err(CanonicalizeError::InvalidUrl(
@@ -1108,10 +1129,23 @@ impl Forge for GitHub {
             ));
         }
 
-        let mut url = Url::parse(data["html_url"].as_str().unwrap()).unwrap();
+        let mut url = Url::parse(data["html_url"].as_str().ok_or_else(|| {
+            CanonicalizeError::Unverifiable(
+                url.clone(),
+                "Unable to verify bug database URL: no html_url".to_string(),
+            )
+        })?)
+        .map_err(|e| {
+            CanonicalizeError::Unverifiable(
+                url.clone(),
+                format!("Unable to verify bug database URL: {}", e),
+            )
+        })?;
 
-        url.set_scheme("https").unwrap();
-        url.path_segments_mut().unwrap().push("issues");
+        url.set_scheme("https").expect("valid scheme");
+        url.path_segments_mut()
+            .expect("path segments")
+            .push("issues");
 
         Ok(url)
     }
@@ -1121,13 +1155,19 @@ impl Forge for GitHub {
         path_segments.pop();
         let db_url = with_path_segments(url, &path_segments).unwrap();
         let mut canonical_db_url = self.check_bug_database_canonical(&db_url)?;
-        canonical_db_url.set_scheme("https").unwrap();
-        canonical_db_url.path_segments_mut().unwrap().push("new");
+        canonical_db_url.set_scheme("https").expect("valid scheme");
+        canonical_db_url
+            .path_segments_mut()
+            .expect("path segments")
+            .push("new");
         Ok(canonical_db_url)
     }
 
     fn bug_database_from_issue_url(&self, url: &Url) -> Option<Url> {
-        let path_elements = url.path_segments().unwrap().collect::<Vec<_>>();
+        let path_elements = url
+            .path_segments()
+            .expect("path segments")
+            .collect::<Vec<_>>();
         if path_elements.len() < 2 || path_elements[1] != "issues" {
             return None;
         }
@@ -1152,12 +1192,15 @@ impl Forge for GitHub {
     }
 
     fn repo_url_from_merge_request_url(&self, url: &Url) -> Option<Url> {
-        let path_elements = url.path_segments().unwrap().collect::<Vec<_>>();
+        let path_elements = url
+            .path_segments()
+            .expect("path segments")
+            .collect::<Vec<_>>();
         if path_elements.len() < 2 || path_elements[1] != "issues" {
             return None;
         }
         let mut url = url.clone();
-        url.set_scheme("https").unwrap();
+        url.set_scheme("https").expect("valid scheme");
         Some(with_path_segments(&url, &path_elements[0..2]).unwrap())
     }
 }
@@ -1186,7 +1229,10 @@ impl Forge for GitLab {
     }
 
     fn bug_database_url_from_bug_submit_url(&self, url: &Url) -> Option<Url> {
-        let mut path_elements = url.path_segments().unwrap().collect::<Vec<_>>();
+        let mut path_elements = url
+            .path_segments()
+            .expect("path segments")
+            .collect::<Vec<_>>();
 
         if path_elements.len() < 2 {
             return None;
@@ -1202,7 +1248,10 @@ impl Forge for GitLab {
     }
 
     fn bug_submit_url_from_bug_database_url(&self, url: &Url) -> Option<Url> {
-        let path_elements = url.path_segments().unwrap().collect::<Vec<_>>();
+        let path_elements = url
+            .path_segments()
+            .expect("path segments")
+            .collect::<Vec<_>>();
 
         if path_elements.len() < 2 {
             return None;
@@ -1212,14 +1261,19 @@ impl Forge for GitLab {
         }
 
         let mut url = url.clone();
-        url.path_segments_mut().unwrap().push("new");
+        url.path_segments_mut().expect("path segments").push("new");
 
         Some(url)
     }
 
     fn check_bug_database_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError> {
-        let host = url.host().unwrap();
-        let mut path_elements = url.path_segments().unwrap().collect::<Vec<_>>();
+        let host = url
+            .host()
+            .ok_or_else(|| CanonicalizeError::InvalidUrl(url.clone(), "no host".to_string()))?;
+        let mut path_elements = url
+            .path_segments()
+            .expect("path segments")
+            .collect::<Vec<_>>();
         if path_elements.len() < 2 || path_elements[path_elements.len() - 1] != "issues" {
             return Err(CanonicalizeError::InvalidUrl(
                 url.clone(),
@@ -1235,7 +1289,12 @@ impl Forge for GitLab {
             "https://{}/api/v4/projects/{}",
             host, proj_segment
         ))
-        .unwrap();
+        .map_err(|_| {
+            CanonicalizeError::InvalidUrl(
+                url.clone(),
+                "GitLab URL with invalid project path".to_string(),
+            )
+        })?;
         match load_json_url(&api_url, None) {
             Ok(data) => {
                 // issues_enabled is only provided when the user is authenticated,
@@ -1277,7 +1336,10 @@ impl Forge for GitLab {
     }
 
     fn check_bug_submit_url_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError> {
-        let path_elements = url.path_segments().unwrap().collect::<Vec<_>>();
+        let path_elements = url
+            .path_segments()
+            .expect("valid segments")
+            .collect::<Vec<_>>();
         if path_elements.len() < 2 || path_elements[path_elements.len() - 2] != "issues" {
             return Err(CanonicalizeError::InvalidUrl(
                 url.clone(),
@@ -1294,12 +1356,18 @@ impl Forge for GitLab {
 
         let db_url = with_path_segments(url, &path_elements[0..path_elements.len() - 1]).unwrap();
         let mut canonical_db_url = self.check_bug_database_canonical(&db_url)?;
-        canonical_db_url.path_segments_mut().unwrap().push("new");
+        canonical_db_url
+            .path_segments_mut()
+            .expect("valid segments")
+            .push("new");
         Ok(canonical_db_url)
     }
 
     fn bug_database_from_issue_url(&self, url: &Url) -> Option<Url> {
-        let path_elements = url.path_segments().unwrap().collect::<Vec<_>>();
+        let path_elements = url
+            .path_segments()
+            .expect("valid segments")
+            .collect::<Vec<_>>();
         if path_elements.len() < 2
             || path_elements[path_elements.len() - 2] != "issues"
             || path_elements[path_elements.len() - 1]
@@ -1313,7 +1381,12 @@ impl Forge for GitLab {
 
     fn bug_database_url_from_repo_url(&self, url: &Url) -> Option<Url> {
         let mut url = url.clone();
-        let last = url.path_segments().unwrap().last().unwrap().to_string();
+        let last = url
+            .path_segments()
+            .expect("valid segments")
+            .last()
+            .unwrap()
+            .to_string();
         url.path_segments_mut()
             .unwrap()
             .pop()
@@ -1323,7 +1396,10 @@ impl Forge for GitLab {
     }
 
     fn repo_url_from_merge_request_url(&self, url: &Url) -> Option<Url> {
-        let path_elements = url.path_segments().unwrap().collect::<Vec<_>>();
+        let path_elements = url
+            .path_segments()
+            .expect("path segments")
+            .collect::<Vec<_>>();
         if path_elements.len() < 3
             || path_elements[path_elements.len() - 2] != "merge_requests"
             || path_elements[path_elements.len() - 1]
@@ -1336,42 +1412,35 @@ impl Forge for GitLab {
     }
 }
 
-pub fn guess_from_travis_yml(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
-    let mut file = match File::open(path) {
-        Ok(f) => f,
-        Err(_) => {
-            error!("Unable to open file: {}", path.display());
-            return vec![];
-        }
-    };
+pub fn guess_from_travis_yml(
+    path: &Path,
+    _trust_package: bool,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    let mut file = File::open(path)?;
 
     let mut contents = String::new();
-    if let Err(e) = file.read_to_string(&mut contents) {
-        error!("Unable to read file {}: {}", path.display(), e);
-        return vec![];
-    }
+    file.read_to_string(&mut contents)?;
 
-    let data: serde_yaml::Value = match serde_yaml::from_str(&contents) {
-        Ok(d) => d,
-        Err(e) => {
-            error!("Unable to parse YAML: {}", e);
-            return vec![];
-        }
-    };
+    let data: serde_yaml::Value =
+        serde_yaml::from_str(&contents).map_err(|e| ProviderError::ParseError(e.to_string()))?;
+
+    let mut ret = Vec::new();
 
     if let Some(go_import_path) = data.get("go_import_path") {
-        let upstream_datum = UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::GoImportPath(go_import_path.as_str().unwrap().to_string()),
-            certainty: Some(Certainty::Certain),
-            origin: Some(path.to_string_lossy().to_string()),
-        };
-        return vec![upstream_datum];
+        if let Some(go_import_path) = go_import_path.as_str() {
+            ret.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::GoImportPath(go_import_path.to_string()),
+                certainty: Some(Certainty::Certain),
+                origin: Some(path.to_string_lossy().to_string()),
+            });
+        }
     }
 
-    vec![]
+    Ok(ret)
 }
 
-pub fn guess_from_environment() -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_environment() -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError>
+{
     let mut results = Vec::new();
     if let Ok(url) = std::env::var("UPSTREAM_BRANCH_URL") {
         results.push(UpstreamDatumWithMetadata {
@@ -1380,120 +1449,141 @@ pub fn guess_from_environment() -> Vec<UpstreamDatumWithMetadata> {
             origin: Some("environment".to_string()),
         });
     }
-    results
+    Ok(results)
 }
 
 // Documentation: https://docs.microsoft.com/en-us/nuget/reference/nuspec
-pub fn guess_from_nuspec(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_nuspec(
+    path: &Path,
+    trust_package: bool,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     const NAMESPACES: &[&str] = &["http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd"];
     // XML parsing and other logic
     let root = match xmlparse_simplify_namespaces(path, NAMESPACES) {
         Some(root) => root,
         None => {
-            warn!("Unable to parse nuspec");
-            return vec![];
+            return Err(ProviderError::ParseError(
+                "Unable to parse nuspec".to_string(),
+            ));
         }
     };
 
     assert_eq!(root.name, "package", "root tag is {}", root.name);
     let metadata = root.get_child("metadata");
     if metadata.is_none() {
-        return vec![];
+        return Err(ProviderError::ParseError(
+            "Unable to find metadata tag".to_string(),
+        ));
     }
     let metadata = metadata.unwrap();
 
     let mut result = Vec::new();
 
     if let Some(version_tag) = metadata.get_child("version") {
-        result.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::Version(version_tag.get_text().unwrap().into_owned()),
-            certainty: Some(Certainty::Certain),
-            origin: Some(path.to_string_lossy().to_string()),
-        });
-    }
-
-    if let Some(description_tag) = metadata.get_child("description") {
-        result.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::Description(description_tag.get_text().unwrap().into_owned()),
-            certainty: Some(Certainty::Certain),
-            origin: Some(path.to_string_lossy().to_string()),
-        });
-    }
-
-    if let Some(authors_tag) = metadata.get_child("authors") {
-        let authors = authors_tag.get_text().unwrap();
-        let authors = authors.split(',').map(Person::from).collect();
-        result.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::Author(authors),
-            certainty: Some(Certainty::Certain),
-            origin: Some(path.to_string_lossy().to_string()),
-        });
-    }
-
-    if let Some(project_url_tag) = metadata.get_child("projectUrl") {
-        let project_url = project_url_tag.get_text().unwrap();
-        let repo_url = vcs::guess_repo_from_url(&url::Url::parse(&project_url).unwrap(), None);
-        if let Some(repo_url) = repo_url {
+        if let Some(version) = version_tag.get_text() {
             result.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Repository(repo_url),
-                certainty: Some(Certainty::Confident),
+                datum: UpstreamDatum::Version(version.into_owned()),
+                certainty: Some(Certainty::Certain),
                 origin: Some(path.to_string_lossy().to_string()),
             });
         }
-        result.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::Homepage(project_url.into_owned()),
-            certainty: Some(Certainty::Certain),
-            origin: Some(path.to_string_lossy().to_string()),
-        });
+    }
+
+    if let Some(description_tag) = metadata.get_child("description") {
+        if let Some(description) = description_tag.get_text() {
+            result.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Description(description.into_owned()),
+                certainty: Some(Certainty::Certain),
+                origin: Some(path.to_string_lossy().to_string()),
+            });
+        }
+    }
+
+    if let Some(authors_tag) = metadata.get_child("authors") {
+        if let Some(authors) = authors_tag.get_text() {
+            let authors = authors.split(',').map(Person::from).collect();
+            result.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Author(authors),
+                certainty: Some(Certainty::Certain),
+                origin: Some(path.to_string_lossy().to_string()),
+            });
+        }
+    }
+
+    if let Some(project_url_tag) = metadata.get_child("projectUrl") {
+        if let Some(project_url) = project_url_tag.get_text() {
+            let repo_url = vcs::guess_repo_from_url(&url::Url::parse(&project_url).unwrap(), None);
+            if let Some(repo_url) = repo_url {
+                result.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Repository(repo_url),
+                    certainty: Some(Certainty::Confident),
+                    origin: Some(path.to_string_lossy().to_string()),
+                });
+            }
+            result.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Homepage(project_url.into_owned()),
+                certainty: Some(Certainty::Certain),
+                origin: Some(path.to_string_lossy().to_string()),
+            });
+        }
     }
 
     if let Some(license_tag) = metadata.get_child("license") {
-        result.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::License(license_tag.get_text().unwrap().into_owned()),
-            certainty: Some(Certainty::Certain),
-            origin: Some(path.to_string_lossy().to_string()),
-        });
+        if let Some(license) = license_tag.get_text() {
+            result.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::License(license.into_owned()),
+                certainty: Some(Certainty::Certain),
+                origin: Some(path.to_string_lossy().to_string()),
+            });
+        }
     }
 
     if let Some(copyright_tag) = metadata.get_child("copyright") {
-        result.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::Copyright(copyright_tag.get_text().unwrap().into_owned()),
-            certainty: Some(Certainty::Certain),
-            origin: Some(path.to_string_lossy().to_string()),
-        });
+        if let Some(copyright) = copyright_tag.get_text() {
+            result.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Copyright(copyright.into_owned()),
+                certainty: Some(Certainty::Certain),
+                origin: Some(path.to_string_lossy().to_string()),
+            });
+        }
     }
 
     if let Some(title_tag) = metadata.get_child("title") {
-        result.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::Name(title_tag.get_text().unwrap().into_owned()),
-            certainty: Some(Certainty::Likely),
-            origin: Some(path.to_string_lossy().to_string()),
-        });
+        if let Some(title) = title_tag.get_text() {
+            result.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Name(title.into_owned()),
+                certainty: Some(Certainty::Likely),
+                origin: Some(path.to_string_lossy().to_string()),
+            });
+        }
     }
 
     if let Some(summary_tag) = metadata.get_child("summary") {
-        result.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::Summary(summary_tag.get_text().unwrap().into_owned()),
-            certainty: Some(Certainty::Certain),
-            origin: Some(path.to_string_lossy().to_string()),
-        });
+        if let Some(summary) = summary_tag.get_text() {
+            result.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Summary(summary.into_owned()),
+                certainty: Some(Certainty::Likely),
+                origin: Some(path.to_string_lossy().to_string()),
+            });
+        }
     }
 
     if let Some(repository_tag) = metadata.get_child("repository") {
-        let repo_url = repository_tag.attributes.get("url").unwrap();
-        let branch = repository_tag.attributes.get("branch");
-        result.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::Repository(vcs::unsplit_vcs_url(
-                repo_url,
-                branch.map(|s| s.as_str()),
-                None,
-            )),
-            certainty: Some(Certainty::Certain),
-            origin: Some(path.to_string_lossy().to_string()),
-        });
+        if let Some(repo_url) = repository_tag.attributes.get("url") {
+            let branch = repository_tag.attributes.get("branch");
+            result.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Repository(vcs::unsplit_vcs_url(
+                    repo_url,
+                    branch.map(|s| s.as_str()),
+                    None,
+                )),
+                certainty: Some(Certainty::Certain),
+                origin: Some(path.to_string_lossy().to_string()),
+            });
+        }
     }
 
-    result
+    Ok(result)
 }
 
 fn find_datum<'a>(
@@ -2127,4 +2217,15 @@ pub fn py_to_upstream_datum_with_metadata(
         certainty: certainty.map(|s| s.parse().unwrap()),
         origin,
     })
+}
+
+pub enum ProviderError {
+    ParseError(String),
+    IoError(std::io::Error),
+}
+
+impl From<std::io::Error> for ProviderError {
+    fn from(e: std::io::Error) -> Self {
+        ProviderError::IoError(e)
+    }
 }

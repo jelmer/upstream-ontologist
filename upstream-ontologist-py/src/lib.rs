@@ -17,6 +17,7 @@ create_exception!(upstream_ontologist, UnverifiableUrl, PyException);
 create_exception!(upstream_ontologist, InvalidUrl, PyException);
 create_exception!(upstream_ontologist, NoSuchRepologyProject, PyException);
 create_exception!(upstream_ontologist, NoSuchForgeProject, PyException);
+create_exception!(upstream_ontologist, ParseError, PyException);
 
 #[pyfunction]
 fn url_from_git_clone_command(command: &[u8]) -> Option<String> {
@@ -275,7 +276,8 @@ fn guess_from_pubspec_yaml(
 
 #[pyfunction]
 fn guess_from_authors(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::guess_from_authors(path.as_path(), trust_package);
+    let ret = upstream_ontologist::guess_from_authors(path.as_path(), trust_package)
+        .map_err(map_provider_err_to_py_err)?;
 
     ret.into_iter()
         .map(|x| upstream_datum_with_metadata_to_py(py, x))
@@ -288,7 +290,8 @@ fn guess_from_metadata_json(
     path: PathBuf,
     trust_package: bool,
 ) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::guess_from_metadata_json(path.as_path(), trust_package);
+    let ret = upstream_ontologist::guess_from_metadata_json(path.as_path(), trust_package)
+        .map_err(map_provider_err_to_py_err)?;
 
     ret.into_iter()
         .map(|x| upstream_datum_with_metadata_to_py(py, x))
@@ -453,8 +456,8 @@ fn guess_from_travis_yml(
     path: PathBuf,
     trust_package: bool,
 ) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::guess_from_travis_yml(path.as_path(), trust_package);
-
+    let ret = upstream_ontologist::guess_from_travis_yml(path.as_path(), trust_package)
+        .map_err(map_provider_err_to_py_err)?;
     ret.into_iter()
         .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
@@ -621,16 +624,24 @@ fn check_url_canonical(url: &str) -> PyResult<String> {
 
 #[pyfunction]
 fn guess_from_environment(py: Python) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::guess_from_environment();
+    let ret = upstream_ontologist::guess_from_environment().map_err(map_provider_err_to_py_err)?;
 
     ret.into_iter()
         .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect::<PyResult<Vec<PyObject>>>()
 }
 
+fn map_provider_err_to_py_err(e: upstream_ontologist::ProviderError) -> PyErr {
+    match e {
+        upstream_ontologist::ProviderError::IoError(e) => e.into(),
+        upstream_ontologist::ProviderError::ParseError(e) => ParseError::new_err((e,)),
+    }
+}
+
 #[pyfunction]
 fn guess_from_nuspec(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::guess_from_nuspec(path.as_path(), trust_package);
+    let ret = upstream_ontologist::guess_from_nuspec(path.as_path(), trust_package)
+        .map_err(map_provider_err_to_py_err)?;
 
     ret.into_iter()
         .map(|x| upstream_datum_with_metadata_to_py(py, x))
