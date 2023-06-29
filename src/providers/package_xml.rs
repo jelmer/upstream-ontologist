@@ -1,22 +1,20 @@
 use crate::xmlparse_simplify_namespaces;
-use crate::{Certainty, Person, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use log::error;
 use std::path::Path;
 
-pub fn guess_from_package_xml(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_package_xml(
+    path: &Path,
+    _trust_package: bool,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     use xmltree::{Element, XMLNode};
     const NAMESPACES: &[&str] = &[
         "http://pear.php.net/dtd/package-2.0",
         "http://pear.php.net/dtd/package-2.1",
     ];
 
-    let root = match xmlparse_simplify_namespaces(path, NAMESPACES) {
-        Some(root) => root,
-        None => {
-            error!("Unable to parse package.xml");
-            return Vec::new();
-        }
-    };
+    let root = xmlparse_simplify_namespaces(path, NAMESPACES)
+        .ok_or_else(|| ProviderError::ParseError("Unable to parse package.xml".to_string()))?;
 
     assert_eq!(root.name, "package", "root tag is {:?}", root.name);
 
@@ -174,5 +172,5 @@ pub fn guess_from_package_xml(path: &Path, _trust_package: bool) -> Vec<Upstream
         });
     }
 
-    upstream_data
+    Ok(upstream_data)
 }

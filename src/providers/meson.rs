@@ -1,11 +1,11 @@
-use crate::{Certainty, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{Certainty, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use log::warn;
 use std::process::Command;
 
 pub fn guess_from_meson(
     path: &std::path::Path,
     _trust_package: bool,
-) -> Vec<UpstreamDatumWithMetadata> {
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     // TODO(jelmer): consider looking for a meson build directory to call "meson
     // introspect" on
     // TODO(jelmer): mesonbuild is python; consider using its internal functions to parse
@@ -13,27 +13,17 @@ pub fn guess_from_meson(
 
     let mut command = Command::new("meson");
     command.arg("introspect").arg("--projectinfo").arg(path);
-    let output = match command.output() {
-        Ok(output) => output,
-        Err(_) => {
-            warn!("meson not installed; skipping meson.build introspection");
-            return Vec::new();
-        }
-    };
+    let output = command.output().map_err(|_| {
+        ProviderError::Other("meson not installed; skipping meson.build introspection".to_string())
+    })?;
     if !output.status.success() {
-        warn!(
+        return Err(ProviderError::Other(format!(
             "meson failed to run; exited with code {}",
             output.status.code().unwrap()
-        );
-        return Vec::new();
+        )));
     }
-    let project_info: serde_json::Value = match serde_json::from_slice(&output.stdout) {
-        Ok(value) => value,
-        Err(_) => {
-            warn!("Failed to parse meson project info");
-            return Vec::new();
-        }
-    };
+    let project_info: serde_json::Value = serde_json::from_slice(&output.stdout)
+        .map_err(|e| ProviderError::Other(format!("Failed to parse meson project info: {}", e)))?;
     let mut results = Vec::new();
     if let Some(descriptive_name) = project_info.get("descriptive_name") {
         if let Some(name) = descriptive_name.as_str() {
@@ -53,5 +43,5 @@ pub fn guess_from_meson(
             });
         }
     }
-    results
+    Ok(results)
 }

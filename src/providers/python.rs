@@ -1,14 +1,19 @@
 use crate::{py_to_upstream_datum, py_to_upstream_datum_with_metadata};
-use crate::{vcs, Certainty, Person, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{vcs, Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use log::{debug, warn};
 use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::path::Path;
 use std::str::FromStr;
 
-pub fn guess_from_pkg_info(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
-    let contents = std::fs::read(path).unwrap();
-    let dist = python_pkginfo::Metadata::parse(contents.as_slice()).unwrap();
+pub fn guess_from_pkg_info(
+    path: &Path,
+    trust_package: bool,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    let contents = std::fs::read(path)?;
+    let dist = python_pkginfo::Metadata::parse(contents.as_slice()).map_err(|e| {
+        ProviderError::ParseError(format!("Failed to parse python package metadata: {}", e))
+    })?;
 
     let mut ret = vec![];
 
@@ -44,7 +49,7 @@ pub fn guess_from_pkg_info(path: &Path, trust_package: bool) -> Vec<UpstreamDatu
         ret.extend(parse_python_long_description(
             description.as_str(),
             dist.description_content_type.as_deref(),
-        ));
+        )?);
     }
 
     ret.extend(parse_python_project_urls(
@@ -103,14 +108,14 @@ pub fn guess_from_pkg_info(path: &Path, trust_package: bool) -> Vec<UpstreamDatu
         });
     }
 
-    ret
+    Ok(ret)
 }
 
 pub fn guess_from_pyproject_toml(
     path: &Path,
     trust_package: bool,
-) -> Vec<UpstreamDatumWithMetadata> {
-    let content = std::fs::read_to_string(path).unwrap();
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    let content = std::fs::read_to_string(path)?;
     let mut ret = Vec::new();
 
     use serde::{Deserialize, Serialize};
@@ -149,7 +154,8 @@ pub fn guess_from_pyproject_toml(
         }
     }
 
-    let pyproject: PyProjectToml = toml::from_str(content.as_str()).unwrap();
+    let pyproject: PyProjectToml =
+        toml::from_str(content.as_str()).map_err(|e| ProviderError::ParseError(e.to_string()))?;
 
     if let Some(inner_project) = pyproject.inner.project {
         ret.push(UpstreamDatumWithMetadata {
@@ -302,7 +308,7 @@ pub fn guess_from_pyproject_toml(
         }
     }
 
-    ret
+    Ok(ret)
 }
 
 fn parse_python_project_urls(
@@ -350,9 +356,9 @@ fn parse_python_project_urls(
 fn parse_python_long_description(
     long_description: &str,
     content_type: Option<&str>,
-) -> Vec<UpstreamDatumWithMetadata> {
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     if long_description.is_empty() {
-        return vec![];
+        return Ok(vec![]);
     }
     let content_type = content_type.unwrap_or("text/plain");
     let mut content_type = content_type.split(';').next().unwrap();
@@ -365,7 +371,8 @@ fn parse_python_long_description(
         "text/plain" => {
             let lines = long_description.split('\n').collect::<Vec<_>>();
             if lines.len() > 30 {
-                return vec![];
+                debug!("Long description is too long ({} lines)", lines.len());
+                return Ok(vec![]);
             }
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Description(long_description.to_string()),
@@ -373,14 +380,10 @@ fn parse_python_long_description(
                 origin: None,
             });
         }
-        "text/restructured-text" | "text/x-rst" => Python::with_gil(|py| {
-            let readme_mod = Python::import(py, "upstream_ontologist.readme").unwrap();
-            let (description, extra_md): (Option<String>, Vec<PyObject>) = readme_mod
-                .call_method1("description_from_readme_rst", (long_description,))
-                .unwrap()
-                .extract()
-                .unwrap();
-
+        "text/restructured-text" | "text/x-rst" => {
+            let (description, extra_md) =
+                crate::readme::description_from_readme_rst(long_description)
+                    .map_err(|e| ProviderError::Other(e.to_string()))?;
             if let Some(description) = description {
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Description(description),
@@ -388,21 +391,12 @@ fn parse_python_long_description(
                     origin: Some("python long description (restructuredText)".to_string()),
                 });
             }
-            ret.extend(
-                extra_md
-                    .into_iter()
-                    .map(|m| py_to_upstream_datum_with_metadata(py, m))
-                    .collect::<PyResult<Vec<_>>>()
-                    .unwrap(),
-            );
-        }),
-        "text/markdown" => Python::with_gil(|py| {
-            let readme_mod = Python::import(py, "upstream_ontologist.readme").unwrap();
-            let (description, extra_md): (Option<String>, Vec<PyObject>) = readme_mod
-                .call_method1("description_from_readme_md", (long_description,))
-                .unwrap()
-                .extract()
-                .unwrap();
+            ret.extend(extra_md);
+        }
+        "text/markdown" => {
+            let (description, extra_md) =
+                crate::readme::description_from_readme_md(long_description)
+                    .map_err(|e| ProviderError::Other(e.to_string()))?;
             if let Some(description) = description {
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Description(description),
@@ -410,34 +404,30 @@ fn parse_python_long_description(
                     origin: Some("python long description (markdown)".to_string()),
                 });
             }
-            ret.extend(
-                extra_md
-                    .into_iter()
-                    .map(|m| py_to_upstream_datum_with_metadata(py, m))
-                    .collect::<PyResult<Vec<_>>>()
-                    .unwrap(),
-            );
-        }),
+            ret.extend(extra_md);
+        }
         _ => {
             warn!("Unknown content type: {}", content_type);
         }
     }
-    ret
+    Ok(ret)
 }
 
-pub fn parse_python_url(url: &str) -> Vec<UpstreamDatumWithMetadata> {
+pub fn parse_python_url(
+    url: &str,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let repo = vcs::guess_repo_from_url(&url::Url::parse(url).unwrap(), None);
     if let Some(repo) = repo {
-        return vec![UpstreamDatumWithMetadata {
+        return Ok(vec![UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Repository(repo),
             certainty: Some(Certainty::Likely),
             origin: None,
-        }];
+        }]);
     }
 
-    vec![UpstreamDatumWithMetadata {
+    Ok(vec![UpstreamDatumWithMetadata {
         datum: UpstreamDatum::Homepage(url.to_string()),
         certainty: Some(Certainty::Likely),
         origin: None,
-    }]
+    }])
 }

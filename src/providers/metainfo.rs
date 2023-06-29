@@ -1,13 +1,16 @@
 //! See https://www.freedesktop.org/software/appstream/docs/chap-Metadata.html
 
-use crate::{Certainty, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{Certainty, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use std::fs::File;
 use std::path::Path;
 
-pub fn guess_from_metainfo(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_metainfo(
+    path: &Path,
+    _trust_package: bool,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     use xmltree::Element;
-    let file = File::open(path).expect("Failed to open file");
-    let root = Element::parse(file).expect("Failed to parse XML");
+    let file = File::open(path)?;
+    let root = Element::parse(file).map_err(|e| ProviderError::ParseError(e.to_string()))?;
 
     let mut results: Vec<UpstreamDatumWithMetadata> = Vec::new();
 
@@ -71,5 +74,5 @@ pub fn guess_from_metainfo(path: &Path, _trust_package: bool) -> Vec<UpstreamDat
         }
     }
 
-    results
+    Ok(results)
 }

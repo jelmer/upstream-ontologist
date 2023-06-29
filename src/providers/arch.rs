@@ -30,7 +30,13 @@ pub fn parse_pkgbuild_variables(file: &str) -> HashMap<String, Vec<String>> {
         if let Some((key, mut value)) = keep.take() {
             value.push_str(&line);
             if line.trim_end().ends_with(')') {
-                let value_parts = shlex::split(value.as_str()).expect("Failed to split value");
+                let value_parts = match shlex::split(value.as_str()) {
+                    Some(value_parts) => value_parts,
+                    None => {
+                        error!("Failed to split value: {}", value.as_str());
+                        continue;
+                    }
+                };
                 variables.insert(key, value_parts);
             } else {
                 keep = Some((key, value));
@@ -42,13 +48,25 @@ pub fn parse_pkgbuild_variables(file: &str) -> HashMap<String, Vec<String>> {
             if value.starts_with('(') {
                 if value.trim_end().ends_with(')') {
                     let value = &value[1..value.len() - 1];
-                    let value_parts = shlex::split(value).expect("Failed to split value");
+                    let value_parts = match shlex::split(value) {
+                        Some(value_parts) => value_parts,
+                        None => {
+                            error!("Failed to split value: {}", value);
+                            continue;
+                        }
+                    };
                     variables.insert(key.to_owned(), value_parts);
                 } else {
                     keep = Some((key.to_owned(), value[1..].to_owned()));
                 }
             } else {
-                let value_parts = shlex::split(value).expect("Failed to split value");
+                let value_parts = match shlex::split(value) {
+                    Some(value_parts) => value_parts,
+                    None => {
+                        error!("Failed to split value: {}", value);
+                        continue;
+                    }
+                };
                 variables.insert(key.to_owned(), value_parts);
             }
         }

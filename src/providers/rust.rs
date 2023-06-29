@@ -1,20 +1,21 @@
-use crate::{Certainty, Person, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use log::debug;
 
 pub fn guess_from_cargo(
     path: &std::path::Path,
     trust_package: bool,
-) -> Vec<UpstreamDatumWithMetadata> {
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     // see https://doc.rust-lang.org/cargo/reference/manifest.html
-    let doc = toml::from_str(&std::fs::read_to_string(path).expect("Failed to read Cargo.toml"));
+    let doc: toml::Table = toml::from_str(&std::fs::read_to_string(path)?)
+        .map_err(|e| ProviderError::ParseError(e.to_string()))?;
 
-    let doc: toml::Table = if let Ok(doc) = doc {
-        doc
-    } else {
-        return Vec::new();
-    };
-
-    let package = doc.get("package").unwrap().as_table().unwrap();
+    let package = doc
+        .get("package")
+        .ok_or_else(|| ProviderError::ParseError("No [package] section in Cargo.toml".to_string()))?
+        .as_table()
+        .ok_or_else(|| {
+            ProviderError::ParseError("[package] section in Cargo.toml is not a table".to_string())
+        })?;
 
     let mut results = Vec::new();
 
@@ -89,5 +90,5 @@ pub fn guess_from_cargo(
         }
     }
 
-    results
+    Ok(results)
 }

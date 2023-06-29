@@ -1,10 +1,13 @@
 //! See https://github.com/ewilderj/doap
-use crate::{Certainty, Person, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use log::error;
 use std::fs::File;
 use std::path::Path;
 
-pub fn guess_from_doap(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_doap(
+    path: &Path,
+    _trust_package: bool,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     use xmltree::Element;
     let file = File::open(path).expect("Failed to open file");
     let doc = Element::parse(file).expect("Failed to parse XML");
@@ -26,11 +29,10 @@ pub fn guess_from_doap(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWi
     }
 
     if root.name != "Project" || root.namespace.as_deref() != Some(DOAP_NAMESPACE) {
-        error!(
+        return Err(ProviderError::ParseError(format!(
             "Doap file does not have DOAP project as root, but {}",
             root.name
-        );
-        return results;
+        )));
     }
 
     fn extract_url(el: &Element) -> Option<&str> {
@@ -243,5 +245,5 @@ pub fn guess_from_doap(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWi
         }
     }
 
-    results
+    Ok(results)
 }

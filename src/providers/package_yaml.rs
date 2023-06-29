@@ -1,9 +1,13 @@
-use crate::{Certainty, Person, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use std::path::Path;
 
-pub fn guess_from_package_yaml(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
-    let reader = std::fs::File::open(path).unwrap();
-    let data: serde_yaml::Value = serde_yaml::from_reader(reader).unwrap();
+pub fn guess_from_package_yaml(
+    path: &Path,
+    trust_package: bool,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    let reader = std::fs::File::open(path)?;
+    let data: serde_yaml::Value =
+        serde_yaml::from_reader(reader).map_err(|e| ProviderError::ParseError(e.to_string()))?;
 
     let mut ret = Vec::new();
 
@@ -45,11 +49,13 @@ pub fn guess_from_package_yaml(path: &Path, trust_package: bool) -> Vec<Upstream
                 .into_iter()
                 .map(Person::from)
                 .collect::<Vec<_>>();
-            ret.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Maintainer(maintainers.pop().unwrap()),
-                certainty: Some(Certainty::Certain),
-                origin: Some(path.display().to_string()),
-            });
+            if let Some(maintainer) = maintainers.pop() {
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Maintainer(maintainer),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(path.display().to_string()),
+                });
+            }
         }
     }
 
@@ -115,5 +121,5 @@ pub fn guess_from_package_yaml(path: &Path, trust_package: bool) -> Vec<Upstream
         }
     }
 
-    ret
+    Ok(ret)
 }

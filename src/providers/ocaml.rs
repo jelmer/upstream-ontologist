@@ -1,16 +1,20 @@
 //! Documentation: https://opam.ocaml.org/doc/Manual.html#Package-definitions
-use crate::{Certainty, Person, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use log::warn;
 use opam_file_rs::value::{OpamFileItem, OpamFileSection, ValueKind};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
-pub fn guess_from_opam(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
-    let mut f = File::open(path).unwrap();
+pub fn guess_from_opam(
+    path: &Path,
+    _trust_package: bool,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    let mut f = File::open(path)?;
     let mut contents = String::new();
-    f.read_to_string(&mut contents).unwrap();
-    let opam = opam_file_rs::parse(contents.as_str()).unwrap();
+    f.read_to_string(&mut contents)?;
+    let opam = opam_file_rs::parse(contents.as_str())
+        .map_err(|e| ProviderError::ParseError(format!("Failed to parse OPAM file: {:?}", e)))?;
     let mut results: Vec<UpstreamDatumWithMetadata> = Vec::new();
 
     fn find_item<'a>(section: &'a OpamFileSection, name: &str) -> Option<&'a OpamFileItem> {
@@ -70,9 +74,8 @@ pub fn guess_from_opam(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWi
             OpamFileItem::Section(_, section)
                 if section.section_name.as_deref() == Some("dev-repo") =>
             {
-                let value = find_item(&section, "repository").unwrap();
-                match value {
-                    OpamFileItem::Variable(_, _, ref value) => {
+                match find_item(&section, "repository") {
+                    Some(OpamFileItem::Variable(_, _, ref value)) => {
                         let value = match value.kind {
                             ValueKind::String(ref s) => s,
                             _ => {
@@ -86,8 +89,12 @@ pub fn guess_from_opam(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWi
                             origin: Some(path.to_string_lossy().to_string()),
                         });
                     }
-                    _ => {
-                        warn!("Unexpected type for dev-repo in OPAM file: {:?}", value);
+                    Some(o) => {
+                        warn!("Unexpected type for dev-repo in OPAM file: {:?}", o);
+                        continue;
+                    }
+                    None => {
+                        warn!("Missing repository for dev-repo in OPAM file");
                         continue;
                     }
                 }
@@ -195,5 +202,5 @@ pub fn guess_from_opam(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWi
         }
     }
 
-    results
+    Ok(results)
 }

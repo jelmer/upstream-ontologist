@@ -1,19 +1,28 @@
-use crate::{Certainty, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{Certainty, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use log::error;
 use std::path::Path;
 
 pub fn guess_from_composer_json(
     path: &Path,
     _trust_package: bool,
-) -> Vec<UpstreamDatumWithMetadata> {
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     // https://getcomposer.org/doc/04-schema.md
-    let file = std::fs::File::open(path).expect("Failed to open composer.json");
+    let file = std::fs::File::open(path)?;
     let package: serde_json::Value =
-        serde_json::from_reader(file).expect("Failed to parse composer.json");
+        serde_json::from_reader(file).map_err(|e| ProviderError::ParseError(e.to_string()))?;
 
     let mut upstream_data: Vec<UpstreamDatumWithMetadata> = Vec::new();
 
-    for (field, value) in package.as_object().unwrap() {
+    let package = match package.as_object() {
+        Some(package) => package,
+        None => {
+            return Err(ProviderError::Other(
+                "Failed to parse composer.json".to_string(),
+            ))
+        }
+    };
+
+    for (field, value) in package {
         match field.as_str() {
             "name" => {
                 upstream_data.push(UpstreamDatumWithMetadata {
@@ -79,5 +88,5 @@ pub fn guess_from_composer_json(
         }
     }
 
-    upstream_data
+    Ok(upstream_data)
 }

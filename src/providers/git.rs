@@ -1,10 +1,13 @@
-use crate::{Certainty, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{Certainty, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use std::path::Path;
 
 #[cfg(feature = "git-config")]
-pub fn guess_from_git_config(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_git_config(
+    path: &Path,
+    trust_package: bool,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let config_file = gix_config::File::from_path_no_includes(path, gix_config::Source::Local)
-        .expect("Failed to open git config");
+        .map_err(|e| ProviderError::ParseError(e.to_string()))?;
     let mut results = Vec::new();
 
     // Check if there's a remote named "upstream"
@@ -33,5 +36,5 @@ pub fn guess_from_git_config(path: &Path, trust_package: bool) -> Vec<UpstreamDa
         }
     }
 
-    results
+    Ok(results)
 }

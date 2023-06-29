@@ -1,14 +1,14 @@
-use crate::{Certainty, Person, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use log::debug;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
-pub fn guess_from_gemspec(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
-    let file = match File::open(path) {
-        Ok(file) => file,
-        Err(_) => return vec![],
-    };
+pub fn guess_from_gemspec(
+    path: &Path,
+    trust_package: bool,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    let file = File::open(path)?;
 
     let reader = BufReader::new(file);
     let mut results = Vec::new();
@@ -53,8 +53,7 @@ pub fn guess_from_gemspec(path: &Path, trust_package: bool) -> Vec<UpstreamDatum
         Err(format!("Could not parse value: {}", value))
     }
 
-    for line in reader.lines() {
-        let line = line.unwrap();
+    for line in reader.lines().flatten() {
         if line.starts_with('#') {
             continue;
         }
@@ -131,5 +130,5 @@ pub fn guess_from_gemspec(path: &Path, trust_package: bool) -> Vec<UpstreamDatum
         }
     }
 
-    results
+    Ok(results)
 }

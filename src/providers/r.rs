@@ -1,6 +1,7 @@
 //! See https://r-pkgs.org/description.html
 
-use crate::{vcs, Certainty, Person, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{vcs, Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
+use log::debug;
 use std::fs::File;
 use std::io::Read;
 use url::Url;
@@ -9,14 +10,14 @@ use url::Url;
 pub fn guess_from_r_description(
     path: &std::path::Path,
     trust_package: bool,
-) -> Vec<UpstreamDatumWithMetadata> {
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     use mailparse::MailHeaderMap;
-    let mut file = File::open(path).expect("Failed to open file");
+    let mut file = File::open(path)?;
     let mut contents = Vec::new();
-    file.read_to_end(&mut contents)
-        .expect("Failed to read file");
+    file.read_to_end(&mut contents)?;
 
-    let msg = mailparse::parse_mail(&contents).expect("Failed to parse mail");
+    let msg =
+        mailparse::parse_mail(&contents).map_err(|e| ProviderError::ParseError(e.to_string()))?;
 
     let headers = msg.get_headers();
 
@@ -128,7 +129,13 @@ pub fn guess_from_r_description(
         }
 
         for (label, url) in urls {
-            let url = Url::parse(url).unwrap();
+            let url = match Url::parse(url) {
+                Ok(url) => url,
+                Err(_) => {
+                    debug!("Invalid URL: {}", url);
+                    continue;
+                }
+            };
             if let Some(hostname) = url.host_str() {
                 if hostname == "bioconductor.org" {
                     results.push(UpstreamDatumWithMetadata {
@@ -163,5 +170,5 @@ pub fn guess_from_r_description(
         }
     }
 
-    results
+    Ok(results)
 }

@@ -1,6 +1,6 @@
 use crate::{
-    bug_database_from_issue_url, repo_url_from_merge_request_url, Certainty, Person, UpstreamDatum,
-    UpstreamDatumWithMetadata,
+    bug_database_from_issue_url, repo_url_from_merge_request_url, Certainty, Person, ProviderError,
+    UpstreamDatum, UpstreamDatumWithMetadata,
 };
 use log::debug;
 use std::fs::File;
@@ -8,8 +8,11 @@ use std::io::BufRead;
 use std::path::Path;
 use url::Url;
 
-pub fn guess_from_debian_patch(path: &Path, trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
-    let file = File::open(path).unwrap();
+pub fn guess_from_debian_patch(
+    path: &Path,
+    trust_package: bool,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    let file = File::open(path)?;
     let reader = std::io::BufReader::new(file);
 
     let net_access = None;
@@ -18,8 +21,24 @@ pub fn guess_from_debian_patch(path: &Path, trust_package: bool) -> Vec<Upstream
 
     for line in reader.lines().flatten() {
         if line.starts_with("Forwarded: ") {
-            let forwarded = line.split_once(':').unwrap().1.trim();
-            let forwarded = Url::parse(forwarded).unwrap();
+            let forwarded = match line.split_once(':') {
+                Some((_, url)) => url.trim(),
+                None => {
+                    debug!("Malformed Forwarded line in patch {}", path.display());
+                    continue;
+                }
+            };
+            let forwarded = match Url::parse(forwarded) {
+                Ok(url) => url,
+                Err(e) => {
+                    debug!(
+                        "Malformed URL in Forwarded line in patch {}: {}",
+                        path.display(),
+                        e
+                    );
+                    continue;
+                }
+            };
 
             if let Some(bug_db) = bug_database_from_issue_url(&forwarded, net_access) {
                 upstream_data.push(UpstreamDatumWithMetadata {
@@ -39,10 +58,12 @@ pub fn guess_from_debian_patch(path: &Path, trust_package: bool) -> Vec<Upstream
         }
     }
 
-    upstream_data
+    Ok(upstream_data)
 }
 
-pub fn metadata_from_itp_bug_body(body: &str) -> Vec<UpstreamDatumWithMetadata> {
+pub fn metadata_from_itp_bug_body(
+    body: &str,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut results: Vec<UpstreamDatumWithMetadata> = Vec::new();
     // Skip first few lines with bug metadata (severity, owner, etc)
     let mut line_iter = body.split_terminator('\n');
@@ -50,7 +71,9 @@ pub fn metadata_from_itp_bug_body(body: &str) -> Vec<UpstreamDatumWithMetadata> 
 
     while let Some(line) = next_line {
         if next_line.is_none() {
-            return vec![];
+            return Err(ProviderError::ParseError(
+                "ITP bug body ended before package name".to_string(),
+            ));
         }
         next_line = line_iter.next();
         if line.trim().is_empty() {
@@ -60,7 +83,9 @@ pub fn metadata_from_itp_bug_body(body: &str) -> Vec<UpstreamDatumWithMetadata> 
 
     while let Some(line) = next_line {
         if next_line.is_none() {
-            return vec![];
+            return Err(ProviderError::ParseError(
+                "ITP bug body ended before package name".to_string(),
+            ));
         }
         if !line.is_empty() {
             break;
@@ -149,5 +174,5 @@ pub fn metadata_from_itp_bug_body(body: &str) -> Vec<UpstreamDatumWithMetadata> 
         origin: None,
     });
 
-    results
+    Ok(results)
 }

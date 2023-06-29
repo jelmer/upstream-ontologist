@@ -1,4 +1,4 @@
-use crate::{Certainty, Person, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use log::error;
 use std::path::Path;
 use url::Url;
@@ -6,15 +6,24 @@ use url::Url;
 pub fn guess_from_package_json(
     path: &Path,
     _trust_package: bool,
-) -> Vec<UpstreamDatumWithMetadata> {
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     // see https://docs.npmjs.com/cli/v7/configuring-npm/package-json
-    let file = std::fs::File::open(path).expect("Failed to open package.json");
+    let file = std::fs::File::open(path)?;
     let package: serde_json::Value =
-        serde_json::from_reader(file).expect("Failed to parse package.json");
+        serde_json::from_reader(file).map_err(|e| ProviderError::ParseError(e.to_string()))?;
 
     let mut upstream_data: Vec<UpstreamDatumWithMetadata> = Vec::new();
 
-    for (field, value) in package.as_object().unwrap() {
+    let package = match package {
+        serde_json::Value::Object(package) => package,
+        _ => {
+            return Err(ProviderError::ParseError(
+                "package.json is not an object".to_string(),
+            ));
+        }
+    };
+
+    for (field, value) in package {
         match field.as_str() {
             "name" => {
                 upstream_data.push(UpstreamDatumWithMetadata {
@@ -174,5 +183,5 @@ pub fn guess_from_package_json(
         }
     }
 
-    upstream_data
+    Ok(upstream_data)
 }

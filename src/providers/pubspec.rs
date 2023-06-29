@@ -1,4 +1,4 @@
-use crate::{Certainty, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{Certainty, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use log::error;
 use std::fs::File;
 use std::path::Path;
@@ -17,16 +17,11 @@ struct Pubspec {
 pub fn guess_from_pubspec_yaml(
     path: &Path,
     _trust_package: bool,
-) -> Vec<UpstreamDatumWithMetadata> {
-    let file = File::open(path).unwrap();
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    let file = File::open(path)?;
 
-    let pubspec: Pubspec = match serde_yaml::from_reader(file) {
-        Ok(pubspec) => pubspec,
-        Err(e) => {
-            error!("Unable to parse {}: {}", path.display(), e);
-            return Vec::new();
-        }
-    };
+    let pubspec: Pubspec =
+        serde_yaml::from_reader(file).map_err(|e| ProviderError::ParseError(e.to_string()))?;
 
     let mut upstream_data: Vec<UpstreamDatumWithMetadata> = Vec::new();
 
@@ -80,5 +75,5 @@ pub fn guess_from_pubspec_yaml(
         });
     }
 
-    upstream_data
+    Ok(upstream_data)
 }

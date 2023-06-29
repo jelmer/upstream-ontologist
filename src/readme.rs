@@ -1,5 +1,7 @@
 use crate::{Certainty, UpstreamDatum, UpstreamDatumWithMetadata};
 use lazy_regex::regex;
+use pyo3::prelude::*;
+use pyo3::types::PyDict;
 
 pub fn skip_paragraph(para: &str) -> (bool, Vec<UpstreamDatumWithMetadata>) {
     let mut ret = Vec::<UpstreamDatumWithMetadata>::new();
@@ -187,4 +189,37 @@ pub fn skip_paragraph(para: &str) -> (bool, Vec<UpstreamDatumWithMetadata>) {
     }
 
     (false, ret)
+}
+
+pub fn description_from_readme_rst(
+    long_description: &str,
+) -> PyResult<(Option<String>, Vec<UpstreamDatumWithMetadata>)> {
+    Python::with_gil(|py| {
+        let readme_mod = Python::import(py, "upstream_ontologist.readme").unwrap();
+        let (description, extra_md): (Option<String>, Vec<PyObject>) = readme_mod
+            .call_method1("description_from_readme_rst", (long_description,))?
+            .extract()?;
+
+        let extra_md = extra_md
+            .into_iter()
+            .map(|m| crate::py_to_upstream_datum_with_metadata(py, m))
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok((description, extra_md))
+    })
+}
+
+pub fn description_from_readme_md(
+    long_description: &str,
+) -> PyResult<(Option<String>, Vec<UpstreamDatumWithMetadata>)> {
+    Python::with_gil(|py| {
+        let readme_mod = Python::import(py, "upstream_ontologist.readme").unwrap();
+        let (description, extra_md): (Option<String>, Vec<PyObject>) = readme_mod
+            .call_method1("description_from_readme_md", (long_description,))?
+            .extract()?;
+        let extra_md = extra_md
+            .into_iter()
+            .map(|m| crate::py_to_upstream_datum_with_metadata(py, m))
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok((description, extra_md))
+    })
 }

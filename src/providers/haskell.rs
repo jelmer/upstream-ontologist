@@ -1,11 +1,11 @@
-use crate::{Certainty, Person, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
 pub fn guess_from_cabal_lines(
     lines: impl Iterator<Item = String>,
-) -> Vec<UpstreamDatumWithMetadata> {
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut repo_url = None;
     let mut repo_branch = None;
     let mut repo_subpath = None;
@@ -86,18 +86,21 @@ pub fn guess_from_cabal_lines(
         ));
     }
 
-    results
+    Ok(results
         .into_iter()
         .map(|(datum, certainty)| UpstreamDatumWithMetadata {
             datum,
             certainty: Some(certainty),
             origin: None,
         })
-        .collect()
+        .collect())
 }
 
-pub fn guess_from_cabal(path: &Path, _trust_package: bool) -> Vec<UpstreamDatumWithMetadata> {
-    let file = File::open(path).expect("Failed to open file");
+pub fn guess_from_cabal(
+    path: &Path,
+    _trust_package: bool,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    let file = File::open(path)?;
     let reader = BufReader::new(file);
 
     guess_from_cabal_lines(
