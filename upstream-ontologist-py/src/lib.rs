@@ -285,8 +285,9 @@ fn guess_from_pubspec_yaml(
 
 #[pyfunction]
 fn guess_from_authors(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::guess_from_authors(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?;
+    let ret =
+        upstream_ontologist::providers::authors::guess_from_authors(path.as_path(), trust_package)
+            .map_err(map_provider_err_to_py_err)?;
 
     ret.into_iter()
         .map(|x| upstream_datum_with_metadata_to_py(py, x))
@@ -940,10 +941,14 @@ fn guess_from_security_md(
     path: PathBuf,
     trust_package: bool,
 ) -> PyResult<Vec<PyObject>> {
-    upstream_ontologist::guess_from_security_md(name, path.as_path(), trust_package)
-        .into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect()
+    upstream_ontologist::providers::security_md::guess_from_security_md(
+        name,
+        path.as_path(),
+        trust_package,
+    )
+    .into_iter()
+    .map(|x| upstream_datum_with_metadata_to_py(py, x))
+    .collect()
 }
 
 #[pyfunction]
