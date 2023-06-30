@@ -381,51 +381,6 @@ def parse_python_long_description(long_description, content_type) -> Iterator[Up
     yield from extra_md
 
 
-def guess_from_setup_cfg(path, trust_package):
-    try:
-        from setuptools.config.setupcfg import read_configuration
-    except ImportError:  # older setuptools
-        from setuptools.config import read_configuration  # type: ignore
-    # read_configuration needs a function cwd
-    try:
-        os.getcwd()
-    except FileNotFoundError:
-        os.chdir(os.path.dirname(path))
-    config = read_configuration(path)
-    metadata = config.get('metadata')
-    if metadata:
-        for field, value in metadata.items():
-            if field == 'name':
-                yield UpstreamDatum('Name', value, 'certain')
-            elif field == 'version':
-                yield UpstreamDatum('Name', value, 'certain')
-            elif field == 'url':
-                yield from parse_python_url(value)
-            elif field == 'description':
-                yield UpstreamDatum('Summary', value, 'certain')
-            elif field == 'long_description':
-                yield from parse_python_long_description(
-                    value,
-                    metadata.get('long_description_content_type'))
-            elif field == 'maintainer':
-                yield UpstreamDatum(
-                    'Maintainer',
-                    Person(name=value, email=metadata.get('maintainer_email')),
-                    'certain')
-            elif field == 'author':
-                yield UpstreamDatum(
-                    'Author',
-                    [Person(name=value, email=metadata.get('author_email'))],
-                    'certain')
-            elif field == 'project_urls':
-                yield from parse_python_project_urls(value)
-            elif field in ('long_description_content_type', 'maintainer_email',
-                           'author_email'):
-                pass
-            else:
-                logger.debug('Unknown setup.cfg field %s (%r)', field, value)
-
-
 parse_python_url = _upstream_ontologist.parse_python_url
 
 
@@ -910,6 +865,7 @@ guess_from_environment = _upstream_ontologist.guess_from_environment
 guess_from_path = _upstream_ontologist.guess_from_path
 guess_from_cargo = _upstream_ontologist.guess_from_cargo
 guess_from_pyproject_toml = _upstream_ontologist.guess_from_pyproject_toml
+guess_from_setup_cfg = _upstream_ontologist.guess_from_setup_cfg
 
 guess_from_pom_xml = _upstream_ontologist.guess_from_pom_xml
 guess_from_git_config = _upstream_ontologist.guess_from_git_config
