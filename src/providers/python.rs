@@ -431,3 +431,127 @@ pub fn parse_python_url(
         origin: None,
     }])
 }
+
+pub fn guess_from_setup_cfg(
+    path: &Path,
+    trust_package: bool,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    let setup_cfg =
+        ini::Ini::load_from_file(path).map_err(|e| ProviderError::ParseError(e.to_string()))?;
+
+    let metadata = match setup_cfg.section(Some("metadata")) {
+        Some(metadata) => metadata,
+        None => {
+            debug!("No [metadata] section in setup.cfg");
+            return Ok(vec![]);
+        }
+    };
+
+    let mut ret = vec![];
+
+    for (field, value) in metadata.iter() {
+        match field {
+            "name" => {
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Name(value.to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: None,
+                });
+            }
+            "version" => {
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Version(value.to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: None,
+                });
+            }
+            "url" => {
+                ret.extend(parse_python_url(value)?);
+            }
+            "description" => {
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Summary(value.to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: None,
+                });
+            }
+            "long_description" => {
+                if let Some(path) = value.strip_prefix(value) {
+                    if path.contains('/') {
+                        debug!("Ignoring long_description path: {}", path);
+                        continue;
+                    }
+                    let value = match std::fs::read_to_string(path) {
+                        Ok(value) => value,
+                        Err(e) => {
+                            debug!("Failed to read long_description file: {}", e);
+                            continue;
+                        }
+                    };
+                    ret.extend(parse_python_long_description(
+                        &value,
+                        metadata.get("long_description_content_type"),
+                    )?);
+                } else {
+                    ret.extend(parse_python_long_description(
+                        value,
+                        metadata.get("long_description_content_type"),
+                    )?);
+                }
+            }
+            "maintainer" => {
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Maintainer(Person {
+                        name: Some(value.to_string()),
+                        email: metadata.get("maintainer_email").map(|s| s.to_string()),
+                        url: None,
+                    }),
+                    certainty: Some(Certainty::Certain),
+                    origin: None,
+                });
+            }
+            "author" => {
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Author(vec![Person {
+                        name: Some(value.to_string()),
+                        email: metadata.get("author_email").map(|s| s.to_string()),
+                        url: None,
+                    }]),
+                    certainty: Some(Certainty::Certain),
+                    origin: None,
+                });
+            }
+            "project_urls" => {
+                let urls = value.split('\n').filter_map(|s| {
+                    if s.is_empty() {
+                        return None;
+                    }
+                    let (key, value) = match s.split_once('=') {
+                        Some((key, value)) => (key, value),
+                        None => {
+                            debug!("Invalid project_urls line: {}", s);
+                            return None;
+                        }
+                    };
+                    Some((key.to_string(), value.to_string()))
+                });
+                ret.extend(parse_python_project_urls(urls));
+            }
+            "license" => {
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::License(value.to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: None,
+                });
+            }
+            "long_description_content_type" | "maintainer_email" | "author_email" => {
+                // Ignore these, they are handled elsewhere
+            }
+            _ => {
+                warn!("Unknown setup.cfg field: {}", field);
+            }
+        }
+    }
+
+    Ok(ret)
+}
