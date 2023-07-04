@@ -792,8 +792,7 @@ fn guess_from_configure(py: Python, path: PathBuf, trust_package: bool) -> PyRes
 
 #[pyfunction]
 fn parse_python_url(py: Python, url: &str) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::providers::python::parse_python_url(url)
-        .map_err(map_provider_err_to_py_err)?;
+    let ret = upstream_ontologist::providers::python::parse_python_url(url);
 
     ret.into_iter()
         .map(|x| upstream_datum_with_metadata_to_py(py, x))
@@ -1021,6 +1020,15 @@ fn guess_from_setup_cfg(py: Python, path: PathBuf, trust_package: bool) -> PyRes
 }
 
 #[pyfunction]
+fn guess_from_setup_py(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
+    upstream_ontologist::providers::python::guess_from_setup_py(path.as_path(), trust_package)
+        .map_err(map_provider_err_to_py_err)?
+        .into_iter()
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
+        .collect()
+}
+
+#[pyfunction]
 fn guess_from_package_yaml(
     py: Python,
     path: PathBuf,
@@ -1118,6 +1126,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_path))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_pyproject_toml))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_setup_cfg))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_setup_py))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_package_yaml))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_pkg_info))?;
     m.add_class::<Forge>()?;
