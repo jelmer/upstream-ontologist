@@ -384,46 +384,6 @@ def parse_python_long_description(long_description, content_type) -> Iterator[Up
 parse_python_url = _upstream_ontologist.parse_python_url
 
 
-def guess_from_setup_py_executed(path):
-    # Import setuptools, just in case it replaces distutils
-    try:
-        import setuptools  # noqa: F401
-    except ModuleNotFoundError:
-        pass
-    from distutils.core import run_setup
-    orig = os.getcwd()
-    result: Any
-    try:
-        os.chdir(os.path.dirname(path))
-        result = run_setup(os.path.abspath(path), stop_after="config")
-    finally:
-        os.chdir(orig)
-    if result.get_name() not in (None, '', 'UNKNOWN'):
-        yield UpstreamDatum('Name', result.get_name(), 'certain')
-    if result.get_version() not in (None, '', 'UNKNOWN'):
-        yield UpstreamDatum('Version', result.get_version(), 'certain')
-    if result.get_url() not in (None, '', 'UNKNOWN'):
-        yield from parse_python_url(result.get_url())
-    if result.get_download_url() not in (None, '', 'UNKNOWN'):
-        yield UpstreamDatum(
-            'Download', result.get_download_url(), 'likely')
-    if result.get_license() not in (None, '', 'UNKNOWN'):
-        yield UpstreamDatum(
-            'License', result.get_license(), 'likely')
-    if result.get_contact() not in (None, '', 'UNKNOWN'):
-        contact = result.get_contact()
-        if result.get_contact_email() not in (None, '', 'UNKNOWN'):
-            contact += " <%s>" % result.get_contact_email()
-        yield UpstreamDatum('Contact', contact, 'likely')
-    if result.get_description() not in (None, '', 'UNKNOWN'):
-        yield UpstreamDatum('Summary', result.get_description(), 'certain')
-    if result.metadata.long_description not in (None, '', 'UNKNOWN'):
-        yield from parse_python_long_description(
-            result.metadata.long_description,
-            getattr(result.metadata, 'long_description_content_type', None))
-    yield from parse_python_project_urls(getattr(result.metadata, 'project_urls', {}))
-
-
 def parse_python_project_urls(urls):
     for url_type, url in urls.items():
         if url_type in ('GitHub', 'Repository', 'Source Code', 'Source'):
@@ -441,109 +401,6 @@ def parse_python_project_urls(urls):
         else:
             logger.debug(
                 'Unknown Python project URL type: %s', url_type)
-
-
-def guess_from_setup_py(path, trust_package):  # noqa: C901
-    if trust_package:
-        try:
-            yield from guess_from_setup_py_executed(path)
-        except Exception as e:
-            logger.warning('Failed to run setup.py: %r', e)
-        else:
-            return
-    with open(path) as inp:
-        setup_text = inp.read()
-    import ast
-
-    # Based on pypi.py in https://github.com/nexB/scancode-toolkit/blob/develop/src/packagedcode/pypi.py
-    #
-    # Copyright (c) nexB Inc. and others. All rights reserved.
-    # ScanCode is a trademark of nexB Inc.
-    # SPDX-License-Identifier: Apache-2.0
-
-    try:
-        tree = ast.parse(setup_text)
-    except SyntaxError as e:
-        logger.warning('Syntax error while parsing setup.py: %s', e)
-        return
-    setup_args = {}
-
-    for statement in tree.body:
-        # We only care about function calls or assignments to functions named
-        # `setup` or `main`
-        if (isinstance(statement, (ast.Expr, ast.Call, ast.Assign))
-            and isinstance(statement.value, ast.Call)
-            and isinstance(statement.value.func, ast.Name)
-            # we also look for main as sometimes this is used instead of
-            # setup()
-                and statement.value.func.id in ('setup', 'main')):
-
-            # Process the arguments to the setup function
-            for kw in getattr(statement.value, 'keywords', []):
-                arg_name = kw.arg
-
-                if isinstance(kw.value, (ast.Str, ast.Constant)):
-                    setup_args[arg_name] = kw.value.s
-
-                elif isinstance(kw.value, (ast.List, ast.Tuple, ast.Set,)):
-                    # We collect the elements of a list if the element
-                    # and tag function calls
-                    value = [
-                        elt.s for elt in kw.value.elts
-                        if isinstance(elt, ast.Constant)
-                    ]
-                    setup_args[arg_name] = value
-
-                elif isinstance(kw.value, ast.Dict):
-                    setup_args[arg_name] = {}
-                    for (key, value) in zip(kw.value.keys, kw.value.values):  # type: ignore
-                        if isinstance(key, ast.Str) and isinstance(value, (ast.Str, ast.Constant)):
-                            setup_args[key.s] = value.s
-
-                # TODO: what if kw.value is an expression like a call to
-                # version=get_version or version__version__
-
-    # End code from https://github.com/nexB/scancode-toolkit/blob/develop/src/packagedcode/pypi.py
-
-    if 'name' in setup_args:
-        yield UpstreamDatum('Name', setup_args['name'], 'certain')
-    if 'version' in setup_args:
-        yield UpstreamDatum('Version', setup_args['version'], 'certain')
-    if 'description' in setup_args:
-        yield UpstreamDatum('Summary', setup_args['description'], 'certain')
-    if 'long_description' in setup_args:
-        yield from parse_python_long_description(
-            setup_args['long_description'], setup_args.get('long_description_content_type'))
-    if 'license' in setup_args:
-        yield UpstreamDatum('License', setup_args['license'], 'certain')
-    if 'download_url' in setup_args and setup_args.get('download_url'):
-        yield UpstreamDatum('Download', setup_args['download_url'], 'certain')
-    if 'url' in setup_args:
-        yield from parse_python_url(setup_args['url'])
-    if 'project_urls' in setup_args:
-        yield from parse_python_project_urls(setup_args['project_urls'])
-    if 'maintainer' in setup_args:
-        maintainer_email = setup_args.get('maintainer_email')
-        maintainer = setup_args['maintainer']
-        if isinstance(maintainer, list) and len(maintainer) == 1:
-            maintainer = maintainer[0]
-        if isinstance(maintainer, str):
-            maintainer = Person(maintainer, maintainer_email)
-            yield UpstreamDatum('Maintainer', maintainer, 'certain')
-    if 'author' in setup_args:
-        author_email = setup_args.get('author_email')
-        author = setup_args['author']
-        if isinstance(author, str):
-            authors = [author]
-            author_emails = [author_email]
-        elif isinstance(author, list):
-            authors = author
-            author_emails = author_email  # type: ignore
-        yield UpstreamDatum(
-            'Author',
-            [Person(author, email)
-             for (author, email) in zip(authors, author_emails)],
-            'certain')
 
 
 guess_from_composer_json = _upstream_ontologist.guess_from_composer_json
@@ -866,6 +723,7 @@ guess_from_path = _upstream_ontologist.guess_from_path
 guess_from_cargo = _upstream_ontologist.guess_from_cargo
 guess_from_pyproject_toml = _upstream_ontologist.guess_from_pyproject_toml
 guess_from_setup_cfg = _upstream_ontologist.guess_from_setup_cfg
+guess_from_setup_py = _upstream_ontologist.guess_from_setup_py
 
 guess_from_pom_xml = _upstream_ontologist.guess_from_pom_xml
 guess_from_git_config = _upstream_ontologist.guess_from_git_config
