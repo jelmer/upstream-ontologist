@@ -348,61 +348,6 @@ def guess_from_debian_changelog(path, trust_package):
 metadata_from_itp_bug_body = _upstream_ontologist.metadata_from_itp_bug_body
 extract_sf_project_name = _upstream_ontologist.extract_sf_project_name
 guess_from_pkg_info = _upstream_ontologist.guess_from_pkg_info
-
-
-def parse_python_long_description(long_description, content_type) -> Iterator[UpstreamDatum]:
-    description: Optional[str]
-    if long_description in (None, ''):
-        return
-    # Discard encoding, etc.
-    if content_type:
-        content_type = content_type.split(';')[0]
-    if '-*-restructuredtext-*-' in long_description.splitlines()[0]:
-        content_type = 'text/restructured-text'
-    extra_md: Iterable[UpstreamDatum]
-    if content_type in (None, 'text/plain'):
-        if len(long_description.splitlines()) > 30:
-            return
-        yield UpstreamDatum(
-            'Description', long_description, 'possible')
-        extra_md = []
-    elif content_type in ('text/restructured-text', 'text/x-rst'):
-        from .readme import description_from_readme_rst
-        description, extra_md = description_from_readme_rst(long_description)
-        if description:
-            yield UpstreamDatum('Description', description, 'possible')
-    elif content_type == 'text/markdown':
-        from .readme import description_from_readme_md
-        description, extra_md = description_from_readme_md(long_description)
-        if description:
-            yield UpstreamDatum('Description', description, 'possible')
-    else:
-        extra_md = []
-    yield from extra_md
-
-
-parse_python_url = _upstream_ontologist.parse_python_url
-
-
-def parse_python_project_urls(urls):
-    for url_type, url in urls.items():
-        if url_type in ('GitHub', 'Repository', 'Source Code', 'Source'):
-            yield UpstreamDatum(
-                'Repository', str(url), 'certain')
-        elif url_type in ('Bug Tracker', 'Bug Reports'):
-            yield UpstreamDatum(
-                'Bug-Database', str(url), 'certain')
-        elif url_type in ('Documentation', ):
-            yield UpstreamDatum(
-                'Documentation', str(url), 'certain')
-        elif url_type in ('Funding', ):
-            yield UpstreamDatum(
-                'Funding', str(url), 'certain')
-        else:
-            logger.debug(
-                'Unknown Python project URL type: %s', url_type)
-
-
 guess_from_composer_json = _upstream_ontologist.guess_from_composer_json
 guess_from_package_json = _upstream_ontologist.guess_from_package_json
 guess_from_package_xml = _upstream_ontologist.guess_from_package_xml
