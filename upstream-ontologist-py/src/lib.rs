@@ -791,15 +791,6 @@ fn guess_from_configure(py: Python, path: PathBuf, trust_package: bool) -> PyRes
 }
 
 #[pyfunction]
-fn parse_python_url(py: Python, url: &str) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::providers::python::parse_python_url(url);
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
 fn guess_from_r_description(
     py: Python,
     path: PathBuf,
@@ -1105,7 +1096,6 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(browse_url_from_repo_url))?;
     m.add_wrapped(wrap_pyfunction!(find_public_repo_url))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_configure))?;
-    m.add_wrapped(wrap_pyfunction!(parse_python_url))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_r_description))?;
     m.add_wrapped(wrap_pyfunction!(find_forge))?;
     m.add_wrapped(wrap_pyfunction!(repo_url_from_merge_request_url))?;
