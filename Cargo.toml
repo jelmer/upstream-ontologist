@@ -13,7 +13,7 @@ pyo3 = { workspace = true }
 log = "0.4"
 shlex = "1.1.0"
 serde_json = "1.0"
-reqwest = { version = "0.11", features=["blocking", "json"]}
+reqwest = { version = "^0.11", features=["blocking", "json"], default-features = false }
 lazy_static = "1"
 regex = "1"
 url = "2"
@@ -41,7 +41,8 @@ pyo3 = "0.19"
 pyo3-log = "0.8"
 
 [features]
-default = ["git-config", "launchpad", "opam", "dist-ini", "cargo", "r-description", "pyproject-toml", "python-pkginfo"]
+default = ["git-config", "launchpad", "opam", "dist-ini", "cargo", "r-description", "pyproject-toml", "python-pkginfo", "default-tls"]
+default-tls = ["reqwest/default-tls"]
 git-config = ["dep:gix-config"]
 launchpad = ["dep:distro-info"]
 opam = ["dep:opam-file-rs"]
@@ -50,6 +51,7 @@ cargo = ["dep:toml"]
 r-description = ["dep:mailparse"]
 pyproject-toml = ["dep:pyproject-toml"]
 python-pkginfo = ["dep:python-pkginfo"]
+rustls-tls = ["reqwest/rustls-tls"]
 
 [lib]
 
