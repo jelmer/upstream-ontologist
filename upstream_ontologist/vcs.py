@@ -31,7 +31,7 @@ __all__ = [
 ]
 
 import logging
-from typing import Optional, Union, List, Tuple
+from typing import Optional, Union, List, Tuple, Callable
 
 from urllib.parse import urlparse, urlunparse, ParseResult
 
@@ -305,7 +305,7 @@ def convert_cvs_list_to_str(urls):
     return urls
 
 
-SANITIZERS = [
+SANITIZERS: List[Callable[[str], str]] = [
     convert_cvs_list_to_str,
     drop_vcs_in_scheme,
     lambda url: fixup_broken_git_details(url, None, None)[0],
@@ -320,5 +320,5 @@ def sanitize_url(url: Union[str, List[str]]) -> str:
     if isinstance(url, str):
         url = url.strip()
     for sanitizer in SANITIZERS:
-        url = sanitizer(url)
+        url = sanitizer(url)  # type: ignore
     return url  # type: ignore
