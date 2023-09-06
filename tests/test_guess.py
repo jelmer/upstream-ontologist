@@ -28,6 +28,7 @@ from upstream_ontologist.guess import (
 class MetadataFromItpBugBody(TestCase):
 
     def test_simple(self):
+        self.maxDiff = None
         self.assertEqual([
             UpstreamDatum('Name', 'setuptools-gettext', 'confident'),
             UpstreamDatum('Version', '0.0.1', 'possible'),

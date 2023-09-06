@@ -91,6 +91,7 @@ https://github.com/jelmer/dulwich/tags/dulwich-(.*).tar.gz
 class GuessFromPackageJsonTests(TestCaseInTempDir):
 
     def test_dummy(self):
+        self.maxDiff = None
         with open("package.json", "w") as f:
             f.write(
                 """\
@@ -114,14 +115,14 @@ class GuessFromPackageJsonTests(TestCaseInTempDir):
             )
         self.assertEqual(
             [
-                UpstreamDatum("Name", "mozillaeslintsetup", "certain"),
                 UpstreamDatum(
                     "Summary",
                     "This package file is for setup of ESLint.",
                     "certain",
-                    None,
+                    "package.json",
                 ),
-                UpstreamDatum("License", "MPL-2.0", "certain", None),
+                UpstreamDatum("License", "MPL-2.0", "certain", "package.json"),
+                UpstreamDatum("Name", "mozillaeslintsetup", "certain", "package.json"),
             ],
             list(guess_from_package_json("package.json", False)),
         )
@@ -129,6 +130,7 @@ class GuessFromPackageJsonTests(TestCaseInTempDir):
 
 class GuessFromRDescriptionTests(TestCaseInTempDir):
     def test_read(self):
+        self.maxDiff = None
         with open("DESCRIPTION", "w") as f:
             f.write(
                 """\
@@ -174,27 +176,32 @@ Date/Publication: 2019-08-02 20:30:02 UTC
         self.assertEqual(
             list(ret),
             [
-                UpstreamDatum("Name", "crul", "certain"),
-                UpstreamDatum("Archive", "CRAN", "certain"),
+                UpstreamDatum("Name", "crul", "certain", "DESCRIPTION"),
+                UpstreamDatum("Archive", "CRAN", "certain", "DESCRIPTION"),
                 UpstreamDatum(
-                    "Bug-Database", "https://github.com/ropensci/crul/issues", "certain"
-                ),
-                UpstreamDatum('Version', '0.8.4', 'certain'),
-                UpstreamDatum('License', 'MIT + file LICENSE', 'certain'),
-                UpstreamDatum('Summary', 'HTTP Client', 'certain'),
+                    "Bug-Database", "https://github.com/ropensci/crul/issues",
+                    "certain", "DESCRIPTION"),
+                UpstreamDatum('Version', '0.8.4', 'certain', "DESCRIPTION"),
+                UpstreamDatum(
+                    'License', 'MIT + file LICENSE', 'certain', "DESCRIPTION"),
+                UpstreamDatum('Summary', 'HTTP Client', 'certain', "DESCRIPTION"),
                 UpstreamDatum('Description', """\
 A simple HTTP client, with tools for making HTTP requests,
 and mocking HTTP requests. The package is built on R6, and takes
 inspiration from Ruby's 'faraday' gem (<https://rubygems.org/gems/faraday>)
 The package name is a play on curl, the widely used command line tool
 for HTTP, and this package is built on top of the R package 'curl', an
-interface to 'libcurl' (<https://curl.haxx.se/libcurl>).""", 'certain'),
+interface to 'libcurl' (<https://curl.haxx.se/libcurl>).""", 'certain', "DESCRIPTION"),
                 UpstreamDatum(
-                    'Maintainer', Person('Scott Chamberlain', email='myrmecocystus@gmail.com'), 'certain'),
+                    'Maintainer',
+                    Person('Scott Chamberlain', email='myrmecocystus@gmail.com'),
+                    'certain', "DESCRIPTION"),
                 UpstreamDatum(
-                    "Repository", "https://github.com/ropensci/crul.git", "certain"
+                    "Repository", "https://github.com/ropensci/crul",
+                    "certain", "DESCRIPTION"
                 ),
-                UpstreamDatum("Homepage", "https://www.example.com/crul", "certain"),
+                UpstreamDatum(
+                    "Homepage", "https://www.example.com/crul", "certain", "DESCRIPTION"),
             ],
         )
 

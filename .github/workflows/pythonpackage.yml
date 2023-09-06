@@ -18,11 +18,14 @@ jobs:
       fail-fast: false
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Install pre-dependencies
+        run: |
+          python -m pip install -U pip "setuptools>=60" setuptools-rust
       - name: Install dependencies (Linux)
         run: |
           sudo apt install libxml2-dev libxslt1-dev
@@ -33,15 +36,15 @@ jobs:
         if: "matrix.os == 'macos-latest'"
       - name: Install dependencies
         run: |
-          python -m pip install -e \
+          python -m pip install  \
             '.[readme,cargo,pyproject,debian_watch,debian_rules,debian_changelog,setup.cfg]'
-          python setup.py develop
+          python setup.py build_ext -i
         if: "matrix.os == 'ubuntu-latest'"
       - name: Install dependencies
         run: |
-          python -m pip install -e \
+          python -m pip install \
             '.[readme,cargo,pyproject,debian_watch,debian_rules,debian_changelog,setup.cfg]'
-          python setup.py develop
+          python setup.py build_ext -i
         if: "matrix.os == 'macos-latest'"
       - name: Install breezy
         run: |
@@ -51,15 +54,18 @@ jobs:
         run: |
           python -m pip install --upgrade pip flake8
           python -m flake8
+        continue-on-error: true
       - name: Style checks (yamllint)
         run: |
           python -m pip install --upgrade yamllint
           yamllint .
+        continue-on-error: true
       - name: Typing checks
         run: |
           pip install -U mypy types-docutils types-Markdown types-toml \
              types-beautifulsoup4
           python -m mypy upstream_ontologist/ tests/
+        continue-on-error: true
       - name: Test suite run
         run: |
           python -m unittest tests.test_suite

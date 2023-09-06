@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.2"]
+requires = ["setuptools>=61.2", "setuptools-rust"]
 build-backend = "setuptools.build_meta"
 
 [tool.mypy]
@@ -15,7 +15,6 @@ module = [
     "pysimplesoap.*",
     "debianbts.*",
     "setuptools.*",
-    "distro_info.*",
     "pcre.*",
     "lxml.*",
     # Not available on Mac OS X
