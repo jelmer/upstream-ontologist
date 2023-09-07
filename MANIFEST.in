@@ -3,3 +3,6 @@ include README.md
 include SECURITY.md
 include AUTHORS
 recursive-include tests *.py README README.md description README.rst
+include Cargo.toml upstream-ontologist-py/Cargo.toml
+recursive-include src *.rs
+recursive-include upstream-ontologist-py *.rs
