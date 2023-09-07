@@ -151,14 +151,14 @@ fn json_to_py(py: Python, data: serde_json::Value) -> PyResult<PyObject> {
             .map(|x| json_to_py(py, x))
             .collect::<PyResult<Vec<PyObject>>>()?
             .into_py(py)),
-        serde_json::Value::Object(o) => Ok(PyDict::from_sequence(
-            py,
-            o.into_iter()
-                .map(|(k, v)| Ok((k.into_py(py), json_to_py(py, v)?)))
-                .collect::<PyResult<Vec<_>>>()?
-                .into_py(py),
-        )?
-        .into_py(py)),
+        serde_json::Value::Object(o) => Ok({
+            let d = PyDict::new(py);
+
+            for (k, v) in o {
+                d.set_item(k.into_py(py), json_to_py(py, v)?)?;
+            }
+            d.into_py(py)
+        }),
     }
 }
 
