@@ -50,6 +50,8 @@ jobs:
           CIBW_SKIP: '*-win32'
           CIBW_ENVIRONMENT: 'PATH="$HOME/.cargo/bin:$PATH"'
           CIBW_BEFORE_BUILD: >
+            if command -v yum; then yum install openssl-devel; fi &&
+            if command -v apk; then apk install openssl; fi &&
             pip install -U setuptools-rust &&
             rustup default nightly &&
             rustup target add all &&
