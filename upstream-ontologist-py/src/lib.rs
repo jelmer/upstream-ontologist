@@ -285,8 +285,9 @@ fn guess_from_pubspec_yaml(
 
 #[pyfunction]
 fn guess_from_authors(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::guess_from_authors(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?;
+    let ret =
+        upstream_ontologist::providers::authors::guess_from_authors(path.as_path(), trust_package)
+            .map_err(map_provider_err_to_py_err)?;
 
     ret.into_iter()
         .map(|x| upstream_datum_with_metadata_to_py(py, x))
@@ -790,16 +791,6 @@ fn guess_from_configure(py: Python, path: PathBuf, trust_package: bool) -> PyRes
 }
 
 #[pyfunction]
-fn parse_python_url(py: Python, url: &str) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::providers::python::parse_python_url(url)
-        .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
 fn guess_from_r_description(
     py: Python,
     path: PathBuf,
@@ -940,10 +931,14 @@ fn guess_from_security_md(
     path: PathBuf,
     trust_package: bool,
 ) -> PyResult<Vec<PyObject>> {
-    upstream_ontologist::guess_from_security_md(name, path.as_path(), trust_package)
-        .into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect()
+    upstream_ontologist::providers::security_md::guess_from_security_md(
+        name,
+        path.as_path(),
+        trust_package,
+    )
+    .into_iter()
+    .map(|x| upstream_datum_with_metadata_to_py(py, x))
+    .collect()
 }
 
 #[pyfunction]
@@ -1000,6 +995,24 @@ fn guess_from_pyproject_toml(
     trust_package: bool,
 ) -> PyResult<Vec<PyObject>> {
     upstream_ontologist::providers::python::guess_from_pyproject_toml(path.as_path(), trust_package)
+        .map_err(map_provider_err_to_py_err)?
+        .into_iter()
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
+        .collect()
+}
+
+#[pyfunction]
+fn guess_from_setup_cfg(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
+    upstream_ontologist::providers::python::guess_from_setup_cfg(path.as_path(), trust_package)
+        .map_err(map_provider_err_to_py_err)?
+        .into_iter()
+        .map(|x| upstream_datum_with_metadata_to_py(py, x))
+        .collect()
+}
+
+#[pyfunction]
+fn guess_from_setup_py(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
+    upstream_ontologist::providers::python::guess_from_setup_py(path.as_path(), trust_package)
         .map_err(map_provider_err_to_py_err)?
         .into_iter()
         .map(|x| upstream_datum_with_metadata_to_py(py, x))
@@ -1083,7 +1096,6 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(browse_url_from_repo_url))?;
     m.add_wrapped(wrap_pyfunction!(find_public_repo_url))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_configure))?;
-    m.add_wrapped(wrap_pyfunction!(parse_python_url))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_r_description))?;
     m.add_wrapped(wrap_pyfunction!(find_forge))?;
     m.add_wrapped(wrap_pyfunction!(repo_url_from_merge_request_url))?;
@@ -1103,6 +1115,8 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_debian_patch))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_path))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_pyproject_toml))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_setup_cfg))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_setup_py))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_package_yaml))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_pkg_info))?;
     m.add_class::<Forge>()?;

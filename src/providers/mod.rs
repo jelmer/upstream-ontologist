@@ -1,4 +1,5 @@
 pub mod arch;
+pub mod authors;
 pub mod autoconf;
 pub mod composer_json;
 pub mod debian;
@@ -22,4 +23,5 @@ pub mod r;
 pub mod ruby;
 #[cfg(feature = "cargo")]
 pub mod rust;
+pub mod security_md;
 pub mod waf;

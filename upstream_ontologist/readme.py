@@ -29,7 +29,7 @@ from . import UpstreamDatum, _upstream_ontologist
 logger = logging.getLogger(__name__)
 
 
-_skip_paragraph = _upstream_ontologist.readme.skip_paragraph
+_skip_paragraph = _upstream_ontologist.readme.skip_paragraph  # type: ignore
 
 
 def _skip_paragraph_block(para):  # noqa: C901
