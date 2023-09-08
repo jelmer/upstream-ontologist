@@ -519,7 +519,7 @@ def guess_from_install(path, trust_package):  # noqa: C901
                     if is_gitlab_site(m.group(1).decode()):
                         url = m.group(0).rstrip(b'.').decode().rstrip()
                         try:
-                            repo_url = guess_repo_from_url(url)
+                            repo_url = guess_repo_from_url(url)  # type: ignore
                         except ValueError:
                             logger.warning(
                                 'Ignoring invalid URL %s in %s', url, path)
@@ -605,7 +605,7 @@ def guess_from_readme(path, trust_package):  # noqa: C901
                     if is_gitlab_site(m.group(1).decode()):
                         url = m.group(0).rstrip(b'.').decode().rstrip()
                         try:
-                            repo_url = guess_repo_from_url(url)
+                            repo_url = guess_repo_from_url(url)  # type: ignore
                         except ValueError:
                             logger.warning(
                                 'Ignoring invalid URL %s in %s', url, path)
@@ -679,8 +679,8 @@ def guess_from_get_orig_source(path, trust_package=False):
         for line in f:
             if line.startswith(b'git clone'):
                 url = url_from_git_clone_command(line)
-                certainty = 'likely' if '$' not in url else 'possible'
                 if url:
+                    certainty = 'likely' if '$' not in url else 'possible'
                     yield UpstreamDatum('Repository', url, certainty)
 
 
