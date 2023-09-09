@@ -6,8 +6,9 @@ pub fn guess_from_git_config(
     path: &Path,
     trust_package: bool,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
-    let config_file = gix_config::File::from_path_no_includes(path, gix_config::Source::Local)
-        .map_err(|e| ProviderError::ParseError(e.to_string()))?;
+    let config_file =
+        gix_config::File::from_path_no_includes(path.to_path_buf(), gix_config::Source::Local)
+            .map_err(|e| ProviderError::ParseError(e.to_string()))?;
     let mut results = Vec::new();
 
     // Check if there's a remote named "upstream"
