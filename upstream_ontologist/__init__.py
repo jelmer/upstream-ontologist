@@ -70,7 +70,7 @@ from . import _upstream_ontologist
 
 SUPPORTED_CERTAINTIES = ["certain", "confident", "likely", "possible", None]
 
-version_string = "0.1.35"
+version_string = "0.1.36"
 
 USER_AGENT = "upstream-ontologist/" + version_string
 # Too aggressive?
