@@ -25,6 +25,8 @@ chrono = "0.4"
 textwrap = ">=0.16"
 lazy-regex = "2"
 breezyshim = "0.1.24"
+debian-watch = "0.2.1"
+debian-changelog = "0.1.8"
 
 [workspace]
 members = [ "upstream-ontologist-py",]
