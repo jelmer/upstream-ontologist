@@ -165,6 +165,7 @@ pub enum UpstreamDatum {
     PeclPackage(String),
     Funding(String),
     Changelog(String),
+    HaskellPackage(String),
 }
 
 #[derive(Clone)]
@@ -211,6 +212,7 @@ impl UpstreamDatum {
             UpstreamDatum::Archive(..) => "Archive",
             UpstreamDatum::Demo(..) => "Demo",
             UpstreamDatum::PeclPackage(..) => "Pecl-Package",
+            UpstreamDatum::HaskellPackage(..) => "Haskell-Package",
             UpstreamDatum::Funding(..) => "Funding",
             UpstreamDatum::Changelog(..) => "Changelog",
         }
@@ -241,6 +243,7 @@ impl UpstreamDatum {
             UpstreamDatum::Archive(s) => Some(s),
             UpstreamDatum::Demo(s) => Some(s),
             UpstreamDatum::PeclPackage(s) => Some(s),
+            UpstreamDatum::HaskellPackage(s) => Some(s),
             UpstreamDatum::Author(..) => None,
             UpstreamDatum::Maintainer(..) => None,
             UpstreamDatum::Keywords(..) => None,
@@ -438,6 +441,9 @@ pub fn guess_upstream_metadata(
                 "Demo" => UpstreamDatum::Demo(value.extract::<String>(py).unwrap()),
                 "Archive" => UpstreamDatum::Archive(value.extract::<String>(py).unwrap()),
                 "Pecl-Package" => UpstreamDatum::PeclPackage(value.extract::<String>(py).unwrap()),
+                "Haskell-Package" => {
+                    UpstreamDatum::HaskellPackage(value.extract::<String>(py).unwrap())
+                }
                 "Author" => UpstreamDatum::Author(
                     value
                         .extract::<Vec<Person>>(py)
@@ -1965,6 +1971,14 @@ pub fn extract_pecl_package_name(url: &str) -> Option<String> {
     None
 }
 
+pub fn extract_hackage_package(url: &str) -> Option<String> {
+    let hackage_regex = regex!(r"https?://hackage\.haskell\.org/package/([^/]+)/.*");
+    if let Some(captures) = hackage_regex.captures(url) {
+        return captures.get(1).map(|m| m.as_str().to_string());
+    }
+    None
+}
+
 /// Obtain metadata from a URL related to the project
 pub fn metadata_from_url(url: &str, origin: Option<&str>) -> Vec<UpstreamDatumWithMetadata> {
     let mut results = Vec::new();
@@ -1994,6 +2008,18 @@ pub fn metadata_from_url(url: &str, origin: Option<&str>) -> Vec<UpstreamDatumWi
         });
     }
 
+    if let Some(haskell_package) = extract_hackage_package(url) {
+        results.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::HaskellPackage(haskell_package),
+            certainty: Some(Certainty::Certain),
+            origin: origin.map(|s| s.to_string()),
+        });
+        results.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Archive("Hackage".to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: origin.map(|s| s.to_string()),
+        });
+    }
     results
 }
 
@@ -2116,6 +2142,7 @@ pub fn py_to_upstream_datum(py: Python, obj: &PyObject) -> PyResult<UpstreamDatu
         "Archive" => Ok(UpstreamDatum::Archive(val.extract::<String>(py)?)),
         "Demo" => Ok(UpstreamDatum::Demo(val.extract::<String>(py)?)),
         "Pecl-Package" => Ok(UpstreamDatum::PeclPackage(val.extract::<String>(py)?)),
+        "Haskell-Package" => Ok(UpstreamDatum::HaskellPackage(val.extract::<String>(py)?)),
         "Author" => Ok(UpstreamDatum::Author(
             val.extract::<Vec<PyObject>>(py)?
                 .into_iter()
@@ -2157,4 +2184,57 @@ impl From<std::io::Error> for ProviderError {
     fn from(e: std::io::Error) -> Self {
         ProviderError::IoError(e)
     }
+}
+
+pub fn guess_from_debian_watch(
+    path: &Path,
+    _trust_package: bool,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    let mut ret = vec![];
+    use debian_changelog::ChangeLog;
+    use debian_watch::{Mode, WatchFile};
+
+    let get_package_name = || -> String {
+        let text = std::fs::read_to_string(path.parent().unwrap().join("changelog")).unwrap();
+        let cl: ChangeLog = text.parse().unwrap();
+        let first_entry = cl.entries().next().unwrap();
+        first_entry.package().unwrap()
+    };
+
+    let w = WatchFile::from_str(&std::fs::read_to_string(path)?).unwrap();
+
+    let origin = Some(path.to_string_lossy().to_string());
+
+    for entry in w.entries() {
+        let url = entry.format_url(get_package_name);
+        match entry.mode().unwrap_or_default() {
+            Mode::Git => {
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Repository(url.to_string()),
+                    certainty: Some(Certainty::Confident),
+                    origin: origin.clone(),
+                });
+            }
+            Mode::Svn => {
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Repository(url.to_string()),
+                    certainty: Some(Certainty::Confident),
+                    origin: origin.clone(),
+                });
+            }
+            Mode::LWP => {
+                if url.scheme() == "http" || url.scheme() == "https" {
+                    if let Some(repo) = vcs::guess_repo_from_url(&url, None) {
+                        ret.push(UpstreamDatumWithMetadata {
+                            datum: UpstreamDatum::Repository(repo),
+                            certainty: Some(Certainty::Likely),
+                            origin: origin.clone(),
+                        });
+                    }
+                }
+            }
+        };
+        ret.extend(metadata_from_url(url.as_str(), origin.as_deref()));
+    }
+    Ok(ret)
 }

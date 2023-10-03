@@ -169,62 +169,7 @@ extract_pecl_package_name = _upstream_ontologist.extract_pecl_package_name
 _metadata_from_url = _upstream_ontologist.metadata_from_url
 
 
-def guess_from_debian_watch(path, trust_package):
-    try:
-        from debmutate.watch import (
-            parse_watch_file,
-            MissingVersion,
-        )
-    except ModuleNotFoundError as e:
-        warn_missing_dependency(path, e.name)
-        return
-
-    try:
-        from debian.deb822 import Deb822
-    except ModuleNotFoundError as e:
-        warn_missing_dependency(path, e.name)
-        return
-
-    def get_package_name():
-        with open(os.path.join(os.path.dirname(path), 'control')) as f:
-            return Deb822(f)['Source']
-    with open(path) as f:
-        try:
-            wf = parse_watch_file(f)
-        except MissingVersion:
-            return
-        if not wf:
-            return
-        for w in wf:
-            url = w.format_url(package=get_package_name)
-            if 'mode=git' in w.options:
-                yield UpstreamDatum(
-                    "Repository", url, "confident",
-                    origin=path)
-                continue
-            if 'mode=svn' in w.options:
-                yield UpstreamDatum(
-                    "Repository", url, "confident",
-                    origin=path)
-                continue
-            if url.startswith('https://') or url.startswith('http://'):
-                repo = guess_repo_from_url(url)
-                if repo:
-                    yield UpstreamDatum(
-                        "Repository", repo, "likely",
-                        origin=path)
-                    continue
-            yield from _metadata_from_url(url, origin=path)
-            m = re.match(
-                'https?://hackage.haskell.org/package/(.*)/distro-monitor',
-                url)
-            if m:
-                yield UpstreamDatum(
-                    "Archive", "Hackage", "certain", origin=path)
-                yield UpstreamDatum(
-                    "Hackage-Package", m.group(1), "certain", origin=path)
-
-
+guess_from_debian_watch = _upstream_ontologist.guess_from_debian_watch
 debian_is_native = _upstream_ontologist.debian_is_native
 
 
