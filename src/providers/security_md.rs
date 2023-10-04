@@ -6,7 +6,7 @@ use crate::{Certainty, UpstreamDatum, UpstreamDatumWithMetadata};
 pub fn guess_from_security_md(
     name: &str,
     path: &std::path::Path,
-    trust_package: bool,
+    _trust_package: bool,
 ) -> Vec<UpstreamDatumWithMetadata> {
     let path = path.strip_prefix("./").unwrap_or(path);
     let mut results = Vec::new();

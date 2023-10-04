@@ -79,6 +79,7 @@ fn upstream_datum_to_py(py: Python, datum: UpstreamDatum) -> PyResult<(String, P
             UpstreamDatum::Funding(p) => p.into_py(py),
             UpstreamDatum::Changelog(c) => c.into_py(py),
             UpstreamDatum::HaskellPackage(p) => p.into_py(py),
+            UpstreamDatum::DebianITP(i) => i.into_py(py),
         },
     ))
 }
@@ -1017,11 +1018,27 @@ fn guess_from_debian_watch(
     path: PathBuf,
     trust_package: bool,
 ) -> PyResult<Vec<PyObject>> {
-    upstream_ontologist::guess_from_debian_watch(path.as_path(), trust_package)
+    upstream_ontologist::providers::debian::guess_from_debian_watch(path.as_path(), trust_package)
         .map_err(map_provider_err_to_py_err)?
         .into_iter()
         .map(|x| upstream_datum_with_metadata_to_py(py, x))
         .collect()
+}
+
+#[pyfunction]
+fn guess_from_debian_changelog(
+    py: Python,
+    path: PathBuf,
+    trust_package: bool,
+) -> PyResult<Vec<PyObject>> {
+    upstream_ontologist::providers::debian::guess_from_debian_changelog(
+        path.as_path(),
+        trust_package,
+    )
+    .map_err(map_provider_err_to_py_err)?
+    .into_iter()
+    .map(|x| upstream_datum_with_metadata_to_py(py, x))
+    .collect()
 }
 
 #[pyfunction]
@@ -1134,6 +1151,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_package_yaml))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_pkg_info))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_debian_watch))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_debian_changelog))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;

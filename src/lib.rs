@@ -8,7 +8,7 @@ use std::str::FromStr;
 
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, Read};
 use std::path::{Path, PathBuf};
 use url::Url;
 
@@ -166,6 +166,7 @@ pub enum UpstreamDatum {
     Funding(String),
     Changelog(String),
     HaskellPackage(String),
+    DebianITP(i32),
 }
 
 #[derive(Clone)]
@@ -215,6 +216,7 @@ impl UpstreamDatum {
             UpstreamDatum::HaskellPackage(..) => "Haskell-Package",
             UpstreamDatum::Funding(..) => "Funding",
             UpstreamDatum::Changelog(..) => "Changelog",
+            UpstreamDatum::DebianITP(..) => "Debian-ITP",
         }
     }
 
@@ -250,6 +252,7 @@ impl UpstreamDatum {
             UpstreamDatum::Copyright(c) => Some(c),
             UpstreamDatum::Funding(f) => Some(f),
             UpstreamDatum::Changelog(c) => Some(c),
+            UpstreamDatum::DebianITP(_c) => None,
         }
     }
 
@@ -444,6 +447,7 @@ pub fn guess_upstream_metadata(
                 "Haskell-Package" => {
                     UpstreamDatum::HaskellPackage(value.extract::<String>(py).unwrap())
                 }
+                "Debian-ITP" => UpstreamDatum::DebianITP(value.extract::<i32>(py).unwrap()),
                 "Author" => UpstreamDatum::Author(
                     value
                         .extract::<Vec<Person>>(py)
@@ -637,6 +641,19 @@ pub enum HTTPJSONError {
         status: u16,
         response: reqwest::blocking::Response,
     },
+}
+
+impl std::fmt::Display for HTTPJSONError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            HTTPJSONError::HTTPError(e) => write!(f, "{}", e),
+            HTTPJSONError::Error {
+                url,
+                status,
+                response: _,
+            } => write!(f, "HTTP error {} for {}:", status, url,),
+        }
+    }
 }
 
 pub fn load_json_url(
@@ -920,11 +937,11 @@ pub trait Forge: Send + Sync {
 
     fn name(&self) -> &'static str;
 
-    fn bug_database_url_from_bug_submit_url(&self, url: &Url) -> Option<Url> {
+    fn bug_database_url_from_bug_submit_url(&self, _url: &Url) -> Option<Url> {
         None
     }
 
-    fn bug_submit_url_from_bug_database_url(&self, url: &Url) -> Option<Url> {
+    fn bug_submit_url_from_bug_database_url(&self, _url: &Url) -> Option<Url> {
         None
     }
 
@@ -942,23 +959,23 @@ pub trait Forge: Send + Sync {
         ))
     }
 
-    fn bug_database_from_issue_url(&self, url: &Url) -> Option<Url> {
+    fn bug_database_from_issue_url(&self, _url: &Url) -> Option<Url> {
         None
     }
 
-    fn bug_database_url_from_repo_url(&self, url: &Url) -> Option<Url> {
+    fn bug_database_url_from_repo_url(&self, _url: &Url) -> Option<Url> {
         None
     }
 
-    fn repo_url_from_merge_request_url(&self, url: &Url) -> Option<Url> {
+    fn repo_url_from_merge_request_url(&self, _url: &Url) -> Option<Url> {
         None
     }
 
     fn extend_metadata(
         &self,
-        metadata: &mut Vec<UpstreamDatumWithMetadata>,
-        project: &str,
-        max_certainty: Certainty,
+        _metadata: &mut Vec<UpstreamDatumWithMetadata>,
+        _project: &str,
+        _max_certainty: Certainty,
     ) {
     }
 }
@@ -1407,7 +1424,7 @@ pub fn guess_from_environment() -> std::result::Result<Vec<UpstreamDatumWithMeta
 // Documentation: https://docs.microsoft.com/en-us/nuget/reference/nuspec
 pub fn guess_from_nuspec(
     path: &Path,
-    trust_package: bool,
+    _trust_package: bool,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     const NAMESPACES: &[&str] = &["http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd"];
     // XML parsing and other logic
@@ -1574,7 +1591,7 @@ fn update_from_guesses(
 fn possible_fields_missing(
     upstream_metadata: &[UpstreamDatumWithMetadata],
     fields: &[&str],
-    field_certainty: Certainty,
+    _field_certainty: Certainty,
 ) -> bool {
     for field in fields {
         match find_datum(upstream_metadata, field) {
@@ -1642,7 +1659,7 @@ impl Forge for SourceForge {
         project: &str,
         max_certainty: Certainty,
     ) {
-        let subproject = find_datum(metadata, "Name").map_or(None, |f| match f.datum {
+        let subproject = find_datum(metadata, "Name").and_then(|f| match f.datum {
             UpstreamDatum::Name(ref name) => Some(name.to_string()),
             _ => None,
         });
@@ -2043,7 +2060,7 @@ pub fn get_repology_metadata(srcname: &str, repo: Option<&str>) -> Option<serde_
 
 pub fn guess_from_path(
     path: &Path,
-    trust_package: bool,
+    _trust_package: bool,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let basename = path.file_name().and_then(|s| s.to_str());
     let mut ret = Vec::new();
@@ -2184,57 +2201,4 @@ impl From<std::io::Error> for ProviderError {
     fn from(e: std::io::Error) -> Self {
         ProviderError::IoError(e)
     }
-}
-
-pub fn guess_from_debian_watch(
-    path: &Path,
-    _trust_package: bool,
-) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
-    let mut ret = vec![];
-    use debian_changelog::ChangeLog;
-    use debian_watch::{Mode, WatchFile};
-
-    let get_package_name = || -> String {
-        let text = std::fs::read_to_string(path.parent().unwrap().join("changelog")).unwrap();
-        let cl: ChangeLog = text.parse().unwrap();
-        let first_entry = cl.entries().next().unwrap();
-        first_entry.package().unwrap()
-    };
-
-    let w = WatchFile::from_str(&std::fs::read_to_string(path)?).unwrap();
-
-    let origin = Some(path.to_string_lossy().to_string());
-
-    for entry in w.entries() {
-        let url = entry.format_url(get_package_name);
-        match entry.mode().unwrap_or_default() {
-            Mode::Git => {
-                ret.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Repository(url.to_string()),
-                    certainty: Some(Certainty::Confident),
-                    origin: origin.clone(),
-                });
-            }
-            Mode::Svn => {
-                ret.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Repository(url.to_string()),
-                    certainty: Some(Certainty::Confident),
-                    origin: origin.clone(),
-                });
-            }
-            Mode::LWP => {
-                if url.scheme() == "http" || url.scheme() == "https" {
-                    if let Some(repo) = vcs::guess_repo_from_url(&url, None) {
-                        ret.push(UpstreamDatumWithMetadata {
-                            datum: UpstreamDatum::Repository(repo),
-                            certainty: Some(Certainty::Likely),
-                            origin: origin.clone(),
-                        });
-                    }
-                }
-            }
-        };
-        ret.extend(metadata_from_url(url.as_str(), origin.as_deref()));
-    }
-    Ok(ret)
 }

@@ -1,5 +1,5 @@
 use crate::{Certainty, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
-use log::warn;
+
 use std::process::Command;
 
 pub fn guess_from_meson(

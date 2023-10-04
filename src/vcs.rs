@@ -2,7 +2,7 @@ use crate::with_path_segments;
 use lazy_regex::regex;
 use log::{debug, warn};
 use pyo3::prelude::*;
-use std::borrow::Cow;
+
 use std::collections::HashMap;
 use url::Url;
 
@@ -136,7 +136,7 @@ fn probe_upstream_breezy_branch_url(url: &url::Url, version: Option<&str>) -> Op
         branch.call_method0("last_revision")?;
         let tags = branch.getattr("tags")?.call_method0("get_tag_dict")?;
         breezy_ui.setattr("ui_factory", old_ui)?;
-        Ok::<HashMap<_, _>, PyErr>(tags.extract()?)
+        tags.extract()
     })
     .map_err(|e| {
         warn!("failed to probe breezy branch: {:?}", e);
@@ -159,9 +159,9 @@ pub fn probe_upstream_branch_url(url: &url::Url, version: Option<&str>) -> Optio
     }
 
     if url.host() == Some(url::Host::Domain("github.com")) {
-        probe_upstream_github_branch_url(&url, version)
+        probe_upstream_github_branch_url(url, version)
     } else {
-        probe_upstream_breezy_branch_url(&url, version)
+        probe_upstream_breezy_branch_url(url, version)
     }
 }
 
@@ -211,7 +211,7 @@ pub fn check_repository_url_canonical(
                         let url = url::Url::parse(
                             description
                                 .trim_start_matches("Moved to ")
-                                .trim_end_matches("."),
+                                .trim_end_matches('.'),
                         )
                         .unwrap();
                         return check_repository_url_canonical(url, version);
@@ -228,7 +228,7 @@ pub fn check_repository_url_canonical(
                         let url = url::Url::parse(
                             description
                                 .trim_start_matches("Mirror of ")
-                                .trim_end_matches("."),
+                                .trim_end_matches('.'),
                         )
                         .unwrap();
                         return check_repository_url_canonical(url, version);
@@ -317,7 +317,7 @@ pub fn is_gitlab_site(hostname: &str, net_access: Option<bool>) -> bool {
 pub fn probe_gitlab_host(hostname: &str) -> bool {
     let url = format!("https://{}/api/v4/version", hostname);
     match crate::load_json_url(&url::Url::parse(url.as_str()).unwrap(), None) {
-        Ok(data) => true,
+        Ok(_data) => true,
         Err(crate::HTTPJSONError::Error {
             status, response, ..
         }) if status == 401 => {
@@ -534,11 +534,11 @@ pub fn guess_repo_from_url(url: &url::Url, net_access: Option<bool>) -> Option<S
             )
         }
         u if is_gitlab_site(u, Some(net_access)) => {
-            if path_segments.len() < 1 {
+            if path_segments.is_empty() {
                 return None;
             }
             let proj_segments = if path_segments.contains(&"-") {
-                path_segments[0..path_segments.iter().position(|s| s.contains("-")).unwrap()]
+                path_segments[0..path_segments.iter().position(|s| s.contains('-')).unwrap()]
                     .to_vec()
             } else if path_segments.contains(&"tags") {
                 path_segments[0..path_segments.iter().position(|s| s == &"tags").unwrap()].to_vec()
@@ -553,7 +553,7 @@ pub fn guess_repo_from_url(url: &url::Url, net_access: Option<bool>) -> Option<S
         "git.php.net" => {
             if path_segments[0] == "repository" {
                 Some(url.to_string())
-            } else if path_segments.len() == 0 {
+            } else if path_segments.is_empty() {
                 let qs = url.query_pairs().collect::<HashMap<_, _>>();
                 qs.get("p")
                     .map(|p| {

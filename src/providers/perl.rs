@@ -1,6 +1,6 @@
 use crate::{Certainty, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use lazy_regex::regex;
-use log::error;
+
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
@@ -79,7 +79,7 @@ pub fn guess_from_perl_module(
         Ok(output) => guess_from_pod(&String::from_utf8_lossy(&output.stdout)),
         Err(e) => Err(ProviderError::Other(format!(
             "Error running perldoc: {}",
-            e.to_string()
+            e
         ))),
     }
 }

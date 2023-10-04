@@ -1,4 +1,4 @@
-use crate::{vcs, Certainty, UpstreamDatum, USER_AGENT};
+use crate::{vcs, UpstreamDatum, USER_AGENT};
 use log::{debug, error};
 use std::collections::HashMap;
 use std::io::BufRead;

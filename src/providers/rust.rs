@@ -3,7 +3,7 @@ use log::debug;
 
 pub fn guess_from_cargo(
     path: &std::path::Path,
-    trust_package: bool,
+    _trust_package: bool,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     // see https://doc.rust-lang.org/cargo/reference/manifest.html
     let doc: toml::Table = toml::from_str(&std::fs::read_to_string(path)?)
@@ -74,7 +74,7 @@ pub fn guess_from_cargo(
             "authors" => {
                 let authors = value.as_array().unwrap();
                 let authors = authors
-                    .into_iter()
+                    .iter()
                     .map(|a| Person::from(a.as_str().unwrap()))
                     .collect();
                 results.push(UpstreamDatumWithMetadata {
@@ -91,4 +91,22 @@ pub fn guess_from_cargo(
     }
 
     Ok(results)
+}
+
+pub fn cargo_translate_dashes(crate_name: &str) -> Result<Option<String>, crate::HTTPJSONError> {
+    let url = format!("https://crates.io/api/v1/crates?q={}", crate_name)
+        .parse()
+        .unwrap();
+    let json: serde_json::Value = crate::load_json_url(&url, None)?;
+
+    // Navigate through the JSON response to find the crate name.
+    if let Some(crates) = json.get("crates").and_then(|c| c.as_array()) {
+        for krate in crates {
+            if let Some(name) = krate.get("id").and_then(|n| n.as_str()) {
+                return Ok(Some(name.to_string()));
+            }
+        }
+    }
+
+    Ok(None)
 }
