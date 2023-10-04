@@ -167,6 +167,7 @@ pub enum UpstreamDatum {
     Changelog(String),
     HaskellPackage(String),
     DebianITP(i32),
+    Screenshots(Vec<String>),
 }
 
 #[derive(Clone)]
@@ -217,6 +218,7 @@ impl UpstreamDatum {
             UpstreamDatum::Funding(..) => "Funding",
             UpstreamDatum::Changelog(..) => "Changelog",
             UpstreamDatum::DebianITP(..) => "Debian-ITP",
+            UpstreamDatum::Screenshots(..) => "Screenshots",
         }
     }
 
@@ -252,6 +254,7 @@ impl UpstreamDatum {
             UpstreamDatum::Copyright(c) => Some(c),
             UpstreamDatum::Funding(f) => Some(f),
             UpstreamDatum::Changelog(c) => Some(c),
+            UpstreamDatum::Screenshots(..) => None,
             UpstreamDatum::DebianITP(_c) => None,
         }
     }
@@ -2117,78 +2120,63 @@ mod test {
     }
 }
 
-pub fn py_to_person(py: Python, obj: PyObject) -> PyResult<Person> {
-    let name = obj.getattr(py, "name")?.extract::<Option<String>>(py)?;
-    let email = obj.getattr(py, "email")?.extract::<Option<String>>(py)?;
-    let url = obj.getattr(py, "url")?.extract::<Option<String>>(py)?;
+impl FromPyObject<'_> for UpstreamDatum {
+    fn extract(obj: &PyAny) -> PyResult<Self> {
+        let field = obj.getattr("field")?.extract::<String>()?;
 
-    Ok(Person { name, email, url })
-}
+        let val = obj.getattr("value")?;
 
-pub fn py_to_upstream_datum(py: Python, obj: &PyObject) -> PyResult<UpstreamDatum> {
-    let field = obj.getattr(py, "field")?.extract::<String>(py)?;
-
-    let val = obj.getattr(py, "value")?;
-
-    match field.as_str() {
-        "Name" => Ok(UpstreamDatum::Name(val.extract::<String>(py)?)),
-        "Version" => Ok(UpstreamDatum::Version(val.extract::<String>(py)?)),
-        "Homepage" => Ok(UpstreamDatum::Homepage(val.extract::<String>(py)?)),
-        "Bug-Database" => Ok(UpstreamDatum::BugDatabase(val.extract::<String>(py)?)),
-        "Bug-Submit" => Ok(UpstreamDatum::BugSubmit(val.extract::<String>(py)?)),
-        "Contact" => Ok(UpstreamDatum::Contact(val.extract::<String>(py)?)),
-        "Repository" => Ok(UpstreamDatum::Repository(val.extract::<String>(py)?)),
-        "Repository-Browse" => Ok(UpstreamDatum::RepositoryBrowse(val.extract::<String>(py)?)),
-        "License" => Ok(UpstreamDatum::License(val.extract::<String>(py)?)),
-        "Description" => Ok(UpstreamDatum::Description(val.extract::<String>(py)?)),
-        "Summary" => Ok(UpstreamDatum::Summary(val.extract::<String>(py)?)),
-        "Cargo-Crate" => Ok(UpstreamDatum::CargoCrate(val.extract::<String>(py)?)),
-        "Security-MD" => Ok(UpstreamDatum::SecurityMD(val.extract::<String>(py)?)),
-        "Security-Contact" => Ok(UpstreamDatum::SecurityContact(val.extract::<String>(py)?)),
-        "Keywords" => Ok(UpstreamDatum::Keywords(val.extract::<Vec<String>>(py)?)),
-        "Copyright" => Ok(UpstreamDatum::Copyright(val.extract::<String>(py)?)),
-        "Documentation" => Ok(UpstreamDatum::Documentation(val.extract::<String>(py)?)),
-        "Go-Import-Path" => Ok(UpstreamDatum::GoImportPath(val.extract::<String>(py)?)),
-        "Download" => Ok(UpstreamDatum::Download(val.extract::<String>(py)?)),
-        "Wiki" => Ok(UpstreamDatum::Wiki(val.extract::<String>(py)?)),
-        "MailingList" => Ok(UpstreamDatum::MailingList(val.extract::<String>(py)?)),
-        "Funding" => Ok(UpstreamDatum::Funding(val.extract::<String>(py)?)),
-        "SourceForge-Project" => Ok(UpstreamDatum::SourceForgeProject(
-            val.extract::<String>(py)?,
-        )),
-        "Archive" => Ok(UpstreamDatum::Archive(val.extract::<String>(py)?)),
-        "Demo" => Ok(UpstreamDatum::Demo(val.extract::<String>(py)?)),
-        "Pecl-Package" => Ok(UpstreamDatum::PeclPackage(val.extract::<String>(py)?)),
-        "Haskell-Package" => Ok(UpstreamDatum::HaskellPackage(val.extract::<String>(py)?)),
-        "Author" => Ok(UpstreamDatum::Author(
-            val.extract::<Vec<PyObject>>(py)?
-                .into_iter()
-                .map(|x| py_to_person(py, x))
-                .collect::<PyResult<Vec<Person>>>()?,
-        )),
-        "Maintainer" => Ok(UpstreamDatum::Maintainer(py_to_person(py, val)?)),
-        "Changelog" => Ok(UpstreamDatum::Changelog(val.extract::<String>(py)?)),
-        _ => Err(PyRuntimeError::new_err(format!("Unknown field: {}", field))),
+        match field.as_str() {
+            "Name" => Ok(UpstreamDatum::Name(val.extract::<String>()?)),
+            "Version" => Ok(UpstreamDatum::Version(val.extract::<String>()?)),
+            "Homepage" => Ok(UpstreamDatum::Homepage(val.extract::<String>()?)),
+            "Bug-Database" => Ok(UpstreamDatum::BugDatabase(val.extract::<String>()?)),
+            "Bug-Submit" => Ok(UpstreamDatum::BugSubmit(val.extract::<String>()?)),
+            "Contact" => Ok(UpstreamDatum::Contact(val.extract::<String>()?)),
+            "Repository" => Ok(UpstreamDatum::Repository(val.extract::<String>()?)),
+            "Repository-Browse" => Ok(UpstreamDatum::RepositoryBrowse(val.extract::<String>()?)),
+            "License" => Ok(UpstreamDatum::License(val.extract::<String>()?)),
+            "Description" => Ok(UpstreamDatum::Description(val.extract::<String>()?)),
+            "Summary" => Ok(UpstreamDatum::Summary(val.extract::<String>()?)),
+            "Cargo-Crate" => Ok(UpstreamDatum::CargoCrate(val.extract::<String>()?)),
+            "Security-MD" => Ok(UpstreamDatum::SecurityMD(val.extract::<String>()?)),
+            "Security-Contact" => Ok(UpstreamDatum::SecurityContact(val.extract::<String>()?)),
+            "Keywords" => Ok(UpstreamDatum::Keywords(val.extract::<Vec<String>>()?)),
+            "Copyright" => Ok(UpstreamDatum::Copyright(val.extract::<String>()?)),
+            "Documentation" => Ok(UpstreamDatum::Documentation(val.extract::<String>()?)),
+            "Go-Import-Path" => Ok(UpstreamDatum::GoImportPath(val.extract::<String>()?)),
+            "Download" => Ok(UpstreamDatum::Download(val.extract::<String>()?)),
+            "Wiki" => Ok(UpstreamDatum::Wiki(val.extract::<String>()?)),
+            "MailingList" => Ok(UpstreamDatum::MailingList(val.extract::<String>()?)),
+            "Funding" => Ok(UpstreamDatum::Funding(val.extract::<String>()?)),
+            "SourceForge-Project" => {
+                Ok(UpstreamDatum::SourceForgeProject(val.extract::<String>()?))
+            }
+            "Archive" => Ok(UpstreamDatum::Archive(val.extract::<String>()?)),
+            "Demo" => Ok(UpstreamDatum::Demo(val.extract::<String>()?)),
+            "Pecl-Package" => Ok(UpstreamDatum::PeclPackage(val.extract::<String>()?)),
+            "Haskell-Package" => Ok(UpstreamDatum::HaskellPackage(val.extract::<String>()?)),
+            "Author" => Ok(UpstreamDatum::Author(val.extract::<Vec<Person>>()?)),
+            "Maintainer" => Ok(UpstreamDatum::Maintainer(val.extract::<Person>()?)),
+            "Changelog" => Ok(UpstreamDatum::Changelog(val.extract::<String>()?)),
+            "Screenshots" => Ok(UpstreamDatum::Screenshots(val.extract::<Vec<String>>()?)),
+            _ => Err(PyRuntimeError::new_err(format!("Unknown field: {}", field))),
+        }
     }
 }
 
-pub fn py_to_upstream_datum_with_metadata(
-    py: Python,
-    obj: PyObject,
-) -> PyResult<UpstreamDatumWithMetadata> {
-    let datum = py_to_upstream_datum(py, &obj)?;
+impl FromPyObject<'_> for UpstreamDatumWithMetadata {
+    fn extract(obj: &PyAny) -> PyResult<Self> {
+        let datum = obj.getattr("datum")?.extract::<UpstreamDatum>()?;
+        let certainty = obj.getattr("certainty")?.extract::<Option<String>>()?;
+        let origin = obj.getattr("origin")?.extract::<Option<String>>()?;
 
-    let origin = obj.getattr(py, "origin")?.extract::<Option<String>>(py)?;
-
-    let certainty = obj
-        .getattr(py, "certainty")?
-        .extract::<Option<String>>(py)?;
-
-    Ok(UpstreamDatumWithMetadata {
-        datum,
-        certainty: certainty.map(|s| s.parse().unwrap()),
-        origin,
-    })
+        Ok(UpstreamDatumWithMetadata {
+            datum,
+            certainty: certainty.map(|s| s.parse().unwrap()),
+            origin,
+        })
+    }
 }
 
 pub enum ProviderError {
