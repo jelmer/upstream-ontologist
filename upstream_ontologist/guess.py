@@ -228,68 +228,7 @@ def guess_from_debian_control(path, trust_package):
                         ''.join(description_lines), certainty)
 
 
-def guess_from_debian_changelog(path, trust_package):
-    try:
-        from debian.changelog import Changelog
-    except ModuleNotFoundError as e:
-        warn_missing_dependency(path, e.name)
-        return
-    with open(path, 'rb') as f:
-        cl = Changelog(f)
-    source = cl.package
-    yield UpstreamDatum('Name', cl.package, 'confident')
-    yield UpstreamDatum('Version', cl.version.upstream_version, 'confident')
-    if source.startswith('rust-'):
-        semver_suffix: Optional[bool]
-        try:
-            from toml.decoder import load as load_toml
-            with open('debian/debcargo.toml') as f:
-                debcargo = load_toml(f)
-        except FileNotFoundError:
-            semver_suffix = False
-        else:
-            semver_suffix = debcargo.get('semver_suffix', False)
-            if not isinstance(semver_suffix, bool):
-                logging.warning(
-                    'Unexpected setting for semver_suffix: %r, resetting to False',
-                    semver_suffix)
-                semver_suffix = False
-        from debmutate.debcargo import parse_debcargo_source_name, cargo_translate_dashes
-        crate, crate_semver_version = parse_debcargo_source_name(
-            source, semver_suffix)
-        if '-' in crate:
-            crate = cargo_translate_dashes(crate)
-        yield UpstreamDatum('Archive', 'crates.io', 'certain')
-        yield UpstreamDatum('Cargo-Crate', crate, 'certain')
-
-    # Find the ITP
-    itp = None
-    for change in cl[-1].changes():
-        m = re.match(r'[\s\*]*Initial Release.*Closes: \#([0-9]+).*', change, re.I)
-        if m:
-            itp = int(m.group(1))
-    if itp:
-        yield UpstreamDatum('Debian-ITP', itp, 'certain')
-        try:
-            import debianbts
-        except ModuleNotFoundError as e:
-            warn_missing_dependency(path, e.name)
-            return
-        else:
-            import pysimplesoap
-
-            logger.debug('Retrieving Debian bug %d', itp)
-            try:
-                orig = debianbts.get_bug_log(itp)[0]
-            except pysimplesoap.client.SoapFault as e:
-                logger.warning('Unable to get info about %d: %s' % (itp, e))
-            except (TypeError, ValueError):
-                # Almost certainly a broken pysimplesoap bug :(
-                logger.exception('Error getting bug log')
-            else:
-                yield from metadata_from_itp_bug_body(orig['body'])
-
-
+guess_from_debian_changelog = _upstream_ontologist.guess_from_debian_changelog
 metadata_from_itp_bug_body = _upstream_ontologist.metadata_from_itp_bug_body
 extract_sf_project_name = _upstream_ontologist.extract_sf_project_name
 guess_from_pkg_info = _upstream_ontologist.guess_from_pkg_info

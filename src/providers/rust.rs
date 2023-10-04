@@ -92,3 +92,21 @@ pub fn guess_from_cargo(
 
     Ok(results)
 }
+
+pub fn cargo_translate_dashes(crate_name: &str) -> Result<Option<String>, crate::HTTPJSONError> {
+    let url = format!("https://crates.io/api/v1/crates?q={}", crate_name)
+        .parse()
+        .unwrap();
+    let json: serde_json::Value = crate::load_json_url(&url, None)?;
+
+    // Navigate through the JSON response to find the crate name.
+    if let Some(crates) = json.get("crates").and_then(|c| c.as_array()) {
+        for krate in crates {
+            if let Some(name) = krate.get("id").and_then(|n| n.as_str()) {
+                return Ok(Some(name.to_string()));
+            }
+        }
+    }
+
+    Ok(None)
+}

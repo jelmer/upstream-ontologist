@@ -2,6 +2,7 @@ use crate::{
     bug_database_from_issue_url, repo_url_from_merge_request_url, Certainty, Person, ProviderError,
     UpstreamDatum, UpstreamDatumWithMetadata,
 };
+use lazy_regex::regex_captures;
 use log::debug;
 use std::fs::File;
 use std::io::BufRead;
@@ -175,4 +176,197 @@ pub fn metadata_from_itp_bug_body(
     });
 
     Ok(results)
+}
+
+pub fn guess_from_debian_changelog(
+    path: &Path,
+    trust_package: bool,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    let cl = debian_changelog::ChangeLog::read_path(path).map_err(|e| {
+        ProviderError::ParseError(format!(
+            "Failed to parse changelog {}: {}",
+            path.display(),
+            e
+        ))
+    })?;
+
+    let first_entry = cl
+        .entries()
+        .next()
+        .ok_or_else(|| ProviderError::ParseError("Empty changelog".to_string()))?;
+
+    let package = first_entry.package().ok_or_else(|| {
+        ProviderError::ParseError(format!("Changelog {} has no package name", path.display()))
+    })?;
+
+    let mut ret = Vec::new();
+    ret.push(UpstreamDatumWithMetadata {
+        datum: UpstreamDatum::Name(package.clone()),
+        certainty: Some(Certainty::Confident),
+        origin: Some(path.to_string_lossy().to_string()),
+    });
+
+    if let Some(version) = first_entry.version() {
+        ret.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Version(version.upstream_version),
+            certainty: Some(Certainty::Confident),
+            origin: Some(path.to_string_lossy().to_string()),
+        });
+    }
+
+    #[cfg(feature = "debcargo")]
+    if package.starts_with("rust-") {
+        let debcargo_toml_path = path.parent().unwrap().join("debcargo.toml");
+        let debcargo_config = debcargo::config::Config::parse(debcargo_toml_path.as_path())
+            .map_err(|e| {
+                ProviderError::ParseError(format!(
+                    "Failed to parse debcargo config {}: {}",
+                    path.display(),
+                    e
+                ))
+            })?;
+
+        let semver_suffix = debcargo_config.semver_suffix;
+        let (mut crate_name, crate_semver_version) =
+            parse_debcargo_source_name(&package, semver_suffix);
+
+        if crate_name.contains('-') {
+            crate_name = match crate::providers::rust::cargo_translate_dashes(crate_name.as_str())
+                .map_err(|e| {
+                ProviderError::Other(format!(
+                    "Failed to translate dashes in crate name {}: {}",
+                    crate_name, e
+                ))
+            })? {
+                Some(name) => name,
+                None => {
+                    return Err(ProviderError::Other(format!(
+                        "Failed to translate dashes in crate name {}",
+                        crate_name
+                    )))
+                }
+            };
+        }
+        ret.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Archive("crates.io".to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.to_string_lossy().to_string()),
+        });
+
+        ret.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::CargoCrate(crate_name),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.to_string_lossy().to_string()),
+        });
+    }
+
+    if let Some(itp) = find_itp(first_entry.change_lines().collect::<Vec<_>>().as_slice()) {
+        ret.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::DebianITP(itp),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.to_string_lossy().to_string()),
+        });
+
+        ret.extend(guess_from_itp_bug(itp)?);
+    }
+
+    Ok(ret)
+}
+
+pub fn find_itp(changes: &[String]) -> Option<i32> {
+    for line in changes {
+        if let Some((_, itp)) = regex_captures!(r"\* Initial release. \(?Closes: #(\d+)\)?", line) {
+            return Some(itp.parse().unwrap());
+        }
+    }
+    None
+}
+
+pub fn guess_from_itp_bug(
+    bugno: i32,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    let debbugs = debbugs::blocking::Debbugs::default();
+
+    let log = debbugs.get_bug_log(bugno).map_err(|e| {
+        ProviderError::ParseError(format!("Failed to get bug log for bug {}: {}", bugno, e))
+    })?;
+
+    metadata_from_itp_bug_body(log[0].body.as_str())
+}
+
+/// Parse a debcargo source name and return crate.
+///
+/// # Arguments
+/// * `source_name` - Source package name
+/// * `semver_suffix` - Whether semver_suffix is enabled
+///
+/// # Returns
+/// tuple with crate name and optional semver
+pub fn parse_debcargo_source_name(
+    source_name: &str,
+    semver_suffix: bool,
+) -> (String, Option<String>) {
+    let mut crate_name = source_name.strip_prefix("rust-").unwrap();
+    match crate_name.rsplitn(2, '-').collect::<Vec<&str>>().as_slice() {
+        [semver, new_crate_name] if semver_suffix => {
+            crate_name = new_crate_name;
+            (crate_name.to_string(), Some(semver.to_string()))
+        }
+        _ => (crate_name.to_string(), None),
+    }
+}
+
+pub fn guess_from_debian_watch(
+    path: &Path,
+    _trust_package: bool,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    let mut ret = vec![];
+    use debian_changelog::ChangeLog;
+    use debian_watch::{Mode, WatchFile};
+
+    let get_package_name = || -> String {
+        let text = std::fs::read_to_string(path.parent().unwrap().join("changelog")).unwrap();
+        let cl: ChangeLog = text.parse().unwrap();
+        let first_entry = cl.entries().next().unwrap();
+        first_entry.package().unwrap()
+    };
+
+    let w: WatchFile = std::fs::read_to_string(path)?
+        .parse()
+        .map_err(|e| ProviderError::ParseError(format!("Failed to parse debian/watch: {}", e)))?;
+
+    let origin = Some(path.to_string_lossy().to_string());
+
+    for entry in w.entries() {
+        let url = entry.format_url(get_package_name);
+        match entry.mode().unwrap_or_default() {
+            Mode::Git => {
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Repository(url.to_string()),
+                    certainty: Some(Certainty::Confident),
+                    origin: origin.clone(),
+                });
+            }
+            Mode::Svn => {
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Repository(url.to_string()),
+                    certainty: Some(Certainty::Confident),
+                    origin: origin.clone(),
+                });
+            }
+            Mode::LWP => {
+                if url.scheme() == "http" || url.scheme() == "https" {
+                    if let Some(repo) = crate::vcs::guess_repo_from_url(&url, None) {
+                        ret.push(UpstreamDatumWithMetadata {
+                            datum: UpstreamDatum::Repository(repo),
+                            certainty: Some(Certainty::Likely),
+                            origin: origin.clone(),
+                        });
+                    }
+                }
+            }
+        };
+        ret.extend(crate::metadata_from_url(url.as_str(), origin.as_deref()));
+    }
+    Ok(ret)
 }

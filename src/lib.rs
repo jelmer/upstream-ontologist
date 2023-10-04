@@ -166,6 +166,7 @@ pub enum UpstreamDatum {
     Funding(String),
     Changelog(String),
     HaskellPackage(String),
+    DebianITP(i32),
 }
 
 #[derive(Clone)]
@@ -215,6 +216,7 @@ impl UpstreamDatum {
             UpstreamDatum::HaskellPackage(..) => "Haskell-Package",
             UpstreamDatum::Funding(..) => "Funding",
             UpstreamDatum::Changelog(..) => "Changelog",
+            UpstreamDatum::DebianITP(..) => "Debian-ITP",
         }
     }
 
@@ -250,6 +252,7 @@ impl UpstreamDatum {
             UpstreamDatum::Copyright(c) => Some(c),
             UpstreamDatum::Funding(f) => Some(f),
             UpstreamDatum::Changelog(c) => Some(c),
+            UpstreamDatum::DebianITP(c) => None,
         }
     }
 
@@ -444,6 +447,7 @@ pub fn guess_upstream_metadata(
                 "Haskell-Package" => {
                     UpstreamDatum::HaskellPackage(value.extract::<String>(py).unwrap())
                 }
+                "Debian-ITP" => UpstreamDatum::DebianITP(value.extract::<i32>(py).unwrap()),
                 "Author" => UpstreamDatum::Author(
                     value
                         .extract::<Vec<Person>>(py)
@@ -637,6 +641,19 @@ pub enum HTTPJSONError {
         status: u16,
         response: reqwest::blocking::Response,
     },
+}
+
+impl std::fmt::Display for HTTPJSONError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            HTTPJSONError::HTTPError(e) => write!(f, "{}", e),
+            HTTPJSONError::Error {
+                url,
+                status,
+                response,
+            } => write!(f, "HTTP error {} for {}:", status, url,),
+        }
+    }
 }
 
 pub fn load_json_url(
@@ -2184,57 +2201,4 @@ impl From<std::io::Error> for ProviderError {
     fn from(e: std::io::Error) -> Self {
         ProviderError::IoError(e)
     }
-}
-
-pub fn guess_from_debian_watch(
-    path: &Path,
-    _trust_package: bool,
-) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
-    let mut ret = vec![];
-    use debian_changelog::ChangeLog;
-    use debian_watch::{Mode, WatchFile};
-
-    let get_package_name = || -> String {
-        let text = std::fs::read_to_string(path.parent().unwrap().join("changelog")).unwrap();
-        let cl: ChangeLog = text.parse().unwrap();
-        let first_entry = cl.entries().next().unwrap();
-        first_entry.package().unwrap()
-    };
-
-    let w = WatchFile::from_str(&std::fs::read_to_string(path)?).unwrap();
-
-    let origin = Some(path.to_string_lossy().to_string());
-
-    for entry in w.entries() {
-        let url = entry.format_url(get_package_name);
-        match entry.mode().unwrap_or_default() {
-            Mode::Git => {
-                ret.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Repository(url.to_string()),
-                    certainty: Some(Certainty::Confident),
-                    origin: origin.clone(),
-                });
-            }
-            Mode::Svn => {
-                ret.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Repository(url.to_string()),
-                    certainty: Some(Certainty::Confident),
-                    origin: origin.clone(),
-                });
-            }
-            Mode::LWP => {
-                if url.scheme() == "http" || url.scheme() == "https" {
-                    if let Some(repo) = vcs::guess_repo_from_url(&url, None) {
-                        ret.push(UpstreamDatumWithMetadata {
-                            datum: UpstreamDatum::Repository(repo),
-                            certainty: Some(Certainty::Likely),
-                            origin: origin.clone(),
-                        });
-                    }
-                }
-            }
-        };
-        ret.extend(metadata_from_url(url.as_str(), origin.as_deref()));
-    }
-    Ok(ret)
 }
