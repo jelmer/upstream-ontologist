@@ -113,6 +113,17 @@ impl From<&str> for Person {
     }
 }
 
+impl ToPyObject for Person {
+    fn to_object(&self, py: Python) -> PyObject {
+        let m = PyModule::import(py, "upstream_ontologist.guess").unwrap();
+        let person_cls = m.getattr("Person").unwrap();
+        person_cls
+            .call1((self.name.as_ref(), self.email.as_ref(), self.url.as_ref()))
+            .unwrap()
+            .into_py(py)
+    }
+}
+
 fn parseaddr(text: &str) -> Option<(String, String)> {
     let re = regex!(r"(.*?)\s*<([^<>]+)>");
     if let Some(captures) = re.captures(text) {
@@ -389,6 +400,30 @@ impl UpstreamMetadata {
 impl From<Vec<UpstreamDatumWithMetadata>> for UpstreamMetadata {
     fn from(v: Vec<UpstreamDatumWithMetadata>) -> Self {
         UpstreamMetadata(v)
+    }
+}
+
+impl ToPyObject for UpstreamDatumWithMetadata {
+    fn to_object(&self, py: Python) -> PyObject {
+        let m = PyModule::import(py, "upstream_ontologist.guess").unwrap();
+
+        let cls = m.getattr("UpstreamDatum").unwrap();
+
+        let (field, py_datum) = self
+            .datum
+            .to_object(py)
+            .extract::<(String, PyObject)>(py)
+            .unwrap();
+        let datum = cls
+            .call1((
+                field,
+                py_datum,
+                self.certainty.map(|x| x.to_string()),
+                self.origin.as_ref(),
+            ))
+            .unwrap();
+
+        datum.to_object(py)
     }
 }
 
@@ -2122,9 +2157,14 @@ mod test {
 
 impl FromPyObject<'_> for UpstreamDatum {
     fn extract(obj: &PyAny) -> PyResult<Self> {
-        let field = obj.getattr("field")?.extract::<String>()?;
-
-        let val = obj.getattr("value")?;
+        let (field, val): (String, &PyAny) =
+            if let Ok((field, val)) = obj.extract::<(String, &PyAny)>() {
+                (field, val)
+            } else {
+                let field = obj.getattr("field")?.extract::<String>()?;
+                let val = obj.getattr("value")?;
+                (field, val)
+            };
 
         match field.as_str() {
             "Name" => Ok(UpstreamDatum::Name(val.extract::<String>()?)),
@@ -2165,11 +2205,60 @@ impl FromPyObject<'_> for UpstreamDatum {
     }
 }
 
+impl ToPyObject for UpstreamDatum {
+    fn to_object(&self, py: Python) -> PyObject {
+        (
+            self.field().to_string(),
+            match self {
+                UpstreamDatum::Name(n) => n.into_py(py),
+                UpstreamDatum::Version(v) => v.into_py(py),
+                UpstreamDatum::Contact(c) => c.into_py(py),
+                UpstreamDatum::Summary(s) => s.into_py(py),
+                UpstreamDatum::License(l) => l.into_py(py),
+                UpstreamDatum::Homepage(h) => h.into_py(py),
+                UpstreamDatum::Description(d) => d.into_py(py),
+                UpstreamDatum::BugDatabase(b) => b.into_py(py),
+                UpstreamDatum::BugSubmit(b) => b.into_py(py),
+                UpstreamDatum::Repository(r) => r.into_py(py),
+                UpstreamDatum::RepositoryBrowse(r) => r.into_py(py),
+                UpstreamDatum::SecurityMD(s) => s.into_py(py),
+                UpstreamDatum::SecurityContact(s) => s.into_py(py),
+                UpstreamDatum::CargoCrate(c) => c.into_py(py),
+                UpstreamDatum::Keywords(ks) => ks.to_object(py),
+                UpstreamDatum::Copyright(c) => c.into_py(py),
+                UpstreamDatum::Documentation(a) => a.into_py(py),
+                UpstreamDatum::GoImportPath(ip) => ip.into_py(py),
+                UpstreamDatum::Archive(a) => a.into_py(py),
+                UpstreamDatum::Demo(d) => d.into_py(py),
+                UpstreamDatum::Maintainer(m) => m.to_object(py),
+                UpstreamDatum::Author(a) => a.to_object(py),
+                UpstreamDatum::Wiki(w) => w.into_py(py),
+                UpstreamDatum::Download(d) => d.into_py(py),
+                UpstreamDatum::MailingList(m) => m.into_py(py),
+                UpstreamDatum::SourceForgeProject(m) => m.into_py(py),
+                UpstreamDatum::PeclPackage(p) => p.into_py(py),
+                UpstreamDatum::Funding(p) => p.into_py(py),
+                UpstreamDatum::Changelog(c) => c.into_py(py),
+                UpstreamDatum::HaskellPackage(p) => p.into_py(py),
+                UpstreamDatum::DebianITP(i) => i.into_py(py),
+                UpstreamDatum::Screenshots(s) => s.to_object(py),
+            },
+        )
+            .to_object(py)
+    }
+}
+
 impl FromPyObject<'_> for UpstreamDatumWithMetadata {
     fn extract(obj: &PyAny) -> PyResult<Self> {
-        let datum = obj.getattr("datum")?.extract::<UpstreamDatum>()?;
-        let certainty = obj.getattr("certainty")?.extract::<Option<String>>()?;
-        let origin = obj.getattr("origin")?.extract::<Option<String>>()?;
+        let (datum, certainty, origin) = if obj.hasattr("datum")? {
+            let datum = obj.getattr("datum")?.extract::<UpstreamDatum>()?;
+            let certainty = obj.getattr("certainty")?.extract::<Option<String>>()?;
+            let origin = obj.getattr("origin")?.extract::<Option<String>>()?;
+            (datum, certainty, origin)
+        } else {
+            let datum = obj.extract::<UpstreamDatum>()?;
+            (datum, None, None)
+        };
 
         Ok(UpstreamDatumWithMetadata {
             datum,
@@ -2188,5 +2277,23 @@ pub enum ProviderError {
 impl From<std::io::Error> for ProviderError {
     fn from(e: std::io::Error) -> Self {
         ProviderError::IoError(e)
+    }
+}
+
+#[cfg(feature = "pyo3")]
+pyo3::create_exception!(
+    upstream_ontologist,
+    ParseError,
+    pyo3::exceptions::PyException
+);
+
+#[cfg(feature = "pyo3")]
+impl From<ProviderError> for PyErr {
+    fn from(e: ProviderError) -> PyErr {
+        match e {
+            ProviderError::IoError(e) => e.into(),
+            ProviderError::ParseError(e) => ParseError::new_err((e,)),
+            ProviderError::Other(e) => PyRuntimeError::new_err((e,)),
+        }
     }
 }

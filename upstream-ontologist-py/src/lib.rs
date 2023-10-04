@@ -4,12 +4,10 @@ use pyo3::exceptions::PyException;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::import_exception;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyList};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use upstream_ontologist::{
-    py_to_upstream_datum, CanonicalizeError, Person, UpstreamDatum, UpstreamDatumWithMetadata,
-};
+use upstream_ontologist::{CanonicalizeError, Person, UpstreamDatum, UpstreamDatumWithMetadata};
 use url::Url;
 
 import_exception!(urllib.error, HTTPError);
@@ -17,7 +15,6 @@ create_exception!(upstream_ontologist, UnverifiableUrl, PyException);
 create_exception!(upstream_ontologist, InvalidUrl, PyException);
 create_exception!(upstream_ontologist, NoSuchRepologyProject, PyException);
 create_exception!(upstream_ontologist, NoSuchForgeProject, PyException);
-create_exception!(upstream_ontologist, ParseError, PyException);
 
 #[pyfunction]
 fn url_from_git_clone_command(command: &[u8]) -> Option<String> {
@@ -39,97 +36,22 @@ fn drop_vcs_in_scheme(url: &str) -> &str {
     upstream_ontologist::vcs::drop_vcs_in_scheme(url)
 }
 
-fn upstream_datum_to_py(py: Python, datum: UpstreamDatum) -> PyResult<(String, PyObject)> {
-    let m = PyModule::import(py, "upstream_ontologist.guess")?;
-    let PersonCls = m.getattr("Person")?;
-    Ok((
-        datum.field().to_string(),
-        match datum {
-            UpstreamDatum::Name(n) => n.into_py(py),
-            UpstreamDatum::Version(v) => v.into_py(py),
-            UpstreamDatum::Contact(c) => c.into_py(py),
-            UpstreamDatum::Summary(s) => s.into_py(py),
-            UpstreamDatum::License(l) => l.into_py(py),
-            UpstreamDatum::Homepage(h) => h.into_py(py),
-            UpstreamDatum::Description(d) => d.into_py(py),
-            UpstreamDatum::BugDatabase(b) => b.into_py(py),
-            UpstreamDatum::BugSubmit(b) => b.into_py(py),
-            UpstreamDatum::Repository(r) => r.into_py(py),
-            UpstreamDatum::RepositoryBrowse(r) => r.into_py(py),
-            UpstreamDatum::SecurityMD(s) => s.into_py(py),
-            UpstreamDatum::SecurityContact(s) => s.into_py(py),
-            UpstreamDatum::CargoCrate(c) => c.into_py(py),
-            UpstreamDatum::Keywords(ks) => ks.into_py(py),
-            UpstreamDatum::Copyright(c) => c.into_py(py),
-            UpstreamDatum::Documentation(a) => a.into_py(py),
-            UpstreamDatum::GoImportPath(ip) => ip.into_py(py),
-            UpstreamDatum::Archive(a) => a.into_py(py),
-            UpstreamDatum::Demo(d) => d.into_py(py),
-            UpstreamDatum::Maintainer(m) => PersonCls.call1((m.name, m.email, m.url))?.into_py(py),
-            UpstreamDatum::Author(a) => a
-                .into_iter()
-                .map(|x| PersonCls.call1((x.name, x.email, x.url)))
-                .collect::<PyResult<Vec<&PyAny>>>()?
-                .into_py(py),
-            UpstreamDatum::Wiki(w) => w.into_py(py),
-            UpstreamDatum::Download(d) => d.into_py(py),
-            UpstreamDatum::MailingList(m) => m.into_py(py),
-            UpstreamDatum::SourceForgeProject(m) => m.into_py(py),
-            UpstreamDatum::PeclPackage(p) => p.into_py(py),
-            UpstreamDatum::Funding(p) => p.into_py(py),
-            UpstreamDatum::Changelog(c) => c.into_py(py),
-            UpstreamDatum::HaskellPackage(p) => p.into_py(py),
-            UpstreamDatum::DebianITP(i) => i.into_py(py),
-        },
-    ))
-}
-
-fn upstream_datum_with_metadata_to_py(
-    py: Python,
-    datum: UpstreamDatumWithMetadata,
-) -> PyResult<PyObject> {
-    let m = PyModule::import(py, "upstream_ontologist.guess")?;
-
-    let UpstreamDatumCls = m.getattr("UpstreamDatum")?;
-
-    {
-        let (field, py_datum) = upstream_datum_to_py(py, datum.datum)?;
-        let datum = UpstreamDatumCls.call1((
-            field,
-            py_datum,
-            datum.certainty.map(|x| x.to_string()),
-            datum.origin,
-        ))?;
-        Ok(datum.to_object(py))
-    }
-}
-
 #[pyfunction]
-fn guess_from_meson(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
+fn guess_from_meson(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
     let ret =
-        upstream_ontologist::providers::meson::guess_from_meson(path.as_path(), trust_package)
-            .map_err(map_provider_err_to_py_err)?;
+        upstream_ontologist::providers::meson::guess_from_meson(path.as_path(), trust_package)?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
-fn guess_from_package_json(
-    py: Python,
-    path: PathBuf,
-    trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
+fn guess_from_package_json(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
     let ret = upstream_ontologist::providers::package_json::guess_from_package_json(
         path.as_path(),
         trust_package,
-    )
-    .map_err(map_provider_err_to_py_err)?;
+    )?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
@@ -189,136 +111,86 @@ fn load_json_url(py: Python, http_url: &str, timeout: Option<u64>) -> PyResult<P
 }
 
 #[pyfunction]
-fn guess_from_composer_json(
-    py: Python,
-    path: PathBuf,
-    trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
+fn guess_from_composer_json(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
     let ret = upstream_ontologist::providers::composer_json::guess_from_composer_json(
         path.as_path(),
         trust_package,
-    )
-    .map_err(map_provider_err_to_py_err)?;
+    )?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
-fn guess_from_package_xml(
-    py: Python,
-    path: PathBuf,
-    trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
+fn guess_from_package_xml(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
     let ret = upstream_ontologist::providers::package_xml::guess_from_package_xml(
         path.as_path(),
         trust_package,
-    )
-    .map_err(map_provider_err_to_py_err)?;
+    )?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
-fn guess_from_dist_ini(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
+fn guess_from_dist_ini(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
     let ret =
-        upstream_ontologist::providers::perl::guess_from_dist_ini(path.as_path(), trust_package)
-            .map_err(map_provider_err_to_py_err)?;
+        upstream_ontologist::providers::perl::guess_from_dist_ini(path.as_path(), trust_package)?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
-fn guess_from_perl_dist_name(
-    py: Python,
-    path: PathBuf,
-    dist_name: &str,
-) -> PyResult<Vec<PyObject>> {
+fn guess_from_perl_dist_name(py: Python, path: PathBuf, dist_name: &str) -> PyResult<PyObject> {
     let ret =
-        upstream_ontologist::providers::perl::guess_from_perl_dist_name(path.as_path(), dist_name)
-            .map_err(map_provider_err_to_py_err)?;
+        upstream_ontologist::providers::perl::guess_from_perl_dist_name(path.as_path(), dist_name)?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
-fn guess_from_perl_module(py: Python, path: PathBuf) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::providers::perl::guess_from_perl_module(path.as_path())
-        .map_err(map_provider_err_to_py_err)?;
+fn guess_from_perl_module(py: Python, path: PathBuf) -> PyResult<PyObject> {
+    let ret = upstream_ontologist::providers::perl::guess_from_perl_module(path.as_path())?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
-fn guess_from_pod(py: Python, contents: &str) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::providers::perl::guess_from_pod(contents)
-        .map_err(map_provider_err_to_py_err)?;
+fn guess_from_pod(py: Python, contents: &str) -> PyResult<PyObject> {
+    let ret = upstream_ontologist::providers::perl::guess_from_pod(contents)?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
-fn guess_from_pubspec_yaml(
-    py: Python,
-    path: PathBuf,
-    trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
+fn guess_from_pubspec_yaml(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
     let ret = upstream_ontologist::providers::pubspec::guess_from_pubspec_yaml(
         path.as_path(),
         trust_package,
-    )
-    .map_err(map_provider_err_to_py_err)?;
+    )?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
-fn guess_from_authors(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
+fn guess_from_authors(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
     let ret =
-        upstream_ontologist::providers::authors::guess_from_authors(path.as_path(), trust_package)
-            .map_err(map_provider_err_to_py_err)?;
+        upstream_ontologist::providers::authors::guess_from_authors(path.as_path(), trust_package)?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
-fn guess_from_metadata_json(
-    py: Python,
-    path: PathBuf,
-    trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::guess_from_metadata_json(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?;
+fn guess_from_metadata_json(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
+    let ret = upstream_ontologist::guess_from_metadata_json(path.as_path(), trust_package)?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
-fn guess_from_meta_json(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
+fn guess_from_meta_json(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
     let ret =
-        upstream_ontologist::providers::perl::guess_from_meta_json(path.as_path(), trust_package)
-            .map_err(map_provider_err_to_py_err)?;
+        upstream_ontologist::providers::perl::guess_from_meta_json(path.as_path(), trust_package)?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyclass(subclass)]
@@ -464,81 +336,57 @@ impl SourceForge {
 }
 
 #[pyfunction]
-fn guess_from_travis_yml(
-    py: Python,
-    path: PathBuf,
-    trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::guess_from_travis_yml(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?;
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+fn guess_from_travis_yml(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
+    let ret = upstream_ontologist::guess_from_travis_yml(path.as_path(), trust_package)?;
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
-fn guess_from_meta_yml(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
+fn guess_from_meta_yml(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
     let ret =
-        upstream_ontologist::providers::perl::guess_from_meta_yml(path.as_path(), trust_package)
-            .map_err(map_provider_err_to_py_err)?;
+        upstream_ontologist::providers::perl::guess_from_meta_yml(path.as_path(), trust_package)?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
-fn metadata_from_itp_bug_body(py: Python, body: &str) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::providers::debian::metadata_from_itp_bug_body(body)
-        .map_err(map_provider_err_to_py_err)?;
+fn metadata_from_itp_bug_body(py: Python, body: &str) -> PyResult<PyObject> {
+    let ret = upstream_ontologist::providers::debian::metadata_from_itp_bug_body(body)?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
-fn guess_from_metainfo(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
+fn guess_from_metainfo(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
     let ret = upstream_ontologist::providers::metainfo::guess_from_metainfo(
         path.as_path(),
         trust_package,
-    )
-    .map_err(map_provider_err_to_py_err)?;
+    )?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
-fn guess_from_doap(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::providers::doap::guess_from_doap(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?;
+fn guess_from_doap(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
+    let ret = upstream_ontologist::providers::doap::guess_from_doap(path.as_path(), trust_package)?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
-fn guess_from_opam(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::providers::ocaml::guess_from_opam(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn guess_from_pom_xml(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
+fn guess_from_opam(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
     let ret =
-        upstream_ontologist::providers::maven::guess_from_pom_xml(path.as_path(), trust_package)
-            .map_err(map_provider_err_to_py_err)?;
+        upstream_ontologist::providers::ocaml::guess_from_opam(path.as_path(), trust_package)?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
+}
+
+#[pyfunction]
+fn guess_from_pom_xml(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
+    let ret =
+        upstream_ontologist::providers::maven::guess_from_pom_xml(path.as_path(), trust_package)?;
+
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
@@ -552,84 +400,58 @@ fn plausible_vcs_browse_url(url: &str) -> PyResult<bool> {
 }
 
 #[pyfunction]
-fn guess_from_wscript(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
+fn guess_from_wscript(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
     let ret =
-        upstream_ontologist::providers::waf::guess_from_wscript(path.as_path(), trust_package)
-            .map_err(map_provider_err_to_py_err)?;
+        upstream_ontologist::providers::waf::guess_from_wscript(path.as_path(), trust_package)?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
-fn guess_from_makefile_pl(
-    py: Python,
-    path: PathBuf,
-    trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
+fn guess_from_makefile_pl(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
+    let ret = upstream_ontologist::providers::perl::guess_from_makefile_pl(
+        path.as_path(),
+        trust_package,
+    )?;
+
+    Ok(ret.to_object(py))
+}
+
+#[pyfunction]
+fn guess_from_go_mod(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
+    let ret = upstream_ontologist::providers::go::guess_from_go_mod(path.as_path(), trust_package)?;
+
+    Ok(ret.to_object(py))
+}
+
+#[pyfunction]
+fn guess_from_cabal(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
     let ret =
-        upstream_ontologist::providers::perl::guess_from_makefile_pl(path.as_path(), trust_package)
-            .map_err(map_provider_err_to_py_err)?;
+        upstream_ontologist::providers::haskell::guess_from_cabal(path.as_path(), trust_package)?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
-fn guess_from_go_mod(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::providers::go::guess_from_go_mod(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?;
+fn guess_from_cabal_lines(py: Python, lines: Vec<String>) -> PyResult<PyObject> {
+    let ret = upstream_ontologist::providers::haskell::guess_from_cabal_lines(lines.into_iter())?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
-fn guess_from_cabal(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
+fn guess_from_git_config(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
     let ret =
-        upstream_ontologist::providers::haskell::guess_from_cabal(path.as_path(), trust_package)
-            .map_err(map_provider_err_to_py_err)?;
+        upstream_ontologist::providers::git::guess_from_git_config(path.as_path(), trust_package)?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
-fn guess_from_cabal_lines(py: Python, lines: Vec<String>) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::providers::haskell::guess_from_cabal_lines(lines.into_iter())
-        .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn guess_from_git_config(
-    py: Python,
-    path: PathBuf,
-    trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
-    let ret =
-        upstream_ontologist::providers::git::guess_from_git_config(path.as_path(), trust_package)
-            .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn guess_from_aur(py: Python, package: &str) -> PyResult<Vec<(String, PyObject)>> {
+fn guess_from_aur(py: Python, package: &str) -> PyResult<PyObject> {
     let ret = upstream_ontologist::providers::arch::guess_from_aur(package);
 
-    ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
-        .collect::<PyResult<Vec<_>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
@@ -648,30 +470,17 @@ fn check_url_canonical(url: &str) -> PyResult<String> {
 }
 
 #[pyfunction]
-fn guess_from_environment(py: Python) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::guess_from_environment().map_err(map_provider_err_to_py_err)?;
+fn guess_from_environment(py: Python) -> PyResult<PyObject> {
+    let ret = upstream_ontologist::guess_from_environment()?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-fn map_provider_err_to_py_err(e: upstream_ontologist::ProviderError) -> PyErr {
-    match e {
-        upstream_ontologist::ProviderError::IoError(e) => e.into(),
-        upstream_ontologist::ProviderError::ParseError(e) => ParseError::new_err((e,)),
-        upstream_ontologist::ProviderError::Other(e) => PyRuntimeError::new_err((e,)),
-    }
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
-fn guess_from_nuspec(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::guess_from_nuspec(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?;
+fn guess_from_nuspec(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
+    let ret = upstream_ontologist::guess_from_nuspec(path.as_path(), trust_package)?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
@@ -722,14 +531,11 @@ fn probe_upstream_branch_url(url: &str, version: Option<&str>) -> Option<bool> {
 }
 
 #[pyfunction]
-fn guess_from_gemspec(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
+fn guess_from_gemspec(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
     let ret =
-        upstream_ontologist::providers::ruby::guess_from_gemspec(path.as_path(), trust_package)
-            .map_err(map_provider_err_to_py_err)?;
+        upstream_ontologist::providers::ruby::guess_from_gemspec(path.as_path(), trust_package)?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
@@ -738,7 +544,7 @@ fn guess_from_launchpad(
     package: &str,
     distribution: Option<&str>,
     suite: Option<&str>,
-) -> PyResult<Vec<(String, PyObject)>> {
+) -> PyResult<PyObject> {
     let ret = upstream_ontologist::providers::launchpad::guess_from_launchpad(
         package,
         distribution,
@@ -746,13 +552,10 @@ fn guess_from_launchpad(
     );
 
     if ret.is_none() {
-        return Ok(vec![]);
+        Ok(Vec::<String>::new().to_object(py))
+    } else {
+        Ok(ret.to_object(py))
     }
-
-    ret.unwrap()
-        .into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
-        .collect::<PyResult<Vec<_>>>()
 }
 
 #[pyfunction]
@@ -780,41 +583,29 @@ fn find_public_repo_url(url: &str, net_access: Option<bool>) -> PyResult<Option<
 }
 
 #[pyfunction]
-fn guess_from_configure(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
+fn guess_from_configure(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
     let ret = upstream_ontologist::providers::autoconf::guess_from_configure(
         path.as_path(),
         trust_package,
-    )
-    .map_err(map_provider_err_to_py_err)?;
+    )?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
-fn guess_from_r_description(
-    py: Python,
-    path: PathBuf,
-    trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
+fn guess_from_r_description(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
     let ret =
-        upstream_ontologist::providers::r::guess_from_r_description(path.as_path(), trust_package)
-            .map_err(map_provider_err_to_py_err)?;
+        upstream_ontologist::providers::r::guess_from_r_description(path.as_path(), trust_package)?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
-fn guess_from_cargo(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::providers::rust::guess_from_cargo(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?;
+fn guess_from_cargo(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
+    let ret =
+        upstream_ontologist::providers::rust::guess_from_cargo(path.as_path(), trust_package)?;
 
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
@@ -908,11 +699,8 @@ fn extract_pecl_package_name(url: &str) -> Option<String> {
 }
 
 #[pyfunction]
-fn metadata_from_url(py: Python, url: &str, origin: Option<&str>) -> PyResult<Vec<PyObject>> {
-    upstream_ontologist::metadata_from_url(url, origin)
-        .into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+fn metadata_from_url(py: Python, url: &str, origin: Option<&str>) -> PyResult<PyObject> {
+    Ok(upstream_ontologist::metadata_from_url(url, origin).to_object(py))
 }
 
 #[pyfunction]
@@ -932,15 +720,15 @@ fn guess_from_security_md(
     name: &str,
     path: PathBuf,
     trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
-    upstream_ontologist::providers::security_md::guess_from_security_md(
-        name,
-        path.as_path(),
-        trust_package,
+) -> PyResult<PyObject> {
+    Ok(
+        upstream_ontologist::providers::security_md::guess_from_security_md(
+            name,
+            path.as_path(),
+            trust_package,
+        )
+        .to_object(py),
     )
-    .into_iter()
-    .map(|x| upstream_datum_with_metadata_to_py(py, x))
-    .collect()
 }
 
 #[pyfunction]
@@ -954,75 +742,63 @@ fn get_sf_metadata(project: &str) -> PyResult<PyObject> {
 
 #[pyfunction]
 fn known_bad_guess(py: Python, datum: PyObject) -> PyResult<bool> {
-    let datum = py_to_upstream_datum(py, &datum)?;
+    let datum: UpstreamDatum = datum.extract(py)?;
     Ok(datum.known_bad_guess())
 }
 
 #[pyfunction]
-fn guess_from_debian_patch(
-    py: Python,
-    path: PathBuf,
-    trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
-    upstream_ontologist::providers::debian::guess_from_debian_patch(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?
-        .into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect()
+fn guess_from_debian_patch(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
+    Ok(
+        upstream_ontologist::providers::debian::guess_from_debian_patch(
+            path.as_path(),
+            trust_package,
+        )?
+        .to_object(py),
+    )
 }
 
 #[pyfunction]
-fn guess_from_path(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    upstream_ontologist::guess_from_path(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?
-        .into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect()
+fn guess_from_path(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
+    Ok(upstream_ontologist::guess_from_path(path.as_path(), trust_package)?.to_object(py))
 }
 
 #[pyfunction(name = "skip_paragraph")]
-fn readme_skip_paragraph(py: Python, para: &str) -> PyResult<(bool, Vec<PyObject>)> {
+fn readme_skip_paragraph(py: Python, para: &str) -> PyResult<(bool, PyObject)> {
     let (skip, para) = upstream_ontologist::readme::skip_paragraph(para);
-    let para = para
-        .into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()?;
-    Ok((skip, para))
+    Ok((skip, para.to_object(py)))
 }
 
 #[pyfunction]
-fn guess_from_pyproject_toml(
-    py: Python,
-    path: PathBuf,
-    trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
-    upstream_ontologist::providers::python::guess_from_pyproject_toml(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?
-        .into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect()
+fn guess_from_pyproject_toml(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
+    Ok(
+        upstream_ontologist::providers::python::guess_from_pyproject_toml(
+            path.as_path(),
+            trust_package,
+        )?
+        .to_object(py),
+    )
 }
 
 #[pyfunction]
-fn guess_from_setup_cfg(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    upstream_ontologist::providers::python::guess_from_setup_cfg(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?
-        .into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect()
+fn guess_from_setup_cfg(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
+    Ok(
+        upstream_ontologist::providers::python::guess_from_setup_cfg(
+            path.as_path(),
+            trust_package,
+        )?
+        .to_object(py),
+    )
 }
 
 #[pyfunction]
-fn guess_from_debian_watch(
-    py: Python,
-    path: PathBuf,
-    trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
-    upstream_ontologist::providers::debian::guess_from_debian_watch(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?
-        .into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect()
+fn guess_from_debian_watch(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
+    Ok(
+        upstream_ontologist::providers::debian::guess_from_debian_watch(
+            path.as_path(),
+            trust_package,
+        )?
+        .to_object(py),
+    )
 }
 
 #[pyfunction]
@@ -1030,49 +806,41 @@ fn guess_from_debian_changelog(
     py: Python,
     path: PathBuf,
     trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
-    upstream_ontologist::providers::debian::guess_from_debian_changelog(
-        path.as_path(),
-        trust_package,
+) -> PyResult<PyObject> {
+    Ok(
+        upstream_ontologist::providers::debian::guess_from_debian_changelog(
+            path.as_path(),
+            trust_package,
+        )?
+        .to_object(py),
     )
-    .map_err(map_provider_err_to_py_err)?
-    .into_iter()
-    .map(|x| upstream_datum_with_metadata_to_py(py, x))
-    .collect()
 }
 
 #[pyfunction]
-fn guess_from_setup_py(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    upstream_ontologist::providers::python::guess_from_setup_py(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?
-        .into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect()
-}
-
-#[pyfunction]
-fn guess_from_package_yaml(
-    py: Python,
-    path: PathBuf,
-    trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
-    upstream_ontologist::providers::package_yaml::guess_from_package_yaml(
-        path.as_path(),
-        trust_package,
+fn guess_from_setup_py(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
+    Ok(
+        upstream_ontologist::providers::python::guess_from_setup_py(path.as_path(), trust_package)?
+            .to_object(py),
     )
-    .map_err(map_provider_err_to_py_err)?
-    .into_iter()
-    .map(|x| upstream_datum_with_metadata_to_py(py, x))
-    .collect()
 }
 
 #[pyfunction]
-fn guess_from_pkg_info(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    upstream_ontologist::providers::python::guess_from_pkg_info(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?
-        .into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect()
+fn guess_from_package_yaml(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
+    Ok(
+        upstream_ontologist::providers::package_yaml::guess_from_package_yaml(
+            path.as_path(),
+            trust_package,
+        )?
+        .to_object(py),
+    )
+}
+
+#[pyfunction]
+fn guess_from_pkg_info(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
+    Ok(
+        upstream_ontologist::providers::python::guess_from_pkg_info(path.as_path(), trust_package)?
+            .to_object(py),
+    )
 }
 
 #[pymodule]
@@ -1168,6 +936,9 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     let readmem = PyModule::new(py, "readme")?;
     readmem.add_wrapped(wrap_pyfunction!(readme_skip_paragraph))?;
     m.add_submodule(readmem)?;
-    m.add("ParseError", py.get_type::<ParseError>())?;
+    m.add(
+        "ParseError",
+        py.get_type::<upstream_ontologist::ParseError>(),
+    )?;
     Ok(())
 }

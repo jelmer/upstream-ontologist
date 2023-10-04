@@ -34,7 +34,7 @@ debbugs = "0.1.0"
 members = [ "upstream-ontologist-py",]
 
 [features]
-default = [ "git-config", "launchpad", "opam", "dist-ini", "cargo", "r-description", "pyproject-toml", "python-pkginfo", "default-tls", "debian"]
+default = [ "git-config", "launchpad", "opam", "dist-ini", "cargo", "r-description", "pyproject-toml", "python-pkginfo", "default-tls", "debian", "pyo3"]
 default-tls = [ "reqwest/default-tls",]
 git-config = [ "dep:gix-config",]
 launchpad = [ "dep:distro-info",]
@@ -47,6 +47,7 @@ python-pkginfo = [ "dep:python-pkginfo",]
 rustls-tls = [ "reqwest/rustls-tls",]
 debcargo = [ "dep:debcargo",]
 debian = ["debcargo"]
+pyo3 = []
 
 [lib]
 

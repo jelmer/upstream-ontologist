@@ -135,9 +135,10 @@ def update_from_guesses(upstream_metadata: UpstreamMetadata,
     for datum in guessed_items:
         current_datum: Optional[UpstreamDatum] = cast(
             Optional[UpstreamDatum], upstream_metadata.get(datum.field))
-        if not current_datum or (
-                certainty_to_confidence(datum.certainty)  # type: ignore
-                < certainty_to_confidence(current_datum.certainty)):
+        if current_datum is None or current_datum.certainty is None or (
+                datum.certainty is not None
+                and certainty_to_confidence(datum.certainty)  # type: ignore
+                < certainty_to_confidence(current_datum.certainty)):  # type: ignore
             upstream_metadata[datum.field] = datum  # type: ignore
             changed.append(datum)
     return changed
