@@ -8,7 +8,7 @@ use std::str::FromStr;
 
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, Read};
 use std::path::{Path, PathBuf};
 use url::Url;
 
@@ -252,7 +252,7 @@ impl UpstreamDatum {
             UpstreamDatum::Copyright(c) => Some(c),
             UpstreamDatum::Funding(f) => Some(f),
             UpstreamDatum::Changelog(c) => Some(c),
-            UpstreamDatum::DebianITP(c) => None,
+            UpstreamDatum::DebianITP(_c) => None,
         }
     }
 
@@ -650,7 +650,7 @@ impl std::fmt::Display for HTTPJSONError {
             HTTPJSONError::Error {
                 url,
                 status,
-                response,
+                response: _,
             } => write!(f, "HTTP error {} for {}:", status, url,),
         }
     }
@@ -937,11 +937,11 @@ pub trait Forge: Send + Sync {
 
     fn name(&self) -> &'static str;
 
-    fn bug_database_url_from_bug_submit_url(&self, url: &Url) -> Option<Url> {
+    fn bug_database_url_from_bug_submit_url(&self, _url: &Url) -> Option<Url> {
         None
     }
 
-    fn bug_submit_url_from_bug_database_url(&self, url: &Url) -> Option<Url> {
+    fn bug_submit_url_from_bug_database_url(&self, _url: &Url) -> Option<Url> {
         None
     }
 
@@ -959,23 +959,23 @@ pub trait Forge: Send + Sync {
         ))
     }
 
-    fn bug_database_from_issue_url(&self, url: &Url) -> Option<Url> {
+    fn bug_database_from_issue_url(&self, _url: &Url) -> Option<Url> {
         None
     }
 
-    fn bug_database_url_from_repo_url(&self, url: &Url) -> Option<Url> {
+    fn bug_database_url_from_repo_url(&self, _url: &Url) -> Option<Url> {
         None
     }
 
-    fn repo_url_from_merge_request_url(&self, url: &Url) -> Option<Url> {
+    fn repo_url_from_merge_request_url(&self, _url: &Url) -> Option<Url> {
         None
     }
 
     fn extend_metadata(
         &self,
-        metadata: &mut Vec<UpstreamDatumWithMetadata>,
-        project: &str,
-        max_certainty: Certainty,
+        _metadata: &mut Vec<UpstreamDatumWithMetadata>,
+        _project: &str,
+        _max_certainty: Certainty,
     ) {
     }
 }
@@ -1424,7 +1424,7 @@ pub fn guess_from_environment() -> std::result::Result<Vec<UpstreamDatumWithMeta
 // Documentation: https://docs.microsoft.com/en-us/nuget/reference/nuspec
 pub fn guess_from_nuspec(
     path: &Path,
-    trust_package: bool,
+    _trust_package: bool,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     const NAMESPACES: &[&str] = &["http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd"];
     // XML parsing and other logic
@@ -1591,7 +1591,7 @@ fn update_from_guesses(
 fn possible_fields_missing(
     upstream_metadata: &[UpstreamDatumWithMetadata],
     fields: &[&str],
-    field_certainty: Certainty,
+    _field_certainty: Certainty,
 ) -> bool {
     for field in fields {
         match find_datum(upstream_metadata, field) {
@@ -1659,7 +1659,7 @@ impl Forge for SourceForge {
         project: &str,
         max_certainty: Certainty,
     ) {
-        let subproject = find_datum(metadata, "Name").map_or(None, |f| match f.datum {
+        let subproject = find_datum(metadata, "Name").and_then(|f| match f.datum {
             UpstreamDatum::Name(ref name) => Some(name.to_string()),
             _ => None,
         });
@@ -2060,7 +2060,7 @@ pub fn get_repology_metadata(srcname: &str, repo: Option<&str>) -> Option<serde_
 
 pub fn guess_from_path(
     path: &Path,
-    trust_package: bool,
+    _trust_package: bool,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let basename = path.file_name().and_then(|s| s.to_str());
     let mut ret = Vec::new();

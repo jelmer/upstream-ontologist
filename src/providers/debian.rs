@@ -11,7 +11,7 @@ use url::Url;
 
 pub fn guess_from_debian_patch(
     path: &Path,
-    trust_package: bool,
+    _trust_package: bool,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let file = File::open(path)?;
     let reader = std::io::BufReader::new(file);
@@ -180,7 +180,7 @@ pub fn metadata_from_itp_bug_body(
 
 pub fn guess_from_debian_changelog(
     path: &Path,
-    trust_package: bool,
+    _trust_package: bool,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let cl = debian_changelog::ChangeLog::read_path(path).map_err(|e| {
         ProviderError::ParseError(format!(
@@ -227,7 +227,7 @@ pub fn guess_from_debian_changelog(
             })?;
 
         let semver_suffix = debcargo_config.semver_suffix;
-        let (mut crate_name, crate_semver_version) =
+        let (mut crate_name, _crate_semver_version) =
             parse_debcargo_source_name(&package, semver_suffix);
 
         if crate_name.contains('-') {

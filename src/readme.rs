@@ -1,7 +1,7 @@
 use crate::{Certainty, UpstreamDatum, UpstreamDatumWithMetadata};
 use lazy_regex::regex;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+
 
 pub fn skip_paragraph(para: &str) -> (bool, Vec<UpstreamDatumWithMetadata>) {
     let mut ret = Vec::<UpstreamDatumWithMetadata>::new();

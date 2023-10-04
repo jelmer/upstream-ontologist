@@ -1,5 +1,5 @@
 use crate::{Certainty, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
-use log::error;
+
 use std::fs::File;
 use std::path::Path;
 

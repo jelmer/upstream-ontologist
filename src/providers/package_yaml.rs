@@ -3,7 +3,7 @@ use std::path::Path;
 
 pub fn guess_from_package_yaml(
     path: &Path,
-    trust_package: bool,
+    _trust_package: bool,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let reader = std::fs::File::open(path)?;
     let data: serde_yaml::Value =

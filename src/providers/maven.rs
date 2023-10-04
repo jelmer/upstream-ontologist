@@ -1,7 +1,7 @@
 //! Documentation: https://maven.apache.org/pom.html
 
 use crate::{vcs, Certainty, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
-use log::{error, warn};
+use log::{warn};
 use std::fs::File;
 use std::path::Path;
 

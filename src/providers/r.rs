@@ -9,7 +9,7 @@ use url::Url;
 #[cfg(feature = "r-description")]
 pub fn guess_from_r_description(
     path: &std::path::Path,
-    trust_package: bool,
+    _trust_package: bool,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     use mailparse::MailHeaderMap;
     let mut file = File::open(path)?;

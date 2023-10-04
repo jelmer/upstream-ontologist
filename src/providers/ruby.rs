@@ -6,7 +6,7 @@ use std::path::Path;
 
 pub fn guess_from_gemspec(
     path: &Path,
-    trust_package: bool,
+    _trust_package: bool,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let file = File::open(path)?;
 

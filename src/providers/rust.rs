@@ -3,7 +3,7 @@ use log::debug;
 
 pub fn guess_from_cargo(
     path: &std::path::Path,
-    trust_package: bool,
+    _trust_package: bool,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     // see https://doc.rust-lang.org/cargo/reference/manifest.html
     let doc: toml::Table = toml::from_str(&std::fs::read_to_string(path)?)
@@ -74,7 +74,7 @@ pub fn guess_from_cargo(
             "authors" => {
                 let authors = value.as_array().unwrap();
                 let authors = authors
-                    .into_iter()
+                    .iter()
                     .map(|a| Person::from(a.as_str().unwrap()))
                     .collect();
                 results.push(UpstreamDatumWithMetadata {
