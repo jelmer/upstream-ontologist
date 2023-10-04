@@ -1,7 +1,7 @@
 use lazy_regex::regex;
 use log::{debug, error, warn};
 use percent_encoding::utf8_percent_encode;
-use pyo3::exceptions::PyRuntimeError;
+use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
 use reqwest::header::HeaderMap;
 use std::str::FromStr;
@@ -2157,14 +2157,23 @@ mod test {
 
 impl FromPyObject<'_> for UpstreamDatum {
     fn extract(obj: &PyAny) -> PyResult<Self> {
-        let (field, val): (String, &PyAny) =
-            if let Ok((field, val)) = obj.extract::<(String, &PyAny)>() {
-                (field, val)
-            } else {
-                let field = obj.getattr("field")?.extract::<String>()?;
-                let val = obj.getattr("value")?;
-                (field, val)
-            };
+        let (field, val): (String, &PyAny) = if let Ok((field, val)) =
+            obj.extract::<(String, &PyAny)>()
+        {
+            (field, val)
+        } else if let Ok(datum) = obj.getattr("datum") {
+            let field = datum.getattr("field")?.extract::<String>()?;
+            let val = datum.getattr("value")?;
+            (field, val)
+        } else if obj.hasattr("field")? && obj.hasattr("value")? {
+            let field = obj.getattr("field")?.extract::<String>()?;
+            let val = obj.getattr("value")?;
+            (field, val)
+        } else {
+            return Err(PyTypeError::new_err((
+                format!("Expected a tuple of (field, value) or an object with field and value attributesm, found {:?}", obj),
+            )));
+        };
 
         match field.as_str() {
             "Name" => Ok(UpstreamDatum::Name(val.extract::<String>()?)),
