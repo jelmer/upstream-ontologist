@@ -27,10 +27,9 @@ name = "upstream-ontologist"
 authors = [{name = "Jelmer Vernooij", email = "jelmer@jelmer.uk"}]
 maintainers = [{name = "Jelmer Vernooij", email = "jelmer@jelmer.uk"}]
 description = "tracking of upstream project metadata"
-requires-python = ">= 3.7"
+requires-python = ">= 3.8"
 dependencies = [
     "python_debian",
-    'typing_extensions;python_version<="3.7"',
     "ruamel.yaml",
     "breezy>=3.3.0",
 ]
