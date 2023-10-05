@@ -315,48 +315,16 @@ def guess_from_debian_copyright(path, trust_package):  # noqa: C901
                 'Repository', repo_url, 'likely')
 
 
-def url_from_cvs_co_command(command):
-    from breezy.location import cvs_to_url
-    from breezy import urlutils
-    import shlex
-    argv = shlex.split(command.decode('utf-8', 'surrogateescape'))
-    args = [arg for arg in argv if arg.strip()]
-    i = 0
-    cvsroot = None
-    module = None
-    command_seen = False
-    del args[0]
-    while i < len(args):
-        if args[i] == '-d':
-            del args[i]
-            cvsroot = args[i]
-            del args[i]
-            continue
-        if args[i].startswith('-d'):
-            cvsroot = args[i][2:]
-            del args[i]
-            continue
-        if command_seen and not args[i].startswith('-'):
-            module = args[i]
-        elif args[i] in ('co', 'checkout'):
-            command_seen = True
-        del args[i]
-    if cvsroot is not None:
-        url = cvs_to_url(cvsroot)
-        if module is not None:
-            return urlutils.join(url, module)
-        return url
-    return None
-
-
+url_from_cvs_co_command = _upstream_ontologist.url_from_cvs_co_command
 url_from_svn_co_command = _upstream_ontologist.url_from_svn_co_command
 url_from_git_clone_command = _upstream_ontologist.url_from_git_clone_command
 url_from_fossil_clone_command = _upstream_ontologist.url_from_fossil_clone_command
+url_from_vcs_command = _upstream_ontologist.url_from_vcs_command
 guess_from_meson = _upstream_ontologist.guess_from_meson
 guess_from_pubspec_yaml = _upstream_ontologist.guess_from_pubspec_yaml
 
 
-def guess_from_install(path, trust_package):  # noqa: C901
+def guess_from_install(path, _trust_package):  # noqa: C901
     urls = []
     try:
         with open(path, 'rb') as f:
@@ -425,15 +393,15 @@ def guess_from_readme(path, trust_package):  # noqa: C901
                 line = line.strip()
                 cmdline = line.strip().lstrip(b'$').strip()
                 if (cmdline.startswith(b'git clone ')
-                        or cmdline.startswith(b'fossil clone ')):
+                        or cmdline.startswith(b'fossil clone ')
+                        or cmdline.startswith(b'hg clone ')
+                        or cmdline.startswith(b'bzr co ')
+                        or cmdline.startswith(b'bzr branch ')):
                     while cmdline.endswith(b'\\'):
                         cmdline += lines[i + 1]
                         cmdline = cmdline.strip()
                         i += 1
-                    if cmdline.startswith(b'git clone '):
-                        url = url_from_git_clone_command(cmdline)
-                    elif cmdline.startswith(b'fossil clone '):
-                        url = url_from_fossil_clone_command(cmdline)
+                    url = url_from_vcs_command(cmdline)
                     if url:
                         urls.append(url)
                 for m in re.findall(b"[\"'`](git clone.*)[\"`']", line):
@@ -559,16 +527,7 @@ guess_from_pom_xml = _upstream_ontologist.guess_from_pom_xml
 guess_from_git_config = _upstream_ontologist.guess_from_git_config
 
 
-def guess_from_get_orig_source(path, trust_package=False):
-    with open(path, 'rb') as f:
-        for line in f:
-            if line.startswith(b'git clone'):
-                url = url_from_git_clone_command(line)
-                if url:
-                    certainty = 'likely' if '$' not in url else 'possible'
-                    yield UpstreamDatum('Repository', url, certainty)
-
-
+guess_from_get_orig_source = _upstream_ontologist.guess_from_get_orig_source
 guess_from_security_md = _upstream_ontologist.guess_from_security_md
 guess_from_go_mod = _upstream_ontologist.guess_from_go_mod
 guess_from_gemspec = _upstream_ontologist.guess_from_gemspec

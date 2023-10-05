@@ -66,7 +66,6 @@ testing = ["breezy>=3.3.0"]
 
 [project.scripts]
 guess-upstream-metadata = "upstream_ontologist.__main__:main"
-autocodemeta = "upstream_ontologist.codemeta:main"
 
 [tool.setuptools]
 packages = [

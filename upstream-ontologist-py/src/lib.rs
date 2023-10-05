@@ -18,17 +18,27 @@ create_exception!(upstream_ontologist, NoSuchForgeProject, PyException);
 
 #[pyfunction]
 fn url_from_git_clone_command(command: &[u8]) -> Option<String> {
-    upstream_ontologist::url_from_git_clone_command(command)
+    upstream_ontologist::vcs_command::url_from_git_clone_command(command)
 }
 
 #[pyfunction]
 fn url_from_fossil_clone_command(command: &[u8]) -> Option<String> {
-    upstream_ontologist::url_from_fossil_clone_command(command)
+    upstream_ontologist::vcs_command::url_from_fossil_clone_command(command)
 }
 
 #[pyfunction]
 fn url_from_svn_co_command(command: &[u8]) -> Option<String> {
-    upstream_ontologist::url_from_svn_co_command(command)
+    upstream_ontologist::vcs_command::url_from_svn_co_command(command)
+}
+
+#[pyfunction]
+fn url_from_cvs_co_command(command: &[u8]) -> Option<String> {
+    upstream_ontologist::vcs_command::url_from_cvs_co_command(command)
+}
+
+#[pyfunction]
+fn url_from_vcs_command(command: &[u8]) -> Option<String> {
+    upstream_ontologist::vcs_command::url_from_vcs_command(command)
 }
 
 #[pyfunction]
@@ -56,7 +66,9 @@ fn guess_from_package_json(py: Python, path: PathBuf, trust_package: bool) -> Py
 
 #[pyfunction]
 fn debian_is_native(path: PathBuf) -> PyResult<Option<bool>> {
-    Ok(upstream_ontologist::debian_is_native(path.as_path())?)
+    Ok(upstream_ontologist::providers::debian::debian_is_native(
+        path.as_path(),
+    )?)
 }
 
 #[pyfunction]
@@ -843,12 +855,29 @@ fn guess_from_pkg_info(py: Python, path: PathBuf, trust_package: bool) -> PyResu
     )
 }
 
+#[pyfunction]
+fn guess_from_get_orig_source(
+    py: Python,
+    path: PathBuf,
+    trust_package: bool,
+) -> PyResult<PyObject> {
+    Ok(
+        upstream_ontologist::vcs_command::guess_from_get_orig_source(
+            path.as_path(),
+            trust_package,
+        )?
+        .to_object(py),
+    )
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
     m.add_wrapped(wrap_pyfunction!(url_from_git_clone_command))?;
+    m.add_wrapped(wrap_pyfunction!(url_from_vcs_command))?;
     m.add_wrapped(wrap_pyfunction!(url_from_fossil_clone_command))?;
     m.add_wrapped(wrap_pyfunction!(url_from_svn_co_command))?;
+    m.add_wrapped(wrap_pyfunction!(url_from_cvs_co_command))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_meson))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_package_json))?;
     m.add_wrapped(wrap_pyfunction!(debian_is_native))?;
@@ -920,6 +949,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_pkg_info))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_debian_watch))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_debian_changelog))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_get_orig_source))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;

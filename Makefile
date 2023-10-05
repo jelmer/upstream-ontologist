@@ -1,3 +1,5 @@
+.PHONY: build check unittest coverage coverage-html flake8 typing
+
 build:
 	python3 setup.py build_ext -i
 

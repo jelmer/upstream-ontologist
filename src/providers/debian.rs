@@ -6,6 +6,7 @@ use lazy_regex::regex_captures;
 use log::debug;
 use std::fs::File;
 use std::io::BufRead;
+use std::io::Read;
 use std::path::Path;
 use url::Url;
 
@@ -369,4 +370,17 @@ pub fn guess_from_debian_watch(
         ret.extend(crate::metadata_from_url(url.as_str(), origin.as_deref()));
     }
     Ok(ret)
+}
+
+pub fn debian_is_native(path: &Path) -> std::io::Result<Option<bool>> {
+    let format_file_path = path.join("source/format");
+    match File::open(format_file_path) {
+        Ok(mut file) => {
+            let mut content = String::new();
+            file.read_to_string(&mut content)?;
+            Ok(Some(content.trim() == "3.0 (native)"))
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(e),
+    }
 }
