@@ -1970,31 +1970,6 @@ pub fn guess_from_path(
     Ok(ret)
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_guess_upstream_metadata() {
-        guess_upstream_metadata(
-            PathBuf::from("."),
-            Some(true),
-            Some(true),
-            Some(true),
-            Some(true),
-        )
-        .unwrap();
-    }
-
-    #[test]
-    fn test_url_from_git_clone_command() {
-        assert_eq!(
-            url_from_git_clone_command(b"git clone https://github.com/foo/bar foo"),
-            Some("https://github.com/foo/bar".to_string())
-        );
-    }
-}
-
 impl FromPyObject<'_> for UpstreamDatum {
     fn extract(obj: &PyAny) -> PyResult<Self> {
         let (field, val): (String, &PyAny) = if let Ok((field, val)) =

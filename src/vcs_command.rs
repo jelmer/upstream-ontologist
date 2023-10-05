@@ -76,6 +76,14 @@ pub fn url_from_git_clone_command(command: &[u8]) -> Option<String> {
     }
 }
 
+#[test]
+fn test_url_from_git_clone_command() {
+    assert_eq!(
+        url_from_git_clone_command(b"git clone https://github.com/foo/bar foo"),
+        Some("https://github.com/foo/bar".to_string())
+    );
+}
+
 pub fn url_from_fossil_clone_command(command: &[u8]) -> Option<String> {
     let mut args = parse_command_bytes(command)?;
     if args.remove(0) != "fossil" || args.remove(0) != "clone" {
