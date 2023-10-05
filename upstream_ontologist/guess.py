@@ -315,40 +315,7 @@ def guess_from_debian_copyright(path, trust_package):  # noqa: C901
                 'Repository', repo_url, 'likely')
 
 
-def url_from_cvs_co_command(command):
-    from breezy.location import cvs_to_url
-    from breezy import urlutils
-    import shlex
-    argv = shlex.split(command.decode('utf-8', 'surrogateescape'))
-    args = [arg for arg in argv if arg.strip()]
-    i = 0
-    cvsroot = None
-    module = None
-    command_seen = False
-    del args[0]
-    while i < len(args):
-        if args[i] == '-d':
-            del args[i]
-            cvsroot = args[i]
-            del args[i]
-            continue
-        if args[i].startswith('-d'):
-            cvsroot = args[i][2:]
-            del args[i]
-            continue
-        if command_seen and not args[i].startswith('-'):
-            module = args[i]
-        elif args[i] in ('co', 'checkout'):
-            command_seen = True
-        del args[i]
-    if cvsroot is not None:
-        url = cvs_to_url(cvsroot)
-        if module is not None:
-            return urlutils.join(url, module)
-        return url
-    return None
-
-
+url_from_cvs_co_command = _upstream_ontologist.url_from_cvs_co_command
 url_from_svn_co_command = _upstream_ontologist.url_from_svn_co_command
 url_from_git_clone_command = _upstream_ontologist.url_from_git_clone_command
 url_from_fossil_clone_command = _upstream_ontologist.url_from_fossil_clone_command
@@ -434,6 +401,8 @@ def guess_from_readme(path, trust_package):  # noqa: C901
                         url = url_from_git_clone_command(cmdline)
                     elif cmdline.startswith(b'fossil clone '):
                         url = url_from_fossil_clone_command(cmdline)
+                    else:
+                        url = None
                     if url:
                         urls.append(url)
                 for m in re.findall(b"[\"'`](git clone.*)[\"`']", line):

@@ -32,6 +32,11 @@ fn url_from_svn_co_command(command: &[u8]) -> Option<String> {
 }
 
 #[pyfunction]
+fn url_from_cvs_co_command(command: &[u8]) -> Option<String> {
+    upstream_ontologist::url_from_cvs_co_command(command)
+}
+
+#[pyfunction]
 fn drop_vcs_in_scheme(url: &str) -> &str {
     upstream_ontologist::vcs::drop_vcs_in_scheme(url)
 }
@@ -849,6 +854,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(url_from_git_clone_command))?;
     m.add_wrapped(wrap_pyfunction!(url_from_fossil_clone_command))?;
     m.add_wrapped(wrap_pyfunction!(url_from_svn_co_command))?;
+    m.add_wrapped(wrap_pyfunction!(url_from_cvs_co_command))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_meson))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_package_json))?;
     m.add_wrapped(wrap_pyfunction!(debian_is_native))?;

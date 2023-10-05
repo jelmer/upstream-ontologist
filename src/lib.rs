@@ -589,7 +589,6 @@ pub fn url_from_fossil_clone_command(command: &[u8]) -> Option<String> {
     }
 }
 
-/*
 pub fn url_from_cvs_co_command(command: &[u8]) -> Option<String> {
     let command_str = match String::from_utf8(command.to_vec()) {
         Ok(s) => s,
@@ -600,7 +599,7 @@ pub fn url_from_cvs_co_command(command: &[u8]) -> Option<String> {
         .filter(|arg| !arg.trim().is_empty())
         .collect();
     let mut args = argv;
-    let mut i = 0;
+    let i = 0;
     let mut cvsroot = None;
     let mut module = None;
     let mut command_seen = false;
@@ -608,33 +607,29 @@ pub fn url_from_cvs_co_command(command: &[u8]) -> Option<String> {
     while i < args.len() {
         if args[i] == "-d" {
             args.remove(i);
-            cvsroot = Some(&args[i][..]);
-            args.remove(i);
+            cvsroot = Some(args.remove(i));
             continue;
         }
         if args[i].starts_with("-d") {
-            cvsroot = Some(&args[i][2..]);
-            args.remove(i);
+            cvsroot = Some(args.remove(i)[2..].to_string());
             continue;
         }
         if command_seen && !args[i].starts_with('-') {
-            module = Some(args[i]);
+            module = Some(args[i].clone());
         } else if args[i] == "co" || args[i] == "checkout" {
             command_seen = true;
         }
         args.remove(i);
     }
     if let Some(cvsroot) = cvsroot {
-        let url = cvs_to_url(&cvsroot);
+        let url = breezyshim::location::cvs_to_url(&cvsroot);
         if let Some(module) = module {
-            return Some(url.join(module));
+            return Some(url.join(module.as_str()).unwrap().to_string());
         }
-        return Some(url);
+        return Some(url.to_string());
     }
     None
 }
-
-*/
 
 pub fn url_from_svn_co_command(command: &[u8]) -> Option<String> {
     if command.ends_with(&[b'\\']) {
