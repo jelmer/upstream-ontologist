@@ -8,7 +8,7 @@ use std::str::FromStr;
 
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufRead, Read};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use url::Url;
 
@@ -20,6 +20,7 @@ const DEFAULT_URLLIB_TIMEOUT: u64 = 3;
 pub mod providers;
 pub mod readme;
 pub mod vcs;
+pub mod vcs_command;
 
 #[derive(Clone, Copy, Debug, Ord, Eq, PartialOrd, PartialEq)]
 pub enum Certainty {
@@ -508,162 +509,6 @@ pub trait UpstreamDataProvider {
         path: &std::path::Path,
         trust_package: bool,
     ) -> dyn Iterator<Item = (UpstreamDatum, Certainty)>;
-}
-
-pub fn url_from_git_clone_command(command: &[u8]) -> Option<String> {
-    if command.ends_with(&[b'\\']) {
-        warn!("Ignoring command with line break: {:?}", command);
-        return None;
-    }
-    let command_str = match String::from_utf8(command.to_vec()) {
-        Ok(s) => s,
-        Err(_) => {
-            warn!("Ignoring command with non-UTF-8: {:?}", command);
-            return None;
-        }
-    };
-    let argv: Vec<String> = shlex::split(command_str.as_str())?
-        .into_iter()
-        .filter(|arg| !arg.trim().is_empty())
-        .collect();
-    let mut args = argv;
-    let mut i = 0;
-    while i < args.len() {
-        if !args[i].starts_with('-') {
-            i += 1;
-            continue;
-        }
-        if args[i].contains('=') {
-            args.remove(i);
-            continue;
-        }
-        // arguments that take a parameter
-        if args[i] == "-b" || args[i] == "--depth" || args[i] == "--branch" {
-            args.remove(i);
-            args.remove(i);
-            continue;
-        }
-        args.remove(i);
-    }
-    let url = args
-        .get(2)
-        .cloned()
-        .unwrap_or_else(|| args.get(0).cloned().unwrap_or_default());
-    if vcs::plausible_url(&url) {
-        Some(url)
-    } else {
-        None
-    }
-}
-
-pub fn url_from_fossil_clone_command(command: &[u8]) -> Option<String> {
-    let command_str = match String::from_utf8(command.to_vec()) {
-        Ok(s) => s,
-        Err(_) => return None,
-    };
-    let argv: Vec<String> = shlex::split(command_str.as_str())?
-        .into_iter()
-        .filter(|arg| !arg.trim().is_empty())
-        .collect();
-    let mut args = argv;
-    let mut i = 0;
-    while i < args.len() {
-        if !args[i].starts_with('-') {
-            i += 1;
-            continue;
-        }
-        if args[i].contains('=') {
-            args.remove(i);
-            continue;
-        }
-        args.remove(i);
-    }
-    let url = args
-        .get(2)
-        .cloned()
-        .unwrap_or_else(|| args.get(0).cloned().unwrap_or_default());
-    if vcs::plausible_url(&url) {
-        Some(url)
-    } else {
-        None
-    }
-}
-
-pub fn url_from_cvs_co_command(command: &[u8]) -> Option<String> {
-    let command_str = match String::from_utf8(command.to_vec()) {
-        Ok(s) => s,
-        Err(_) => return None,
-    };
-    let argv: Vec<String> = shlex::split(command_str.as_str())?
-        .into_iter()
-        .filter(|arg| !arg.trim().is_empty())
-        .collect();
-    let mut args = argv;
-    let i = 0;
-    let mut cvsroot = None;
-    let mut module = None;
-    let mut command_seen = false;
-    args.remove(0);
-    while i < args.len() {
-        if args[i] == "-d" {
-            args.remove(i);
-            cvsroot = Some(args.remove(i));
-            continue;
-        }
-        if args[i].starts_with("-d") {
-            cvsroot = Some(args.remove(i)[2..].to_string());
-            continue;
-        }
-        if command_seen && !args[i].starts_with('-') {
-            module = Some(args[i].clone());
-        } else if args[i] == "co" || args[i] == "checkout" {
-            command_seen = true;
-        }
-        args.remove(i);
-    }
-    if let Some(cvsroot) = cvsroot {
-        let url = breezyshim::location::cvs_to_url(&cvsroot);
-        if let Some(module) = module {
-            return Some(url.join(module.as_str()).unwrap().to_string());
-        }
-        return Some(url.to_string());
-    }
-    None
-}
-
-pub fn url_from_svn_co_command(command: &[u8]) -> Option<String> {
-    if command.ends_with(&[b'\\']) {
-        warn!("Ignoring command with line break: {:?}", command);
-        return None;
-    }
-    let command_str = match std::str::from_utf8(command) {
-        Ok(s) => s,
-        Err(_) => return None,
-    };
-    let argv: Vec<String> = shlex::split(command_str)?
-        .into_iter()
-        .filter(|arg| !arg.trim().is_empty())
-        .collect();
-    let args = argv;
-    let url_schemes = vec!["svn+ssh", "http", "https", "svn"];
-    args.into_iter().find(|arg| {
-        url_schemes
-            .iter()
-            .any(|scheme| arg.starts_with(&format!("{}://", scheme)))
-    })
-}
-
-pub fn debian_is_native(path: &Path) -> std::io::Result<Option<bool>> {
-    let format_file_path = path.join("source/format");
-    match File::open(format_file_path) {
-        Ok(mut file) => {
-            let mut content = String::new();
-            file.read_to_string(&mut content)?;
-            Ok(Some(content.trim() == "3.0 (native)"))
-        }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(e),
-    }
 }
 
 #[derive(Debug)]
