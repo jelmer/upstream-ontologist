@@ -61,6 +61,19 @@ jobs:
             curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=nightly --profile=minimal -y &&
             rustup target add all &&
             rustup show
+          CIBW_BEFORE_BUILD_MACOS: >
+            brew install openssl &&
+            pip install -U setuptools-rust &&
+            curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=nightly --profile=minimal -y &&
+            rustup target add all &&
+            rustup show
+          CIBW_BEFORE_BUILD_WINDOWS: >
+            vcpkg install openssl &&
+            pip install -U setuptools-rust &&
+            curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=nightly --profile=minimal -y &&
+            rustup target add all &&
+            rustup show
+          CIBW_ENVIRONMENT_WINDOWS: 'CMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake"'
       - name: Upload wheels
         uses: actions/upload-artifact@v3
         with:

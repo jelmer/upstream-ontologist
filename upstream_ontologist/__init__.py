@@ -58,12 +58,7 @@ from dataclasses import dataclass
 from email.utils import parseaddr
 import ruamel.yaml
 
-
-try:
-    from typing import TypedDict  # type: ignore
-except ImportError:
-    from typing_extensions import TypedDict  # type: ignore
-
+from typing import TypedDict
 
 from . import _upstream_ontologist
 
