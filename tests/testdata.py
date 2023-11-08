@@ -38,9 +38,11 @@ class TestDataTestCase(unittest.TestCase):
         return f"testdata test: {self.name}"
 
     def runTest(self):
-        got = get_upstream_info(self.path, trust_package=True, net_access=False, check=False)
-        jp = os.path.join(self.path, 'expected.yaml')
-        with open(jp, 'r') as f:
+        got = get_upstream_info(
+            self.path, trust_package=True, net_access=False, check=False
+        )
+        jp = os.path.join(self.path, "expected.yaml")
+        with open(jp, "r") as f:
             expected = yaml.load(f)
         self.assertEqual(expected, got)
 
@@ -48,7 +50,7 @@ class TestDataTestCase(unittest.TestCase):
 def test_suite():
     suite = unittest.TestSuite()
     for entry in os.scandir(os.path.join(os.path.dirname(__file__), "..", "testdata")):
-        if entry.name.endswith('~'):
+        if entry.name.endswith("~"):
             continue
         suite.addTest(TestDataTestCase(entry.name, entry.path))
     return suite

@@ -53,13 +53,12 @@ class TestCaseInTempDir(TestCase):
 
 
 class GuessFromDebianWatchTests(TestCaseInTempDir):
-
     def setUp(self):
         super().setUp()
         try:
             import pcre  # noqa: F401
         except ModuleNotFoundError:
-            self.skipTest('pcre not available')
+            self.skipTest("pcre not available")
 
     def test_empty(self):
         with open("watch", "w") as f:
@@ -89,7 +88,6 @@ https://github.com/jelmer/dulwich/tags/dulwich-(.*).tar.gz
 
 
 class GuessFromPackageJsonTests(TestCaseInTempDir):
-
     def test_dummy(self):
         self.maxDiff = None
         with open("package.json", "w") as f:
@@ -179,29 +177,43 @@ Date/Publication: 2019-08-02 20:30:02 UTC
                 UpstreamDatum("Name", "crul", "certain", "DESCRIPTION"),
                 UpstreamDatum("Archive", "CRAN", "certain", "DESCRIPTION"),
                 UpstreamDatum(
-                    "Bug-Database", "https://github.com/ropensci/crul/issues",
-                    "certain", "DESCRIPTION"),
-                UpstreamDatum('Version', '0.8.4', 'certain', "DESCRIPTION"),
+                    "Bug-Database",
+                    "https://github.com/ropensci/crul/issues",
+                    "certain",
+                    "DESCRIPTION",
+                ),
+                UpstreamDatum("Version", "0.8.4", "certain", "DESCRIPTION"),
                 UpstreamDatum(
-                    'License', 'MIT + file LICENSE', 'certain', "DESCRIPTION"),
-                UpstreamDatum('Summary', 'HTTP Client', 'certain', "DESCRIPTION"),
-                UpstreamDatum('Description', """\
+                    "License", "MIT + file LICENSE", "certain", "DESCRIPTION"
+                ),
+                UpstreamDatum("Summary", "HTTP Client", "certain", "DESCRIPTION"),
+                UpstreamDatum(
+                    "Description",
+                    """\
 A simple HTTP client, with tools for making HTTP requests,
 and mocking HTTP requests. The package is built on R6, and takes
 inspiration from Ruby's 'faraday' gem (<https://rubygems.org/gems/faraday>)
 The package name is a play on curl, the widely used command line tool
 for HTTP, and this package is built on top of the R package 'curl', an
-interface to 'libcurl' (<https://curl.haxx.se/libcurl>).""", 'certain', "DESCRIPTION"),
-                UpstreamDatum(
-                    'Maintainer',
-                    Person('Scott Chamberlain', email='myrmecocystus@gmail.com'),
-                    'certain', "DESCRIPTION"),
-                UpstreamDatum(
-                    "Repository", "https://github.com/ropensci/crul",
-                    "certain", "DESCRIPTION"
+interface to 'libcurl' (<https://curl.haxx.se/libcurl>).""",
+                    "certain",
+                    "DESCRIPTION",
                 ),
                 UpstreamDatum(
-                    "Homepage", "https://www.example.com/crul", "certain", "DESCRIPTION"),
+                    "Maintainer",
+                    Person("Scott Chamberlain", email="myrmecocystus@gmail.com"),
+                    "certain",
+                    "DESCRIPTION",
+                ),
+                UpstreamDatum(
+                    "Repository",
+                    "https://github.com/ropensci/crul",
+                    "certain",
+                    "DESCRIPTION",
+                ),
+                UpstreamDatum(
+                    "Homepage", "https://www.example.com/crul", "certain", "DESCRIPTION"
+                ),
             ],
         )
 

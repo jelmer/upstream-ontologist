@@ -29,7 +29,6 @@ from upstream_ontologist.readme import (
 
 
 class ReadmeTestCase(TestCase):
-
     def __init__(self, path):
         super().__init__()
         self.path = path
@@ -44,20 +43,20 @@ class ReadmeTestCase(TestCase):
         readme_plain = None
         description = None
         for entry in os.scandir(self.path):
-            if entry.name.endswith('~'):
+            if entry.name.endswith("~"):
                 continue
             base, ext = os.path.splitext(entry.name)
-            if entry.name == 'description':
+            if entry.name == "description":
                 with open(entry.path) as f:
                     description = f.read()
             elif base == "README":
-                if ext == '.md':
+                if ext == ".md":
                     with open(entry.path) as f:
                         readme_md = f.read()
-                elif ext == '.rst':
+                elif ext == ".rst":
                     with open(entry.path) as f:
                         readme_rst = f.read()
-                elif ext == '':
+                elif ext == "":
                     with open(entry.path) as f:
                         readme_plain = f.read()
                 else:
@@ -69,32 +68,27 @@ class ReadmeTestCase(TestCase):
             try:
                 import markdown  # noqa: F401
             except ModuleNotFoundError:
-                self.skipTest(
-                    'Skipping README.md tests, markdown not available')
-            actual_description, unused_md = description_from_readme_md(
-                readme_md)
+                self.skipTest("Skipping README.md tests, markdown not available")
+            actual_description, unused_md = description_from_readme_md(readme_md)
             self.assertEqual(actual_description, description)
 
         if readme_rst is not None:
             if platform.python_implementation() == "PyPy":
-                self.skipTest('Skipping README.rst tests on pypy')
+                self.skipTest("Skipping README.rst tests on pypy")
             try:
                 import docutils  # noqa: F401
             except ModuleNotFoundError:
-                self.skipTest(
-                    'Skipping README.rst tests, docutils not available')
-            actual_description, unused_rst = description_from_readme_rst(
-                readme_rst)
+                self.skipTest("Skipping README.rst tests, docutils not available")
+            actual_description, unused_rst = description_from_readme_rst(readme_rst)
             self.assertEqual(actual_description, description)
 
         if readme_plain is not None:
-            actual_description, unused_rst = description_from_readme_plain(
-                readme_plain)
+            actual_description, unused_rst = description_from_readme_plain(readme_plain)
             self.assertEqual(actual_description, description)
 
 
 def test_suite():
     suite = TestSuite()
-    for entry in os.scandir(os.path.join(os.path.dirname(__file__), 'readme_data')):
+    for entry in os.scandir(os.path.join(os.path.dirname(__file__), "readme_data")):
         suite.addTest(ReadmeTestCase(entry.path))
     return suite

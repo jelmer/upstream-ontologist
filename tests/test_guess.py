@@ -20,29 +20,42 @@
 from unittest import TestCase
 
 from upstream_ontologist import UpstreamDatum, Person
-from upstream_ontologist.guess import (
-    metadata_from_itp_bug_body
-)
+from upstream_ontologist.guess import metadata_from_itp_bug_body
 
 
 class MetadataFromItpBugBody(TestCase):
-
     def test_simple(self):
         self.maxDiff = None
-        self.assertEqual([
-            UpstreamDatum('Name', 'setuptools-gettext', 'confident'),
-            UpstreamDatum('Version', '0.0.1', 'possible'),
-            UpstreamDatum(
-                'Author', [Person.from_string(
-                    'Breezy Team <breezy-core@googlegroups.com>')], 'confident'),
-            UpstreamDatum('Homepage', 'https://github.com/jelmer/setuptools-gettext', 'confident'),
-            UpstreamDatum('License', 'GPL', 'confident'),
-            UpstreamDatum('Summary', 'Compile .po files into .mo files', 'confident'),
-            UpstreamDatum('Description', """\
+        self.assertEqual(
+            [
+                UpstreamDatum("Name", "setuptools-gettext", "confident"),
+                UpstreamDatum("Version", "0.0.1", "possible"),
+                UpstreamDatum(
+                    "Author",
+                    [Person.from_string("Breezy Team <breezy-core@googlegroups.com>")],
+                    "confident",
+                ),
+                UpstreamDatum(
+                    "Homepage",
+                    "https://github.com/jelmer/setuptools-gettext",
+                    "confident",
+                ),
+                UpstreamDatum("License", "GPL", "confident"),
+                UpstreamDatum(
+                    "Summary", "Compile .po files into .mo files", "confident"
+                ),
+                UpstreamDatum(
+                    "Description",
+                    """\
 This extension for setuptools compiles gettext .po files
 found in the source directory into .mo files and installs them.
-""", 'likely')
-        ], list(metadata_from_itp_bug_body("""\
+""",
+                    "likely",
+                ),
+            ],
+            list(
+                metadata_from_itp_bug_body(
+                    """\
 Package: wnpp
 Severity: wishlist
 Owner: Jelmer Vernooij <jelmer@debian.org>
@@ -59,4 +72,7 @@ Debbugs-Cc: debian-devel@lists.debian.org
 This extension for setuptools compiles gettext .po files
 found in the source directory into .mo files and installs them.
 
-""")))
+"""
+                )
+            ),
+        )

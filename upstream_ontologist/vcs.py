@@ -90,15 +90,16 @@ def find_secure_repo_url(
         return url
 
     # Sites we know to be available over https
-    if (parsed_repo_url.hostname
-        and (
-            is_gitlab_site(parsed_repo_url.hostname, net_access)
-            or parsed_repo_url.hostname in [
-                "github.com",
-                "git.launchpad.net",
-                "bazaar.launchpad.net",
-                "code.launchpad.net",
-            ])):
+    if parsed_repo_url.hostname and (
+        is_gitlab_site(parsed_repo_url.hostname, net_access)
+        or parsed_repo_url.hostname
+        in [
+            "github.com",
+            "git.launchpad.net",
+            "bazaar.launchpad.net",
+            "code.launchpad.net",
+        ]
+    ):
         parsed_repo_url = parsed_repo_url._replace(scheme="https")
 
     if parsed_repo_url.scheme == "lp":
@@ -156,7 +157,9 @@ def fix_path_in_port(
     if not port or port.isdigit():
         return None, None, None
     return (
-        parsed._replace(path="{}/{}".format(port, parsed.path.lstrip("/")), netloc=host),
+        parsed._replace(
+            path="{}/{}".format(port, parsed.path.lstrip("/")), netloc=host
+        ),
         branch,
         subpath,
     )
@@ -170,8 +173,8 @@ def fix_gitlab_scheme(parsed, branch, subpath: Optional[str]):
 
 def fix_github_scheme(parsed, branch, subpath: Optional[str]):
     # GitHub no longer supports the git:// scheme
-    if parsed.hostname == 'github.com' and parsed.scheme == 'git':
-        return parsed._replace(scheme='https'), branch, subpath
+    if parsed.hostname == "github.com" and parsed.scheme == "git":
+        return parsed._replace(scheme="https"), branch, subpath
     return None, None, None
 
 
@@ -301,6 +304,7 @@ def convert_cvs_list_to_str(urls):
         return urls
     if urls[0].startswith(":extssh:") or urls[0].startswith(":pserver:"):
         from breezy.location import cvs_to_url
+
         return cvs_to_url(urls[0]) + "#" + urls[1]
     return urls
 

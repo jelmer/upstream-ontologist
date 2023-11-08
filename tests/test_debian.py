@@ -25,11 +25,10 @@ from upstream_ontologist.debian import (
 
 
 class UpstreamNameToDebianSourceNameTests(TestCase):
-
     def test_gnu(self):
-        self.assertEqual(
-            'lala', upstream_name_to_debian_source_name('GNU Lala'))
+        self.assertEqual("lala", upstream_name_to_debian_source_name("GNU Lala"))
 
     def test_parentheses(self):
         self.assertEqual(
-            'mun', upstream_name_to_debian_source_name('Made Up Name (MUN)'))
+            "mun", upstream_name_to_debian_source_name("Made Up Name (MUN)")
+        )

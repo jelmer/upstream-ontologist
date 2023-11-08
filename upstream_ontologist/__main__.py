@@ -62,7 +62,8 @@ def main(argv=None):
     parser.add_argument(
         "--from-homepage",
         type=str,
-        help="Scan specified homepage rather than current directory")
+        help="Scan specified homepage rather than current directory",
+    )
     parser.add_argument(
         "--consult-external-directory",
         action="store_true",
@@ -71,7 +72,7 @@ def main(argv=None):
     parser.add_argument(
         "--version", action="version", version="%(prog)s " + version_string
     )
-    parser.add_argument('--verbose', action='store_true')
+    parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args(argv)
 
     if args.verbose:
@@ -85,6 +86,7 @@ def main(argv=None):
 
     if args.from_homepage:
         from .homepage import guess_from_homepage
+
         for entry in guess_from_homepage(args.from_homepage):
             if isinstance(entry, UpstreamDatum):
                 print(
@@ -113,7 +115,7 @@ def main(argv=None):
         ruamel.yaml.scalarstring.walk_tree(metadata)
         yaml.register_class(Person)
         # Prefer .buffer so we can write e.g. surrogates
-        yaml.dump(metadata, getattr(sys.stdout, 'buffer', sys.stdout))
+        yaml.dump(metadata, getattr(sys.stdout, "buffer", sys.stdout))
         return 0
 
 
