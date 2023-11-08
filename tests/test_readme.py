@@ -23,8 +23,8 @@ from unittest import TestCase, TestSuite
 
 from upstream_ontologist.readme import (
     description_from_readme_md,
-    description_from_readme_rst,
     description_from_readme_plain,
+    description_from_readme_rst,
 )
 
 

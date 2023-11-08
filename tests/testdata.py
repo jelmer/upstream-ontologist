@@ -18,8 +18,8 @@
 import os
 import unittest
 
-from upstream_ontologist.guess import get_upstream_info
 from upstream_ontologist import yaml
+from upstream_ontologist.guess import get_upstream_info
 
 
 class TestDataTestCase(unittest.TestCase):
@@ -42,7 +42,7 @@ class TestDataTestCase(unittest.TestCase):
             self.path, trust_package=True, net_access=False, check=False
         )
         jp = os.path.join(self.path, "expected.yaml")
-        with open(jp, "r") as f:
+        with open(jp) as f:
             expected = yaml.load(f)
         self.assertEqual(expected, got)
 

@@ -15,41 +15,40 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
-from functools import partial
 import logging
 import operator
 import os
 import re
 import socket
 import urllib.error
-from typing import Optional, Iterable, List, Iterator, Any, Dict, Tuple, cast, Callable
+from functools import partial
+from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Tuple, cast
 from urllib.parse import urlparse
-from urllib.request import urlopen, Request
-
-from . import _upstream_ontologist
-
-from .vcs import (
-    browse_url_from_repo_url,
-    sanitize_url as sanitize_vcs_url,
-    is_gitlab_site,
-    guess_repo_from_url,
-    check_repository_url_canonical,
-)
+from urllib.request import Request, urlopen
 
 from . import (
     DEFAULT_URLLIB_TIMEOUT,
     USER_AGENT,
+    InvalidUrl,
+    Person,
     UpstreamDatum,
     UpstreamMetadata,
-    min_certainty,
-    certainty_to_confidence,
-    certainty_sufficient,
-    _load_json_url,
-    Person,
-    InvalidUrl,
     UrlUnverifiable,
+    _load_json_url,
+    _upstream_ontologist,
+    certainty_sufficient,
+    certainty_to_confidence,
+    min_certainty,
 )
-
+from .vcs import (
+    browse_url_from_repo_url,
+    check_repository_url_canonical,
+    guess_repo_from_url,
+    is_gitlab_site,
+)
+from .vcs import (
+    sanitize_url as sanitize_vcs_url,
+)
 
 # Pecl is quite slow, so up the timeout a bit.
 PECL_URLLIB_TIMEOUT = 15
@@ -256,8 +255,8 @@ def guess_from_debian_copyright(path, trust_package):  # noqa: C901
     try:
         from debian.copyright import (
             Copyright,
-            NotMachineReadableError,
             MachineReadableFormatError,
+            NotMachineReadableError,
         )
     except ModuleNotFoundError as e:
         warn_missing_dependency(path, e.name)
@@ -1433,11 +1432,11 @@ def _extrapolate_fields(
                 logger.debug(
                     "Extrapolating (%r ⇒ %r) from ('%s: %s', %s)",
                     [
-                        "{}: {}".format(us.field, us.value)
+                        f"{us.field}: {us.value}"
                         for us in old_to_values.values()
                         if us
                     ],
-                    ["{}: {}".format(us.field, us.value) for us in changes if us],
+                    [f"{us.field}: {us.value}" for us in changes if us],
                     from_value.field,
                     from_value.value,
                     from_value.certainty,

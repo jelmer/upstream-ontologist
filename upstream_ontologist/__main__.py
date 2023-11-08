@@ -22,18 +22,19 @@ import os
 import sys
 
 from . import (
-    version_string,
-    UpstreamDatum,
     Person,
+    UpstreamDatum,
+    version_string,
 )
 from .guess import (
-    guess_upstream_metadata,
     guess_upstream_info,
+    guess_upstream_metadata,
 )
 
 
 def main(argv=None):
     import argparse
+
     import ruamel.yaml
 
     parser = argparse.ArgumentParser(sys.argv[0])
@@ -90,15 +91,13 @@ def main(argv=None):
         for entry in guess_from_homepage(args.from_homepage):
             if isinstance(entry, UpstreamDatum):
                 print(
-                    "%s: %r - certainty %s (from %s)"
-                    % (entry.field, entry.value, entry.certainty, entry.origin)
+                    f"{entry.field}: {entry.value!r} - certainty {entry.certainty} (from {entry.origin})"
                 )
     elif args.scan:
         for entry in guess_upstream_info(args.path, args.trust):
             if isinstance(entry, UpstreamDatum):
                 print(
-                    "%s: %r - certainty %s (from %s)"
-                    % (entry.field, entry.value, entry.certainty, entry.origin)
+                    f"{entry.field}: {entry.value!r} - certainty {entry.certainty} (from {entry.origin})"
                 )
             else:
                 raise TypeError(entry)

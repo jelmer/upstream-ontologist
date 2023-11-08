@@ -31,25 +31,27 @@ __all__ = [
 ]
 
 import logging
-from typing import Optional, Union, List, Tuple, Callable
-
-from urllib.parse import urlparse, urlunparse, ParseResult
+from typing import Callable, List, Optional, Tuple, Union
+from urllib.parse import ParseResult, urlparse, urlunparse
 
 from ._upstream_ontologist import (  # noqa: F401
-    drop_vcs_in_scheme,
+    browse_url_from_repo_url,
     canonical_git_repo_url,
-    unsplit_vcs_url,
-    plausible_vcs_browse_url as plausible_browse_url,
-    plausible_vcs_url as plausible_url,
-    probe_upstream_branch_url,
     check_repository_url_canonical,
+    drop_vcs_in_scheme,
+    find_public_repo_url,
     guess_repo_from_url,
     is_gitlab_site,
     probe_gitlab_host,
-    browse_url_from_repo_url,
-    find_public_repo_url,
+    probe_upstream_branch_url,
+    unsplit_vcs_url,
 )
-
+from ._upstream_ontologist import (
+    plausible_vcs_browse_url as plausible_browse_url,
+)
+from ._upstream_ontologist import (
+    plausible_vcs_url as plausible_url,
+)
 
 KNOWN_GITLAB_SITES = [
     "salsa.debian.org",

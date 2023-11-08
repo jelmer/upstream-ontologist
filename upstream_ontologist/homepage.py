@@ -15,14 +15,13 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
-from typing import List
-import urllib.error
-from urllib.request import Request, urlopen
-from urllib.parse import urljoin
-
 import logging
+import urllib.error
+from typing import List
+from urllib.parse import urljoin
+from urllib.request import Request, urlopen
 
-from . import UpstreamDatum, USER_AGENT
+from . import USER_AGENT, UpstreamDatum
 
 logger = logging.getLogger(__name__)
 

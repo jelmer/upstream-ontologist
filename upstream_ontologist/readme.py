@@ -20,11 +20,10 @@
 import logging
 import platform
 import re
-from typing import Optional, Tuple, Iterable, List
+from typing import Iterable, List, Optional, Tuple
 from urllib.parse import urlparse
 
 from . import UpstreamDatum, _upstream_ontologist
-
 
 logger = logging.getLogger(__name__)
 

@@ -24,23 +24,22 @@ from unittest import (
     TestCase,
 )
 
-
 from upstream_ontologist import (
-    UpstreamDatum,
     Person,
-    min_certainty,
+    UpstreamDatum,
+    certainty_sufficient,
     certainty_to_confidence,
     confidence_to_certainty,
-    certainty_sufficient,
+    min_certainty,
 )
 from upstream_ontologist.guess import (
-    guess_repo_from_url,
-    guess_from_package_json,
-    guess_from_debian_watch,
-    guess_from_r_description,
     bug_database_url_from_bug_submit_url,
-    url_from_git_clone_command,
+    guess_from_debian_watch,
+    guess_from_package_json,
+    guess_from_r_description,
+    guess_repo_from_url,
     url_from_fossil_clone_command,
+    url_from_git_clone_command,
 )
 
 

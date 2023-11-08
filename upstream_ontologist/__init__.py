@@ -53,15 +53,13 @@ Supported, but currently not set.
 - Webservice
 """
 
-from typing import Optional, Sequence, TypeVar, Generic, List
 from dataclasses import dataclass
 from email.utils import parseaddr
+from typing import Generic, List, Optional, Sequence, TypedDict, TypeVar
+
 import ruamel.yaml
 
-from typing import TypedDict
-
 from . import _upstream_ontologist
-
 
 SUPPORTED_CERTAINTIES = ["certain", "confident", "likely", "possible", None]
 
@@ -168,7 +166,7 @@ class UpstreamDatum(Generic[T]):
         )
 
     def __str__(self):
-        return "{}: {}".format(self.field, self.value)
+        return f"{self.field}: {self.value}"
 
     def __repr__(self):
         return "{}({!r}, {!r}, {!r}, {!r})".format(

@@ -19,14 +19,14 @@
 from unittest import TestCase
 
 from upstream_ontologist.vcs import (
-    plausible_url,
-    fixup_rcp_style_git_repo_url,
-    is_gitlab_site,
+    browse_url_from_repo_url,
     canonical_git_repo_url,
     find_public_repo_url,
-    guess_repo_from_url,
     fixup_broken_git_details,
-    browse_url_from_repo_url,
+    fixup_rcp_style_git_repo_url,
+    guess_repo_from_url,
+    is_gitlab_site,
+    plausible_url,
 )
 
 

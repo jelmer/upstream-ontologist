@@ -19,7 +19,7 @@
 
 from unittest import TestCase
 
-from upstream_ontologist import UpstreamDatum, Person
+from upstream_ontologist import Person, UpstreamDatum
 from upstream_ontologist.guess import metadata_from_itp_bug_body
 
 
