@@ -31,25 +31,27 @@ __all__ = [
 ]
 
 import logging
-from typing import Optional, Union, List, Tuple, Callable
-
-from urllib.parse import urlparse, urlunparse, ParseResult
+from typing import Callable, List, Optional, Tuple, Union
+from urllib.parse import ParseResult, urlparse, urlunparse
 
 from ._upstream_ontologist import (  # noqa: F401
-    drop_vcs_in_scheme,
+    browse_url_from_repo_url,
     canonical_git_repo_url,
-    unsplit_vcs_url,
-    plausible_vcs_browse_url as plausible_browse_url,
-    plausible_vcs_url as plausible_url,
-    probe_upstream_branch_url,
     check_repository_url_canonical,
+    drop_vcs_in_scheme,
+    find_public_repo_url,
     guess_repo_from_url,
     is_gitlab_site,
     probe_gitlab_host,
-    browse_url_from_repo_url,
-    find_public_repo_url,
+    probe_upstream_branch_url,
+    unsplit_vcs_url,
 )
-
+from ._upstream_ontologist import (
+    plausible_vcs_browse_url as plausible_browse_url,
+)
+from ._upstream_ontologist import (
+    plausible_vcs_url as plausible_url,
+)
 
 KNOWN_GITLAB_SITES = [
     "salsa.debian.org",
@@ -90,15 +92,16 @@ def find_secure_repo_url(
         return url
 
     # Sites we know to be available over https
-    if (parsed_repo_url.hostname
-        and (
-            is_gitlab_site(parsed_repo_url.hostname, net_access)
-            or parsed_repo_url.hostname in [
-                "github.com",
-                "git.launchpad.net",
-                "bazaar.launchpad.net",
-                "code.launchpad.net",
-            ])):
+    if parsed_repo_url.hostname and (
+        is_gitlab_site(parsed_repo_url.hostname, net_access)
+        or parsed_repo_url.hostname
+        in [
+            "github.com",
+            "git.launchpad.net",
+            "bazaar.launchpad.net",
+            "code.launchpad.net",
+        ]
+    ):
         parsed_repo_url = parsed_repo_url._replace(scheme="https")
 
     if parsed_repo_url.scheme == "lp":
@@ -156,7 +159,9 @@ def fix_path_in_port(
     if not port or port.isdigit():
         return None, None, None
     return (
-        parsed._replace(path="{}/{}".format(port, parsed.path.lstrip("/")), netloc=host),
+        parsed._replace(
+            path="{}/{}".format(port, parsed.path.lstrip("/")), netloc=host
+        ),
         branch,
         subpath,
     )
@@ -170,8 +175,8 @@ def fix_gitlab_scheme(parsed, branch, subpath: Optional[str]):
 
 def fix_github_scheme(parsed, branch, subpath: Optional[str]):
     # GitHub no longer supports the git:// scheme
-    if parsed.hostname == 'github.com' and parsed.scheme == 'git':
-        return parsed._replace(scheme='https'), branch, subpath
+    if parsed.hostname == "github.com" and parsed.scheme == "git":
+        return parsed._replace(scheme="https"), branch, subpath
     return None, None, None
 
 
@@ -301,6 +306,7 @@ def convert_cvs_list_to_str(urls):
         return urls
     if urls[0].startswith(":extssh:") or urls[0].startswith(":pserver:"):
         from breezy.location import cvs_to_url
+
         return cvs_to_url(urls[0]) + "#" + urls[1]
     return urls
 

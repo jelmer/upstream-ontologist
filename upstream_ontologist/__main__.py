@@ -22,18 +22,19 @@ import os
 import sys
 
 from . import (
-    version_string,
-    UpstreamDatum,
     Person,
+    UpstreamDatum,
+    version_string,
 )
 from .guess import (
-    guess_upstream_metadata,
     guess_upstream_info,
+    guess_upstream_metadata,
 )
 
 
 def main(argv=None):
     import argparse
+
     import ruamel.yaml
 
     parser = argparse.ArgumentParser(sys.argv[0])
@@ -62,7 +63,8 @@ def main(argv=None):
     parser.add_argument(
         "--from-homepage",
         type=str,
-        help="Scan specified homepage rather than current directory")
+        help="Scan specified homepage rather than current directory",
+    )
     parser.add_argument(
         "--consult-external-directory",
         action="store_true",
@@ -71,7 +73,7 @@ def main(argv=None):
     parser.add_argument(
         "--version", action="version", version="%(prog)s " + version_string
     )
-    parser.add_argument('--verbose', action='store_true')
+    parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args(argv)
 
     if args.verbose:
@@ -85,18 +87,17 @@ def main(argv=None):
 
     if args.from_homepage:
         from .homepage import guess_from_homepage
+
         for entry in guess_from_homepage(args.from_homepage):
             if isinstance(entry, UpstreamDatum):
                 print(
-                    "%s: %r - certainty %s (from %s)"
-                    % (entry.field, entry.value, entry.certainty, entry.origin)
+                    f"{entry.field}: {entry.value!r} - certainty {entry.certainty} (from {entry.origin})"
                 )
     elif args.scan:
         for entry in guess_upstream_info(args.path, args.trust):
             if isinstance(entry, UpstreamDatum):
                 print(
-                    "%s: %r - certainty %s (from %s)"
-                    % (entry.field, entry.value, entry.certainty, entry.origin)
+                    f"{entry.field}: {entry.value!r} - certainty {entry.certainty} (from {entry.origin})"
                 )
             else:
                 raise TypeError(entry)
@@ -113,7 +114,7 @@ def main(argv=None):
         ruamel.yaml.scalarstring.walk_tree(metadata)
         yaml.register_class(Person)
         # Prefer .buffer so we can write e.g. surrogates
-        yaml.dump(metadata, getattr(sys.stdout, 'buffer', sys.stdout))
+        yaml.dump(metadata, getattr(sys.stdout, "buffer", sys.stdout))
         return 0
 
 

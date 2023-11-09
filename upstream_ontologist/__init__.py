@@ -53,15 +53,13 @@ Supported, but currently not set.
 - Webservice
 """
 
-from typing import Optional, Sequence, TypeVar, Generic, List
 from dataclasses import dataclass
 from email.utils import parseaddr
+from typing import Generic, List, Optional, Sequence, TypedDict, TypeVar
+
 import ruamel.yaml
 
-from typing import TypedDict
-
 from . import _upstream_ontologist
-
 
 SUPPORTED_CERTAINTIES = ["certain", "confident", "likely", "possible", None]
 
@@ -72,13 +70,13 @@ USER_AGENT = "upstream-ontologist/" + version_string
 DEFAULT_URLLIB_TIMEOUT = 3
 
 
-yaml = ruamel.yaml.YAML(typ='safe')
+yaml = ruamel.yaml.YAML(typ="safe")
 
 
 @dataclass
 @yaml.register_class
 class Person:
-    yaml_tag = '!Person'
+    yaml_tag = "!Person"
 
     name: str
     email: Optional[str] = None
@@ -87,8 +85,8 @@ class Person:
     def __init__(self, name, email=None, url=None):
         self.name = name
         self.email = email
-        if url and url.startswith('mailto:'):
-            self.email = url[len('mailto:'):]
+        if url and url.startswith("mailto:"):
+            self.email = url[len("mailto:") :]
             self.url = None
         else:
             self.url = url
@@ -98,29 +96,26 @@ class Person:
         d = {}
         for k, v in node.value:
             d[k.value] = v.value
-        return cls(
-            name=d.get('name'),
-            email=d.get('email'),
-            url=d.get('url'))
+        return cls(name=d.get("name"), email=d.get("email"), url=d.get("url"))
 
     @classmethod
     def from_string(cls, text):
-        text = text.replace(' at ', '@')
-        text = text.replace(' -at- ', '@')
-        text = text.replace(' -dot- ', '.')
-        text = text.replace('[AT]', '@')
-        if '(' in text and text.endswith(')'):
-            (p1, p2) = text[:-1].split('(', 1)
-            if p2.startswith('https://') or p2.startswith('http://'):
+        text = text.replace(" at ", "@")
+        text = text.replace(" -at- ", "@")
+        text = text.replace(" -dot- ", ".")
+        text = text.replace("[AT]", "@")
+        if "(" in text and text.endswith(")"):
+            (p1, p2) = text[:-1].split("(", 1)
+            if p2.startswith("https://") or p2.startswith("http://"):
                 url = p2
-                if '<' in p1:
+                if "<" in p1:
                     (name, email) = parseaddr(p1)
                     return cls(name=name, email=email, url=url)
                 return cls(name=p1, url=url)
-            elif '@' in p2:
+            elif "@" in p2:
                 return cls(name=p1, email=p2)
             return cls(text)
-        elif '<' in text:
+        elif "<" in text:
             (name, email) = parseaddr(text)
             return cls(name=name, email=email)
         else:
@@ -128,11 +123,11 @@ class Person:
 
     def __str__(self):
         if self.email:
-            return f'{self.name} <{self.email}>'
+            return f"{self.name} <{self.email}>"
         return self.name
 
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class UpstreamDatum(Generic[T]):
@@ -145,8 +140,13 @@ class UpstreamDatum(Generic[T]):
     certainty: Optional[str]
     origin: Optional[str]
 
-    def __init__(self, field: str, value: T, certainty: Optional[str] = None,
-                 origin: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        field: str,
+        value: T,
+        certainty: Optional[str] = None,
+        origin: Optional[str] = None,
+    ) -> None:
         self.field = field
         if value is None:
             raise ValueError(field)
@@ -166,7 +166,7 @@ class UpstreamDatum(Generic[T]):
         )
 
     def __str__(self):
-        return "{}: {}".format(self.field, self.value)
+        return f"{self.field}: {self.value}"
 
     def __repr__(self):
         return "{}({!r}, {!r}, {!r}, {!r})".format(
@@ -178,17 +178,21 @@ class UpstreamDatum(Generic[T]):
         )
 
 
-UpstreamMetadata = TypedDict('UpstreamMetadata', {
-    'Name': UpstreamDatum[str],
-    'Contact': UpstreamDatum[str],
-    'Repository': UpstreamDatum[str],
-    'Repository-Browse': UpstreamDatum[str],
-    'Summary': UpstreamDatum[str],
-    'Bug-Database': UpstreamDatum[str],
-    'Bug-Submit': UpstreamDatum[str],
-    'Homepage': UpstreamDatum[str],
-    'Screenshots': UpstreamDatum[List[str]],
-}, total=False)
+UpstreamMetadata = TypedDict(
+    "UpstreamMetadata",
+    {
+        "Name": UpstreamDatum[str],
+        "Contact": UpstreamDatum[str],
+        "Repository": UpstreamDatum[str],
+        "Repository-Browse": UpstreamDatum[str],
+        "Summary": UpstreamDatum[str],
+        "Bug-Database": UpstreamDatum[str],
+        "Bug-Submit": UpstreamDatum[str],
+        "Homepage": UpstreamDatum[str],
+        "Screenshots": UpstreamDatum[List[str]],
+    },
+    total=False,
+)
 
 
 class UpstreamPackage:

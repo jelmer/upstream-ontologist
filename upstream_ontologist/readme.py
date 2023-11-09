@@ -20,11 +20,10 @@
 import logging
 import platform
 import re
-from typing import Optional, Tuple, Iterable, List
+from typing import Iterable, List, Optional, Tuple
 from urllib.parse import urlparse
 
 from . import UpstreamDatum, _upstream_ontologist
-
 
 logger = logging.getLogger(__name__)
 
@@ -39,55 +38,69 @@ def _skip_paragraph_block(para):  # noqa: C901
     for c in para.children:
         if isinstance(c, str) and not c.strip():
             continue
-        if c.name == 'a':
+        if c.name == "a":
             if len(list(c.children)) != 1:
                 name = None
             elif isinstance(list(c.children)[0], str):
                 name = list(c.children)[0]
-            elif list(c.children)[0].name == 'img':
-                name = list(c.children)[0].get('alt')
+            elif list(c.children)[0].name == "img":
+                name = list(c.children)[0].get("alt")
             else:
                 name = None
-            if name in ('CRAN', 'CRAN_Status_Badge', 'CRAN_Logs_Badge'):
-                extra_metadata.append(UpstreamDatum('Archive', 'CRAN', 'confident'))
-            elif name == 'Gitter':
-                parsed_url = urlparse(c.get('href'))
-                extra_metadata.append(UpstreamDatum(
-                    'Repository',
-                    'https://github.com/%s' % '/'.join(parsed_url.path.strip('/').split('/')[:2]),
-                    'confident'))
-            elif name and name.lower() == 'build status':
-                parsed_url = urlparse(c.get('href'))
-                if parsed_url.hostname == 'travis-ci.org':
-                    extra_metadata.append(UpstreamDatum(
-                        'Repository',
-                        'https://github.com/%s' % '/'.join(parsed_url.path.strip('/').split('/')[:2]),
-                        'confident'))
-            elif name and name.lower() == 'documentation':
-                extra_metadata.append(UpstreamDatum(
-                    'Documentation', c.get('href'), 'confident'))
-            elif name and name.lower() == 'api docs':
-                extra_metadata.append(UpstreamDatum(
-                    'API-Documentation', c.get('href'), 'confident'))
-            elif name and name.lower() == 'downloads':
-                extra_metadata.append(UpstreamDatum(
-                    'Download', c.get('href'), 'confident'))
-            elif name and name.lower() == 'crates.io':
-                href = c.get('href')
-                if href.startswith('https://crates.io/crates/'):
-                    extra_metadata.append(UpstreamDatum(
-                        'Cargo-Crate', href.rsplit('/')[-1], 'confident'))
+            if name in ("CRAN", "CRAN_Status_Badge", "CRAN_Logs_Badge"):
+                extra_metadata.append(UpstreamDatum("Archive", "CRAN", "confident"))
+            elif name == "Gitter":
+                parsed_url = urlparse(c.get("href"))
+                extra_metadata.append(
+                    UpstreamDatum(
+                        "Repository",
+                        "https://github.com/%s"
+                        % "/".join(parsed_url.path.strip("/").split("/")[:2]),
+                        "confident",
+                    )
+                )
+            elif name and name.lower() == "build status":
+                parsed_url = urlparse(c.get("href"))
+                if parsed_url.hostname == "travis-ci.org":
+                    extra_metadata.append(
+                        UpstreamDatum(
+                            "Repository",
+                            "https://github.com/%s"
+                            % "/".join(parsed_url.path.strip("/").split("/")[:2]),
+                            "confident",
+                        )
+                    )
+            elif name and name.lower() == "documentation":
+                extra_metadata.append(
+                    UpstreamDatum("Documentation", c.get("href"), "confident")
+                )
+            elif name and name.lower() == "api docs":
+                extra_metadata.append(
+                    UpstreamDatum("API-Documentation", c.get("href"), "confident")
+                )
+            elif name and name.lower() == "downloads":
+                extra_metadata.append(
+                    UpstreamDatum("Download", c.get("href"), "confident")
+                )
+            elif name and name.lower() == "crates.io":
+                href = c.get("href")
+                if href.startswith("https://crates.io/crates/"):
+                    extra_metadata.append(
+                        UpstreamDatum("Cargo-Crate", href.rsplit("/")[-1], "confident")
+                    )
             elif name:
-                m = re.match('(.*) License', name)
+                m = re.match("(.*) License", name)
                 if m:
-                    extra_metadata.append(UpstreamDatum('License', m.group(1), 'likely'))
+                    extra_metadata.append(
+                        UpstreamDatum("License", m.group(1), "likely")
+                    )
                 else:
-                    logger.debug('Unhandled field %r in README', name)
+                    logger.debug("Unhandled field %r in README", name)
             continue
         break
     else:
         return (True, extra_metadata)
-    if para.get_text() == '':
+    if para.get_text() == "":
         return (True, extra_metadata)
     return (False, [])
 
@@ -97,21 +110,21 @@ def render(el):
 
 
 def _parse_first_header_text(text):
-    m = re.fullmatch('([A-Za-z]+) ([0-9.]+)', text)
+    m = re.fullmatch("([A-Za-z]+) ([0-9.]+)", text)
     if m:
         return m.group(1), None, m.group(2)
-    m = re.fullmatch('([A-Za-z]+): (.+)', text)
+    m = re.fullmatch("([A-Za-z]+): (.+)", text)
     if m:
         return m.group(1), m.group(2), None
-    m = re.fullmatch('([A-Za-z]+) - (.+)', text)
+    m = re.fullmatch("([A-Za-z]+) - (.+)", text)
     if m:
         return m.group(1), m.group(2), None
-    m = re.fullmatch('([A-Za-z]+) -- (.+)', text)
+    m = re.fullmatch("([A-Za-z]+) -- (.+)", text)
     if m:
         return m.group(1), m.group(2), None
-    m = re.fullmatch('([A-Za-z]+) version ([^ ]+)', text)
+    m = re.fullmatch("([A-Za-z]+) version ([^ ]+)", text)
     if m:
-        name, version = text.split(' version ', 1)
+        name, version = text.split(" version ", 1)
         summary = None
         return name, summary, version
     return None, None, None
@@ -122,36 +135,36 @@ def _parse_first_header(el):
     if not name and el.get_text():
         name = el.get_text()
     if name:
-        if 'installation' in name.lower():
-            certainty = 'possible'
+        if "installation" in name.lower():
+            certainty = "possible"
         else:
-            certainty = 'likely'
-        if name.startswith('About '):
-            name = name[len('About '):]
-        yield UpstreamDatum('Name', name.strip(), certainty)
+            certainty = "likely"
+        if name.startswith("About "):
+            name = name[len("About ") :]
+        yield UpstreamDatum("Name", name.strip(), certainty)
     if summary:
-        yield UpstreamDatum('Summary', summary, 'likely')
+        yield UpstreamDatum("Summary", summary, "likely")
     if version:
-        yield UpstreamDatum('Version', version, 'likely')
+        yield UpstreamDatum("Version", version, "likely")
 
 
 def _is_semi_header(el):
-    if el.name != 'p':
+    if el.name != "p":
         return False
-    if el.get_text().strip() == 'INSTALLATION':
+    if el.get_text().strip() == "INSTALLATION":
         return True
-    if el.get_text().count('\n') > 0:
+    if el.get_text().count("\n") > 0:
         return False
-    m = re.match(r'([a-z-A-Z0-9]+) - ([^\.]+)', el.get_text())
+    m = re.match(r"([a-z-A-Z0-9]+) - ([^\.]+)", el.get_text())
     if m:
         return True
     return False
 
 
 def _ul_is_field_list(el):
-    names = ['Issues', 'Home', 'Documentation', 'License']
-    for li in el.findAll('li'):
-        m = re.match(r'([A-Za-z]+)\s*:.*', li.get_text().strip())
+    names = ["Issues", "Home", "Documentation", "License"]
+    for li in el.findAll("li"):
+        m = re.match(r"([A-Za-z]+)\s*:.*", li.get_text().strip())
         if not m or m.group(1) not in names:
             return False
     return True
@@ -162,11 +175,11 @@ def _extract_paragraphs(children, metadata):
     for el in children:
         if isinstance(el, str):
             continue
-        if el.name == 'div':
+        if el.name == "div":
             paragraphs.extend(_extract_paragraphs(el.children, metadata))
-            if paragraphs and 'section' in (el.get('class') or []):
+            if paragraphs and "section" in (el.get("class") or []):
                 break
-        if el.name == 'p':
+        if el.name == "p":
             if _is_semi_header(el):
                 if len(paragraphs) == 0:
                     metadata.extend(_parse_first_header(el))
@@ -181,20 +194,19 @@ def _extract_paragraphs(children, metadata):
                 else:
                     continue
             if el.get_text().strip():
-                paragraphs.append(render(el) + '\n')
-        elif el.name == 'pre':
+                paragraphs.append(render(el) + "\n")
+        elif el.name == "pre":
             paragraphs.append(render(el))
-        elif el.name == 'ul' and len(paragraphs) > 0:
+        elif el.name == "ul" and len(paragraphs) > 0:
             if _ul_is_field_list(el):
                 metadata.extend(_parse_ul_field_list(el))
             else:
                 paragraphs.append(
-                    ''.join(
-                        '* %s\n' % li.get_text()
-                        for li in el.findAll('li')))
-        elif re.match('h[0-9]', el.name):
+                    "".join("* %s\n" % li.get_text() for li in el.findAll("li"))
+                )
+        elif re.match("h[0-9]", el.name):
             if len(paragraphs) == 0:
-                if el.get_text() not in ('About', 'Introduction', 'Overview'):
+                if el.get_text() not in ("About", "Introduction", "Overview"):
                     metadata.extend(_parse_first_header(el))
                 continue
             break
@@ -202,34 +214,34 @@ def _extract_paragraphs(children, metadata):
 
 
 def _parse_field(name, body):
-    if name == 'Homepage' and body.find('a'):
-        yield UpstreamDatum('Homepage', body.find('a').get('href'), 'confident')
-    if name == 'Home' and body.find('a'):
-        yield UpstreamDatum('Homepage', body.find('a').get('href'), 'confident')
-    if name == 'Issues' and body.find('a'):
-        yield UpstreamDatum('Bug-Database', body.find('a').get('href'), 'confident')
-    if name == 'Documentation' and body.find('a'):
-        yield UpstreamDatum('Documentation', body.find('a').get('href'), 'confident')
-    if name == 'License':
-        yield UpstreamDatum('License', body.get_text(), 'confident')
+    if name == "Homepage" and body.find("a"):
+        yield UpstreamDatum("Homepage", body.find("a").get("href"), "confident")
+    if name == "Home" and body.find("a"):
+        yield UpstreamDatum("Homepage", body.find("a").get("href"), "confident")
+    if name == "Issues" and body.find("a"):
+        yield UpstreamDatum("Bug-Database", body.find("a").get("href"), "confident")
+    if name == "Documentation" and body.find("a"):
+        yield UpstreamDatum("Documentation", body.find("a").get("href"), "confident")
+    if name == "License":
+        yield UpstreamDatum("License", body.get_text(), "confident")
 
 
 def _parse_ul_field_list(el):
-    for li in el.findAll('li'):
+    for li in el.findAll("li"):
         cs = list(li.children)
         if len(cs) == 2 and isinstance(cs[0], str):
-            name = cs[0].strip().rstrip(':')
+            name = cs[0].strip().rstrip(":")
             body = cs[1]
             yield from _parse_field(name, body)
 
 
 def _parse_field_list(tab):
-    for tr in tab.findAll('tr', {'class': 'field'}):
-        name_cell = tr.find('th', {'class': 'field-name'})
+    for tr in tab.findAll("tr", {"class": "field"}):
+        name_cell = tr.find("th", {"class": "field-name"})
         if not name_cell:
             continue
-        name = name_cell.get_text().rstrip(':')
-        body = tr.find('td', {'class': 'field-body'})
+        name = name_cell.get_text().rstrip(":")
+        body = tr.find("td", {"class": "field-body"})
         if not body:
             continue
         yield from _parse_field(name, body)
@@ -242,7 +254,7 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[Upstream
         return None, {}
     # First, skip past the first header.
     for el in soup.children:
-        if el.name in ('h1', 'h2', 'h3'):
+        if el.name in ("h1", "h2", "h3"):
             metadata.extend(_parse_first_header(el))
             el.decompose()
             break
@@ -251,7 +263,7 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[Upstream
         else:
             break
 
-    table = soup.find('table', {'class': 'field-list'})
+    table = soup.find("table", {"class": "field-list"})
     if table:
         metadata.extend(_parse_field_list(table))
 
@@ -259,88 +271,100 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[Upstream
     paragraphs.extend(_extract_paragraphs(soup.children, metadata))
 
     if len(paragraphs) == 0:
-        logger.debug('Empty description; no paragraphs.')
+        logger.debug("Empty description; no paragraphs.")
         return None, metadata
 
     if len(paragraphs) < 6:
-        return '\n'.join(paragraphs), metadata
+        return "\n".join(paragraphs), metadata
     logger.debug(
-        'Not returning description, number of paragraphs too high: %d',
-        len(paragraphs))
+        "Not returning description, number of paragraphs too high: %d", len(paragraphs)
+    )
     return None, metadata
 
 
-def description_from_readme_md(md_text: str) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
+def description_from_readme_md(
+    md_text: str
+) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
     """Description from README.md."""
     try:
         import markdown
     except ModuleNotFoundError:
-        logger.debug('markdown not available, not parsing README.md')
+        logger.debug("markdown not available, not parsing README.md")
         return None, {}
     html_text = markdown.markdown(md_text)
     try:
         from bs4 import BeautifulSoup, FeatureNotFound
     except ModuleNotFoundError:
-        logger.debug('BeautifulSoup not available, not parsing README.md')
+        logger.debug("BeautifulSoup not available, not parsing README.md")
         return None, {}
     # Strip surrogates
-    html_text = html_text.encode('utf-8', 'replace').decode('utf-8')
+    html_text = html_text.encode("utf-8", "replace").decode("utf-8")
     try:
-        soup = BeautifulSoup(html_text, 'lxml')
+        soup = BeautifulSoup(html_text, "lxml")
     except FeatureNotFound:
-        logger.debug('lxml not available, not parsing README.md')
+        logger.debug("lxml not available, not parsing README.md")
         return None, {}
     return _description_from_basic_soup(soup.body)
 
 
-def description_from_readme_rst(rst_text: str) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
+def description_from_readme_rst(
+    rst_text: str
+) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
     """Description from README.rst."""
     if platform.python_implementation() == "PyPy":
-        logger.debug('docutils does not appear to work on PyPy, skipping README.rst.')
+        logger.debug("docutils does not appear to work on PyPy, skipping README.rst.")
         return None, {}
     try:
         from docutils.core import publish_parts
     except ModuleNotFoundError:
-        logger.debug('docutils not available, not parsing README.rst')
+        logger.debug("docutils not available, not parsing README.rst")
         return None, {}
 
     from docutils.writers.html4css1 import Writer
-    settings = {'initial_header_level': 2, 'report_level': 0}
+
+    settings = {"initial_header_level": 2, "report_level": 0}
     html_text = publish_parts(
-        rst_text, writer=Writer(), settings_overrides=settings).get('html_body')
+        rst_text, writer=Writer(), settings_overrides=settings
+    ).get("html_body")
     try:
         from bs4 import BeautifulSoup, FeatureNotFound
     except ModuleNotFoundError:
-        logger.debug('BeautifulSoup not available, not parsing README.rst')
+        logger.debug("BeautifulSoup not available, not parsing README.rst")
         return None, {}
     try:
-        soup = BeautifulSoup(html_text, 'lxml')
+        soup = BeautifulSoup(html_text, "lxml")
     except FeatureNotFound:
-        logger.debug('lxml not available, not parsing README.rst')
+        logger.debug("lxml not available, not parsing README.rst")
         return None, {}
     if not soup.body:
         return None, {}
     return _description_from_basic_soup(list(soup.body.children)[0])
 
 
-def description_from_readme_plain(text: str) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
+def description_from_readme_plain(
+    text: str
+) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
     lines = list(text.splitlines(False))
     metadata = []
     if not lines:
         return None, {}
-    if lines[0].strip() and len(lines) > 1 and (not lines[1] or not lines[1][0].isalnum()):
+    if (
+        lines[0].strip()
+        and len(lines) > 1
+        and (not lines[1] or not lines[1][0].isalnum())
+    ):
         name, summary, version = _parse_first_header_text(lines[0])
         if name:
-            metadata.append(UpstreamDatum('Name', name, 'likely'))
+            metadata.append(UpstreamDatum("Name", name, "likely"))
         if version:
-            metadata.append(UpstreamDatum('Version', version, 'likely'))
+            metadata.append(UpstreamDatum("Version", version, "likely"))
         if summary:
-            metadata.append(UpstreamDatum('Summary', summary, 'likely'))
+            metadata.append(UpstreamDatum("Summary", summary, "likely"))
         if name or version or summary:
             lines.pop(0)
     else:
         name = version = summary = None
-    while lines and not lines[0].strip('-').strip():
+    while lines and not lines[0].strip("-").strip():
         lines.pop(0)
 
     paras: List[List[str]] = [[]]
@@ -354,14 +378,14 @@ def description_from_readme_plain(text: str) -> Tuple[Optional[str], Iterable[Up
     for para in paras:
         if not para:
             continue
-        line = '\n'.join(para)
+        line = "\n".join(para)
         (skip, extra_metadata) = _skip_paragraph(line)
         metadata.extend(extra_metadata)
         if skip:
             continue
-        output.append(line + '\n')
+        output.append(line + "\n")
     if len(output) > 30:
         return None, {}
     while output and not output[-1].strip():
         output.pop(-1)
-    return '\n'.join(output), metadata
+    return "\n".join(output), metadata
