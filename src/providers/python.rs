@@ -346,6 +346,13 @@ fn parse_python_project_urls(
                     origin: None,
                 });
             }
+            "Homepage" => {
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Homepage(url.to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: None,
+                });
+            }
             _u => {
                 debug!("Unknown Python project URL type: {}", url_type);
             }
