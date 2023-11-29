@@ -46,6 +46,8 @@ from ._upstream_ontologist import (  # noqa: F401
     probe_upstream_branch_url,
     unsplit_vcs_url,
     fixup_rcp_style_git_repo_url,
+    SECURE_SCHEMES,
+    KNOWN_GITLAB_SITES,
 )
 from ._upstream_ontologist import (
     plausible_vcs_browse_url as plausible_browse_url,
@@ -54,17 +56,8 @@ from ._upstream_ontologist import (
     plausible_vcs_url as plausible_url,
 )
 
-KNOWN_GITLAB_SITES = [
-    "salsa.debian.org",
-    "invent.kde.org",
-    "0xacab.org",
-]
-
 
 logger = logging.getLogger(__name__)
-
-
-SECURE_SCHEMES = ["https", "git+ssh", "bzr+ssh", "hg+ssh", "ssh", "svn+ssh"]
 
 
 def try_open_branch(url: str, branch_name: Optional[str] = None):

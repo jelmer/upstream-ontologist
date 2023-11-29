@@ -6,7 +6,7 @@ use pyo3::import_exception;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::path::PathBuf;
-use upstream_ontologist::{CanonicalizeError, Person, UpstreamDatum, UpstreamDatumWithMetadata};
+use upstream_ontologist::{CanonicalizeError, UpstreamDatum};
 use url::Url;
 
 import_exception!(urllib.error, HTTPError);
@@ -1014,5 +1014,11 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
         "ParseError",
         py.get_type::<upstream_ontologist::ParseError>(),
     )?;
+    m.add(
+        "KNOWN_GITLAB_SITES",
+        upstream_ontologist::vcs::KNOWN_GITLAB_SITES.to_vec())?;
+    m.add(
+        "SECURE_SCHEMES",
+        upstream_ontologist::vcs::SECURE_SCHEMES.to_vec())?;
     Ok(())
 }

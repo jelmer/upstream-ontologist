@@ -6,7 +6,22 @@ use pyo3::prelude::*;
 use std::collections::HashMap;
 use url::Url;
 
-pub const VCSES: [&str; 3] = ["git", "bzr", "hg"];
+pub const VCSES: &[&str] = &["git", "bzr", "hg"];
+
+pub const KNOWN_GITLAB_SITES: &[&str] = &[
+    "salsa.debian.org",
+    "invent.kde.org",
+    "0xacab.org",
+];
+
+pub const SECURE_SCHEMES: &[&str] = &["https", "git+ssh", "bzr+ssh", "hg+ssh", "ssh", "svn+ssh"];
+
+const KNOWN_HOSTING_SITES: &[&str] = &[
+    "code.launchpad.net",
+    "github.com",
+    "launchpad.net",
+    "git.openstack.org",
+];
 
 pub fn plausible_url(url: &str) -> bool {
     url.contains(':')
@@ -288,15 +303,6 @@ pub fn check_repository_url_canonical(
         "unable to successfully probe URL".to_string(),
     ))
 }
-
-const KNOWN_GITLAB_SITES: &[&str] = &["salsa.debian.org", "invent.kde.org", "0xacab.org"];
-
-const KNOWN_HOSTING_SITES: &[&str] = &[
-    "code.launchpad.net",
-    "github.com",
-    "launchpad.net",
-    "git.openstack.org",
-];
 
 pub fn is_gitlab_site(hostname: &str, net_access: Option<bool>) -> bool {
     if KNOWN_GITLAB_SITES.contains(&hostname) {
