@@ -48,11 +48,7 @@ from ._upstream_ontologist import (  # noqa: F401
     fixup_rcp_style_git_repo_url,
     SECURE_SCHEMES,
     KNOWN_GITLAB_SITES,
-)
-from ._upstream_ontologist import (
     plausible_vcs_browse_url as plausible_browse_url,
-)
-from ._upstream_ontologist import (
     plausible_vcs_url as plausible_url,
 )
 
