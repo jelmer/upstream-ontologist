@@ -45,6 +45,7 @@ from ._upstream_ontologist import (  # noqa: F401
     probe_gitlab_host,
     probe_upstream_branch_url,
     unsplit_vcs_url,
+    fixup_rcp_style_git_repo_url,
 )
 from ._upstream_ontologist import (
     plausible_vcs_browse_url as plausible_browse_url,
@@ -133,19 +134,6 @@ def find_secure_repo_url(
 
     # Can't find a secure URI :(
     return None
-
-
-def fixup_rcp_style_git_repo_url(url: str) -> str:
-    try:
-        from breezy.location import rcp_location_to_url
-    except ModuleNotFoundError:
-        return url
-
-    try:
-        repo_url = rcp_location_to_url(url)
-    except ValueError:
-        return url
-    return repo_url
 
 
 def fix_path_in_port(

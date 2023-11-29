@@ -905,6 +905,11 @@ fn guess_from_get_orig_source(
     )
 }
 
+#[pyfunction]
+fn fixup_rcp_style_git_repo_url(url: &str) -> PyResult<String> {
+    Ok(upstream_ontologist::vcs::fixup_rcp_style_git_repo_url(url).unwrap_or(url.to_string()))
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -988,6 +993,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_debian_changelog))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_debian_copyright))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_get_orig_source))?;
+    m.add_wrapped(wrap_pyfunction!(fixup_rcp_style_git_repo_url))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;

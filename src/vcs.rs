@@ -793,3 +793,7 @@ pub fn find_public_repo_url(repo_url: &str, net_access: Option<bool>) -> Option<
 
     revised_url
 }
+
+pub fn fixup_rcp_style_git_repo_url(url: &str) -> Option<String> {
+    breezyshim::location::rcp_location_to_url(url).ok().map(|url| url.to_string())
+}
