@@ -17,8 +17,6 @@ module = [
     "setuptools.*",
     "pcre.*",
     "lxml.*",
-    # Not available on Mac OS X
-    "debmutate.*",
 ]
 ignore_missing_imports = true
 
@@ -50,8 +48,6 @@ debian_changelog = [
     "httplib2>=0.7.8",
     "python_debian",
 ]
-debian_watch = ["debmutate[watch]>=0.66"]
-debian_rules = ["debmutate"]
 pyproject = ["tomlkit"]
 homepage = ["bs4"]
 readme = [

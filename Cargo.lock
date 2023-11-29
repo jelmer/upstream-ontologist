@@ -1969,6 +1969,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "makefile-lossless"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd5e0a2d9a68e4c19c655158e8d6cbf8bd64524254747e66f8215a2e58c0d102"
+dependencies = [
+ "log",
+ "rowan",
+]
+
+[[package]]
 name = "maplit"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3663,6 +3673,7 @@ dependencies = [
  "lazy_static",
  "log",
  "mailparse",
+ "makefile-lossless",
  "maplit",
  "opam-file-rs",
  "percent-encoding",

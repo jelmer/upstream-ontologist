@@ -317,6 +317,38 @@ pub fn parse_debcargo_source_name(
     }
 }
 
+pub fn guess_from_debian_rules(path: &Path, _trust_package: bool) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    let f = std::fs::File::open(path)?;
+    let mf = makefile_lossless::Makefile::read_relaxed(f)
+        .map_err(|e| ProviderError::ParseError(format!("Failed to parse debian/rules: {}", e)))?;
+
+    let mut ret = vec![];
+
+    if let Some(variable) = mf.variable_definitions().find(|v| v.name().as_deref() == Some("DEB_UPSTREAM_GIT")) {
+        let origin = Some(path.to_string_lossy().to_string());
+        let certainty = Some(Certainty::Likely);
+        let datum = UpstreamDatum::Repository(variable.raw_value().unwrap());
+        ret.push(UpstreamDatumWithMetadata {
+            datum,
+            certainty,
+            origin,
+        });
+    }
+
+    if let Some(deb_upstream_url) = mf.variable_definitions().find(|v| v.name().as_deref() == Some("DEB_UPSTREAM_URL")) {
+        let origin = Some(path.to_string_lossy().to_string());
+        let certainty = Some(Certainty::Likely);
+        let datum = UpstreamDatum::Download(deb_upstream_url.raw_value().unwrap());
+        ret.push(UpstreamDatumWithMetadata {
+            datum,
+            certainty,
+            origin,
+        });
+    }
+
+    Ok(ret)
+}
+
 pub fn guess_from_debian_watch(
     path: &Path,
     _trust_package: bool,

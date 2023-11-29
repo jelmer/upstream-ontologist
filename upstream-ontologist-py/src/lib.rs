@@ -803,6 +803,17 @@ fn guess_from_setup_cfg(py: Python, path: PathBuf, trust_package: bool) -> PyRes
 }
 
 #[pyfunction]
+fn guess_from_debian_rules(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
+    Ok(
+        upstream_ontologist::providers::debian::guess_from_debian_rules(
+            path.as_path(),
+            trust_package,
+        )?
+        .to_object(py),
+    )
+}
+
+#[pyfunction]
 fn guess_from_debian_watch(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
     Ok(
         upstream_ontologist::providers::debian::guess_from_debian_watch(
@@ -948,6 +959,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_package_yaml))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_pkg_info))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_debian_watch))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_debian_rules))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_debian_changelog))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_get_orig_source))?;
     m.add_class::<Forge>()?;

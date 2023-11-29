@@ -150,31 +150,11 @@ def update_from_guesses(
     return changed
 
 
-def guess_from_debian_rules(path, trust_package):
-    try:
-        from debmutate._rules import Makefile
-    except ModuleNotFoundError as e:
-        warn_missing_dependency(path, e.name)
-        return
-    mf = Makefile.from_path(path)
-    try:
-        upstream_git = mf.get_variable(b"UPSTREAM_GIT")
-    except KeyError:
-        pass
-    else:
-        yield UpstreamDatum[str]("Repository", upstream_git.decode(), "likely")
-    try:
-        upstream_url = mf.get_variable(b"DEB_UPSTREAM_URL")
-    except KeyError:
-        pass
-    else:
-        yield UpstreamDatum("Download", upstream_url.decode(), "likely")
-
-
 extract_pecl_package_name = _upstream_ontologist.extract_pecl_package_name
 _metadata_from_url = _upstream_ontologist.metadata_from_url
 
 
+guess_from_debian_rules = _upstream_ontologist.guess_from_debian_rules
 guess_from_debian_watch = _upstream_ontologist.guess_from_debian_watch
 debian_is_native = _upstream_ontologist.debian_is_native
 
@@ -1419,8 +1399,8 @@ def _extrapolate_fields(
             if all(
                 [
                     old_value is not None
-                    and certainty_to_confidence(from_certainty)
-                    > certainty_to_confidence(old_value.certainty)  # type: ignore
+                    and certainty_to_confidence(from_certainty)  # type: ignore
+                    > certainty_to_confidence(old_value.certainty)
                     for old_value in old_to_values.values()
                 ]
             ):
