@@ -1,7 +1,6 @@
 use clap::Parser;
 use maplit::hashmap;
 use pyo3::types::PyDict;
-use std::collections::HashMap;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;

@@ -159,65 +159,7 @@ guess_from_debian_watch = _upstream_ontologist.guess_from_debian_watch
 debian_is_native = _upstream_ontologist.debian_is_native
 
 
-def guess_from_debian_control(path, trust_package):
-    try:
-        from debian.deb822 import Deb822
-    except ModuleNotFoundError as e:
-        warn_missing_dependency(path, e.name)
-        return
-    with open(path) as f:
-        source = Deb822(f)
-        is_native = debian_is_native(os.path.dirname(path))
-        if "Homepage" in source:
-            yield UpstreamDatum("Homepage", source["Homepage"], "certain")
-        if "XS-Go-Import-Path" in source:
-            yield UpstreamDatum(
-                "Go-Import-Path", source["XS-Go-Import-Path"], "certain"
-            )
-            yield (
-                UpstreamDatum(
-                    "Repository", "https://" + source["XS-Go-Import-Path"], "likely"
-                )
-            )
-        if is_native:
-            if "Vcs-Git" in source:
-                yield UpstreamDatum("Repository", source["Vcs-Git"], "certain")
-            if "Vcs-Browse" in source:
-                yield UpstreamDatum(
-                    "Repository-Browse", source["Vcs-Browse"], "certain"
-                )
-        other_paras = list(Deb822.iter_paragraphs(f))
-        if len(other_paras) == 1 and is_native:
-            certainty = "certain"
-        elif len(other_paras) > 1 and is_native:
-            certainty = "possible"
-        elif len(other_paras) == 1 and not is_native:
-            certainty = "confident"
-        else:
-            certainty = "likely"
-        for para in other_paras:
-            if "Description" in para:
-                lines = para["Description"].splitlines(True)
-                summary = lines[0].rstrip("\n")
-                description_lines = [
-                    ("\n" if line == " .\n" else line[1:]) for line in lines[1:]
-                ]
-                if description_lines and description_lines[-1].startswith(
-                    "This package contains "
-                ):
-                    if " - " in summary:
-                        summary = summary.rsplit(" - ", 1)[0]
-                    del description_lines[-1]
-                if description_lines and not description_lines[-1].strip():
-                    del description_lines[-1]
-                if summary:
-                    yield UpstreamDatum("Summary", summary, certainty)
-                if description_lines:
-                    yield UpstreamDatum(
-                        "Description", "".join(description_lines), certainty
-                    )
-
-
+guess_from_debian_control = _upstream_ontologist.guess_from_debian_control
 guess_from_debian_changelog = _upstream_ontologist.guess_from_debian_changelog
 metadata_from_itp_bug_body = _upstream_ontologist.metadata_from_itp_bug_body
 extract_sf_project_name = _upstream_ontologist.extract_sf_project_name
@@ -229,79 +171,7 @@ guess_from_pod = _upstream_ontologist.guess_from_pod
 guess_from_perl_module = _upstream_ontologist.guess_from_perl_module
 guess_from_perl_dist_name = _upstream_ontologist.guess_from_perl_dist_name
 guess_from_dist_ini = _upstream_ontologist.guess_from_dist_ini
-
-
-def guess_from_debian_copyright(path, trust_package):  # noqa: C901
-    try:
-        from debian.copyright import (
-            Copyright,
-            MachineReadableFormatError,
-            NotMachineReadableError,
-        )
-    except ModuleNotFoundError as e:
-        warn_missing_dependency(path, e.name)
-        return
-    from_urls = []
-    with open(path) as f:
-        try:
-            copyright = Copyright(f, strict=False)
-        except NotMachineReadableError:
-            header = None
-        except MachineReadableFormatError as e:
-            logger.warning("Error parsing copyright file: %s", e)
-            header = None
-        except ValueError as e:
-            # This can happen with an error message of
-            # ValueError: value must not have blank lines
-            logger.warning("Error parsing copyright file: %s", e)
-            header = None
-        else:
-            header = copyright.header
-    if header:
-        if header.upstream_name:
-            certainty = "certain"
-            if " " in header.upstream_name:
-                certainty = "confident"
-            yield UpstreamDatum("Name", header.upstream_name, certainty)
-        if header.upstream_contact:
-            yield UpstreamDatum("Contact", ",".join(header.upstream_contact), "certain")
-        if header.source:
-            if " " in header.source:
-                from_urls.extend([u for u in re.split("[ ,\n]", header.source) if u])  # type: ignore
-            else:
-                from_urls.append(header.source)
-        if "X-Upstream-Bugs" in header:  # type: ignore
-            yield UpstreamDatum("Bug-Database", header["X-Upstream-Bugs"], "certain")
-        if "X-Source-Downloaded-From" in header:  # type: ignore
-            url = guess_repo_from_url(header["X-Source-Downloaded-From"])
-            if url is not None:
-                yield UpstreamDatum("Repository", url, "certain")
-        if header.source:
-            from_urls.extend(
-                [
-                    m.group(0)
-                    for m in re.finditer(r"((http|https):\/\/([^ ]+))", header.source)
-                ]
-            )  # type: ignore
-        referenced_licenses = set()
-        for para in copyright.all_paragraphs():
-            if para.license:
-                referenced_licenses.add(para.license.synopsis)  # type: ignore
-        if len(referenced_licenses) == 1 and referenced_licenses != {None}:
-            yield UpstreamDatum("License", referenced_licenses.pop(), "certain")
-    else:
-        with open(path) as f:
-            for line in f:
-                m = re.match(r".* was downloaded from ([^\s]+)", line)
-                if m:
-                    from_urls.append(m.group(1))
-
-    for from_url in from_urls:
-        yield from _metadata_from_url(from_url, origin=path)
-        repo_url = guess_repo_from_url(from_url)
-        if repo_url:
-            yield UpstreamDatum("Repository", repo_url, "likely")
-
+guess_from_debian_copyright = _upstream_ontologist.guess_from_debian_copyright
 
 url_from_cvs_co_command = _upstream_ontologist.url_from_cvs_co_command
 url_from_svn_co_command = _upstream_ontologist.url_from_svn_co_command

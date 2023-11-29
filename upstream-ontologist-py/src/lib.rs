@@ -4,8 +4,7 @@ use pyo3::exceptions::PyException;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::import_exception;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
-use std::collections::HashMap;
+use pyo3::types::PyDict;
 use std::path::PathBuf;
 use upstream_ontologist::{CanonicalizeError, Person, UpstreamDatum, UpstreamDatumWithMetadata};
 use url::Url;
@@ -497,15 +496,14 @@ fn guess_from_nuspec(py: Python, path: PathBuf, trust_package: bool) -> PyResult
 
 #[pyfunction]
 fn guess_repo_from_url(url: &str, net_access: Option<bool>) -> PyResult<Option<String>> {
-    let url = Url::parse(url);
-    if let Err(e) = url {
-        return Ok(None);
+    if let Ok(url) = Url::parse(url) {
+        Ok(upstream_ontologist::vcs::guess_repo_from_url(
+            &url,
+            net_access,
+        ))
+    } else {
+        Ok(None)
     }
-
-    Ok(upstream_ontologist::vcs::guess_repo_from_url(
-        &url.unwrap(),
-        net_access,
-    ))
 }
 
 #[pyfunction]
@@ -759,6 +757,21 @@ fn known_bad_guess(py: Python, datum: PyObject) -> PyResult<bool> {
 }
 
 #[pyfunction]
+fn guess_from_debian_copyright(
+    py: Python,
+    path: PathBuf,
+    trust_package: bool,
+) -> PyResult<PyObject> {
+    Ok(
+        upstream_ontologist::providers::debian::guess_from_debian_copyright(
+            path.as_path(),
+            trust_package,
+        )?
+        .to_object(py),
+    )
+}
+
+#[pyfunction]
 fn guess_from_debian_patch(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
     Ok(
         upstream_ontologist::providers::debian::guess_from_debian_patch(
@@ -806,6 +819,17 @@ fn guess_from_setup_cfg(py: Python, path: PathBuf, trust_package: bool) -> PyRes
 fn guess_from_debian_rules(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
     Ok(
         upstream_ontologist::providers::debian::guess_from_debian_rules(
+            path.as_path(),
+            trust_package,
+        )?
+        .to_object(py),
+    )
+}
+
+#[pyfunction]
+fn guess_from_debian_control(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
+    Ok(
+        upstream_ontologist::providers::debian::guess_from_debian_control(
             path.as_path(),
             trust_package,
         )?
@@ -959,8 +983,10 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_package_yaml))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_pkg_info))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_debian_watch))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_debian_control))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_debian_rules))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_debian_changelog))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_debian_copyright))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_get_orig_source))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;

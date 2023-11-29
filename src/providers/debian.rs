@@ -349,6 +349,228 @@ pub fn guess_from_debian_rules(path: &Path, _trust_package: bool) -> Result<Vec<
     Ok(ret)
 }
 
+pub fn guess_from_debian_control(
+    path: &Path,
+    _trust_package: bool,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    let mut ret = vec![];
+    use std::str::FromStr;
+
+    let control = debian_control::Control::from_str(&std::fs::read_to_string(path)?)
+        .map_err(|e| ProviderError::ParseError(format!("Failed to parse debian/control: {}", e)))?;
+
+    let source = control.source().unwrap();
+
+    let is_native = debian_is_native(path.parent().unwrap()).map_err(|e| {
+        ProviderError::ParseError(format!("Failed to parse debian/source/format: {}", e))
+    })?;
+
+    if let Some(homepage) = source.homepage() {
+        ret.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Homepage(homepage.to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.to_string_lossy().to_string()),
+        });
+    }
+
+    if let Some(go_import_path) = source.get("XS-Go-Import-Path") {
+        ret.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::GoImportPath(go_import_path.to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.to_string_lossy().to_string()),
+        });
+
+        ret.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Repository(format!("https://{}", go_import_path)),
+            certainty: Some(Certainty::Likely),
+            origin: Some(path.to_string_lossy().to_string()),
+        });
+    }
+
+    if is_native == Some(true){
+        if let Some(vcs_git) = source.vcs_git() {
+            ret.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Repository(vcs_git),
+                certainty: Some(Certainty::Certain),
+                origin: Some(path.to_string_lossy().to_string()),
+            });
+        }
+
+        if let Some(vcs_browser) = source.vcs_browser() {
+            ret.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::RepositoryBrowse(vcs_browser),
+                certainty: Some(Certainty::Certain),
+                origin: Some(path.to_string_lossy().to_string()),
+            });
+        }
+    }
+
+    let binaries = control.binaries().collect::<Vec<_>>();
+
+    let certainty = if binaries.len() == 1 && is_native == Some(true) {
+        // Debian native package with only one binary package
+        Certainty::Certain
+    } else if binaries.len() > 1 && is_native == Some(true) {
+        Certainty::Possible
+    } else if binaries.len() == 1 && is_native == Some(false) {
+        // Debian non-native package with only one binary package, so description is likely to be
+        // good but might be Debian-specific
+        Certainty::Confident
+    } else {
+        Certainty::Likely
+    };
+
+    for binary in binaries {
+        if let Some(description) = binary.description() {
+            let lines = description.split('\n').collect::<Vec<_>>();
+            let mut summary = lines[0].to_string();
+            let mut description_lines = &lines[1..];
+
+            if !description_lines.is_empty() && description_lines.last().unwrap().starts_with("This package contains") {
+                summary = summary.split(" - ").next().unwrap_or(summary.as_str()).to_string();
+                description_lines = description_lines.split_last().unwrap().1;
+            }
+
+            if !summary.is_empty() {
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Summary(summary),
+                    certainty: Some(certainty),
+                    origin: Some(path.to_string_lossy().to_string()),
+                });
+            }
+
+            if !description_lines.is_empty() {
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Description(description_lines.join("\n")),
+                    certainty: Some(certainty),
+                    origin: Some(path.to_string_lossy().to_string()),
+                });
+            }
+        }
+    }
+
+    Ok(ret)
+}
+
+pub fn guess_from_debian_copyright(
+    path: &Path,
+    _trust_package: bool,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    let mut ret = vec![];
+    let text = &std::fs::read_to_string(path)?;
+    let mut urls = vec![];
+    match debian_copyright::Copyright::from_str_relaxed(
+        text
+    ) {
+        Ok((c, _)) => {
+            let header = c.header().unwrap();
+            if let Some(upstream_name) = header.upstream_name() {
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Name(upstream_name.to_string()),
+                    certainty: Some(if upstream_name.contains(' ') {
+                        Certainty::Confident
+                    } else {
+                        Certainty::Certain
+                    }),
+                    origin: Some(path.to_string_lossy().to_string()),
+                });
+            }
+
+            if let Some(upstream_contact) = header.upstream_contact() {
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Contact(upstream_contact),
+                    certainty: Some(Certainty::Possible),
+                    origin: Some(path.to_string_lossy().to_string()),
+                });
+            }
+
+            if let Some(source) = header.source() {
+                if source.contains(' ') {
+                    urls.extend(source.split(|c| c == ' ' || c == '\n' || c == ',').filter(|s| !s.is_empty()).map(|s| s.to_string()));
+                } else {
+                    urls.push(source.clone());
+                }
+
+                for (m, _, _) in lazy_regex::regex_captures!(r"(http|https)://([^ ,]+)", source.as_str()) {
+                    urls.push(m.to_string());
+                }
+            }
+
+            if let Some(upstream_bugs) = header.get("X-Upstream-Bugs") {
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::BugDatabase(upstream_bugs),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(path.to_string_lossy().to_string()),
+                });
+            }
+
+            if let Some(source_downloaded_from) = header.get("X-Source-Downloaded-From") {
+                if let Ok(url) = source_downloaded_from.parse::<url::Url>() {
+                    urls.push(url.to_string());
+                }
+
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Download(source_downloaded_from),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(path.to_string_lossy().to_string()),
+                });
+            }
+
+            let referenced_licenses = c.iter_licenses().filter_map(|l| l.name()).collect::<std::collections::HashSet<_>>();
+            if referenced_licenses.len() == 1 {
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::License(referenced_licenses.into_iter().next().unwrap()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(path.to_string_lossy().to_string()),
+                });
+            }
+        }
+        Err(debian_copyright::Error::IoError(e)) => {
+            unreachable!("IO error: {}", e);
+        }
+        Err(debian_copyright::Error::ParseError(e)) => {
+            return Err(ProviderError::ParseError(e.to_string()));
+        }
+        Err(debian_copyright::Error::NotMachineReadable) => {
+            for line in text.lines() {
+                if let Some(name) = line.strip_prefix("Upstream-Name: ") {
+                    ret.push(UpstreamDatumWithMetadata {
+                        datum: UpstreamDatum::Name(name.to_string()),
+                        certainty: Some(Certainty::Possible),
+                        origin: Some(path.to_str().unwrap().to_string()),
+                    });
+                }
+
+                if let Some(url) = lazy_regex::regex_find!(r".* was downloaded from ([^\s]+)", line) {
+                    urls.push(url.to_string());
+                    ret.push(UpstreamDatumWithMetadata {
+                        datum: UpstreamDatum::Download(url.to_string()),
+                        certainty: Some(Certainty::Possible),
+                        origin: Some(path.to_string_lossy().to_string()),
+                    });
+                }
+            }
+
+        }
+    }
+
+    for url in urls.into_iter() {
+        if let Ok(url) = url.parse() {
+            if let Some(repo_url) = crate::vcs::guess_repo_from_url(&url, None) {
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Repository(repo_url),
+                    certainty: Some(Certainty::Confident),
+                    origin: Some(path.to_string_lossy().to_string()),
+                });
+            }
+        }
+
+        ret.extend(crate::metadata_from_url(url.as_str(), Some(path.to_str().unwrap())));
+    }
+
+    Ok(ret)
+}
+
 pub fn guess_from_debian_watch(
     path: &Path,
     _trust_package: bool,
@@ -410,9 +632,23 @@ pub fn debian_is_native(path: &Path) -> std::io::Result<Option<bool>> {
         Ok(mut file) => {
             let mut content = String::new();
             file.read_to_string(&mut content)?;
-            Ok(Some(content.trim() == "3.0 (native)"))
+            return Ok(Some(content.trim() == "3.0 (native)"));
         }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(e),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e),
     }
+
+    let changelog_file = path.join("changelog");
+    match File::open(changelog_file) {
+        Ok(mut file) => {
+            let cl = debian_changelog::ChangeLog::read(&mut file).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            let first_entry = cl.entries().next().unwrap();
+            let version = first_entry.version().unwrap();
+            return Ok(Some(version.debian_revision.is_none()));
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {},
+        Err(e) => { return Err(e) }
+    }
+
+    Ok(None)
 }

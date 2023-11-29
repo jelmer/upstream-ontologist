@@ -41,7 +41,13 @@ def guess_from_composer_json(
 def guess_from_pubspec_yaml(
     path: str, trust_package: bool
 ) -> Iterator[UpstreamDatum]: ...
+def guess_from_debian_copyright(
+    path: str, trust_package: bool
+) -> Iterator[UpstreamDatum]: ...
 def guess_from_debian_patch(
+    path: str, trust_package: bool
+) -> Iterator[UpstreamDatum]: ...
+def guess_from_debian_control(
     path: str, trust_package: bool
 ) -> Iterator[UpstreamDatum]: ...
 def guess_from_debian_watch(
