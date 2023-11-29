@@ -1309,7 +1309,7 @@ pub fn guess_from_nuspec(
     let root = match xmlparse_simplify_namespaces(path, NAMESPACES) {
         Some(root) => root,
         None => {
-            return Err(ProviderError::ParseError(
+            return Err(crate::ProviderError::ParseError(
                 "Unable to parse nuspec".to_string(),
             ));
         }
@@ -2096,6 +2096,13 @@ pub enum ProviderError {
     ParseError(String),
     IoError(std::io::Error),
     Other(String),
+    HttpJsonError(HTTPJSONError),
+}
+
+impl From<HTTPJSONError> for ProviderError {
+    fn from(e: HTTPJSONError) -> Self {
+        ProviderError::HttpJsonError(e)
+    }
 }
 
 impl From<std::io::Error> for ProviderError {
@@ -2118,6 +2125,7 @@ impl From<ProviderError> for PyErr {
             ProviderError::IoError(e) => e.into(),
             ProviderError::ParseError(e) => ParseError::new_err((e,)),
             ProviderError::Other(e) => PyRuntimeError::new_err((e,)),
+            ProviderError::HttpJsonError(e) => PyRuntimeError::new_err((e.to_string(),)),
         }
     }
 }

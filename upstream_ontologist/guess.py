@@ -764,22 +764,7 @@ class NoSuchPackage(Exception):
         self.package = package
 
 
-def guess_from_hackage(hackage_package):
-    http_url = "http://hackage.haskell.org/package/{}/{}.cabal".format(
-        hackage_package, hackage_package
-    )
-    headers = {"User-Agent": USER_AGENT}
-    try:
-        http_contents = urlopen(
-            Request(http_url, headers=headers), timeout=DEFAULT_URLLIB_TIMEOUT
-        ).read()
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            raise NoSuchPackage(hackage_package) from e
-        raise
-    return guess_from_cabal_lines(
-        http_contents.decode("utf-8", "surrogateescape").splitlines(True)
-    )
+guess_from_hackage = _upstream_ontologist.guess_from_hackage
 
 
 class PackageRepository:
@@ -1441,90 +1426,9 @@ def guess_from_pecl_package(package):
             yield "Homepage", tag.attrs["href"]
 
 
-def guess_from_gobo(package: str):  # noqa: C901
-    packages_url = "https://api.github.com/repos/gobolinux/Recipes/contents"
-    try:
-        contents = _load_json_url(packages_url)
-    except urllib.error.HTTPError as e:
-        if e.code == 403:
-            logger.debug("error loading %s: %r. rate limiting?", packages_url, e)
-            return
-        raise
-    packages = [entry["name"] for entry in contents]
-    for p in packages:
-        if p.lower() == package.lower():
-            package = p
-            break
-    else:
-        logger.debug("No gobo package named %s", package)
-        return
-
-    contents_url = (
-        "https://api.github.com/repos/gobolinux/Recipes/contents/%s" % package
-    )
-    try:
-        contents = _load_json_url(contents_url)
-    except urllib.error.HTTPError as e:
-        if e.code == 403:
-            logger.debug("error loading %s: %r. rate limiting?", contents_url, e)
-            return
-        raise
-    versions = [entry["name"] for entry in contents]
-    base_url = (
-        "https://raw.githubusercontent.com/gobolinux/Recipes/master/{}/{}".format(
-            package, versions[-1]
-        )
-    )
-    headers = {"User-Agent": USER_AGENT}
-    try:
-        f = urlopen(
-            Request(base_url + "/Recipe", headers=headers),
-            timeout=DEFAULT_URLLIB_TIMEOUT,
-        )
-    except urllib.error.HTTPError as e:
-        if e.code == 403:
-            logger.debug("error loading %s: %r. rate limiting?", base_url, e)
-            return
-        if e.code != 404:
-            raise
-    else:
-        for line in f:
-            m = re.match(b'url="(.*)"$', line)
-            if m:
-                yield "Download", m.group(1).decode()
-
-    url = base_url + "/Resources/Description"
-    try:
-        f = urlopen(Request(url, headers=headers), timeout=DEFAULT_URLLIB_TIMEOUT)
-    except urllib.error.HTTPError as e:
-        if e.code == 403:
-            logger.debug("error loading %s: %r. rate limiting?", url, e)
-            return
-        if e.code != 404:
-            raise
-    else:
-        for line in f:
-            m = re.match(b"\\[(.*)\\] (.*)", line)
-            if not m:
-                continue
-            key = m.group(1).decode()
-            value = m.group(2).decode()
-            if key == "Name":
-                yield "Name", value
-            elif key == "Summary":
-                yield "Summary", value
-            elif key == "License":
-                yield "License", value
-            elif key == "Description":
-                yield "Description", value
-            elif key == "Homepage":
-                yield "Homepage", value
-            else:
-                logger.warning("Unknown field %s in gobo Description", key)
-
-
 guess_from_aur = _upstream_ontologist.guess_from_aur
 guess_from_launchpad = _upstream_ontologist.guess_from_launchpad
+guess_from_gobo = _upstream_ontologist.guess_from_gobo
 
 
 def fix_upstream_metadata(upstream_metadata: UpstreamMetadata):

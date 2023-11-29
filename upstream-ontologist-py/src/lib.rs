@@ -466,6 +466,18 @@ fn guess_from_aur(py: Python, package: &str) -> PyResult<PyObject> {
 }
 
 #[pyfunction]
+fn guess_from_hackage(py: Python, package: &str) -> PyResult<PyObject> {
+    let ret = upstream_ontologist::providers::haskell::guess_from_hackage(package)?;
+
+    Ok(ret.to_object(py))
+}
+
+#[pyfunction]
+fn guess_from_gobo(package: &str) -> PyResult<Vec<(String, String)>> {
+    Ok(upstream_ontologist::providers::gobo::guess_from_gobo(package)?)
+}
+
+#[pyfunction]
 fn check_url_canonical(url: &str) -> PyResult<String> {
     Ok(upstream_ontologist::check_url_canonical(
         &Url::parse(url).map_err(|e| InvalidUrl::new_err((url.to_string(), e.to_string())))?,
@@ -994,6 +1006,8 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_debian_copyright))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_get_orig_source))?;
     m.add_wrapped(wrap_pyfunction!(fixup_rcp_style_git_repo_url))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_gobo))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_hackage))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;

@@ -109,3 +109,34 @@ pub fn guess_from_cabal(
             .map(|line| line.expect("Failed to read line")),
     )
 }
+
+pub fn guess_from_hackage(package: &str) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    let client = reqwest::blocking::Client::builder()
+        .user_agent(crate::USER_AGENT)
+        .build().unwrap();
+
+    let url: url::Url = format!("https://hackage.haskell.org/package/{}/{}.cabal", package, package).parse().unwrap();
+
+    match client.get(url).send() {
+        Ok(response) => {
+            let reader = BufReader::new(response);
+            guess_from_cabal_lines(
+                reader
+                    .lines()
+                    .map(|line| line.expect("Failed to read line")),
+            )
+        }
+        Err(e) => {
+            match e.status() {
+                Some(reqwest::StatusCode::NOT_FOUND) => {
+                    log::warn!("Package {} not found on Hackage", package);
+                    Ok(Vec::new())
+                }
+                _ => {
+                    log::warn!("Failed to fetch package {} from Hackage: {}", package, e);
+                    Err(ProviderError::Other(format!("Failed to fetch package {} from Hackage: {}", package, e)))
+                }
+            }
+        }
+    }
+}

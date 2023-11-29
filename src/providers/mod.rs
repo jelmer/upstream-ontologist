@@ -5,6 +5,7 @@ pub mod composer_json;
 pub mod debian;
 pub mod doap;
 pub mod git;
+pub mod gobo;
 pub mod go;
 pub mod haskell;
 pub mod launchpad;
