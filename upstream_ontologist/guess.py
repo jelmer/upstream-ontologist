@@ -16,7 +16,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
 import logging
-import operator
 import os
 import re
 import socket
@@ -688,45 +687,6 @@ def _possible_fields_missing(upstream_metadata, fields, field_certainty):
         return False
 
 
-def guess_from_repology(repology_project):
-    try:
-        metadata = get_repology_metadata(repology_project)
-    except (socket.timeout, TimeoutError):
-        logger.warning("timeout contacting repology, ignoring: %s", repology_project)
-        return
-
-    fields: Dict[str, Dict[str, int]] = {}
-
-    def _add_field(name, value, add):
-        fields.setdefault(name, {})
-        fields[name].setdefault(value, 0)
-        fields[name][value] += add
-
-    for entry in metadata:
-        if entry.get("status") == "outdated":
-            score = 1
-        else:
-            score = 10
-
-        if "www" in entry:
-            for www in entry["www"]:
-                _add_field("Homepage", www, score)
-
-        if "licenses" in entry:
-            for license in entry["licenses"]:
-                _add_field("License", license, score)
-
-        if "summary" in entry:
-            _add_field("Summary", entry["summary"], score)
-
-        if "downloads" in entry:
-            for download in entry["downloads"]:
-                _add_field("Download", download, score)
-
-    for field, scores in fields.items():
-        yield field, max(scores, key=operator.itemgetter(1))
-
-
 def extend_from_external_guesser(
     upstream_metadata, guesser_certainty, guesser_fields, guesser
 ):
@@ -832,6 +792,8 @@ GitHub = _upstream_ontologist.GitHub
 GitLab = _upstream_ontologist.GitLab
 SourceForge = _upstream_ontologist.SourceForge
 Launchpad = _upstream_ontologist.Launchpad
+
+guess_from_repology = _upstream_ontologist.guess_from_repology
 
 
 class Pecl(PackageRepository):

@@ -466,6 +466,13 @@ fn guess_from_aur(py: Python, package: &str) -> PyResult<PyObject> {
 }
 
 #[pyfunction]
+fn guess_from_repology(py: Python, package: &str) -> PyResult<PyObject> {
+    let ret = upstream_ontologist::providers::repology::guess_from_repology(package)?;
+
+    Ok(ret.to_object(py))
+}
+
+#[pyfunction]
 fn guess_from_hackage(py: Python, package: &str) -> PyResult<PyObject> {
     let ret = upstream_ontologist::providers::haskell::guess_from_hackage(package)?;
 
@@ -962,6 +969,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_cabal_lines))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_git_config))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_aur))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_repology))?;
     m.add_wrapped(wrap_pyfunction!(check_url_canonical))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_environment))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_nuspec))?;

@@ -21,6 +21,7 @@ pub mod perl;
 pub mod pubspec;
 pub mod python;
 pub mod r;
+pub mod repology;
 pub mod ruby;
 #[cfg(feature = "cargo")]
 pub mod rust;
