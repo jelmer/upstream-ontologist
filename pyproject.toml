@@ -12,8 +12,6 @@ ignore_missing_imports = false
 module = [
     # No type hints yet
     "ruamel.*",
-    "pysimplesoap.*",
-    "debianbts.*",
     "setuptools.*",
     "pcre.*",
     "lxml.*",
@@ -42,13 +40,10 @@ Homepage = "https://github.com/jelmer/upstream-ontologist"
 Repository = "https://github.com/jelmer/upstream-ontologist.git"
 
 [project.optional-dependencies]
-cargo = ["tomlkit"]
 debian_changelog = [
-    "python-debianbts",
     "httplib2>=0.7.8",
     "python_debian",
 ]
-pyproject = ["tomlkit"]
 homepage = ["bs4"]
 readme = [
     "docutils",
