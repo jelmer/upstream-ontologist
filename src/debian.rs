@@ -16,9 +16,7 @@ pub fn upstream_name_to_debian_source_name(mut upstream_name: &str) -> String {
     // Convert to lowercase and replace characters
     upstream_name
         .to_lowercase()
-        .replace("_", "-")
-        .replace(" ", "-")
-        .replace("/", "-")
+        .replace(['_', ' ', '/'], "-")
 }
 
 pub fn upstream_package_to_debian_source_name(package: &crate::UpstreamPackage) -> String {
@@ -34,6 +32,24 @@ pub fn upstream_package_to_debian_source_name(package: &crate::UpstreamPackage) 
     upstream_name_to_debian_source_name(package.name.as_str())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_gnu() {
+        assert_eq!("lala", upstream_name_to_debian_source_name("GNU Lala"));
+    }
+
+    #[test]
+    fn test_abbrev() {
+        assert_eq!(
+            "mun",
+            upstream_name_to_debian_source_name("Made Up Name (MUN)")
+        );
+    }
+}
+
 pub fn upstream_package_to_debian_binary_name(package: &crate::UpstreamPackage) -> String {
     if package.family == "rust" {
         return format!("rust-{}", package.name.to_lowercase());
@@ -44,7 +60,7 @@ pub fn upstream_package_to_debian_binary_name(package: &crate::UpstreamPackage) 
     }
 
     // TODO(jelmer)
-    package.name.to_lowercase().replace("_", "-")
+    package.name.to_lowercase().replace('_', "-")
 }
 
 pub fn valid_debian_package_name(name: &str) -> bool {

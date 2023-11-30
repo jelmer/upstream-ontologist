@@ -2137,5 +2137,35 @@ pub struct UpstreamPackage {
     pub name: String
 }
 
+impl FromPyObject<'_> for UpstreamPackage {
+    fn extract(obj: &PyAny) -> PyResult<Self> {
+        let family = obj.getattr("family")?.extract::<String>()?;
+        let name = obj.getattr("name")?.extract::<String>()?;
+        Ok(UpstreamPackage { family, name })
+    }
+}
+
+impl ToPyObject for UpstreamPackage {
+    fn to_object(&self, py: Python) -> PyObject {
+        let dict = pyo3::types::PyDict::new(py);
+        dict.set_item("family", self.family.clone()).unwrap();
+        dict.set_item("name", self.name.clone()).unwrap();
+        dict.into()
+    }
+}
+
 #[derive(Debug)]
 pub struct UpstreamVersion(String);
+
+impl FromPyObject<'_> for UpstreamVersion {
+    fn extract(obj: &PyAny) -> PyResult<Self> {
+        let version = obj.extract::<String>()?;
+        Ok(UpstreamVersion(version))
+    }
+}
+
+impl ToPyObject for UpstreamVersion {
+    fn to_object(&self, py: Python) -> PyObject {
+        self.0.to_object(py)
+    }
+}

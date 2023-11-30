@@ -15,29 +15,11 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
-from .. import UpstreamPackage, _upstream_ontologist
+from . import _upstream_ontologist
 
 
-def upstream_package_to_debian_source_name(package: UpstreamPackage) -> str:
-    if package.family == "rust":
-        return "rust-%s" % package.name.lower()
-    if package.family == "perl":
-        return "lib%s-perl" % package.name.lower().replace("::", "-")
-    if package.family == "node":
-        return "node-%s" % package.name.lower()
-    # TODO(jelmer):
-    return upstream_name_to_debian_source_name(package.name)
-
-
-def upstream_package_to_debian_binary_name(package: UpstreamPackage) -> str:
-    if package.family == "rust":
-        return "rust-%s" % package.name.lower()
-    if package.family == "perl":
-        return "lib%s-perl" % package.name.lower().replace("::", "-")
-    if package.family == "node":
-        return "node-%s" % package.name.lower()
-    # TODO(jelmer):
-    return package.name.lower().replace("_", "-")
+upstream_package_to_debian_source_name = _upstream_ontologist.upstream_package_to_debian_source_name
+upstream_package_to_debian_binary_name = _upstream_ontologist.upstream_package_to_debian_binary_name
 
 
 def compare_upstream_versions(family, version1, version2):
@@ -49,4 +31,3 @@ debian_to_upstream_version = _upstream_ontologist.debian_to_upstream_version
 upstream_name_to_debian_source_name = _upstream_ontologist.upstream_name_to_debian_source_name
 debian_to_upstream_version = _upstream_ontologist.debian_to_upstream_version
 upstream_name_to_debian_source_name = _upstream_ontologist.upstream_name_to_debian_source_name
-upstream_version_to_debian_upstream_version = _upstream_ontologist.upstream_version_to_debian_upstream_version

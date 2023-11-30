@@ -6,7 +6,7 @@ use pyo3::import_exception;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::path::PathBuf;
-use upstream_ontologist::{CanonicalizeError, UpstreamDatum};
+use upstream_ontologist::{CanonicalizeError, UpstreamDatum, UpstreamPackage};
 use url::Url;
 
 import_exception!(urllib.error, HTTPError);
@@ -952,6 +952,16 @@ fn upstream_name_to_debian_source_name(name: &str) -> PyResult<String> {
     Ok(upstream_ontologist::debian::upstream_name_to_debian_source_name(name))
 }
 
+#[pyfunction]
+fn upstream_package_to_debian_binary_name(package: UpstreamPackage) -> PyResult<String> {
+    Ok(upstream_ontologist::debian::upstream_package_to_debian_binary_name(&package))
+}
+
+#[pyfunction]
+fn upstream_package_to_debian_source_name(package: UpstreamPackage) -> PyResult<String> {
+    Ok(upstream_ontologist::debian::upstream_package_to_debian_source_name(&package))
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -1043,6 +1053,8 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(valid_debian_package_name))?;
     m.add_wrapped(wrap_pyfunction!(debian_to_upstream_version))?;
     m.add_wrapped(wrap_pyfunction!(upstream_name_to_debian_source_name))?;
+    m.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_source_name))?;
+    m.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_binary_name))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;
