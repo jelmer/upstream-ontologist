@@ -15,31 +15,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
-import re
-from typing import Optional
-
-from .. import UpstreamPackage
-
-
-def debian_to_upstream_version(version):
-    """Drop debian-specific modifiers from an upstream version string."""
-    return version.upstream_version.split("+dfsg")[0]
-
-
-def upstream_name_to_debian_source_name(upstream_name: str) -> str:
-    m = re.match(r"^(.{10,})\((.*)\)", upstream_name)
-    if m:
-        upstream_name = m.group(2)
-    if upstream_name.startswith("GNU "):
-        upstream_name = upstream_name[len("GNU ") :]
-    return upstream_name.lower().replace("_", "-").replace(" ", "-").replace("/", "-")
-
-
-def upstream_version_to_debian_upstream_version(
-    version: str, family: Optional[str] = None
-) -> str:
-    # TODO(jelmer)
-    return version
+from .. import UpstreamPackage, _upstream_ontologist
 
 
 def upstream_package_to_debian_source_name(package: UpstreamPackage) -> str:
@@ -68,8 +44,9 @@ def compare_upstream_versions(family, version1, version2):
     raise NotImplementedError
 
 
-package_name_re = re.compile("[a-z0-9][a-z0-9+-.]+")
-
-
-def valid_debian_package_name(name):
-    return bool(package_name_re.fullmatch(name))
+valid_debian_package_name = _upstream_ontologist.valid_debian_package_name
+debian_to_upstream_version = _upstream_ontologist.debian_to_upstream_version
+upstream_name_to_debian_source_name = _upstream_ontologist.upstream_name_to_debian_source_name
+debian_to_upstream_version = _upstream_ontologist.debian_to_upstream_version
+upstream_name_to_debian_source_name = _upstream_ontologist.upstream_name_to_debian_source_name
+upstream_version_to_debian_upstream_version = _upstream_ontologist.upstream_version_to_debian_upstream_version

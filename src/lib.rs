@@ -17,6 +17,7 @@ static USER_AGENT: &str = concat!("upstream-ontologist/", env!("CARGO_PKG_VERSIO
 // Too aggressive?
 const DEFAULT_URLLIB_TIMEOUT: u64 = 3;
 
+pub mod debian;
 pub mod providers;
 pub mod readme;
 pub mod vcs;
@@ -2129,3 +2130,12 @@ impl From<ProviderError> for PyErr {
         }
     }
 }
+
+#[derive(Debug)]
+pub struct UpstreamPackage {
+    pub family: String,
+    pub name: String
+}
+
+#[derive(Debug)]
+pub struct UpstreamVersion(String);

@@ -937,6 +937,21 @@ fn guess_from_install(py: Python, path: PathBuf, trust_package: bool) -> PyResul
     )
 }
 
+#[pyfunction]
+fn valid_debian_package_name(name: &str) -> PyResult<bool> {
+    Ok(upstream_ontologist::debian::valid_debian_package_name(name))
+}
+
+#[pyfunction]
+fn debian_to_upstream_version(version: &str) -> PyResult<String> {
+    Ok(upstream_ontologist::debian::debian_to_upstream_version(version).to_string())
+}
+
+#[pyfunction]
+fn upstream_name_to_debian_source_name(name: &str) -> PyResult<String> {
+    Ok(upstream_ontologist::debian::upstream_name_to_debian_source_name(name))
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -1025,6 +1040,9 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_gobo))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_hackage))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_install))?;
+    m.add_wrapped(wrap_pyfunction!(valid_debian_package_name))?;
+    m.add_wrapped(wrap_pyfunction!(debian_to_upstream_version))?;
+    m.add_wrapped(wrap_pyfunction!(upstream_name_to_debian_source_name))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;
