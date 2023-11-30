@@ -929,6 +929,14 @@ fn fixup_rcp_style_git_repo_url(url: &str) -> PyResult<String> {
     Ok(upstream_ontologist::vcs::fixup_rcp_style_git_repo_url(url).unwrap_or(url.to_string()))
 }
 
+#[pyfunction]
+fn guess_from_install(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
+    Ok(
+        upstream_ontologist::providers::guess_from_install(path.as_path(), trust_package)?
+            .to_object(py),
+    )
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -1016,6 +1024,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(fixup_rcp_style_git_repo_url))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_gobo))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_hackage))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_install))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;
