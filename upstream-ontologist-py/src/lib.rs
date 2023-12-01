@@ -4,10 +4,9 @@ use pyo3::exceptions::PyException;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::import_exception;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
-use std::collections::HashMap;
+use pyo3::types::PyDict;
 use std::path::PathBuf;
-use upstream_ontologist::{CanonicalizeError, Person, UpstreamDatum, UpstreamDatumWithMetadata};
+use upstream_ontologist::{CanonicalizeError, UpstreamDatum, UpstreamPackage};
 use url::Url;
 
 import_exception!(urllib.error, HTTPError);
@@ -467,6 +466,25 @@ fn guess_from_aur(py: Python, package: &str) -> PyResult<PyObject> {
 }
 
 #[pyfunction]
+fn guess_from_repology(py: Python, package: &str) -> PyResult<PyObject> {
+    let ret = upstream_ontologist::providers::repology::guess_from_repology(package)?;
+
+    Ok(ret.to_object(py))
+}
+
+#[pyfunction]
+fn guess_from_hackage(py: Python, package: &str) -> PyResult<PyObject> {
+    let ret = upstream_ontologist::providers::haskell::guess_from_hackage(package)?;
+
+    Ok(ret.to_object(py))
+}
+
+#[pyfunction]
+fn guess_from_gobo(package: &str) -> PyResult<Vec<(String, String)>> {
+    Ok(upstream_ontologist::providers::gobo::guess_from_gobo(package)?)
+}
+
+#[pyfunction]
 fn check_url_canonical(url: &str) -> PyResult<String> {
     Ok(upstream_ontologist::check_url_canonical(
         &Url::parse(url).map_err(|e| InvalidUrl::new_err((url.to_string(), e.to_string())))?,
@@ -497,15 +515,14 @@ fn guess_from_nuspec(py: Python, path: PathBuf, trust_package: bool) -> PyResult
 
 #[pyfunction]
 fn guess_repo_from_url(url: &str, net_access: Option<bool>) -> PyResult<Option<String>> {
-    let url = Url::parse(url);
-    if let Err(e) = url {
-        return Ok(None);
+    if let Ok(url) = Url::parse(url) {
+        Ok(upstream_ontologist::vcs::guess_repo_from_url(
+            &url,
+            net_access,
+        ))
+    } else {
+        Ok(None)
     }
-
-    Ok(upstream_ontologist::vcs::guess_repo_from_url(
-        &url.unwrap(),
-        net_access,
-    ))
 }
 
 #[pyfunction]
@@ -759,6 +776,21 @@ fn known_bad_guess(py: Python, datum: PyObject) -> PyResult<bool> {
 }
 
 #[pyfunction]
+fn guess_from_debian_copyright(
+    py: Python,
+    path: PathBuf,
+    trust_package: bool,
+) -> PyResult<PyObject> {
+    Ok(
+        upstream_ontologist::providers::debian::guess_from_debian_copyright(
+            path.as_path(),
+            trust_package,
+        )?
+        .to_object(py),
+    )
+}
+
+#[pyfunction]
 fn guess_from_debian_patch(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
     Ok(
         upstream_ontologist::providers::debian::guess_from_debian_patch(
@@ -795,6 +827,28 @@ fn guess_from_pyproject_toml(py: Python, path: PathBuf, trust_package: bool) -> 
 fn guess_from_setup_cfg(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
     Ok(
         upstream_ontologist::providers::python::guess_from_setup_cfg(
+            path.as_path(),
+            trust_package,
+        )?
+        .to_object(py),
+    )
+}
+
+#[pyfunction]
+fn guess_from_debian_rules(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
+    Ok(
+        upstream_ontologist::providers::debian::guess_from_debian_rules(
+            path.as_path(),
+            trust_package,
+        )?
+        .to_object(py),
+    )
+}
+
+#[pyfunction]
+fn guess_from_debian_control(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
+    Ok(
+        upstream_ontologist::providers::debian::guess_from_debian_control(
             path.as_path(),
             trust_package,
         )?
@@ -870,6 +924,51 @@ fn guess_from_get_orig_source(
     )
 }
 
+#[pyfunction]
+fn fixup_rcp_style_git_repo_url(url: &str) -> PyResult<String> {
+    Ok(upstream_ontologist::vcs::fixup_rcp_style_git_repo_url(url).unwrap_or(url.to_string()))
+}
+
+#[pyfunction]
+fn guess_from_install(py: Python, path: PathBuf, trust_package: bool) -> PyResult<PyObject> {
+    Ok(
+        upstream_ontologist::providers::guess_from_install(path.as_path(), trust_package)?
+            .to_object(py),
+    )
+}
+
+#[pyfunction]
+fn valid_debian_package_name(name: &str) -> PyResult<bool> {
+    Ok(upstream_ontologist::debian::valid_debian_package_name(name))
+}
+
+#[pyfunction]
+fn debian_to_upstream_version(version: &str) -> PyResult<String> {
+    Ok(upstream_ontologist::debian::debian_to_upstream_version(version).to_string())
+}
+
+#[pyfunction]
+fn upstream_name_to_debian_source_name(name: &str) -> PyResult<String> {
+    Ok(upstream_ontologist::debian::upstream_name_to_debian_source_name(name))
+}
+
+#[pyfunction]
+fn upstream_package_to_debian_binary_name(package: UpstreamPackage) -> PyResult<String> {
+    Ok(upstream_ontologist::debian::upstream_package_to_debian_binary_name(&package))
+}
+
+#[pyfunction]
+fn upstream_package_to_debian_source_name(package: UpstreamPackage) -> PyResult<String> {
+    Ok(upstream_ontologist::debian::upstream_package_to_debian_source_name(&package))
+}
+
+#[pyfunction]
+pub fn find_secure_repo_url(
+    url: String, branch: Option<&str>, net_access: Option<bool>
+) -> Option<String> {
+    upstream_ontologist::vcs::find_secure_repo_url(url.parse().unwrap(), branch, net_access).map(|u| u.to_string())
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -910,6 +1009,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_cabal_lines))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_git_config))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_aur))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_repology))?;
     m.add_wrapped(wrap_pyfunction!(check_url_canonical))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_environment))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_nuspec))?;
@@ -948,8 +1048,21 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_from_package_yaml))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_pkg_info))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_debian_watch))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_debian_control))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_debian_rules))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_debian_changelog))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_debian_copyright))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_get_orig_source))?;
+    m.add_wrapped(wrap_pyfunction!(fixup_rcp_style_git_repo_url))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_gobo))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_hackage))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_install))?;
+    m.add_wrapped(wrap_pyfunction!(valid_debian_package_name))?;
+    m.add_wrapped(wrap_pyfunction!(debian_to_upstream_version))?;
+    m.add_wrapped(wrap_pyfunction!(upstream_name_to_debian_source_name))?;
+    m.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_source_name))?;
+    m.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_binary_name))?;
+    m.add_wrapped(wrap_pyfunction!(find_secure_repo_url))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;
@@ -970,5 +1083,11 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
         "ParseError",
         py.get_type::<upstream_ontologist::ParseError>(),
     )?;
+    m.add(
+        "KNOWN_GITLAB_SITES",
+        upstream_ontologist::vcs::KNOWN_GITLAB_SITES.to_vec())?;
+    m.add(
+        "SECURE_SCHEMES",
+        upstream_ontologist::vcs::SECURE_SCHEMES.to_vec())?;
     Ok(())
 }

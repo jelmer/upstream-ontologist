@@ -6,7 +6,22 @@ use pyo3::prelude::*;
 use std::collections::HashMap;
 use url::Url;
 
-pub const VCSES: [&str; 3] = ["git", "bzr", "hg"];
+pub const VCSES: &[&str] = &["git", "bzr", "hg"];
+
+pub const KNOWN_GITLAB_SITES: &[&str] = &[
+    "salsa.debian.org",
+    "invent.kde.org",
+    "0xacab.org",
+];
+
+pub const SECURE_SCHEMES: &[&str] = &["https", "git+ssh", "bzr+ssh", "hg+ssh", "ssh", "svn+ssh"];
+
+const KNOWN_HOSTING_SITES: &[&str] = &[
+    "code.launchpad.net",
+    "github.com",
+    "launchpad.net",
+    "git.openstack.org",
+];
 
 pub fn plausible_url(url: &str) -> bool {
     url.contains(':')
@@ -288,15 +303,6 @@ pub fn check_repository_url_canonical(
         "unable to successfully probe URL".to_string(),
     ))
 }
-
-const KNOWN_GITLAB_SITES: &[&str] = &["salsa.debian.org", "invent.kde.org", "0xacab.org"];
-
-const KNOWN_HOSTING_SITES: &[&str] = &[
-    "code.launchpad.net",
-    "github.com",
-    "launchpad.net",
-    "git.openstack.org",
-];
 
 pub fn is_gitlab_site(hostname: &str, net_access: Option<bool>) -> bool {
     if KNOWN_GITLAB_SITES.contains(&hostname) {
@@ -792,4 +798,85 @@ pub fn find_public_repo_url(repo_url: &str, net_access: Option<bool>) -> Option<
     }
 
     revised_url
+}
+
+pub fn fixup_rcp_style_git_repo_url(url: &str) -> Option<String> {
+    breezyshim::location::rcp_location_to_url(url).ok().map(|url| url.to_string())
+}
+
+pub fn try_open_branch(url: &url::Url, branch_name: Option<&str>) -> Option<Box<dyn breezyshim::branch::Branch>> {
+    match Python::with_gil(|py| {
+        let uim = py.import("breezy.ui")?;
+        let controldirm = py.import("breezy.controldir")?;
+        let controldir_cls = controldirm.getattr("ControlDir")?;
+
+        let old_ui_factory = uim.getattr("ui_factory")?;
+        uim.setattr("ui_factory", uim.call_method0("SilentUIFactory")?)?;
+
+        let r = || -> PyResult<PyObject>{
+            let c = controldir_cls.call_method1("open", (url.to_string(),))?;
+            let b = c.call_method1("open_branch", (branch_name, ))?;
+
+            b.call_method0("last_revision")?;
+            Ok(b.to_object(py))
+        }();
+
+        uim.setattr("ui_factory", old_ui_factory)?;
+
+        match r {
+            Ok(b) => Ok(b),
+            Err(e) => Err(e)
+        }
+    }) {
+        Ok(b) => Python::with_gil(|py| Some(Box::new(breezyshim::branch::RegularBranch::new(b.to_object(py))) as Box<dyn breezyshim::branch::Branch>)),
+        Err(_) => None
+    }
+}
+
+pub fn find_secure_repo_url(
+    mut url: url::Url, branch: Option<&str>, net_access: Option<bool>
+) -> Option<url::Url> {
+    if SECURE_SCHEMES.contains(&url.scheme()) {
+        return Some(url);
+    }
+
+    // Sites we know to be available over https
+    if let Some(hostname) = url.host_str() {
+        if is_gitlab_site(hostname, net_access) || vec![ "github.com", "git.launchpad.net", "bazaar.launchpad.net", "code.launchpad.net", ].contains(&hostname) {
+            url.set_scheme("https").ok()?;
+        }
+    }
+
+    if url.scheme() == "lp" {
+        url.set_scheme("https").ok()?;
+        url.set_host(Some("code.launchpad.net")).ok()?;
+    }
+
+    if vec!["git.savannah.gnu.org", "git.sv.gnu.org"].contains(&url.host_str().unwrap()) {
+        if url.scheme() == "http" {
+            url.set_scheme("https").ok()?;
+        } else {
+            url.set_scheme("https").ok()?;
+            url.set_path(format!("/git{}", url.path()).as_str());
+        }
+    }
+
+    if net_access.unwrap_or(true) {
+        let mut secure_repo_url = url.clone();
+        secure_repo_url.set_scheme("https").ok()?;
+        let insecure_branch = try_open_branch(&url, branch);
+        let secure_branch = try_open_branch(&secure_repo_url, branch);
+        if let Some(secure_branch) = secure_branch {
+            if insecure_branch.is_none() || secure_branch.last_revision() == insecure_branch.unwrap().last_revision() {
+                url = secure_repo_url;
+            }
+        }
+    }
+
+    if SECURE_SCHEMES.contains(&url.scheme()) {
+        Some(url)
+    } else {
+        // Can't find a secure URI :(
+        None
+    }
 }

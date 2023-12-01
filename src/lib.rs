@@ -17,6 +17,7 @@ static USER_AGENT: &str = concat!("upstream-ontologist/", env!("CARGO_PKG_VERSIO
 // Too aggressive?
 const DEFAULT_URLLIB_TIMEOUT: u64 = 3;
 
+pub mod debian;
 pub mod providers;
 pub mod readme;
 pub mod vcs;
@@ -1309,7 +1310,7 @@ pub fn guess_from_nuspec(
     let root = match xmlparse_simplify_namespaces(path, NAMESPACES) {
         Some(root) => root,
         None => {
-            return Err(ProviderError::ParseError(
+            return Err(crate::ProviderError::ParseError(
                 "Unable to parse nuspec".to_string(),
             ));
         }
@@ -2096,6 +2097,13 @@ pub enum ProviderError {
     ParseError(String),
     IoError(std::io::Error),
     Other(String),
+    HttpJsonError(HTTPJSONError),
+}
+
+impl From<HTTPJSONError> for ProviderError {
+    fn from(e: HTTPJSONError) -> Self {
+        ProviderError::HttpJsonError(e)
+    }
 }
 
 impl From<std::io::Error> for ProviderError {
@@ -2118,6 +2126,46 @@ impl From<ProviderError> for PyErr {
             ProviderError::IoError(e) => e.into(),
             ProviderError::ParseError(e) => ParseError::new_err((e,)),
             ProviderError::Other(e) => PyRuntimeError::new_err((e,)),
+            ProviderError::HttpJsonError(e) => PyRuntimeError::new_err((e.to_string(),)),
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct UpstreamPackage {
+    pub family: String,
+    pub name: String
+}
+
+impl FromPyObject<'_> for UpstreamPackage {
+    fn extract(obj: &PyAny) -> PyResult<Self> {
+        let family = obj.getattr("family")?.extract::<String>()?;
+        let name = obj.getattr("name")?.extract::<String>()?;
+        Ok(UpstreamPackage { family, name })
+    }
+}
+
+impl ToPyObject for UpstreamPackage {
+    fn to_object(&self, py: Python) -> PyObject {
+        let dict = pyo3::types::PyDict::new(py);
+        dict.set_item("family", self.family.clone()).unwrap();
+        dict.set_item("name", self.name.clone()).unwrap();
+        dict.into()
+    }
+}
+
+#[derive(Debug)]
+pub struct UpstreamVersion(String);
+
+impl FromPyObject<'_> for UpstreamVersion {
+    fn extract(obj: &PyAny) -> PyResult<Self> {
+        let version = obj.extract::<String>()?;
+        Ok(UpstreamVersion(version))
+    }
+}
+
+impl ToPyObject for UpstreamVersion {
+    fn to_object(&self, py: Python) -> PyObject {
+        self.0.to_object(py)
     }
 }

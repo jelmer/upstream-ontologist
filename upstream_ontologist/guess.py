@@ -16,7 +16,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
 import logging
-import operator
 import os
 import re
 import socket
@@ -55,14 +54,6 @@ PECL_URLLIB_TIMEOUT = 15
 
 
 logger = logging.getLogger(__name__)
-
-
-def warn_missing_dependency(path, module_name):
-    logger.warning(
-        "Not scanning %s, because the python module %s is not available",
-        path,
-        module_name,
-    )
 
 
 get_sf_metadata = _upstream_ontologist.get_sf_metadata
@@ -150,94 +141,16 @@ def update_from_guesses(
     return changed
 
 
-def guess_from_debian_rules(path, trust_package):
-    try:
-        from debmutate._rules import Makefile
-    except ModuleNotFoundError as e:
-        warn_missing_dependency(path, e.name)
-        return
-    mf = Makefile.from_path(path)
-    try:
-        upstream_git = mf.get_variable(b"UPSTREAM_GIT")
-    except KeyError:
-        pass
-    else:
-        yield UpstreamDatum[str]("Repository", upstream_git.decode(), "likely")
-    try:
-        upstream_url = mf.get_variable(b"DEB_UPSTREAM_URL")
-    except KeyError:
-        pass
-    else:
-        yield UpstreamDatum("Download", upstream_url.decode(), "likely")
-
-
 extract_pecl_package_name = _upstream_ontologist.extract_pecl_package_name
 _metadata_from_url = _upstream_ontologist.metadata_from_url
 
 
+guess_from_debian_rules = _upstream_ontologist.guess_from_debian_rules
 guess_from_debian_watch = _upstream_ontologist.guess_from_debian_watch
 debian_is_native = _upstream_ontologist.debian_is_native
 
 
-def guess_from_debian_control(path, trust_package):
-    try:
-        from debian.deb822 import Deb822
-    except ModuleNotFoundError as e:
-        warn_missing_dependency(path, e.name)
-        return
-    with open(path) as f:
-        source = Deb822(f)
-        is_native = debian_is_native(os.path.dirname(path))
-        if "Homepage" in source:
-            yield UpstreamDatum("Homepage", source["Homepage"], "certain")
-        if "XS-Go-Import-Path" in source:
-            yield UpstreamDatum(
-                "Go-Import-Path", source["XS-Go-Import-Path"], "certain"
-            )
-            yield (
-                UpstreamDatum(
-                    "Repository", "https://" + source["XS-Go-Import-Path"], "likely"
-                )
-            )
-        if is_native:
-            if "Vcs-Git" in source:
-                yield UpstreamDatum("Repository", source["Vcs-Git"], "certain")
-            if "Vcs-Browse" in source:
-                yield UpstreamDatum(
-                    "Repository-Browse", source["Vcs-Browse"], "certain"
-                )
-        other_paras = list(Deb822.iter_paragraphs(f))
-        if len(other_paras) == 1 and is_native:
-            certainty = "certain"
-        elif len(other_paras) > 1 and is_native:
-            certainty = "possible"
-        elif len(other_paras) == 1 and not is_native:
-            certainty = "confident"
-        else:
-            certainty = "likely"
-        for para in other_paras:
-            if "Description" in para:
-                lines = para["Description"].splitlines(True)
-                summary = lines[0].rstrip("\n")
-                description_lines = [
-                    ("\n" if line == " .\n" else line[1:]) for line in lines[1:]
-                ]
-                if description_lines and description_lines[-1].startswith(
-                    "This package contains "
-                ):
-                    if " - " in summary:
-                        summary = summary.rsplit(" - ", 1)[0]
-                    del description_lines[-1]
-                if description_lines and not description_lines[-1].strip():
-                    del description_lines[-1]
-                if summary:
-                    yield UpstreamDatum("Summary", summary, certainty)
-                if description_lines:
-                    yield UpstreamDatum(
-                        "Description", "".join(description_lines), certainty
-                    )
-
-
+guess_from_debian_control = _upstream_ontologist.guess_from_debian_control
 guess_from_debian_changelog = _upstream_ontologist.guess_from_debian_changelog
 metadata_from_itp_bug_body = _upstream_ontologist.metadata_from_itp_bug_body
 extract_sf_project_name = _upstream_ontologist.extract_sf_project_name
@@ -249,79 +162,7 @@ guess_from_pod = _upstream_ontologist.guess_from_pod
 guess_from_perl_module = _upstream_ontologist.guess_from_perl_module
 guess_from_perl_dist_name = _upstream_ontologist.guess_from_perl_dist_name
 guess_from_dist_ini = _upstream_ontologist.guess_from_dist_ini
-
-
-def guess_from_debian_copyright(path, trust_package):  # noqa: C901
-    try:
-        from debian.copyright import (
-            Copyright,
-            MachineReadableFormatError,
-            NotMachineReadableError,
-        )
-    except ModuleNotFoundError as e:
-        warn_missing_dependency(path, e.name)
-        return
-    from_urls = []
-    with open(path) as f:
-        try:
-            copyright = Copyright(f, strict=False)
-        except NotMachineReadableError:
-            header = None
-        except MachineReadableFormatError as e:
-            logger.warning("Error parsing copyright file: %s", e)
-            header = None
-        except ValueError as e:
-            # This can happen with an error message of
-            # ValueError: value must not have blank lines
-            logger.warning("Error parsing copyright file: %s", e)
-            header = None
-        else:
-            header = copyright.header
-    if header:
-        if header.upstream_name:
-            certainty = "certain"
-            if " " in header.upstream_name:
-                certainty = "confident"
-            yield UpstreamDatum("Name", header.upstream_name, certainty)
-        if header.upstream_contact:
-            yield UpstreamDatum("Contact", ",".join(header.upstream_contact), "certain")
-        if header.source:
-            if " " in header.source:
-                from_urls.extend([u for u in re.split("[ ,\n]", header.source) if u])  # type: ignore
-            else:
-                from_urls.append(header.source)
-        if "X-Upstream-Bugs" in header:  # type: ignore
-            yield UpstreamDatum("Bug-Database", header["X-Upstream-Bugs"], "certain")
-        if "X-Source-Downloaded-From" in header:  # type: ignore
-            url = guess_repo_from_url(header["X-Source-Downloaded-From"])
-            if url is not None:
-                yield UpstreamDatum("Repository", url, "certain")
-        if header.source:
-            from_urls.extend(
-                [
-                    m.group(0)
-                    for m in re.finditer(r"((http|https):\/\/([^ ]+))", header.source)
-                ]
-            )  # type: ignore
-        referenced_licenses = set()
-        for para in copyright.all_paragraphs():
-            if para.license:
-                referenced_licenses.add(para.license.synopsis)  # type: ignore
-        if len(referenced_licenses) == 1 and referenced_licenses != {None}:
-            yield UpstreamDatum("License", referenced_licenses.pop(), "certain")
-    else:
-        with open(path) as f:
-            for line in f:
-                m = re.match(r".* was downloaded from ([^\s]+)", line)
-                if m:
-                    from_urls.append(m.group(1))
-
-    for from_url in from_urls:
-        yield from _metadata_from_url(from_url, origin=path)
-        repo_url = guess_repo_from_url(from_url)
-        if repo_url:
-            yield UpstreamDatum("Repository", repo_url, "likely")
-
+guess_from_debian_copyright = _upstream_ontologist.guess_from_debian_copyright
 
 url_from_cvs_co_command = _upstream_ontologist.url_from_cvs_co_command
 url_from_svn_co_command = _upstream_ontologist.url_from_svn_co_command
@@ -330,64 +171,7 @@ url_from_fossil_clone_command = _upstream_ontologist.url_from_fossil_clone_comma
 url_from_vcs_command = _upstream_ontologist.url_from_vcs_command
 guess_from_meson = _upstream_ontologist.guess_from_meson
 guess_from_pubspec_yaml = _upstream_ontologist.guess_from_pubspec_yaml
-
-
-def guess_from_install(path, _trust_package):  # noqa: C901
-    urls = []
-    try:
-        with open(path, "rb") as f:
-            lines = list(f.readlines())
-            for i, line in enumerate(lines):
-                line = line.strip()
-                cmdline = line.strip().lstrip(b"$").strip()
-                if cmdline.startswith(b"git clone ") or cmdline.startswith(
-                    b"fossil clone "
-                ):
-                    while cmdline.endswith(b"\\"):
-                        cmdline += lines[i + 1]
-                        cmdline = cmdline.strip()
-                        i += 1
-                    if cmdline.startswith(b"git clone "):
-                        url = url_from_git_clone_command(cmdline)
-                    elif cmdline.startswith(b"fossil clone "):
-                        url = url_from_fossil_clone_command(cmdline)
-                    if url:
-                        urls.append(url)
-                for m in re.findall(b"[\"'`](git clone.*)[\"`']", line):
-                    url = url_from_git_clone_command(m)
-                    if url:
-                        urls.append(url)
-                project_re = b'([^/]+)/([^/?.()"#>\\s]*[^-/?.()"#>\\s])'
-                for m in re.finditer(
-                    b"https://github.com/" + project_re + b"(.git)?", line
-                ):
-                    yield UpstreamDatum(
-                        "Repository",
-                        m.group(0).rstrip(b".").decode().rstrip(),
-                        "possible",
-                    )
-                m = re.fullmatch(b"https://github.com/" + project_re, line)
-                if m:
-                    yield UpstreamDatum(
-                        "Repository", line.strip().rstrip(b".").decode(), "possible"
-                    )
-                m = re.fullmatch(b"git://([^ ]+)", line)
-                if m:
-                    yield UpstreamDatum(
-                        "Repository", line.strip().rstrip(b".").decode(), "possible"
-                    )
-                for m in re.finditer(b'https://([^]/]+)/([^]\\s()"#]+)', line):
-                    if is_gitlab_site(m.group(1).decode()):
-                        url = m.group(0).rstrip(b".").decode().rstrip()
-                        try:
-                            repo_url = guess_repo_from_url(url)  # type: ignore
-                        except ValueError:
-                            logger.warning("Ignoring invalid URL %s in %s", url, path)
-                        else:
-                            if repo_url:
-                                yield UpstreamDatum("Repository", repo_url, "possible")
-    except IsADirectoryError:
-        pass
+guess_from_install = _upstream_ontologist.guess_from_install
 
 
 def guess_from_readme(path, trust_package):  # noqa: C901
@@ -838,45 +622,6 @@ def _possible_fields_missing(upstream_metadata, fields, field_certainty):
         return False
 
 
-def guess_from_repology(repology_project):
-    try:
-        metadata = get_repology_metadata(repology_project)
-    except (socket.timeout, TimeoutError):
-        logger.warning("timeout contacting repology, ignoring: %s", repology_project)
-        return
-
-    fields: Dict[str, Dict[str, int]] = {}
-
-    def _add_field(name, value, add):
-        fields.setdefault(name, {})
-        fields[name].setdefault(value, 0)
-        fields[name][value] += add
-
-    for entry in metadata:
-        if entry.get("status") == "outdated":
-            score = 1
-        else:
-            score = 10
-
-        if "www" in entry:
-            for www in entry["www"]:
-                _add_field("Homepage", www, score)
-
-        if "licenses" in entry:
-            for license in entry["licenses"]:
-                _add_field("License", license, score)
-
-        if "summary" in entry:
-            _add_field("Summary", entry["summary"], score)
-
-        if "downloads" in entry:
-            for download in entry["downloads"]:
-                _add_field("Download", download, score)
-
-    for field, scores in fields.items():
-        yield field, max(scores, key=operator.itemgetter(1))
-
-
 def extend_from_external_guesser(
     upstream_metadata, guesser_certainty, guesser_fields, guesser
 ):
@@ -914,22 +659,7 @@ class NoSuchPackage(Exception):
         self.package = package
 
 
-def guess_from_hackage(hackage_package):
-    http_url = "http://hackage.haskell.org/package/{}/{}.cabal".format(
-        hackage_package, hackage_package
-    )
-    headers = {"User-Agent": USER_AGENT}
-    try:
-        http_contents = urlopen(
-            Request(http_url, headers=headers), timeout=DEFAULT_URLLIB_TIMEOUT
-        ).read()
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            raise NoSuchPackage(hackage_package) from e
-        raise
-    return guess_from_cabal_lines(
-        http_contents.decode("utf-8", "surrogateescape").splitlines(True)
-    )
+guess_from_hackage = _upstream_ontologist.guess_from_hackage
 
 
 class PackageRepository:
@@ -997,6 +727,8 @@ GitHub = _upstream_ontologist.GitHub
 GitLab = _upstream_ontologist.GitLab
 SourceForge = _upstream_ontologist.SourceForge
 Launchpad = _upstream_ontologist.Launchpad
+
+guess_from_repology = _upstream_ontologist.guess_from_repology
 
 
 class Pecl(PackageRepository):
@@ -1419,8 +1151,8 @@ def _extrapolate_fields(
             if all(
                 [
                     old_value is not None
-                    and certainty_to_confidence(from_certainty)
-                    > certainty_to_confidence(old_value.certainty)  # type: ignore
+                    and certainty_to_confidence(from_certainty)  # type: ignore
+                    > certainty_to_confidence(old_value.certainty)
                     for old_value in old_to_values.values()
                 ]
             ):
@@ -1591,90 +1323,9 @@ def guess_from_pecl_package(package):
             yield "Homepage", tag.attrs["href"]
 
 
-def guess_from_gobo(package: str):  # noqa: C901
-    packages_url = "https://api.github.com/repos/gobolinux/Recipes/contents"
-    try:
-        contents = _load_json_url(packages_url)
-    except urllib.error.HTTPError as e:
-        if e.code == 403:
-            logger.debug("error loading %s: %r. rate limiting?", packages_url, e)
-            return
-        raise
-    packages = [entry["name"] for entry in contents]
-    for p in packages:
-        if p.lower() == package.lower():
-            package = p
-            break
-    else:
-        logger.debug("No gobo package named %s", package)
-        return
-
-    contents_url = (
-        "https://api.github.com/repos/gobolinux/Recipes/contents/%s" % package
-    )
-    try:
-        contents = _load_json_url(contents_url)
-    except urllib.error.HTTPError as e:
-        if e.code == 403:
-            logger.debug("error loading %s: %r. rate limiting?", contents_url, e)
-            return
-        raise
-    versions = [entry["name"] for entry in contents]
-    base_url = (
-        "https://raw.githubusercontent.com/gobolinux/Recipes/master/{}/{}".format(
-            package, versions[-1]
-        )
-    )
-    headers = {"User-Agent": USER_AGENT}
-    try:
-        f = urlopen(
-            Request(base_url + "/Recipe", headers=headers),
-            timeout=DEFAULT_URLLIB_TIMEOUT,
-        )
-    except urllib.error.HTTPError as e:
-        if e.code == 403:
-            logger.debug("error loading %s: %r. rate limiting?", base_url, e)
-            return
-        if e.code != 404:
-            raise
-    else:
-        for line in f:
-            m = re.match(b'url="(.*)"$', line)
-            if m:
-                yield "Download", m.group(1).decode()
-
-    url = base_url + "/Resources/Description"
-    try:
-        f = urlopen(Request(url, headers=headers), timeout=DEFAULT_URLLIB_TIMEOUT)
-    except urllib.error.HTTPError as e:
-        if e.code == 403:
-            logger.debug("error loading %s: %r. rate limiting?", url, e)
-            return
-        if e.code != 404:
-            raise
-    else:
-        for line in f:
-            m = re.match(b"\\[(.*)\\] (.*)", line)
-            if not m:
-                continue
-            key = m.group(1).decode()
-            value = m.group(2).decode()
-            if key == "Name":
-                yield "Name", value
-            elif key == "Summary":
-                yield "Summary", value
-            elif key == "License":
-                yield "License", value
-            elif key == "Description":
-                yield "Description", value
-            elif key == "Homepage":
-                yield "Homepage", value
-            else:
-                logger.warning("Unknown field %s in gobo Description", key)
-
-
 guess_from_aur = _upstream_ontologist.guess_from_aur
 guess_from_launchpad = _upstream_ontologist.guess_from_launchpad
+guess_from_gobo = _upstream_ontologist.guess_from_gobo
 
 
 def fix_upstream_metadata(upstream_metadata: UpstreamMetadata):

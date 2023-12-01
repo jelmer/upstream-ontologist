@@ -28,6 +28,8 @@ __all__ = [
     "unsplit_vcs_url",
     "browse_url_from_repo_url",
     "find_public_repo_url",
+    "SECURE_SCHEMES",
+    "find_secure_repo_url",
 ]
 
 import logging
@@ -45,107 +47,16 @@ from ._upstream_ontologist import (  # noqa: F401
     probe_gitlab_host,
     probe_upstream_branch_url,
     unsplit_vcs_url,
-)
-from ._upstream_ontologist import (
+    fixup_rcp_style_git_repo_url,
+    SECURE_SCHEMES,
+    KNOWN_GITLAB_SITES,
     plausible_vcs_browse_url as plausible_browse_url,
-)
-from ._upstream_ontologist import (
     plausible_vcs_url as plausible_url,
+    find_secure_repo_url,
 )
-
-KNOWN_GITLAB_SITES = [
-    "salsa.debian.org",
-    "invent.kde.org",
-    "0xacab.org",
-]
 
 
 logger = logging.getLogger(__name__)
-
-
-SECURE_SCHEMES = ["https", "git+ssh", "bzr+ssh", "hg+ssh", "ssh", "svn+ssh"]
-
-
-def try_open_branch(url: str, branch_name: Optional[str] = None):
-    import breezy.ui
-    from breezy.controldir import ControlDir
-
-    old_ui = breezy.ui.ui_factory
-    breezy.ui.ui_factory = breezy.ui.SilentUIFactory()
-    try:
-        c = ControlDir.open(url)
-        b = c.open_branch(name=branch_name)
-        b.last_revision()
-        return b
-    except Exception:
-        # TODO(jelmer): Catch more specific exceptions?
-        return None
-    finally:
-        breezy.ui.ui_factory = old_ui
-
-
-def find_secure_repo_url(
-    url: str, branch: Optional[str] = None, net_access: bool = True
-) -> Optional[str]:
-    parsed_repo_url = urlparse(url)
-    if parsed_repo_url.scheme in SECURE_SCHEMES:
-        return url
-
-    # Sites we know to be available over https
-    if parsed_repo_url.hostname and (
-        is_gitlab_site(parsed_repo_url.hostname, net_access)
-        or parsed_repo_url.hostname
-        in [
-            "github.com",
-            "git.launchpad.net",
-            "bazaar.launchpad.net",
-            "code.launchpad.net",
-        ]
-    ):
-        parsed_repo_url = parsed_repo_url._replace(scheme="https")
-
-    if parsed_repo_url.scheme == "lp":
-        parsed_repo_url = parsed_repo_url._replace(
-            scheme="https", netloc="code.launchpad.net"
-        )
-
-    if parsed_repo_url.hostname in ("git.savannah.gnu.org", "git.sv.gnu.org"):
-        if parsed_repo_url.scheme == "http":
-            parsed_repo_url = parsed_repo_url._replace(scheme="https")
-        else:
-            parsed_repo_url = parsed_repo_url._replace(
-                scheme="https", path="/git" + parsed_repo_url.path
-            )
-
-    if net_access:
-        secure_repo_url = parsed_repo_url._replace(scheme="https")
-        insecure_branch = try_open_branch(url, branch)
-        secure_branch = try_open_branch(urlunparse(secure_repo_url), branch)
-        if secure_branch:
-            if (
-                not insecure_branch
-                or secure_branch.last_revision() == insecure_branch.last_revision()
-            ):
-                parsed_repo_url = secure_repo_url
-
-    if parsed_repo_url.scheme in SECURE_SCHEMES:
-        return urlunparse(parsed_repo_url)
-
-    # Can't find a secure URI :(
-    return None
-
-
-def fixup_rcp_style_git_repo_url(url: str) -> str:
-    try:
-        from breezy.location import rcp_location_to_url
-    except ModuleNotFoundError:
-        return url
-
-    try:
-        repo_url = rcp_location_to_url(url)
-    except ValueError:
-        return url
-    return repo_url
 
 
 def fix_path_in_port(
