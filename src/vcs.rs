@@ -1152,7 +1152,7 @@ pub const FIXERS: &[fn(&VcsLocation) -> Option<VcsLocation>] = &[
 ];
 
 /// Attempt to fix up broken Git URLs.
-fn fixup_broken_git_details(
+pub fn fixup_broken_git_details(
     location: &VcsLocation,
 ) -> Cow<'_, VcsLocation> {
     let mut location = Cow::Borrowed(location);
@@ -1163,7 +1163,7 @@ fn fixup_broken_git_details(
 }
 
 
-fn convert_cvs_list_to_str(urls: &[&str]) -> Option<String> {
+pub fn convert_cvs_list_to_str(urls: &[&str]) -> Option<String> {
     if urls[0].starts_with(":extssh:") || urls[0].starts_with(":pserver:") {
         let url = breezyshim::location::cvs_to_url(urls[0]);
         Some(format!("{}#{}", url, urls[1]))

@@ -980,6 +980,24 @@ fn sanitize_url(url: &str) -> PyResult<String> {
     Ok(upstream_ontologist::vcs::sanitize_url(&url).to_string())
 }
 
+#[pyfunction]
+fn convert_cvs_list_to_str(urls: Vec<&str>) -> Option<String> {
+    upstream_ontologist::vcs::convert_cvs_list_to_str(urls.as_slice())
+}
+
+#[pyfunction]
+fn fixup_broken_git_details(
+    location: &str, branch: Option<&str>, subpath: Option<&str>
+) -> (String, Option<String>, Option<String>) {
+    let location = upstream_ontologist::vcs::VcsLocation {
+        url: location.parse().unwrap(),
+        branch: branch.map(|s| s.to_string()),
+        subpath: subpath.map(|s| s.to_string()),
+    };
+    let ret = upstream_ontologist::vcs::fixup_broken_git_details(&location);
+    (ret.url.to_string(), ret.branch.as_ref().map(|s| s.to_string()), ret.subpath.as_ref().map(|s| s.to_string()))
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -1075,6 +1093,8 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_binary_name))?;
     m.add_wrapped(wrap_pyfunction!(find_secure_repo_url))?;
     m.add_wrapped(wrap_pyfunction!(sanitize_url))?;
+    m.add_wrapped(wrap_pyfunction!(convert_cvs_list_to_str))?;
+    m.add_wrapped(wrap_pyfunction!(fixup_broken_git_details))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;

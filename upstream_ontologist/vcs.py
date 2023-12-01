@@ -30,12 +30,15 @@ __all__ = [
     "find_public_repo_url",
     "SECURE_SCHEMES",
     "find_secure_repo_url",
+    "convert_cvs_list_to_str",
+    "fixup_broken_git_details",
 ]
 
 from ._upstream_ontologist import (  # noqa: F401
     browse_url_from_repo_url,
     canonical_git_repo_url,
     check_repository_url_canonical,
+    convert_cvs_list_to_str,
     drop_vcs_in_scheme,
     find_public_repo_url,
     guess_repo_from_url,
@@ -50,4 +53,5 @@ from ._upstream_ontologist import (  # noqa: F401
     plausible_vcs_url as plausible_url,
     find_secure_repo_url,
     sanitize_url,
+    fixup_broken_git_details,
 )
