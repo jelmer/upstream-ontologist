@@ -962,6 +962,13 @@ fn upstream_package_to_debian_source_name(package: UpstreamPackage) -> PyResult<
     Ok(upstream_ontologist::debian::upstream_package_to_debian_source_name(&package))
 }
 
+#[pyfunction]
+pub fn find_secure_repo_url(
+    url: String, branch: Option<&str>, net_access: Option<bool>
+) -> Option<String> {
+    upstream_ontologist::vcs::find_secure_repo_url(url.parse().unwrap(), branch, net_access).map(|u| u.to_string())
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -1055,6 +1062,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(upstream_name_to_debian_source_name))?;
     m.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_source_name))?;
     m.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_binary_name))?;
+    m.add_wrapped(wrap_pyfunction!(find_secure_repo_url))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;

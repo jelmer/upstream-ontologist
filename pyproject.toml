@@ -61,7 +61,6 @@ guess-upstream-metadata = "upstream_ontologist.__main__:main"
 [tool.setuptools]
 packages = [
     "upstream_ontologist",
-    "upstream_ontologist.debian",
 ]
 include-package-data = false
 

@@ -56,14 +56,6 @@ PECL_URLLIB_TIMEOUT = 15
 logger = logging.getLogger(__name__)
 
 
-def warn_missing_dependency(path, module_name):
-    logger.warning(
-        "Not scanning %s, because the python module %s is not available",
-        path,
-        module_name,
-    )
-
-
 get_sf_metadata = _upstream_ontologist.get_sf_metadata
 NoSuchForgeProject = _upstream_ontologist.NoSuchForgeProject
 NoSuchRepologyProject = _upstream_ontologist.NoSuchRepologyProject
