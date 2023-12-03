@@ -143,7 +143,7 @@ def _parse_first_header(el):
             name = name[len("About ") :]
         yield UpstreamDatum("Name", name.strip(), certainty)
     if summary:
-        yield UpstreamDatum("Summary", summary, "likely")
+        yield UpstreamDatum("X-Summary", summary, "likely")
     if version:
         yield UpstreamDatum("Version", version, "likely")
 
@@ -359,7 +359,7 @@ def description_from_readme_plain(
         if version:
             metadata.append(UpstreamDatum("Version", version, "likely"))
         if summary:
-            metadata.append(UpstreamDatum("Summary", summary, "likely"))
+            metadata.append(UpstreamDatum("X-Summary", summary, "likely"))
         if name or version or summary:
             lines.pop(0)
     else:

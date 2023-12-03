@@ -77,11 +77,11 @@ pub fn guess_from_cabal_lines(
         (repo_url, repo_branch, repo_subpath)
     {
         results.push((
-            UpstreamDatum::Repository(crate::vcs::unsplit_vcs_url(
-                &repo_url,
-                Some(&repo_branch),
-                Some(&repo_subpath),
-            )),
+            UpstreamDatum::Repository(crate::vcs::unsplit_vcs_url(&crate::vcs::VcsLocation {
+                url: repo_url.parse().unwrap(),
+                branch: Some(repo_branch),
+                subpath: Some(repo_subpath),
+            })),
             Certainty::Certain,
         ));
     }

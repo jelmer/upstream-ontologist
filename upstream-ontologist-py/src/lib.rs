@@ -1,7 +1,7 @@
 use log::debug;
 use pyo3::create_exception;
 use pyo3::exceptions::PyException;
-use pyo3::exceptions::PyRuntimeError;
+use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::import_exception;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -41,8 +41,8 @@ fn url_from_vcs_command(command: &[u8]) -> Option<String> {
 }
 
 #[pyfunction]
-fn drop_vcs_in_scheme(url: &str) -> &str {
-    upstream_ontologist::vcs::drop_vcs_in_scheme(url)
+fn drop_vcs_in_scheme(url: &str) -> String {
+    upstream_ontologist::vcs::drop_vcs_in_scheme(&url.parse().unwrap()).map_or_else(|| url.to_string(), |u| u.to_string())
 }
 
 #[pyfunction]
@@ -71,8 +71,13 @@ fn debian_is_native(path: PathBuf) -> PyResult<Option<bool>> {
 }
 
 #[pyfunction]
-fn unsplit_vcs_url(repo_url: &str, branch: Option<&str>, subpath: Option<&str>) -> String {
-    upstream_ontologist::vcs::unsplit_vcs_url(repo_url, branch, subpath)
+fn unsplit_vcs_url(repo_url: &str, branch: Option<&str>, subpath: Option<&str>) -> PyResult<String> {
+    let location = upstream_ontologist::vcs::VcsLocation {
+        url: repo_url.parse().map_err(|e: url::ParseError| PyValueError::new_err(e.to_string()))?,
+        branch: branch.map(|b| b.to_string()),
+        subpath: subpath.map(|b| b.to_string()),
+    };
+    Ok(upstream_ontologist::vcs::unsplit_vcs_url(&location))
 }
 
 fn json_to_py(py: Python, data: serde_json::Value) -> PyResult<PyObject> {
@@ -593,15 +598,20 @@ fn browse_url_from_repo_url(
     branch: Option<&str>,
     subpath: Option<&str>,
     net_access: Option<bool>,
-) -> Option<String> {
-    upstream_ontologist::vcs::browse_url_from_repo_url(url, branch, subpath, net_access)
+) -> PyResult<Option<String>> {
+    let location = upstream_ontologist::vcs::VcsLocation {
+        url: Url::parse(url).map_err(|e| PyValueError::new_err(format!("Invalid URL: {}", e)))?,
+        branch: branch.map(|s| s.to_string()),
+        subpath: subpath.map(|s| s.to_string()),
+    };
+    Ok(upstream_ontologist::vcs::browse_url_from_repo_url(&location, net_access).map(|u| u.to_string()))
 }
 
 #[pyfunction]
 fn canonical_git_repo_url(url: &str, net_access: Option<bool>) -> PyResult<String> {
     let url =
         Url::parse(url).map_err(|e| PyRuntimeError::new_err(format!("Invalid URL: {}", e)))?;
-    Ok(upstream_ontologist::vcs::canonical_git_repo_url(&url, net_access).to_string())
+    Ok(upstream_ontologist::vcs::canonical_git_repo_url(&url, net_access).map_or_else(|| url.to_string(), |u| u.to_string()))
 }
 
 #[pyfunction]
@@ -926,7 +936,7 @@ fn guess_from_get_orig_source(
 
 #[pyfunction]
 fn fixup_rcp_style_git_repo_url(url: &str) -> PyResult<String> {
-    Ok(upstream_ontologist::vcs::fixup_rcp_style_git_repo_url(url).unwrap_or(url.to_string()))
+    Ok(upstream_ontologist::vcs::fixup_rcp_style_git_repo_url(url).map_or(url.to_string(), |u| u.to_string()))
 }
 
 #[pyfunction]
@@ -967,6 +977,31 @@ pub fn find_secure_repo_url(
     url: String, branch: Option<&str>, net_access: Option<bool>
 ) -> Option<String> {
     upstream_ontologist::vcs::find_secure_repo_url(url.parse().unwrap(), branch, net_access).map(|u| u.to_string())
+}
+
+#[pyfunction]
+fn sanitize_url(url: &str) -> PyResult<String> {
+    let url: url::Url = url.parse().map_err(|e| PyValueError::new_err(format!("{}", e)))?;
+    Ok(upstream_ontologist::vcs::sanitize_url(&url).to_string())
+}
+
+#[pyfunction]
+fn convert_cvs_list_to_str(urls: Vec<&str>) -> Option<String> {
+    upstream_ontologist::vcs::convert_cvs_list_to_str(urls.as_slice())
+}
+
+#[pyfunction]
+fn fixup_broken_git_details(
+    location: &str, branch: Option<&str>, subpath: Option<&str>
+) -> (String, Option<String>, Option<String>) {
+    let url = upstream_ontologist::vcs::fixup_git_url(location);
+    let location = upstream_ontologist::vcs::VcsLocation {
+        url: url.parse().unwrap(),
+        branch: branch.map(|s| s.to_string()),
+        subpath: subpath.map(|s| s.to_string()),
+    };
+    let ret = upstream_ontologist::vcs::fixup_git_location(&location);
+    (ret.url.to_string(), ret.branch.as_ref().map(|s| s.to_string()), ret.subpath.as_ref().map(|s| s.to_string()))
 }
 
 #[pymodule]
@@ -1063,6 +1098,9 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_source_name))?;
     m.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_binary_name))?;
     m.add_wrapped(wrap_pyfunction!(find_secure_repo_url))?;
+    m.add_wrapped(wrap_pyfunction!(sanitize_url))?;
+    m.add_wrapped(wrap_pyfunction!(convert_cvs_list_to_str))?;
+    m.add_wrapped(wrap_pyfunction!(fixup_broken_git_details))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;
