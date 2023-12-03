@@ -55,11 +55,24 @@ impl ToString for Certainty {
     }
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone, Debug, PartialEq, Eq)]
 pub struct Person {
     pub name: Option<String>,
     pub email: Option<String>,
     pub url: Option<String>,
+}
+
+impl std::fmt::Display for Person {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name.as_ref().unwrap_or(&"".to_string()))?;
+        if let Some(email) = &self.email {
+            write!(f, " <{}>", email)?;
+        }
+        if let Some(url) = &self.url {
+            write!(f, " ({})", url)?;
+        }
+        Ok(())
+    }
 }
 
 impl From<&str> for Person {
@@ -147,7 +160,7 @@ impl FromPyObject<'_> for Person {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum UpstreamDatum {
     Name(String),
     Homepage(String),
@@ -183,7 +196,7 @@ pub enum UpstreamDatum {
     Screenshots(Vec<String>),
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct UpstreamDatumWithMetadata {
     pub datum: UpstreamDatum,
     pub origin: Option<String>,
@@ -375,6 +388,63 @@ impl UpstreamDatum {
     }
 }
 
+impl std::fmt::Display for UpstreamDatum {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UpstreamDatum::Name(s) => write!(f, "Name: {}", s),
+            UpstreamDatum::Homepage(s) => write!(f, "Homepage: {}", s),
+            UpstreamDatum::Repository(s) => write!(f, "Repository: {}", s),
+            UpstreamDatum::RepositoryBrowse(s) => write!(f, "RepositoryBrowse: {}", s),
+            UpstreamDatum::Description(s) => write!(f, "Description: {}", s),
+            UpstreamDatum::Summary(s) => write!(f, "Summary: {}", s),
+            UpstreamDatum::License(s) => write!(f, "License: {}", s),
+            UpstreamDatum::BugDatabase(s) => write!(f, "BugDatabase: {}", s),
+            UpstreamDatum::BugSubmit(s) => write!(f, "BugSubmit: {}", s),
+            UpstreamDatum::Contact(s) => write!(f, "Contact: {}", s),
+            UpstreamDatum::CargoCrate(s) => write!(f, "CargoCrate: {}", s),
+            UpstreamDatum::SecurityMD(s) => write!(f, "SecurityMD: {}", s),
+            UpstreamDatum::SecurityContact(s) => write!(f, "SecurityContact: {}", s),
+            UpstreamDatum::Version(s) => write!(f, "Version: {}", s),
+            UpstreamDatum::Documentation(s) => write!(f, "Documentation: {}", s),
+            UpstreamDatum::GoImportPath(s) => write!(f, "GoImportPath: {}", s),
+            UpstreamDatum::Download(s) => write!(f, "Download: {}", s),
+            UpstreamDatum::Wiki(s) => write!(f, "Wiki: {}", s),
+            UpstreamDatum::MailingList(s) => write!(f, "MailingList: {}", s),
+            UpstreamDatum::SourceForgeProject(s) => write!(f, "SourceForgeProject: {}", s),
+            UpstreamDatum::Archive(s) => write!(f, "Archive: {}", s),
+            UpstreamDatum::Demo(s) => write!(f, "Demo: {}", s),
+            UpstreamDatum::PeclPackage(s) => write!(f, "PeclPackage: {}", s),
+            UpstreamDatum::Author(authors) => {
+                write!(f, "Author: {}", authors.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", "))
+            }
+            UpstreamDatum::Maintainer(maintainer) => {
+                write!(f, "Maintainer: {}", maintainer)
+            },
+            UpstreamDatum::Keywords(keywords) => {
+                write!(f, "Keywords: {}", keywords.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", "))
+            },
+            UpstreamDatum::Copyright(s) => {
+                write!(f, "Copyright: {}", s)
+            },
+            UpstreamDatum::Funding(s) => {
+                write!(f, "Funding: {}", s)
+            },
+            UpstreamDatum::Changelog(s) => {
+                write!(f, "Changelog: {}", s)
+            },
+            UpstreamDatum::DebianITP(s) => {
+                write!(f, "DebianITP: {}", s)
+            }
+            UpstreamDatum::HaskellPackage(p) => {
+                write!(f, "HaskellPackage: {}", p)
+            }
+            UpstreamDatum::Screenshots(s) => {
+                write!(f, "Screenshots: {}", s.join(", "))
+            }
+        }
+    }
+}
+
 pub struct UpstreamMetadata(Vec<UpstreamDatumWithMetadata>);
 
 impl UpstreamMetadata {
@@ -386,12 +456,16 @@ impl UpstreamMetadata {
         self.0.iter()
     }
 
-    pub fn get_field(&self, field: &str) -> Option<&UpstreamDatumWithMetadata> {
+    pub fn get(&self, field: &str) -> Option<&UpstreamDatumWithMetadata> {
         self.0.iter().find(|d| d.datum.field() == field)
     }
 
-    pub fn has_field(&self, field: &str) -> bool {
-        self.get_field(field).is_some()
+    pub fn insert(&mut self, datum: UpstreamDatumWithMetadata) {
+        self.0.push(datum);
+    }
+
+    pub fn contains_key(&self, field: &str) -> bool {
+        self.get(field).is_some()
     }
 
     pub fn discard_known_bad(&mut self) {

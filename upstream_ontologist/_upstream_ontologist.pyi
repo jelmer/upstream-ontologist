@@ -1,4 +1,4 @@
-from typing import Iterator, List, Tuple
+from typing import Iterator, List, Tuple, Any
 
 from upstream_ontologist import UpstreamDatum, UpstreamMetadata, UpstreamPackage
 
