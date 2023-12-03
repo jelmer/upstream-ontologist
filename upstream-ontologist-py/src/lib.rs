@@ -71,8 +71,13 @@ fn debian_is_native(path: PathBuf) -> PyResult<Option<bool>> {
 }
 
 #[pyfunction]
-fn unsplit_vcs_url(repo_url: &str, branch: Option<&str>, subpath: Option<&str>) -> String {
-    upstream_ontologist::vcs::unsplit_vcs_url(repo_url, branch, subpath)
+fn unsplit_vcs_url(repo_url: &str, branch: Option<&str>, subpath: Option<&str>) -> PyResult<String> {
+    let location = upstream_ontologist::vcs::VcsLocation {
+        url: repo_url.parse().map_err(|e: url::ParseError| PyValueError::new_err(e.to_string()))?,
+        branch: branch.map(|b| b.to_string()),
+        subpath: subpath.map(|b| b.to_string()),
+    };
+    Ok(upstream_ontologist::vcs::unsplit_vcs_url(&location))
 }
 
 fn json_to_py(py: Python, data: serde_json::Value) -> PyResult<PyObject> {
@@ -989,12 +994,13 @@ fn convert_cvs_list_to_str(urls: Vec<&str>) -> Option<String> {
 fn fixup_broken_git_details(
     location: &str, branch: Option<&str>, subpath: Option<&str>
 ) -> (String, Option<String>, Option<String>) {
+    let url = upstream_ontologist::vcs::fixup_git_url(location);
     let location = upstream_ontologist::vcs::VcsLocation {
-        url: location.parse().unwrap(),
+        url: url.parse().unwrap(),
         branch: branch.map(|s| s.to_string()),
         subpath: subpath.map(|s| s.to_string()),
     };
-    let ret = upstream_ontologist::vcs::fixup_broken_git_details(&location);
+    let ret = upstream_ontologist::vcs::fixup_git_location(&location);
     (ret.url.to_string(), ret.branch.as_ref().map(|s| s.to_string()), ret.subpath.as_ref().map(|s| s.to_string()))
 }
 

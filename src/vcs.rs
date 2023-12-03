@@ -44,12 +44,29 @@ pub fn drop_vcs_in_scheme(url: &Url) -> Option<Url> {
     }
 }
 
-pub fn unsplit_vcs_url(repo_url: &str, branch: Option<&str>, subpath: Option<&str>) -> String {
-    let mut url = repo_url.to_string();
-    if let Some(branch_name) = branch {
+pub fn split_vcs_url(location: &str) -> (String, Option<String>, Option<String>) {
+    let mut url = location.to_string();
+    let mut branch = None;
+    let mut subpath = None;
+    if let Some(idx) = url.find('[') {
+        if let Some(idx2) = url.find(']') {
+            subpath = Some(url[idx + 1..idx2].to_string());
+            url = url[..idx].to_string();
+        }
+    }
+    if let Some(idx) = url.find(" -b ") {
+        branch = Some(url[idx + 4..].to_string());
+        url = url[..idx].to_string();
+    }
+    (url, branch, subpath)
+}
+
+pub fn unsplit_vcs_url(location: &VcsLocation) -> String {
+    let mut url = location.url.to_string();
+    if let Some(branch_name) = location.branch.as_deref() {
         url = format!("{} -b {}", url, branch_name);
     }
-    if let Some(subpath_str) = subpath {
+    if let Some(subpath_str) = location.subpath.as_deref() {
         url = format!("{} [{}]", url, subpath_str);
     }
     url
@@ -715,7 +732,7 @@ pub fn browse_url_from_repo_url(
             )
             .unwrap()
         )
-    } else if is_gitlab_site(location.url.host_str().unwrap(), net_access) {
+    } else if location.url.host_str().is_some() && is_gitlab_site(location.url.host_str().unwrap(), net_access) {
         let mut path = location.url.path().to_string();
         if path.ends_with(".git") {
             path = path[..path.len() - 4].to_string();
@@ -851,17 +868,22 @@ pub fn find_secure_repo_url(
         url.set_host(Some("code.launchpad.net")).unwrap();
     }
 
-    if vec!["git.savannah.gnu.org", "git.sv.gnu.org"].contains(&url.host_str().unwrap()) {
-        if url.scheme() == "http" {
-            url = derive_with_scheme(&url, "https");
-        } else {
-            url = derive_with_scheme(&url, "https");
-            url.set_path(format!("/git{}", url.path()).as_str());
+    if let Some(host) = url.host_str() {
+        if vec!["git.savannah.gnu.org", "git.sv.gnu.org"].contains(&host) {
+            if url.scheme() == "http" {
+                url = derive_with_scheme(&url, "https");
+            } else {
+                url = derive_with_scheme(&url, "https");
+                url.set_path(format!("/git{}", url.path()).as_str());
+            }
         }
+    } else {
+        return None;
     }
 
+
     if net_access.unwrap_or(true) {
-        let mut secure_repo_url = derive_with_scheme(&url, "https");
+        let secure_repo_url = derive_with_scheme(&url, "https");
         let insecure_branch = try_open_branch(&url, branch);
         let secure_branch = try_open_branch(&secure_repo_url, branch);
         if let Some(secure_branch) = secure_branch {
@@ -886,6 +908,12 @@ pub struct VcsLocation {
     pub subpath: Option<String>,
 }
 
+impl ToString for VcsLocation {
+    fn to_string(&self) -> String {
+        unsplit_vcs_url(self)
+    }
+}
+
 impl From<VcsLocation> for url::Url {
     fn from(v: VcsLocation) -> Self {
         v.url
@@ -904,10 +932,12 @@ impl From<url::Url> for VcsLocation {
 
 impl From<&str> for VcsLocation {
     fn from(url: &str) -> Self {
+        let (url, branch, subpath) = split_vcs_url(url);
+        let url = fixup_git_url(url.as_str());
         VcsLocation {
-            url: url::Url::parse(url).unwrap(),
-            branch: None,
-            subpath: None,
+            url: url.parse().unwrap(),
+            branch,
+            subpath
         }
     }
 }
@@ -918,81 +948,64 @@ fn derive_with_scheme(url: &url::Url, scheme: &str) -> url::Url {
     url::Url::parse(&s).unwrap()
 }
 
-fn fix_path_in_port(location: &VcsLocation) -> Option<VcsLocation> {
-    location.url.host_str()?;
-    let host = location.url.host_str().unwrap();
-    if host.ends_with(']') {
+fn fix_path_in_port(url: &str) -> Option<String> {
+    let (_, scheme, host, port, rest)  = match lazy_regex::regex_captures!(r"^([^:]+)://([^:]+):([^/]+)(/.*)$", url) {
+        Some(c) => c,
+        None => return None,
+    };
+
+    if port.ends_with(']') {
         return None;
     }
-    if let Some((host, port)) = host.rsplit_once(':') {
-        if let Ok(port) = port.parse::<u16>() {
-            let mut url = location.url.clone();
-            url.set_host(Some(host)).unwrap();
-            url.set_port(Some(port)).unwrap();
-            Some(VcsLocation {
-                url,
-                branch: location.branch.clone(),
-                subpath: location.subpath.clone(),
-            })
-        } else {
-            None
-        }
-    }
-    else {
-        None
-    }
-}
 
-fn fix_gitlab_scheme(location: &VcsLocation) -> Option<VcsLocation> {
-    if is_gitlab_site(location.url.host_str().unwrap(), None) {
-        let mut url = derive_with_scheme(&location.url, "https");
-        return Some(VcsLocation {
-            url,
-            branch: location.branch.clone(),
-            subpath: location.subpath.clone(),
-        });
-    }
-    None
-}
-
-
-fn fix_github_scheme(location: &VcsLocation) -> Option<VcsLocation> {
-    // GitHub no longer supports the git:// scheme
-    if location.url.host_str() == Some("github.com") && location.url.scheme() == "git" {
-        let mut url = derive_with_scheme(&location.url, "https");
-        return Some(VcsLocation {
-            url,
-            branch: location.branch.clone(),
-            subpath: location.subpath.clone(),
-        });
-    }
-    None
-}
-
-fn fix_salsa_cgit_url(location: &VcsLocation) -> Option<VcsLocation> {
-    if location.url.host_str() == Some("salsa.debian.org") {
-        if let Some(suffix) = location.url.path().strip_prefix("/cgit/") {
-            let mut url = location.url.clone();
-            url.set_path(suffix);
-            Some(VcsLocation {
-                url,
-                branch: location.branch.clone(),
-                subpath: location.subpath.clone(),
-            })
-        } else {
-            None
-        }
+    if let Ok(port) = port.parse::<u16>() {
+        Some(format!("{}://{}:{}{}", scheme, host, port, rest))
     } else {
-        None
+        Some(format!("{}://{}/{}{}", scheme, host, port, rest))
     }
+}
+
+fn fix_gitlab_scheme(url: &str) -> Option<String> {
+    if let Ok(url) = url::Url::parse(url) {
+        if let Some(host) = url.host_str() {
+            if is_gitlab_site(host, None) {
+                return Some(derive_with_scheme(&url, "https").to_string());
+            }
+        }
+    }
+    None
+}
+
+
+fn fix_github_scheme(url: &str) -> Option<String> {
+    // GitHub no longer supports the git:// scheme
+    if let Ok(url) = url::Url::parse(url) {
+        if url.host_str() == Some("github.com") {
+            return Some(derive_with_scheme(&url, "https").to_string());
+        }
+    }
+    None
+}
+
+fn fix_salsa_cgit_url(url: &str) -> Option<String> {
+    if let Ok(url) = url::Url::parse(url) {
+        if url.host_str() == Some("salsa.debian.org") {
+            if let Some(suffix) = url.path().strip_prefix("/cgit/") {
+                let mut url = url.clone();
+                url.set_path(suffix);
+                return Some(url.to_string());
+            }
+        }
+    }
+    None
 }
 
 fn fix_gitlab_tree_in_url(location: &VcsLocation) -> Option<VcsLocation> {
     if is_gitlab_site(location.url.host_str()?, None) {
-        let segments = location.url.path_segments().unwrap().into_iter().collect::<Vec<_>>();
-        if segments.len() >= 5 && segments[3] == "tree" {
-            let branch = segments[..3].join("/");
-            let path = segments[4..].join("/");
+        let segments = location.url.path_segments().unwrap().collect::<Vec<_>>();
+        if let Some(p) = segments.iter().position(|p| *p == "tree") {
+            let branch = segments[(p + 1)..].join("/");
+            let path = segments[..p].join("/");
             let mut url = location.url.clone();
             url.set_path(path.as_str());
             return Some(VcsLocation {
@@ -1006,64 +1019,57 @@ fn fix_gitlab_tree_in_url(location: &VcsLocation) -> Option<VcsLocation> {
 }
 
 
-fn fix_double_slash(location: &VcsLocation) -> Option<VcsLocation> {
-    let path = location.url.path();
-    if let Some(suffix) = path.strip_prefix("//") {
-        let mut url = location.url.clone();
-        url.set_path(suffix);
-        return Some(VcsLocation {
-            url,
-            branch: location.branch.clone(),
-            subpath: location.subpath.clone(),
-        });
+fn fix_double_slash(url: &str) -> Option<String> {
+    if let Ok(mut url) = url::Url::parse(url) {
+        if url.path().starts_with("//") {
+            let path = url.path().to_string().strip_prefix("//").unwrap().to_string();
+            url.set_path(path.as_str());
+            return Some(url.to_string());
+        }
     }
     None
 }
 
-fn fix_extra_colon(location: &VcsLocation) -> Option<VcsLocation> {
-    let netloc = location.url.host_str()?;
-    if let Some(prefix) = netloc.strip_suffix(":") {
-        let mut url = location.url.clone();
-        url.set_host(Some(prefix)).unwrap();
-        Some(VcsLocation {
-            url,
-            branch: location.branch.clone(),
-            subpath: location.subpath.clone(),
-        })
-    } else {
-        None
+fn fix_extra_colon(url: &str) -> Option<String> {
+    if let Ok(mut url) = url::Url::parse(url) {
+        if url.path().starts_with(':') {
+            let path = url.path().to_string().strip_prefix(':').unwrap().to_string();
+            url.set_path(&path);
+            return Some(url.to_string());
+        }
     }
+    None
 }
 
 
-fn drop_git_username(location: &VcsLocation) -> Option<VcsLocation> {
-    if location.url.host_str() != Some("github.com") && location.url.host_str() != Some("salsa.debian.org") && location.url.host_str() != Some("gitlab.com") {
-        return None;
+fn drop_git_username(url: &str) -> Option<String> {
+    if let Ok(mut url) = url::Url::parse(url) {
+        if let Some(host) = url.host_str() {
+            if !["github.com", "salsa.debian.org", "gitlab.com"].contains(&host) {
+                return None;
+            }
+        } else {
+            return None;
+        }
+        if !["git", "http", "https"].contains(&url.scheme()) {
+            return None;
+        }
+        if url.username() == "git" {
+            url.set_username("").unwrap();
+            return Some( url.to_string());
+        }
     }
-    if ["git", "http", "https"].contains(&location.url.scheme()) {
-        return None;
-    }
-    if location.url.username() != "git" {
-        let mut url = location.url.clone();
-        url.set_username("").unwrap();
-        Some(VcsLocation {
-            url,
-            branch: location.branch.clone(),
-            subpath: location.subpath.clone(),
-        })
-    } else {
-        None
-    }
+    None
 }
 
 
 fn fix_branch_argument(location: &VcsLocation) -> Option<VcsLocation> {
     if location.url.host_str() == Some("github.com") {
         // TODO(jelmer): Handle gitlab sites too?
-        let path_elements = location.url.path_segments().unwrap().into_iter().collect::<Vec<_>>();
+        let path_elements = location.url.path_segments().unwrap().collect::<Vec<_>>();
         if path_elements.len() > 2 && path_elements[2] == "tree" {
-            let branch = path_elements[..2].join("/");
-            let path = path_elements[3..].join("/");
+            let branch = path_elements[3..].join("/");
+            let path = path_elements[..2].join("/");
             let mut url = location.url.clone();
             url.set_path(path.as_str());
             Some(VcsLocation {
@@ -1080,88 +1086,85 @@ fn fix_branch_argument(location: &VcsLocation) -> Option<VcsLocation> {
 }
 
 
-fn fix_git_gnome_org_url(location: &VcsLocation) -> Option<VcsLocation> {
-    if location.url.host_str() == Some("git.gnome.org") {
-        if location.url.path_segments().unwrap().nth(1) == Some("browse") {
-            let mut url = location.url.clone();
-            let path_elements = location.url.path_segments().unwrap().collect::<Vec<_>>();
-            let path = path_elements[1..].join("/");
-            url.set_path(path.as_str());
-            Some(VcsLocation {
-                url,
-                branch: location.branch.clone(),
-                subpath: location.subpath.clone(),
-            })
-        } else {
-            let mut url = derive_with_scheme(&location.url, "https");
+fn fix_git_gnome_org_url(url: &str) -> Option<String> {
+    if let Ok(url) = url::Url::parse(url) {
+        if url.host_str() == Some("git.gnome.org") {
+            let mut path_segments = url.path_segments().unwrap().collect::<Vec<_>>();
+            if path_segments.first().map(|p| *p == "browse") == Some(true) {
+                path_segments.remove(0);
+            }
+
+            let mut url = derive_with_scheme(&url, "https");
             url.set_host(Some("gitlab.gnome.org")).unwrap();
-            url.set_path(format!("GNOME{}", url.path()).as_str());
-            Some(VcsLocation {
-                url,
-                branch: location.branch.clone(),
-                subpath: location.subpath.clone(),
-            })
+            url.set_path(format!("GNOME/{}", path_segments.join("/")).as_str());
+            return Some(url.to_string());
         }
-    } else {
-        None
-    }
-}
-
-
-fn fix_anongit_url(location: &VcsLocation) -> Option<VcsLocation> {
-    if location.url.host_str() == Some("anongit.kde.org") && location.url.scheme() == "git" {
-        let mut url = derive_with_scheme(&location.url, "https");
-        return Some(VcsLocation {
-            url,
-            branch: location.branch.clone(),
-            subpath: location.subpath.clone(),
-        });
     }
     None
 }
 
-fn fix_freedesktop_org_url(location: &VcsLocation) -> Option<VcsLocation> {
-    if location.url.host_str() == Some("anongit.freedesktop.org") {
-        let mut url = derive_with_scheme(&location.url, "https");
-        if let Some(suffix) = location.url.path().strip_prefix("/git/") {
-            url.set_path(suffix);
+
+fn fix_kde_anongit_url(url: &str) -> Option<String> {
+    if let Ok(url) = url::Url::parse(url) {
+        if url.host_str() == Some("anongit.kde.org") {
+            let url = derive_with_scheme(&url, "https");
+            return Some(url.to_string());
         }
-        url.set_host(Some("gitlab.freedesktop.org")).unwrap();
-        return Some(VcsLocation {
-            url,
-            branch: location.branch.clone(),
-            subpath: location.subpath.clone(),
-        });
     }
     None
 }
 
-pub const FIXERS: &[fn(&VcsLocation) -> Option<VcsLocation>] = &[
-    fix_path_in_port,
-    fix_gitlab_scheme,
-    fix_github_scheme,
-    fix_salsa_cgit_url,
+fn fix_freedesktop_org_url(url: &str) -> Option<String> {
+    if let Ok(url) = url::Url::parse(url) {
+        if url.host_str() == Some("anongit.freedesktop.org") {
+            let suffix = url.path().strip_prefix("/git/");
+            let mut url = derive_with_scheme(&url, "https");
+            if let Some(suffix) = suffix {
+                url.set_path(suffix);
+            }
+            url.set_host(Some("gitlab.freedesktop.org")).unwrap();
+            return Some(url.to_string());
+        }
+    }
+    None
+}
+
+const LOCATION_FIXERS: &[fn(&VcsLocation) -> Option<VcsLocation>] = &[
     fix_gitlab_tree_in_url,
-    fix_double_slash,
-    fix_extra_colon,
-    drop_git_username,
     fix_branch_argument,
-    fix_git_gnome_org_url,
-    fix_anongit_url,
-    fix_freedesktop_org_url,
 ];
 
 /// Attempt to fix up broken Git URLs.
-pub fn fixup_broken_git_details(
+pub fn fixup_git_location(
     location: &VcsLocation,
 ) -> Cow<'_, VcsLocation> {
     let mut location = Cow::Borrowed(location);
-    for cb in FIXERS {
+    for cb in LOCATION_FIXERS {
         location =  cb(&location).map_or(location, Cow::Owned);
     }
     location
 }
 
+const URL_FIXERS: &[fn(&str) -> Option<String>] = &[
+    fix_path_in_port,
+    fix_gitlab_scheme,
+    fix_github_scheme,
+    fix_salsa_cgit_url,
+    fix_double_slash,
+    fix_extra_colon,
+    drop_git_username,
+    fix_freedesktop_org_url,
+    fix_kde_anongit_url,
+    fix_git_gnome_org_url,
+];
+
+pub fn fixup_git_url(url: &str) -> String {
+    let mut url = url.to_string();
+    for cb in URL_FIXERS {
+        url = cb(&url).unwrap_or(url);
+    }
+    url
+}
 
 pub fn convert_cvs_list_to_str(urls: &[&str]) -> Option<String> {
     if urls[0].starts_with(":extssh:") || urls[0].starts_with(":pserver:") {
@@ -1175,7 +1178,7 @@ pub fn convert_cvs_list_to_str(urls: &[&str]) -> Option<String> {
 
 pub const SANITIZERS: &[fn(&str) -> Option<Url>] = &[
     |url| drop_vcs_in_scheme(&url.parse().unwrap()),
-    |url| Some(fixup_broken_git_details(&VcsLocation::from(url)).url.clone()),
+    |url| Some(fixup_git_location(&VcsLocation::from(url)).url.clone()),
     fixup_rcp_style_git_repo_url,
     |url| find_public_repo_url(url.to_string().as_str(), None).map(|u| u.parse().unwrap()),
     |url| canonical_git_repo_url(&url.parse().unwrap(), None),
@@ -1192,6 +1195,12 @@ pub fn sanitize_url(url: &Url)-> Url {
 
 #[cfg(test)]
 mod tests {
+    use super::fixup_git_url;
+
+    fn fixup_git_location(url: &str) -> String {
+        super::fixup_git_location(&super::VcsLocation::from(url)).to_string()
+    }
+
     #[test]
     fn test_plausible_url() {
         use super::plausible_url;
@@ -1285,7 +1294,6 @@ mod tests {
     #[test]
     fn test_fixup_rcp_leave() {
         use super::fixup_rcp_style_git_repo_url;
-        use url::Url;
         assert_eq!(
             None,
             fixup_rcp_style_git_repo_url("https://salsa.debian.org/jelmer/example")
@@ -1328,16 +1336,16 @@ mod tests {
     }
 
     #[test]
-    fn test_fixup_broken_git_details() {
-        use super::{fixup_broken_git_details, VcsLocation};
+    fn test_fixup_git_location() {
+        use super::{fixup_git_location, VcsLocation};
         assert_eq!(
             VcsLocation {
                 url: "https://github.com/jelmer/dulwich".parse().unwrap(),
                 branch: None,
                 subpath: None,
             },
-            fixup_broken_git_details(&VcsLocation {
-                url: "git://github.com/jelmer/dulwich".parse().unwrap(),
+            fixup_git_location(&VcsLocation {
+                url: "https://github.com/jelmer/dulwich".parse().unwrap(),
                 branch: None,
                 subpath: None,
             }).into_owned()
@@ -1387,18 +1395,140 @@ mod tests {
     #[test]
     fn test_fix_github_scheme() {
         use super::fix_github_scheme;
-        use super::VcsLocation;
-        use url::Url;
         assert_eq!(
-            Some(VcsLocation{
-            url: "https://github.com/jelmer/example".parse::<Url>().unwrap(),
-            branch: None,
-            subpath: None,
-            }),
-            fix_github_scheme(&VcsLocation{
-                url: "git://github.com/jelmer/example".parse::<Url>().unwrap(),
-                branch: None,
-                subpath: None,
-            }));
+            Some("https://github.com/jelmer/example"),
+            fix_github_scheme("git://github.com/jelmer/example").as_deref()
+        );
+    }
+
+    #[test]
+    fn test_fix_git_gnome_org_url() {
+        use super::fix_git_gnome_org_url;
+        assert_eq!(
+            Some("https://gitlab.gnome.org/GNOME/example".to_string()),
+            fix_git_gnome_org_url("https://git.gnome.org/browse/example")
+        );
+    }
+
+    #[test]
+    fn test_fixup() {
+        assert_eq!(
+            "https://github.com/jelmer/dulwich",
+            fixup_git_url("https://github.com:jelmer/dulwich")
+        );
+        assert_eq!(
+            "https://github.com/jelmer/dulwich -b blah",
+            fixup_git_location("https://github.com:jelmer/dulwich -b blah"),
+        );
+        assert_eq!(
+            "https://github.com/jelmer/dulwich",
+            fixup_git_url("git://github.com/jelmer/dulwich"),
+        );
+    }
+
+    #[test]
+    fn test_preserves() {
+        assert_eq!(
+            "https://github.com/jelmer/dulwich",
+            fixup_git_url("https://github.com/jelmer/dulwich"),
+        );
+    }
+
+    #[test]
+    fn test_salsa_not_https() {
+        assert_eq!(
+            "https://salsa.debian.org/jelmer/dulwich",
+            fixup_git_url("git://salsa.debian.org/jelmer/dulwich"),
+        );
+    }
+
+    #[test]
+    fn test_salsa_uses_cgit() {
+        assert_eq!(
+            "https://salsa.debian.org/jelmer/dulwich",
+            fixup_git_url(
+                "https://salsa.debian.org/cgit/jelmer/dulwich"
+            ),
+        );
+    }
+
+    #[test]
+    fn test_salsa_tree_branch() {
+        assert_eq!(
+            "https://salsa.debian.org/jelmer/dulwich -b master",
+            fixup_git_location(
+                "https://salsa.debian.org/jelmer/dulwich/tree/master"
+            ),
+        );
+    }
+
+    #[test]
+    fn test_strip_extra_slash() {
+        assert_eq!(
+            "https://salsa.debian.org/salve/auctex.git",
+            fixup_git_url("https://salsa.debian.org//salve/auctex.git"),
+        );
+    }
+
+    #[test]
+    fn test_strip_extra_colon() {
+        assert_eq!(
+            "https://salsa.debian.org/mckinstry/lcov.git",
+            fixup_git_url(
+                "https://salsa.debian.org:/mckinstry/lcov.git"
+            ),
+        );
+    }
+
+    #[test]
+    fn test_strip_username() {
+        assert_eq!(
+            "https://github.com/RPi-Distro/pgzero.git",
+            fixup_git_url("git://git@github.com:RPi-Distro/pgzero.git"),
+        );
+        assert_eq!(
+            "https://salsa.debian.org/debian-astro-team/pyavm.git",
+            fixup_git_url(
+                "https://git@salsa.debian.org:debian-astro-team/pyavm.git"
+            ),
+        );
+    }
+
+    #[test]
+    fn test_github_tree_url() {
+        assert_eq!(
+            "https://github.com/blah/blah -b master",
+            fixup_git_location("https://github.com/blah/blah/tree/master"),
+        );
+    }
+
+    #[test]
+    fn test_freedesktop() {
+        assert_eq!(
+            "https://gitlab.freedesktop.org/xorg/xserver",
+            fixup_git_url("git://anongit.freedesktop.org/xorg/xserver"),
+        );
+        assert_eq!(
+            "https://gitlab.freedesktop.org/xorg/lib/libSM",
+            fixup_git_url(
+                "git://anongit.freedesktop.org/git/xorg/lib/libSM"
+            ),
+        );
+    }
+
+    #[test]
+    fn test_anongit() {
+        assert_eq!(
+            "https://anongit.kde.org/kdev-php.git",
+            fixup_git_url("git://anongit.kde.org/kdev-php.git"),
+        );
+    }
+
+    #[test]
+    fn test_gnome() {
+        assert_eq!(
+            "https://gitlab.gnome.org/GNOME/alacarte",
+            fixup_git_url("https://git.gnome.org/browse/alacarte"),
+        );
     }
 }

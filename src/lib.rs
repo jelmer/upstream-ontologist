@@ -1420,11 +1420,11 @@ pub fn guess_from_nuspec(
         if let Some(repo_url) = repository_tag.attributes.get("url") {
             let branch = repository_tag.attributes.get("branch");
             result.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Repository(vcs::unsplit_vcs_url(
-                    repo_url,
-                    branch.map(|s| s.as_str()),
-                    None,
-                )),
+                datum: UpstreamDatum::Repository(vcs::unsplit_vcs_url(&vcs::VcsLocation {
+                    url: repo_url.parse().unwrap(),
+                    branch: branch.cloned(),
+                    subpath: None,
+                })),
                 certainty: Some(Certainty::Certain),
                 origin: Some(path.to_string_lossy().to_string()),
             });

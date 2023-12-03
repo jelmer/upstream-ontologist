@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 #[derive(serde::Deserialize)]
 struct Contents {
     name: String,
@@ -8,13 +9,13 @@ struct Contents {
     html_url: url::Url,
     git_url: url::Url,
     download_url: Option<url::Url>,
-    #[serde(rename = "type")]
-    type_: String,
+    r#type: String,
     content: Option<String>,
     encoding: Option<String>,
     _links: Links,
 }
 
+#[allow(dead_code)]
 #[derive(serde::Deserialize)]
 struct Links {
     #[serde(rename = "self")]

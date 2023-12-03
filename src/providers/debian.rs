@@ -559,7 +559,7 @@ pub fn guess_from_debian_copyright(
             if let Some(repo_url) = crate::vcs::guess_repo_from_url(&url, None) {
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Repository(repo_url),
-                    certainty: Some(Certainty::Confident),
+                    certainty: Some(Certainty::Likely),
                     origin: Some(path.to_string_lossy().to_string()),
                 });
             }

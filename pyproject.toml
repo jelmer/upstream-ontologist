@@ -15,6 +15,7 @@ module = [
     "setuptools.*",
     "pcre.*",
     "lxml.*",
+    "breezy.*",
 ]
 ignore_missing_imports = true
 
