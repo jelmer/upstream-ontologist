@@ -3,6 +3,94 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
+pub fn parse_cabal_lines(
+    lines: impl Iterator<Item = String>,
+) -> Vec<(Option<String>, String, String)> {
+    let mut ret = Vec::new();
+    let mut section = None;
+    for line in lines {
+        if line.trim_start().starts_with("--") {
+            // Comment
+            continue;
+        }
+        // Empty line
+        if line.trim().is_empty() {
+            section = None;
+            continue;
+        }
+
+        let (field, value) = match line.split_once(':') {
+            Some((field, value)) => (field.to_lowercase(), value.trim()),
+            None => {
+                if !line.starts_with(' ') {
+                    section = Some(line.trim().to_lowercase());
+                } else {
+                    log::debug!("Failed to parse line: {}", line);
+                }
+                continue;
+            }
+        };
+
+        if section.is_none() && !field.starts_with(' ') {
+            ret.push((None, field.trim().to_string(), value.to_owned()));
+        } else if field.starts_with(' ') {
+            ret.push((section.clone(), field.trim().to_lowercase(), value.to_owned()));
+        } else {
+            log::debug!("Invalid field {}", field);
+        }
+    }
+    ret
+}
+
+#[cfg(test)]
+mod parse_tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_cabal_lines() {
+        let lines = r#"Name:          foo
+Version:    0.0
+License: BSD3
+Author: John Doe
+Maintainer: John Doe <joe@example.com>
+Cabal-Version: >= 1.10
+Homepage: https://example.com
+
+Executable program1
+  Build-Depends:  HUnit
+  Main-Is:       Main.hs
+
+source-repository head
+  type: git
+  location: https://github.com/example/blah
+"#;
+        let parsed = parse_cabal_lines(lines.lines().map(|s| s.to_owned()));
+
+        assert_eq!(
+            parsed,
+            vec![
+                (None, "name".to_owned(), "foo".to_owned()),
+                (None, "version".to_owned(), "0.0".to_owned()),
+                (None, "license".to_owned(), "BSD3".to_owned()),
+                (None, "author".to_owned(), "John Doe".to_owned()),
+                (
+                    None,
+                    "maintainer".to_owned(),
+                    "John Doe <joe@example.com>".to_owned()
+                ),
+                (
+                    None,
+                    "cabal-version".to_owned(),
+                    ">= 1.10".to_owned()
+                ),
+                (None, "homepage".to_owned(), "https://example.com".to_owned()),
+                (Some("executable program1".to_owned()), "build-depends".to_owned(), "HUnit".to_owned()),
+                (Some("executable program1".to_owned()), "main-is".to_owned(), "Main.hs".to_owned()),
+                (Some("source-repository head".to_owned()), "type".to_owned(), "git".to_owned()),
+                (Some("source-repository head".to_owned()), "location".to_owned(), "https://github.com/example/blah".to_owned())]);
+    }
+}
+
 pub fn guess_from_cabal_lines(
     lines: impl Iterator<Item = String>,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
@@ -10,77 +98,50 @@ pub fn guess_from_cabal_lines(
     let mut repo_branch = None;
     let mut repo_subpath = None;
 
-    let mut section = None;
     let mut results = Vec::new();
 
-    for line in lines {
-        if line.trim_start().starts_with("--") {
-            // Comment
-            continue;
-        }
-        if line.trim().is_empty() {
-            section = None;
-            continue;
-        }
-        let line_parts: Vec<&str> = line.splitn(2, ':').collect();
-        if line_parts.len() != 2 {
-            if !line.starts_with(' ') {
-                section = Some(line.trim().to_lowercase());
+    for (section, key, value) in parse_cabal_lines(lines) {
+        match (section.as_deref(), key.as_str()) {
+            (None, "homepage") => results.push((
+                UpstreamDatum::Homepage(value.to_owned()),
+                Certainty::Certain,
+            )),
+            (None, "bug-reports") => results.push((
+                UpstreamDatum::BugDatabase(value.to_owned()),
+                Certainty::Certain,
+            )),
+            (None, "name") => results.push((UpstreamDatum::Name(value.to_owned()), Certainty::Certain)),
+            (None, "maintainer") => results.push((
+                UpstreamDatum::Maintainer(Person::from(value.as_str())),
+                Certainty::Certain,
+            )),
+            (None, "copyright") => results.push((
+                UpstreamDatum::Copyright(value.to_owned()),
+                Certainty::Certain,
+            )),
+            (None, "license") => {
+                results.push((UpstreamDatum::License(value.to_owned()), Certainty::Certain))
             }
-            continue;
-        }
-        let field = line_parts[0].trim().to_lowercase();
-        let value = line_parts[1].trim();
-
-        if !field.starts_with(' ') {
-            match field.as_str() {
-                "homepage" => results.push((
-                    UpstreamDatum::Homepage(value.to_owned()),
-                    Certainty::Certain,
-                )),
-                "bug-reports" => results.push((
-                    UpstreamDatum::BugDatabase(value.to_owned()),
-                    Certainty::Certain,
-                )),
-                "name" => results.push((UpstreamDatum::Name(value.to_owned()), Certainty::Certain)),
-                "maintainer" => results.push((
-                    UpstreamDatum::Maintainer(Person::from(value)),
-                    Certainty::Certain,
-                )),
-                "copyright" => results.push((
-                    UpstreamDatum::Copyright(value.to_owned()),
-                    Certainty::Certain,
-                )),
-                "license" => {
-                    results.push((UpstreamDatum::License(value.to_owned()), Certainty::Certain))
-                }
-                "author" => results.push((
-                    UpstreamDatum::Author(vec![Person::from(value)]),
-                    Certainty::Certain,
-                )),
-                _ => {}
-            }
-        } else {
-            let field = field.trim();
-            if section == Some("source-repository head".to_lowercase()) {
-                match field {
-                    "location" => repo_url = Some(value.to_owned()),
-                    "branch" => repo_branch = Some(value.to_owned()),
-                    "subdir" => repo_subpath = Some(value.to_owned()),
-                    _ => {}
-                }
+            (None, "author") => results.push((
+                UpstreamDatum::Author(vec![Person::from(value.as_str())]),
+                Certainty::Certain,
+            )),
+            (Some("source-repository head"), "location") => repo_url = Some(value.to_owned()),
+            (Some("source-repository head"), "branch") => repo_branch = Some(value.to_owned()),
+            (Some("source-repository head"), "subdir") => repo_subpath = Some(value.to_owned()),
+            _ => {
+                log::debug!("Unknown field {:?} in section {:?}", key, section);
             }
         }
     }
 
-    if let (Some(repo_url), Some(repo_branch), Some(repo_subpath)) =
-        (repo_url, repo_branch, repo_subpath)
-    {
+
+    if let Some(repo_url) = repo_url {
         results.push((
             UpstreamDatum::Repository(crate::vcs::unsplit_vcs_url(&crate::vcs::VcsLocation {
                 url: repo_url.parse().unwrap(),
-                branch: Some(repo_branch),
-                subpath: Some(repo_subpath),
+                branch: repo_branch,
+                subpath: repo_subpath,
             })),
             Certainty::Certain,
         ));
