@@ -17,7 +17,6 @@
 
 import logging
 import os
-import socket
 import urllib.error
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple, cast
 from urllib.parse import urlparse
@@ -46,10 +45,6 @@ from .vcs import (
     sanitize_url as sanitize_vcs_url,
 )
 
-# Pecl is quite slow, so up the timeout a bit.
-PECL_URLLIB_TIMEOUT = 15
-
-
 logger = logging.getLogger(__name__)
 
 
@@ -57,6 +52,7 @@ get_sf_metadata = _upstream_ontologist.get_sf_metadata
 NoSuchForgeProject = _upstream_ontologist.NoSuchForgeProject
 NoSuchRepologyProject = _upstream_ontologist.NoSuchRepologyProject
 get_repology_metadata = _upstream_ontologist.get_repology_metadata
+guess_from_pecl_package = _upstream_ontologist.guess_from_pecl_package
 
 
 def guess_upstream_info(path, trust_package):
@@ -939,37 +935,6 @@ def check_upstream_metadata(  # noqa: C901
             else:
                 screenshots.certainty = "likely"
         screenshots.value = newvalue
-
-
-def guess_from_pecl_package(package):
-    url = "https://pecl.php.net/packages/%s" % package
-    headers = {"User-Agent": USER_AGENT}
-    try:
-        f = urlopen(Request(url, headers=headers), timeout=PECL_URLLIB_TIMEOUT)
-    except urllib.error.HTTPError as e:
-        if e.code != 404:
-            raise
-        return
-    except (socket.timeout, TimeoutError):
-        logger.warning("timeout contacting pecl, ignoring: %s", url)
-        return
-    try:
-        from bs4 import BeautifulSoup, Tag
-    except ModuleNotFoundError:
-        logger.warning("bs4 missing so unable to scan pecl page, ignoring %s", url)
-        return
-    bs = BeautifulSoup(f.read(), features="lxml")
-    tag = bs.find("a", text="Browse Source")
-    if isinstance(tag, Tag):
-        yield "Repository-Browse", tag.attrs["href"]
-    tag = bs.find("a", text="Package Bugs")
-    if isinstance(tag, Tag):
-        yield "Bug-Database", tag.attrs["href"]
-    label_tag = bs.find("th", text="Homepage")
-    if isinstance(label_tag, Tag) and label_tag.parent is not None:
-        tag = label_tag.parent.find("a")
-        if isinstance(tag, Tag):
-            yield "Homepage", tag.attrs["href"]
 
 
 guess_from_aur = _upstream_ontologist.guess_from_aur

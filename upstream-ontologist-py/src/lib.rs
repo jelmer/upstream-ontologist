@@ -278,6 +278,13 @@ Ok(ret.to_object(py))
 }
 
 #[pyfunction]
+fn guess_from_pecl_package(py: Python, package: &str) -> PyResult<PyObject> {
+    let ret = upstream_ontologist::providers::php::guess_from_pecl_package(package)?;
+
+    Ok(ret.to_object(py))
+}
+
+#[pyfunction]
 fn guess_from_aur(py: Python, package: &str) -> PyResult<PyObject> {
     let ret = upstream_ontologist::providers::arch::guess_from_aur(package);
 
@@ -814,6 +821,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(plausible_vcs_url))?;
     m.add_wrapped(wrap_pyfunction!(plausible_vcs_browse_url))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_aur))?;
+    m.add_wrapped(wrap_pyfunction!(guess_from_pecl_package))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_pod))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_repology))?;
     m.add_wrapped(wrap_pyfunction!(check_url_canonical))?;

@@ -5,6 +5,8 @@ pub fn guess_from_pecl_package(package: &str) -> Result<Vec<UpstreamDatum>, Prov
 
     let client = reqwest::blocking::Client::builder()
         .user_agent(crate::USER_AGENT)
+        // PECL is slow
+        .timeout(std::time::Duration::from_secs(15))
         .build().unwrap();
 
     let response = client.get(url).send().map_err(|e| ProviderError::Other(e.to_string()))?;
@@ -32,7 +34,7 @@ impl<'a> select::predicate::Predicate for TextMatches<'a> {
 
 fn guess_from_pecl_page(body: &str) -> Result<Vec<UpstreamDatum>, ProviderError> {
     use select::document::Document;
-    use select::predicate::{Name, Predicate, Text, And};
+    use select::predicate::{Name, And};
     let document = Document::from_read(body.as_bytes()).map_err(|e| ProviderError::Other(e.to_string()))?;
     let mut ret = Vec::new();
 
@@ -45,9 +47,7 @@ fn guess_from_pecl_page(body: &str) -> Result<Vec<UpstreamDatum>, ProviderError>
     }
 
     if let Some(node) = document.find(And(Name("th"), TextMatches("Homepage"))).next() {
-        node.parent().and_then(|node| node.find(Name("a")).next()).map(|node| {
-            ret.push(UpstreamDatum::Homepage(node.attr("href").unwrap().to_string()));
-        });
+        if let Some(node) = node.parent().and_then(|node| node.find(Name("a")).next()) { ret.push(UpstreamDatum::Homepage(node.attr("href").unwrap().to_string())); }
     }
 
     Ok(ret)

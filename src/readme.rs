@@ -228,7 +228,7 @@ pub fn description_from_readme_plain(
     })
 }
 
-pub fn guess_from_readme(path: &std::path::Path, trust_package: bool) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+pub fn guess_from_readme(path: &std::path::Path, _trust_package: bool) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut urls: Vec<url::Url> = vec![];
     let mut ret = vec![];
 
@@ -357,7 +357,7 @@ pub fn guess_from_readme(path: &std::path::Path, trust_package: bool) -> Result<
         _ => {
             Ok((None, vec![]))
         },
-    }.map_err(|e| ProviderError::Python(e))?;
+    }.map_err(ProviderError::Python)?;
     if let Some(description) = description {
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Description(description),
