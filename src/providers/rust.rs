@@ -64,12 +64,13 @@ pub fn guess_from_cargo(
                 });
             }
             "version" => {
-                let version = value.as_str().unwrap();
-                results.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Version(version.to_string()),
-                    certainty: Some(Certainty::Certain),
-                    origin: Some(path.to_string_lossy().to_string()),
-                });
+                if let Some(version) = value.as_str() {
+                    results.push(UpstreamDatumWithMetadata {
+                        datum: UpstreamDatum::Version(version.to_string()),
+                        certainty: Some(Certainty::Certain),
+                        origin: Some(path.to_string_lossy().to_string()),
+                    });
+                }
             }
             "authors" => {
                 let authors = value.as_array().unwrap();

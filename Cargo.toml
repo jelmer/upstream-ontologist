@@ -20,7 +20,6 @@ configparser = "3"
 serde_yaml = "0.8"
 percent-encoding = "2"
 html5ever = ">=0.26"
-select = "0.6"
 chrono = "0.4"
 textwrap = ">=0.16"
 lazy-regex = "2"
@@ -36,6 +35,8 @@ xml = "0.8.10"
 makefile-lossless = { version = "0.1.2", optional = true }
 debian-copyright = { version = "0.1.2", optional = true }
 debian-control = { version = "0.1.6", optional = true }
+select = "0.6.0"
+pulldown-cmark = "0.9.3"
 
 [workspace]
 members = [ "upstream-ontologist-py",]

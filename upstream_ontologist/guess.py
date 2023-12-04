@@ -17,8 +17,6 @@
 
 import logging
 import os
-import re
-import socket
 import urllib.error
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple, cast
 from urllib.parse import urlparse
@@ -42,15 +40,10 @@ from .vcs import (
     browse_url_from_repo_url,
     check_repository_url_canonical,
     guess_repo_from_url,
-    is_gitlab_site,
 )
 from .vcs import (
     sanitize_url as sanitize_vcs_url,
 )
-
-# Pecl is quite slow, so up the timeout a bit.
-PECL_URLLIB_TIMEOUT = 15
-
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +52,7 @@ get_sf_metadata = _upstream_ontologist.get_sf_metadata
 NoSuchForgeProject = _upstream_ontologist.NoSuchForgeProject
 NoSuchRepologyProject = _upstream_ontologist.NoSuchRepologyProject
 get_repology_metadata = _upstream_ontologist.get_repology_metadata
-guess_from_pod = _upstream_ontologist.guess_from_pod
+guess_from_pecl_package = _upstream_ontologist.guess_from_pecl_package
 
 
 def guess_upstream_info(path, trust_package):
@@ -159,133 +152,6 @@ url_from_svn_co_command = _upstream_ontologist.url_from_svn_co_command
 url_from_git_clone_command = _upstream_ontologist.url_from_git_clone_command
 url_from_fossil_clone_command = _upstream_ontologist.url_from_fossil_clone_command
 url_from_vcs_command = _upstream_ontologist.url_from_vcs_command
-
-
-def guess_from_readme(path, trust_package):  # noqa: C901
-    urls = []
-    try:
-        with open(path, "rb") as f:
-            lines = list(f.readlines())
-            for i, line in enumerate(lines):
-                line = line.strip()
-                cmdline = line.strip().lstrip(b"$").strip()
-                if (
-                    cmdline.startswith(b"git clone ")
-                    or cmdline.startswith(b"fossil clone ")
-                    or cmdline.startswith(b"hg clone ")
-                    or cmdline.startswith(b"bzr co ")
-                    or cmdline.startswith(b"bzr branch ")
-                ):
-                    while cmdline.endswith(b"\\"):
-                        cmdline += lines[i + 1]
-                        cmdline = cmdline.strip()
-                        i += 1
-                    url = url_from_vcs_command(cmdline)
-                    if url:
-                        urls.append(url)
-                for m in re.findall(b"[\"'`](git clone.*)[\"`']", line):
-                    url = url_from_git_clone_command(m)
-                    if url:
-                        urls.append(url)
-                m = re.fullmatch(rb"cvs.*-d\s*:pserver:.*", line)
-                if m:
-                    url = url_from_cvs_co_command(m.group(0))
-                    if url:
-                        urls.append(url)
-                for m in re.finditer(b"($ )?(svn co .*)", line):
-                    url = url_from_svn_co_command(m.group(2))
-                    if url:
-                        urls.append(url)
-                project_re = b'([^/]+)/([^/?.()"#>\\s]*[^-,/?.()"#>\\s])'
-                for m in re.finditer(b"https://travis-ci.org/" + project_re, line):
-                    yield UpstreamDatum(
-                        "Repository",
-                        "https://github.com/{}/{}".format(
-                            m.group(1).decode(), m.group(2).decode().rstrip()
-                        ),
-                        certainty="possible",
-                    )
-                for m in re.finditer(b"https://coveralls.io/r/" + project_re, line):
-                    yield UpstreamDatum(
-                        "Repository",
-                        "https://github.com/{}/{}".format(
-                            m.group(1).decode(), m.group(2).decode().rstrip()
-                        ),
-                        certainty="possible",
-                    )
-                for m in re.finditer(
-                    b"https://github.com/([^/]+)/([^/]+)/issues", line
-                ):
-                    yield UpstreamDatum(
-                        "Bug-Database", m.group(0).decode().rstrip(), certainty="possible"
-                    )
-                for m in re.finditer(
-                    b"https://github.com/" + project_re + b"(.git)?", line
-                ):
-                    yield UpstreamDatum(
-                        "Repository",
-                        m.group(0).rstrip(b".").decode().rstrip(),
-                        certainty="possible",
-                    )
-                m = re.fullmatch(b"https://github.com/" + project_re, line)
-                if m:
-                    yield UpstreamDatum(
-                        "Repository", line.strip().rstrip(b".").decode(), certainty="possible"
-                    )
-                m = re.fullmatch(b"git://([^ ]+)", line)
-                if m:
-                    yield UpstreamDatum(
-                        "Repository", line.strip().rstrip(b".").decode(), certainty="possible"
-                    )
-                for m in re.finditer(b'https://([^]/]+)/([^]\\s()"#]+)', line):
-                    if is_gitlab_site(m.group(1).decode()):
-                        url = m.group(0).rstrip(b".").decode().rstrip()
-                        try:
-                            repo_url = guess_repo_from_url(url)  # type: ignore
-                        except ValueError:
-                            logger.warning("Ignoring invalid URL %s in %s", url, path)
-                        else:
-                            if repo_url:
-                                yield UpstreamDatum("Repository", repo_url, certainty="possible")
-        if path.lower().endswith("readme.md"):
-            with open(path, "rb") as f:
-                from .readme import description_from_readme_md
-
-                contents = f.read().decode("utf-8", "surrogateescape")
-                description, extra_md = description_from_readme_md(contents)
-        elif path.lower().endswith("readme.rst"):
-            with open(path, "rb") as f:
-                from .readme import description_from_readme_rst
-
-                contents = f.read().decode("utf-8", "surrogateescape")
-                description, extra_md = description_from_readme_rst(contents)
-        elif path.lower().endswith("readme"):
-            with open(path, "rb") as f:
-                from .readme import description_from_readme_plain
-
-                contents = f.read().decode("utf-8", "surrogateescape")
-                description, extra_md = description_from_readme_plain(contents)
-        else:
-            description = None
-            extra_md = []
-        if description is not None:
-            yield UpstreamDatum("Description", description, certainty="possible")
-        yield from extra_md
-        if path.lower().endswith("readme.pod"):
-            with open(path, "rb") as f:
-                yield from guess_from_pod(f.read())
-    except IsADirectoryError:
-        pass
-
-    def prefer_public(url):
-        parsed_url = urlparse(url)
-        if "ssh" in parsed_url.scheme:
-            return 1
-        return 0
-
-    urls.sort(key=prefer_public)
-    if urls:
-        yield UpstreamDatum("Repository", urls[0], certainty="possible")
 
 
 def guess_upstream_metadata_items(
@@ -1069,37 +935,6 @@ def check_upstream_metadata(  # noqa: C901
             else:
                 screenshots.certainty = "likely"
         screenshots.value = newvalue
-
-
-def guess_from_pecl_package(package):
-    url = "https://pecl.php.net/packages/%s" % package
-    headers = {"User-Agent": USER_AGENT}
-    try:
-        f = urlopen(Request(url, headers=headers), timeout=PECL_URLLIB_TIMEOUT)
-    except urllib.error.HTTPError as e:
-        if e.code != 404:
-            raise
-        return
-    except (socket.timeout, TimeoutError):
-        logger.warning("timeout contacting pecl, ignoring: %s", url)
-        return
-    try:
-        from bs4 import BeautifulSoup, Tag
-    except ModuleNotFoundError:
-        logger.warning("bs4 missing so unable to scan pecl page, ignoring %s", url)
-        return
-    bs = BeautifulSoup(f.read(), features="lxml")
-    tag = bs.find("a", text="Browse Source")
-    if isinstance(tag, Tag):
-        yield "Repository-Browse", tag.attrs["href"]
-    tag = bs.find("a", text="Package Bugs")
-    if isinstance(tag, Tag):
-        yield "Bug-Database", tag.attrs["href"]
-    label_tag = bs.find("th", text="Homepage")
-    if isinstance(label_tag, Tag) and label_tag.parent is not None:
-        tag = label_tag.parent.find("a")
-        if isinstance(tag, Tag):
-            yield "Homepage", tag.attrs["href"]
 
 
 guess_from_aur = _upstream_ontologist.guess_from_aur

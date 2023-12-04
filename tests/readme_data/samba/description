@@ -10,7 +10,7 @@ Desktops into Active Directory environments. It can function both as a
 domain controller or as a regular domain member.
 
 For the AD DC implementation a full HOWTO is provided at:
-      https://wiki.samba.org/index.php/Samba4/HOWTO
+https://wiki.samba.org/index.php/Samba4/HOWTO
 
 Community guidelines can be read at:
-      https://wiki.samba.org/index.php/How_to_do_Samba:_Nicely
+https://wiki.samba.org/index.php/How_to_do_Samba:_Nicely

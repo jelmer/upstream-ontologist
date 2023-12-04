@@ -12,12 +12,14 @@ pub mod launchpad;
 pub mod maven;
 pub mod meson;
 pub mod metainfo;
+pub mod nuspec;
 #[cfg(feature = "opam")]
 pub mod ocaml;
 pub mod package_json;
 pub mod package_xml;
 pub mod package_yaml;
 pub mod perl;
+pub mod php;
 pub mod pubspec;
 pub mod python;
 pub mod r;

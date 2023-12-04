@@ -559,7 +559,7 @@ pub fn guess_from_debian_copyright(
             if let Some(repo_url) = crate::vcs::guess_repo_from_url(&url, None) {
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Repository(repo_url),
-                    certainty: Some(Certainty::Likely),
+                    certainty: Some(Certainty::Confident),
                     origin: Some(path.to_string_lossy().to_string()),
                 });
             }
@@ -614,7 +614,7 @@ pub fn guess_from_debian_watch(
                     if let Some(repo) = crate::vcs::guess_repo_from_url(&url, None) {
                         ret.push(UpstreamDatumWithMetadata {
                             datum: UpstreamDatum::Repository(repo),
-                            certainty: Some(Certainty::Likely),
+                            certainty: Some(Certainty::Confident),
                             origin: origin.clone(),
                         });
                     }
@@ -651,7 +651,7 @@ https://github.com/jelmer/dulwich/tags/dulwich-(.*).tar.gz
             vec![
                 UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Repository("https://github.com/jelmer/dulwich".to_string()),
-                    certainty: Some(Certainty::Likely),
+                    certainty: Some(Certainty::Confident),
                     origin: Some(path.to_string_lossy().to_string()),
                 }],
             guess_from_debian_watch(&path, false).unwrap());

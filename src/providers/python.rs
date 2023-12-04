@@ -810,7 +810,8 @@ fn guess_from_setup_py_parsed(
             }
         };
 
-        let ast_dict = py.import("ast.Dict").unwrap();
+        let ast = py.import("ast").unwrap();
+        let ast_dict = ast.getattr("Dict").unwrap();
 
         let get_dict_from_expr = |expr: &PyAny| -> Option<HashMap<String, String>> {
             if expr.is_instance(ast_dict).ok()? {
@@ -961,6 +962,10 @@ fn guess_from_setup_py_parsed(
                         });
                     }
                 }
+                // Handled above
+                "author_email" | "maintainer_email" => {},
+                // Irrelevant
+                "rust_extensions" | "data_files" => {},
                 _ => {
                     warn!("Unknown key in setup.py: {}", key);
                 }

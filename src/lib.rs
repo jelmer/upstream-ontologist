@@ -206,37 +206,68 @@ impl FromPyObject<'_> for Person {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum UpstreamDatum {
+    /// Name of the project
     Name(String),
+    /// URL to project homepage
     Homepage(String),
+    /// URL to the project's source code repository
     Repository(String),
+    /// URL to browse the project's source code repository
     RepositoryBrowse(String),
+    /// Long description of the project
     Description(String),
+    /// Short summary of the project (one line)
     Summary(String),
+    /// License name or SPDX identifier
     License(String),
+    /// List of authors
     Author(Vec<Person>),
+    /// List of maintainers
     Maintainer(Person),
+    /// URL of the project's issue tracker
     BugDatabase(String),
+    /// URL to submit a new bug
     BugSubmit(String),
+    /// URL to the project's contact page or email address
     Contact(String),
+    /// Cargo crate name
     CargoCrate(String),
+    /// Name of the security page name
     SecurityMD(String),
+    /// URL to the security page or email address
     SecurityContact(String),
+    /// Last version of the project
     Version(String),
+    /// List of keywords
     Keywords(Vec<String>),
+    /// Copyright notice
     Copyright(String),
+    /// URL to the project's documentation
     Documentation(String),
+    /// Go import path
     GoImportPath(String),
+    /// URL to the project's download page
     Download(String),
+    /// URL to the project's wiki
     Wiki(String),
+    /// URL to the project's mailing list
     MailingList(String),
+    /// SourceForge project name
     SourceForgeProject(String),
     Archive(String),
+    /// URL to a demo instance
     Demo(String),
+    /// PHP PECL package name
     PeclPackage(String),
+    /// URL to the funding page
     Funding(String),
+    /// URL to the changelog
     Changelog(String),
+    /// Haskell package name
     HaskellPackage(String),
+    /// Debian ITP (Intent To Package) bug number
     DebianITP(i32),
+    /// List of URLs to screenshots
     Screenshots(Vec<String>),
 }
 
@@ -1422,140 +1453,6 @@ pub fn guess_from_environment() -> std::result::Result<Vec<UpstreamDatumWithMeta
     Ok(results)
 }
 
-// Documentation: https://docs.microsoft.com/en-us/nuget/reference/nuspec
-pub fn guess_from_nuspec(
-    path: &Path,
-    _trust_package: bool,
-) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
-    const NAMESPACES: &[&str] = &["http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd"];
-    // XML parsing and other logic
-    let root = match xmlparse_simplify_namespaces(path, NAMESPACES) {
-        Some(root) => root,
-        None => {
-            return Err(crate::ProviderError::ParseError(
-                "Unable to parse nuspec".to_string(),
-            ));
-        }
-    };
-
-    assert_eq!(root.name, "package", "root tag is {}", root.name);
-    let metadata = root.get_child("metadata");
-    if metadata.is_none() {
-        return Err(ProviderError::ParseError(
-            "Unable to find metadata tag".to_string(),
-        ));
-    }
-    let metadata = metadata.unwrap();
-
-    let mut result = Vec::new();
-
-    if let Some(version_tag) = metadata.get_child("version") {
-        if let Some(version) = version_tag.get_text() {
-            result.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Version(version.into_owned()),
-                certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
-            });
-        }
-    }
-
-    if let Some(description_tag) = metadata.get_child("description") {
-        if let Some(description) = description_tag.get_text() {
-            result.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Description(description.into_owned()),
-                certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
-            });
-        }
-    }
-
-    if let Some(authors_tag) = metadata.get_child("authors") {
-        if let Some(authors) = authors_tag.get_text() {
-            let authors = authors.split(',').map(Person::from).collect();
-            result.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Author(authors),
-                certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
-            });
-        }
-    }
-
-    if let Some(project_url_tag) = metadata.get_child("projectUrl") {
-        if let Some(project_url) = project_url_tag.get_text() {
-            let repo_url = vcs::guess_repo_from_url(&url::Url::parse(&project_url).unwrap(), None);
-            if let Some(repo_url) = repo_url {
-                result.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Repository(repo_url),
-                    certainty: Some(Certainty::Confident),
-                    origin: Some(path.to_string_lossy().to_string()),
-                });
-            }
-            result.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Homepage(project_url.into_owned()),
-                certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
-            });
-        }
-    }
-
-    if let Some(license_tag) = metadata.get_child("license") {
-        if let Some(license) = license_tag.get_text() {
-            result.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::License(license.into_owned()),
-                certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
-            });
-        }
-    }
-
-    if let Some(copyright_tag) = metadata.get_child("copyright") {
-        if let Some(copyright) = copyright_tag.get_text() {
-            result.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Copyright(copyright.into_owned()),
-                certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
-            });
-        }
-    }
-
-    if let Some(title_tag) = metadata.get_child("title") {
-        if let Some(title) = title_tag.get_text() {
-            result.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Name(title.into_owned()),
-                certainty: Some(Certainty::Likely),
-                origin: Some(path.to_string_lossy().to_string()),
-            });
-        }
-    }
-
-    if let Some(summary_tag) = metadata.get_child("summary") {
-        if let Some(summary) = summary_tag.get_text() {
-            result.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Summary(summary.into_owned()),
-                certainty: Some(Certainty::Likely),
-                origin: Some(path.to_string_lossy().to_string()),
-            });
-        }
-    }
-
-    if let Some(repository_tag) = metadata.get_child("repository") {
-        if let Some(repo_url) = repository_tag.attributes.get("url") {
-            let branch = repository_tag.attributes.get("branch");
-            result.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Repository(vcs::unsplit_vcs_url(&vcs::VcsLocation {
-                    url: repo_url.parse().unwrap(),
-                    branch: branch.cloned(),
-                    subpath: None,
-                })),
-                certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
-            });
-        }
-    }
-
-    Ok(result)
-}
-
 fn find_datum<'a>(
     metadata: &'a [UpstreamDatumWithMetadata],
     field: &str,
@@ -2486,7 +2383,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
         }).collect::<Vec<_>>();
 
         for filename in readme_filenames {
-            candidates.push((filename.to_string_lossy().to_string(), Box::new(|path, s| crate::guess_from_readme(path, s.trust_package))));
+            candidates.push((filename.to_string_lossy().to_string(), Box::new(|path, s| crate::readme::guess_from_readme(path, s.trust_package))));
         }
 
         let mut nuspec_filenames = std::fs::read_dir(&path).unwrap().filter_map(|entry| {
@@ -2500,7 +2397,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
 
         if nuspec_filenames.len() == 1 {
             let nuspec_filename = nuspec_filenames.remove(0);
-            candidates.push((nuspec_filename.to_string_lossy().to_string(), Box::new(|path, s| crate::guess_from_nuspec(path, s.trust_package))));
+            candidates.push((nuspec_filename.to_string_lossy().to_string(), Box::new(|path, s| crate::providers::nuspec::guess_from_nuspec(path, s.trust_package))));
         } else if nuspec_filenames.len() > 1 {
             log::warn!("Multiple nuspec files found: {:?}, ignoring all.", nuspec_filenames);
         }
@@ -2607,31 +2504,4 @@ impl Iterator for UpstreamMetadataScanner {
 pub fn guess_upstream_info(
     path: &std::path::Path, trust_package: Option<bool>) -> impl Iterator<Item = Result<UpstreamDatumWithMetadata, ProviderError>> {
     UpstreamMetadataScanner::from_path(path, trust_package)
-}
-
-pub fn guess_from_readme(path: &std::path::Path, trust_package: bool) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
-    Python::with_gil(|py| -> PyResult<Vec<UpstreamDatumWithMetadata>> {
-        let m =py.import("upstream_ontologist.guess").unwrap();
-        let guess = m.getattr("guess_from_readme").unwrap();
-
-        let it = guess.call1((path.to_string_lossy().to_string(), trust_package))?;
-
-        let mut result = Vec::new();
-        loop {
-            match it.call_method0("__next__") {
-                Ok(v) => {
-                    let v: UpstreamDatumWithMetadata = v.extract().unwrap();
-                    result.push(v);
-                }
-                Err(e) => {
-                    if e.get_type(py).name().unwrap() == "StopIteration" {
-                        break;
-                    }
-                    return Err(e);
-                }
-            }
-        }
-
-        Ok(result)
-    }).map_err(ProviderError::Python)
 }
