@@ -18,6 +18,7 @@ static USER_AGENT: &str = concat!("upstream-ontologist/", env!("CARGO_PKG_VERSIO
 const DEFAULT_URLLIB_TIMEOUT: u64 = 3;
 
 pub mod debian;
+pub mod extrapolate;
 pub mod providers;
 pub mod readme;
 pub mod vcs;
@@ -87,44 +88,87 @@ impl From<&str> for Person {
                 if p2.starts_with("https://") || p2.starts_with("http://") {
                     let url = p2.to_string();
                     if let Some((name, email)) = parseaddr(p1) {
-                        return Person {
+                        Person {
                             name: Some(name),
                             email: Some(email),
                             url: Some(url),
-                        };
+                        }
                     } else {
-                        return Person {
+                        Person {
                             name: Some(p1.to_string()),
                             url: Some(url),
                             ..Default::default()
-                        };
+                        }
                     }
                 } else if p2.contains('@') {
-                    return Person {
+                    Person {
                         name: Some(p1.to_string()),
                         email: Some(p2.to_string()),
                         ..Default::default()
-                    };
+                    }
+                } else {
+                    Person {
+                        name: Some(text.to_string()),
+                        ..Default::default()
+                    }
                 }
-                return Person {
+            } else {
+                Person {
                     name: Some(text.to_string()),
                     ..Default::default()
-                };
+                }
             }
         } else if text.contains('<') {
             if let Some((name, email)) = parseaddr(text.as_str()) {
                 return Person {
-                    name: Some(name),
+                name: Some(name),
                     email: Some(email),
                     ..Default::default()
                 };
+            } else {
+                Person {
+                    name: Some(text.to_string()),
+                    ..Default::default()
+                }
+            }
+        } else if text.contains('@') && !text.contains(' ') {
+            return Person {
+                email: Some(text.to_string()),
+                ..Default::default()
+            };
+        } else {
+            Person {
+                name: Some(text),
+                ..Default::default()
             }
         }
+    }
+}
 
-        Person {
-            name: Some(text),
-            ..Default::default()
-        }
+#[cfg(test)]
+mod person_tests {
+    use super::*;
+
+    #[test]
+    fn test_from_str() {
+        assert_eq!(
+            Person::from("Foo Bar <foo@example.com>"), Person {
+                name: Some("Foo Bar".to_string()),
+                email: Some("foo@example.com".to_string()),
+                url: None
+            });
+        assert_eq!(
+            Person::from("Foo Bar"), Person {
+                name: Some("Foo Bar".to_string()),
+                email: None,
+                url: None
+            });
+        assert_eq!(
+            Person::from("foo@example.com"), Person {
+                name: None,
+                email: Some("foo@example.com".to_string()),
+                url: None
+            });
     }
 }
 
@@ -196,7 +240,7 @@ pub enum UpstreamDatum {
     Screenshots(Vec<String>),
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct UpstreamDatumWithMetadata {
     pub datum: UpstreamDatum,
     pub origin: Option<String>,
@@ -490,13 +534,17 @@ impl ToPyObject for UpstreamDatumWithMetadata {
             .to_object(py)
             .extract::<(String, PyObject)>(py)
             .unwrap();
+
+        let kwargs = pyo3::types::PyDict::new(py);
+        kwargs.set_item("certainty", self.certainty.map(|x| x.to_string())).unwrap();
+        kwargs.set_item("origin", self.origin.as_ref()).unwrap();
+
+
         let datum = cls
-            .call1((
+            .call((
                 field,
                 py_datum,
-                self.certainty.map(|x| x.to_string()),
-                self.origin.as_ref(),
-            ))
+            ), Some(kwargs))
             .unwrap();
 
         datum.to_object(py)
@@ -2149,15 +2197,13 @@ impl ToPyObject for UpstreamDatum {
 
 impl FromPyObject<'_> for UpstreamDatumWithMetadata {
     fn extract(obj: &PyAny) -> PyResult<Self> {
-        let (datum, certainty, origin) = if obj.hasattr("datum")? {
-            let datum = obj.getattr("datum")?.extract::<UpstreamDatum>()?;
-            let certainty = obj.getattr("certainty")?.extract::<Option<String>>()?;
-            let origin = obj.getattr("origin")?.extract::<Option<String>>()?;
-            (datum, certainty, origin)
+        let certainty = obj.getattr("certainty")?.extract::<Option<String>>()?;
+        let origin = obj.getattr("origin")?.extract::<Option<String>>()?;
+        let datum = if obj.hasattr("datum")? {
+            obj.getattr("datum")?.extract::<UpstreamDatum>()
         } else {
-            let datum = obj.extract::<UpstreamDatum>()?;
-            (datum, None, None)
-        };
+            obj.extract::<UpstreamDatum>()
+        }?;
 
         Ok(UpstreamDatumWithMetadata {
             datum,
@@ -2167,12 +2213,28 @@ impl FromPyObject<'_> for UpstreamDatumWithMetadata {
     }
 }
 
+#[derive(Debug)]
 pub enum ProviderError {
     ParseError(String),
     IoError(std::io::Error),
     Other(String),
     HttpJsonError(HTTPJSONError),
+    Python(PyErr)
 }
+
+impl std::fmt::Display for ProviderError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ProviderError::ParseError(e) => write!(f, "Parse error: {}", e),
+            ProviderError::IoError(e) => write!(f, "IO error: {}", e),
+            ProviderError::Other(e) => write!(f, "Other error: {}", e),
+            ProviderError::HttpJsonError(e) => write!(f, "HTTP JSON error: {}", e),
+            ProviderError::Python(e) => write!(f, "Python error: {}", e),
+        }
+    }
+}
+
+impl std::error::Error for ProviderError {}
 
 impl From<HTTPJSONError> for ProviderError {
     fn from(e: HTTPJSONError) -> Self {
@@ -2201,6 +2263,7 @@ impl From<ProviderError> for PyErr {
             ProviderError::ParseError(e) => ParseError::new_err((e,)),
             ProviderError::Other(e) => PyRuntimeError::new_err((e,)),
             ProviderError::HttpJsonError(e) => PyRuntimeError::new_err((e.to_string(),)),
+            ProviderError::Python(e) => e
         }
     }
 }
@@ -2242,4 +2305,333 @@ impl ToPyObject for UpstreamVersion {
     fn to_object(&self, py: Python) -> PyObject {
         self.0.to_object(py)
     }
+}
+
+#[derive(Debug)]
+pub struct GuesserSettings {
+    pub trust_package: bool,
+}
+
+pub struct UpstreamMetadataGuesser {
+    pub name: std::path::PathBuf,
+    pub guess: Box<dyn FnOnce(&GuesserSettings) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>>,
+}
+
+impl std::fmt::Debug for UpstreamMetadataGuesser {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("UpstreamMetadataGuesser")
+            .field("name", &self.name)
+            .finish()
+    }
+}
+
+const STATIC_GUESSERS: &[(&str, fn(&std::path::Path, bool) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>)] = &[
+        ("debian/watch", crate::providers::debian::guess_from_debian_watch),
+        ("debian/control", crate::providers::debian::guess_from_debian_control),
+        ("debian/changelog", crate::providers::debian::guess_from_debian_changelog),
+        ("debian/rules", crate::providers::debian::guess_from_debian_rules),
+        ("PKG-INFO", crate::providers::python::guess_from_pkg_info),
+        ("package.json", crate::providers::package_json::guess_from_package_json),
+        ("composer.json", crate::providers::composer_json::guess_from_composer_json),
+        ("package.xml", crate::providers::package_xml::guess_from_package_xml),
+        ("package.yaml", crate::providers::package_yaml::guess_from_package_yaml),
+        ("dist.ini", crate::providers::perl::guess_from_dist_ini),
+        ("debian/copyright", crate::providers::debian::guess_from_debian_copyright),
+        ("META.json", crate::providers::perl::guess_from_meta_json),
+        ("MYMETA.json", crate::providers::perl::guess_from_meta_json),
+        ("META.yml", crate::providers::perl::guess_from_meta_yml),
+        ("MYMETA.yml", crate::providers::perl::guess_from_meta_yml),
+        ("configure", crate::providers::autoconf::guess_from_configure),
+        ("DESCRIPTION", crate::providers::r::guess_from_r_description),
+        ("Cargo.toml", crate::providers::rust::guess_from_cargo),
+        ("pom.xml", crate::providers::maven::guess_from_pom_xml),
+        (".git/config", crate::providers::git::guess_from_git_config),
+        ("debian/get-orig-source.sh", crate::vcs_command::guess_from_get_orig_source),
+        ("pyproject.toml", crate::providers::python::guess_from_pyproject_toml),
+        ("setup.cfg", crate::providers::python::guess_from_setup_cfg),
+        ("go.mod", crate::providers::go::guess_from_go_mod),
+        ("Makefile.PL", crate::providers::perl::guess_from_makefile_pl),
+        ("wscript", crate::providers::waf::guess_from_wscript),
+        ("AUTHORS", crate::providers::authors::guess_from_authors),
+        ("INSTALL", crate::providers::guess_from_install),
+        ("pubspec.yaml", crate::providers::pubspec::guess_from_pubspec_yaml),
+        ("pubspec.yml", crate::providers::pubspec::guess_from_pubspec_yaml),
+        ("meson.build", crate::providers::meson::guess_from_meson),
+        ("metadata.json", crate::guess_from_metadata_json),
+        (".travis.yml", crate::guess_from_travis_yml),
+];
+
+fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
+    let mut candidates: Vec<(String, Box<dyn FnOnce(&std::path::Path, &GuesserSettings) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>>)> = Vec::new();
+
+    let path = path.canonicalize().unwrap();
+
+    for (name, cb) in STATIC_GUESSERS {
+        let subpath = path.join(name);
+        if subpath.exists() {
+            candidates.push((name.to_string(), Box::new(move |_path, s: &GuesserSettings| cb(&subpath, s.trust_package))));
+        }
+    }
+
+    for name in ["SECURITY.md", ".github/SECURITY.md", "docs/SECURITY.md"].iter() {
+        if path.join(name).exists() {
+            candidates.push((name.to_string(), Box::new(move |path, s: &GuesserSettings| crate::providers::security_md::guess_from_security_md(name, path, s.trust_package))));
+        }
+    }
+
+        let mut found_pkg_info = path.join("PKG-INFO").exists();
+        for entry in std::fs::read_dir(&path).unwrap() {
+            let entry = entry.unwrap();
+            let filename = entry.file_name().to_string_lossy().to_string();
+            if filename.ends_with(".egg-info") {
+                candidates.push((format!("{}/PKG-INFO", filename), Box::new(move |_path, s| crate::providers::python::guess_from_pkg_info(entry.path().join("PKG-INFO").as_path(), s.trust_package))));
+                found_pkg_info = true;
+            } else if filename.ends_with(".dist-info") {
+                candidates.push((format!("{}/METADATA", filename), Box::new(move |_path, s| crate::providers::python::guess_from_pkg_info(entry.path().join("PKG-INFO").as_path(), s.trust_package))));
+                found_pkg_info = true;
+            }
+        }
+
+        if !found_pkg_info && path.join("setup.py").exists(){
+            candidates.push(("setup.py".to_string(), Box::new(|path, s| crate::providers::python::guess_from_setup_py(path, s.trust_package))));
+        }
+
+        for entry in std::fs::read_dir(&path).unwrap() {
+            let entry = entry.unwrap();
+
+            if entry.file_name().to_string_lossy().ends_with(".gemspec") {
+                candidates.push((entry.file_name().to_string_lossy().to_string(), Box::new(move |_path, s| crate::providers::ruby::guess_from_gemspec(entry.path().as_path(), s.trust_package))));
+            }
+        }
+
+        // TODO(jelmer): Perhaps scan all directories if no other primary project information file has been found?
+        for entry in std::fs::read_dir(&path).unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path();
+
+            if entry.file_type().unwrap().is_dir() {
+                let description_name = format!("{}/DESCRIPTION", entry.file_name().to_string_lossy());
+                if path.join(&description_name).exists() {
+                    candidates.push((description_name, Box::new(move |_path, s| crate::providers::r::guess_from_r_description(entry.path().as_path(), s.trust_package))));
+                }
+            }
+        }
+
+        let mut doap_filenames = std::fs::read_dir(&path).unwrap().filter_map(|entry| {
+            let entry = entry.unwrap();
+            let filename = entry.file_name().to_string_lossy().to_string();
+            if filename.ends_with(".doap") || (filename.ends_with(".xml") && filename.starts_with("doap_XML_")) {
+                Some(entry.file_name())
+            } else {
+                None
+            }
+        }).collect::<Vec<_>>();
+
+        if doap_filenames.len() == 1 {
+            let doap_filename = doap_filenames.remove(0);
+            candidates.push((doap_filename.to_string_lossy().to_string(), Box::new(|path, s| crate::providers::doap::guess_from_doap(path, s.trust_package))));
+        } else if doap_filenames.len() > 1 {
+            log::warn!("Multiple DOAP files found: {:?}, ignoring all.", doap_filenames);
+        }
+
+        let mut metainfo_filenames = std::fs::read_dir(&path).unwrap().filter_map(|entry| {
+            let entry = entry.unwrap();
+            if entry.file_name().to_string_lossy().ends_with(".metainfo.xml") {
+                Some(entry.file_name())
+            } else {
+                None
+            }
+        }).collect::<Vec<_>>();
+
+        if metainfo_filenames.len() == 1 {
+            let metainfo_filename = metainfo_filenames.remove(0);
+            candidates.push((metainfo_filename.to_string_lossy().to_string(), Box::new(|path, s| crate::providers::metainfo::guess_from_metainfo(path, s.trust_package))));
+        } else if metainfo_filenames.len() > 1 {
+            log::warn!("Multiple metainfo files found: {:?}, ignoring all.", metainfo_filenames);
+        }
+
+        let mut cabal_filenames = std::fs::read_dir(&path).unwrap().filter_map(|entry| {
+            let entry = entry.unwrap();
+            if entry.file_name().to_string_lossy().ends_with(".cabal") {
+                Some(entry.file_name())
+            } else {
+                None
+            }
+        }).collect::<Vec<_>>();
+
+        if cabal_filenames.len() == 1 {
+            let cabal_filename = cabal_filenames.remove(0);
+            candidates.push((cabal_filename.to_string_lossy().to_string(), Box::new(|path, s| crate::providers::haskell::guess_from_cabal(path, s.trust_package))));
+        } else if cabal_filenames.len() > 1 {
+            log::warn!("Multiple cabal files found: {:?}, ignoring all.", cabal_filenames);
+        }
+
+        let readme_filenames = std::fs::read_dir(&path).unwrap().filter_map(|entry| {
+            let entry = entry.unwrap();
+            let filename = entry.file_name().to_string_lossy().to_string();
+            if !(filename.to_lowercase().starts_with("readme") || filename.to_lowercase().starts_with("hacking") || filename.to_lowercase().starts_with("contributing")) {
+                return None;
+            }
+
+            if filename.ends_with('~') {
+                return None;
+            }
+
+            let extension = entry.path().extension().map(|s| s.to_string_lossy().to_string());
+
+            if extension.as_deref() == Some("html") || extension.as_deref() == Some("pdf") || extension.as_deref() == Some("xml") {
+                return None;
+            }
+            Some(entry.file_name())
+        }).collect::<Vec<_>>();
+
+        for filename in readme_filenames {
+            candidates.push((filename.to_string_lossy().to_string(), Box::new(|path, s| crate::guess_from_readme(path, s.trust_package))));
+        }
+
+        let mut nuspec_filenames = std::fs::read_dir(&path).unwrap().filter_map(|entry| {
+            let entry = entry.unwrap();
+            if entry.file_name().to_string_lossy().ends_with(".nuspec") {
+                Some(entry.file_name())
+            } else {
+                None
+            }
+        }).collect::<Vec<_>>();
+
+        if nuspec_filenames.len() == 1 {
+            let nuspec_filename = nuspec_filenames.remove(0);
+            candidates.push((nuspec_filename.to_string_lossy().to_string(), Box::new(|path, s| crate::guess_from_nuspec(path, s.trust_package))));
+        } else if nuspec_filenames.len() > 1 {
+            log::warn!("Multiple nuspec files found: {:?}, ignoring all.", nuspec_filenames);
+        }
+
+        let mut opam_filenames = std::fs::read_dir(&path).unwrap().filter_map(|entry| {
+            let entry = entry.unwrap();
+            if entry.file_name().to_string_lossy().ends_with(".opam") {
+                Some(entry.file_name())
+            } else {
+                None
+            }
+        }).collect::<Vec<_>>();
+
+        if opam_filenames.len() == 1 {
+            let opam_filename = opam_filenames.remove(0);
+            candidates.push((opam_filename.to_string_lossy().to_string(), Box::new(|path, s| crate::providers::ocaml::guess_from_opam(path, s.trust_package))));
+        } else if opam_filenames.len() > 1 {
+            log::warn!("Multiple opam files found: {:?}, ignoring all.", opam_filenames);
+        }
+
+        let debian_patches = match std::fs::read_dir(path.join("debian").join("patches")) {
+            Ok(patches) => {
+                patches.filter_map(|entry| {
+                    let entry = entry.unwrap();
+                    if entry.file_name().to_string_lossy().ends_with(".patch") {
+                        Some(format!("debian/patches/{}", entry.file_name().to_string_lossy()))
+                    } else {
+                        None
+                    }
+                }).collect::<Vec<_>>()
+            },
+            Err(_) => Vec::new(),
+        };
+
+        for filename in debian_patches {
+            candidates.push((filename.clone(), Box::new(|path, s| crate::providers::debian::guess_from_debian_patch(path, s.trust_package))));
+        }
+
+    candidates.push(("environment".to_string(), Box::new(|_path, _| crate::guess_from_environment())));
+    candidates.push((".".to_string(), Box::new(|path, s| crate::guess_from_path(path, s.trust_package))));
+
+    candidates.into_iter().filter_map(|(name, cb)| {
+        assert!(name.len() > 0 && !name.starts_with('/'), "invalid name: {}", name);
+        let path = path.join(name);
+        Some(UpstreamMetadataGuesser {
+            name: path.clone(),
+            guess: Box::new(move |s| cb(&path, s)),
+        })
+    }).collect()
+}
+
+pub struct UpstreamMetadataScanner{
+    path: std::path::PathBuf,
+    config: GuesserSettings,
+    pending: Vec<UpstreamDatumWithMetadata>,
+    guessers: Vec<UpstreamMetadataGuesser>,
+}
+
+impl UpstreamMetadataScanner {
+    pub fn from_path(path: &std::path::Path, trust_package: Option<bool>) -> Self {
+        let trust_package = trust_package.unwrap_or(false);
+
+        let guessers = find_guessers(path);
+
+        Self {
+            path: path.to_path_buf(),
+            pending: Vec::new(),
+            config: GuesserSettings {
+                trust_package,
+            },
+            guessers,
+        }
+
+    }
+}
+
+impl Iterator for UpstreamMetadataScanner {
+    type Item = Result<UpstreamDatumWithMetadata, ProviderError>;
+
+    fn next(&mut self) -> Option<Result<UpstreamDatumWithMetadata, ProviderError>> {
+        loop {
+            if !self.pending.is_empty() {
+                return Some(Ok(self.pending.remove(0)));
+            }
+
+            if self.guessers.is_empty() {
+                return None;
+            }
+
+            let guesser = self.guessers.remove(0);
+
+            let guess = (guesser.guess)(&self.config);
+            match guess {
+                Ok(entries) => {
+                    self.pending.extend(entries.into_iter().map(|mut e| { e.origin = e.origin.or(Some(guesser.name.display().to_string())); e} ));
+                }
+                Err(e) => { return Some(Err(e)); }
+            }
+        }
+    }
+}
+
+
+pub fn guess_upstream_info(
+    path: &std::path::Path, trust_package: Option<bool>) -> impl Iterator<Item = Result<UpstreamDatumWithMetadata, ProviderError>> {
+    UpstreamMetadataScanner::from_path(path, trust_package)
+}
+
+pub fn guess_from_readme(path: &std::path::Path, trust_package: bool) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    Python::with_gil(|py| -> PyResult<Vec<UpstreamDatumWithMetadata>> {
+        let m =py.import("upstream_ontologist.guess").unwrap();
+        let guess = m.getattr("guess_from_readme").unwrap();
+
+        let it = guess.call1((path.to_string_lossy().to_string(), trust_package))?;
+
+        let mut result = Vec::new();
+        loop {
+            match it.call_method0("__next__") {
+                Ok(v) => {
+                    let v: UpstreamDatumWithMetadata = v.extract().unwrap();
+                    result.push(v);
+                }
+                Err(e) => {
+                    if e.get_type(py).name().unwrap() == "StopIteration" {
+                        break;
+                    }
+                    return Err(e);
+                }
+            }
+        }
+
+        Ok(result)
+    }).map_err(ProviderError::Python)
 }

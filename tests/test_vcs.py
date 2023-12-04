@@ -95,7 +95,7 @@ class FindPublicVcsUrlTests(TestCase):
 class FixupRcpStyleUrlTests(TestCase):
     def test_fixup(self):
         try:
-            import breezy   # noqa: F401
+            import breezy  # noqa: F401
         except ModuleNotFoundError:
             self.skipTest("breezy is not available")
         self.assertEqual(

@@ -35,23 +35,27 @@ __all__ = [
 ]
 
 from ._upstream_ontologist import (  # noqa: F401
+    KNOWN_GITLAB_SITES,
+    SECURE_SCHEMES,
     browse_url_from_repo_url,
     canonical_git_repo_url,
     check_repository_url_canonical,
     convert_cvs_list_to_str,
     drop_vcs_in_scheme,
     find_public_repo_url,
+    find_secure_repo_url,
+    fixup_broken_git_details,
+    fixup_rcp_style_git_repo_url,
     guess_repo_from_url,
     is_gitlab_site,
     probe_gitlab_host,
     probe_upstream_branch_url,
-    unsplit_vcs_url,
-    fixup_rcp_style_git_repo_url,
-    SECURE_SCHEMES,
-    KNOWN_GITLAB_SITES,
-    plausible_vcs_browse_url as plausible_browse_url,
-    plausible_vcs_url as plausible_url,
-    find_secure_repo_url,
     sanitize_url,
-    fixup_broken_git_details,
+    unsplit_vcs_url,
+)
+from ._upstream_ontologist import (
+    plausible_vcs_browse_url as plausible_browse_url,
+)
+from ._upstream_ontologist import (
+    plausible_vcs_url as plausible_url,
 )

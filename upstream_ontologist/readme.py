@@ -48,7 +48,7 @@ def _skip_paragraph_block(para):  # noqa: C901
             else:
                 name = None
             if name in ("CRAN", "CRAN_Status_Badge", "CRAN_Logs_Badge"):
-                extra_metadata.append(UpstreamDatum("Archive", "CRAN", "confident"))
+                extra_metadata.append(UpstreamDatum("Archive", "CRAN", certainty="confident"))
             elif name == "Gitter":
                 parsed_url = urlparse(c.get("href"))
                 extra_metadata.append(
@@ -56,7 +56,7 @@ def _skip_paragraph_block(para):  # noqa: C901
                         "Repository",
                         "https://github.com/%s"
                         % "/".join(parsed_url.path.strip("/").split("/")[:2]),
-                        "confident",
+                        certainty="confident",
                     )
                 )
             elif name and name.lower() == "build status":
@@ -67,32 +67,32 @@ def _skip_paragraph_block(para):  # noqa: C901
                             "Repository",
                             "https://github.com/%s"
                             % "/".join(parsed_url.path.strip("/").split("/")[:2]),
-                            "confident",
+                            certainty="confident",
                         )
                     )
             elif name and name.lower() == "documentation":
                 extra_metadata.append(
-                    UpstreamDatum("Documentation", c.get("href"), "confident")
+                    UpstreamDatum("Documentation", c.get("href"), certainty="confident")
                 )
             elif name and name.lower() == "api docs":
                 extra_metadata.append(
-                    UpstreamDatum("API-Documentation", c.get("href"), "confident")
+                    UpstreamDatum("API-Documentation", c.get("href"), certainty="confident")
                 )
             elif name and name.lower() == "downloads":
                 extra_metadata.append(
-                    UpstreamDatum("Download", c.get("href"), "confident")
+                    UpstreamDatum("Download", c.get("href"), certainty="confident")
                 )
             elif name and name.lower() == "crates.io":
                 href = c.get("href")
                 if href.startswith("https://crates.io/crates/"):
                     extra_metadata.append(
-                        UpstreamDatum("Cargo-Crate", href.rsplit("/")[-1], "confident")
+                        UpstreamDatum("Cargo-Crate", href.rsplit("/")[-1], certainty="confident")
                     )
             elif name:
                 m = re.match("(.*) License", name)
                 if m:
                     extra_metadata.append(
-                        UpstreamDatum("License", m.group(1), "likely")
+                        UpstreamDatum("License", m.group(1), certainty="likely")
                     )
                 else:
                     logger.debug("Unhandled field %r in README", name)
@@ -141,11 +141,11 @@ def _parse_first_header(el):
             certainty = "likely"
         if name.startswith("About "):
             name = name[len("About ") :]
-        yield UpstreamDatum("Name", name.strip(), certainty)
+        yield UpstreamDatum("Name", name.strip(), certainty=certainty)
     if summary:
-        yield UpstreamDatum("Summary", summary, "likely")
+        yield UpstreamDatum("Summary", summary, certainty="likely")
     if version:
-        yield UpstreamDatum("Version", version, "likely")
+        yield UpstreamDatum("Version", version, certainty="likely")
 
 
 def _is_semi_header(el):
@@ -215,15 +215,15 @@ def _extract_paragraphs(children, metadata):
 
 def _parse_field(name, body):
     if name == "Homepage" and body.find("a"):
-        yield UpstreamDatum("Homepage", body.find("a").get("href"), "confident")
+        yield UpstreamDatum("Homepage", body.find("a").get("href"), certainty="confident")
     if name == "Home" and body.find("a"):
-        yield UpstreamDatum("Homepage", body.find("a").get("href"), "confident")
+        yield UpstreamDatum("Homepage", body.find("a").get("href"), certainty="confident")
     if name == "Issues" and body.find("a"):
-        yield UpstreamDatum("Bug-Database", body.find("a").get("href"), "confident")
+        yield UpstreamDatum("Bug-Database", body.find("a").get("href"), certainty="confident")
     if name == "Documentation" and body.find("a"):
-        yield UpstreamDatum("Documentation", body.find("a").get("href"), "confident")
+        yield UpstreamDatum("Documentation", body.find("a").get("href"), certainty="confident")
     if name == "License":
-        yield UpstreamDatum("License", body.get_text(), "confident")
+        yield UpstreamDatum("License", body.get_text(), certainty="confident")
 
 
 def _parse_ul_field_list(el):
@@ -355,11 +355,11 @@ def description_from_readme_plain(
     ):
         name, summary, version = _parse_first_header_text(lines[0])
         if name:
-            metadata.append(UpstreamDatum("Name", name, "likely"))
+            metadata.append(UpstreamDatum("Name", name, certainty="likely"))
         if version:
-            metadata.append(UpstreamDatum("Version", version, "likely"))
+            metadata.append(UpstreamDatum("Version", version, certainty="likely"))
         if summary:
-            metadata.append(UpstreamDatum("Summary", summary, "likely"))
+            metadata.append(UpstreamDatum("Summary", summary, certainty="likely"))
         if name or version or summary:
             lines.pop(0)
     else:

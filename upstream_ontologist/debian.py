@@ -17,7 +17,6 @@
 
 from . import _upstream_ontologist
 
-
 upstream_package_to_debian_source_name = _upstream_ontologist.upstream_package_to_debian_source_name
 upstream_package_to_debian_binary_name = _upstream_ontologist.upstream_package_to_debian_binary_name
 

@@ -8,6 +8,7 @@ use pyo3::types::PyDict;
 use pyo3::types::PyTuple;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::collections::HashMap;
 use upstream_ontologist::{CanonicalizeError, UpstreamPackage};
 use url::Url;
 
@@ -767,7 +768,7 @@ fn guess_from_security_md(
             name,
             path.as_path(),
             trust_package,
-        )
+        )?
         .to_object(py),
     )
 }
@@ -1181,6 +1182,27 @@ impl UpstreamMetadata {
     }
 }
 
+#[pyfunction]
+fn guess_upstream_info(
+    py: Python,
+    path: std::path::PathBuf,
+    trust_package: Option<bool>) -> PyResult<Vec<PyObject>> {
+    let mut result = Vec::new();
+
+    for datum in upstream_ontologist::guess_upstream_info(&path, trust_package) {
+        let datum = match datum {
+            Ok(datum) => datum,
+            Err(e) => {
+                log::warn!("Warning: {}", e);
+                continue;
+            }
+        };
+        result.push(datum.to_object(py));
+    }
+
+    Ok(result)
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -1278,6 +1300,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(sanitize_url))?;
     m.add_wrapped(wrap_pyfunction!(convert_cvs_list_to_str))?;
     m.add_wrapped(wrap_pyfunction!(fixup_broken_git_details))?;
+    m.add_wrapped(wrap_pyfunction!(guess_upstream_info))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;

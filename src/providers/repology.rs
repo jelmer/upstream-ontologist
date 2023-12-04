@@ -1,13 +1,14 @@
 use std::collections::HashMap;
 
+#[allow(dead_code)]
 #[derive(serde::Deserialize)]
 struct Project {
-    name: String,
-    status: Option<String>,
-    www: Vec<String>,
-    licenses: Vec<String>,
-    summary: Option<String>,
-    downloads: Vec<String>,
+    pub name: String,
+    pub status: Option<String>,
+    pub www: Vec<String>,
+    pub licenses: Vec<String>,
+    pub summary: Option<String>,
+    pub downloads: Vec<String>,
 }
 
 pub fn guess_from_repology(repology_project: &str) -> Result<Vec<(String, String)>, crate::ProviderError> {

@@ -144,6 +144,7 @@ class UpstreamDatum(Generic[T]):
         self,
         field: str,
         value: T,
+        *,
         certainty: Optional[str] = None,
         origin: Optional[str] = None,
     ) -> None:
