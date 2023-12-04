@@ -59,6 +59,7 @@ get_sf_metadata = _upstream_ontologist.get_sf_metadata
 NoSuchForgeProject = _upstream_ontologist.NoSuchForgeProject
 NoSuchRepologyProject = _upstream_ontologist.NoSuchRepologyProject
 get_repology_metadata = _upstream_ontologist.get_repology_metadata
+guess_from_pod = _upstream_ontologist.guess_from_pod
 
 
 def guess_upstream_info(path, trust_package):
@@ -147,33 +148,17 @@ def update_from_guesses(
 extract_pecl_package_name = _upstream_ontologist.extract_pecl_package_name
 
 
-guess_from_debian_rules = _upstream_ontologist.guess_from_debian_rules
-guess_from_debian_watch = _upstream_ontologist.guess_from_debian_watch
 debian_is_native = _upstream_ontologist.debian_is_native
 
 
-guess_from_debian_control = _upstream_ontologist.guess_from_debian_control
-guess_from_debian_changelog = _upstream_ontologist.guess_from_debian_changelog
 metadata_from_itp_bug_body = _upstream_ontologist.metadata_from_itp_bug_body
 extract_sf_project_name = _upstream_ontologist.extract_sf_project_name
-guess_from_pkg_info = _upstream_ontologist.guess_from_pkg_info
-guess_from_composer_json = _upstream_ontologist.guess_from_composer_json
-guess_from_package_json = _upstream_ontologist.guess_from_package_json
-guess_from_package_xml = _upstream_ontologist.guess_from_package_xml
-guess_from_pod = _upstream_ontologist.guess_from_pod
-guess_from_perl_module = _upstream_ontologist.guess_from_perl_module
-guess_from_perl_dist_name = _upstream_ontologist.guess_from_perl_dist_name
-guess_from_dist_ini = _upstream_ontologist.guess_from_dist_ini
-guess_from_debian_copyright = _upstream_ontologist.guess_from_debian_copyright
 
 url_from_cvs_co_command = _upstream_ontologist.url_from_cvs_co_command
 url_from_svn_co_command = _upstream_ontologist.url_from_svn_co_command
 url_from_git_clone_command = _upstream_ontologist.url_from_git_clone_command
 url_from_fossil_clone_command = _upstream_ontologist.url_from_fossil_clone_command
 url_from_vcs_command = _upstream_ontologist.url_from_vcs_command
-guess_from_meson = _upstream_ontologist.guess_from_meson
-guess_from_pubspec_yaml = _upstream_ontologist.guess_from_pubspec_yaml
-guess_from_install = _upstream_ontologist.guess_from_install
 
 
 def guess_from_readme(path, trust_package):  # noqa: C901
@@ -301,40 +286,6 @@ def guess_from_readme(path, trust_package):  # noqa: C901
     urls.sort(key=prefer_public)
     if urls:
         yield UpstreamDatum("Repository", urls[0], certainty="possible")
-
-
-guess_from_debian_patch = _upstream_ontologist.guess_from_debian_patch
-guess_from_meta_json = _upstream_ontologist.guess_from_meta_json
-guess_from_travis_yml = _upstream_ontologist.guess_from_travis_yml
-guess_from_meta_yml = _upstream_ontologist.guess_from_meta_yml
-guess_from_metainfo = _upstream_ontologist.guess_from_metainfo
-guess_from_doap = _upstream_ontologist.guess_from_doap
-guess_from_opam = _upstream_ontologist.guess_from_opam
-guess_from_nuspec = _upstream_ontologist.guess_from_nuspec
-guess_from_cabal = _upstream_ontologist.guess_from_cabal
-guess_from_cabal_lines = _upstream_ontologist.guess_from_cabal_lines
-guess_from_configure = _upstream_ontologist.guess_from_configure
-guess_from_r_description = _upstream_ontologist.guess_from_r_description
-guess_from_environment = _upstream_ontologist.guess_from_environment
-guess_from_path = _upstream_ontologist.guess_from_path
-guess_from_cargo = _upstream_ontologist.guess_from_cargo
-guess_from_pyproject_toml = _upstream_ontologist.guess_from_pyproject_toml
-guess_from_setup_cfg = _upstream_ontologist.guess_from_setup_cfg
-guess_from_setup_py = _upstream_ontologist.guess_from_setup_py
-
-guess_from_pom_xml = _upstream_ontologist.guess_from_pom_xml
-guess_from_git_config = _upstream_ontologist.guess_from_git_config
-
-
-guess_from_get_orig_source = _upstream_ontologist.guess_from_get_orig_source
-guess_from_security_md = _upstream_ontologist.guess_from_security_md
-guess_from_go_mod = _upstream_ontologist.guess_from_go_mod
-guess_from_gemspec = _upstream_ontologist.guess_from_gemspec
-guess_from_makefile_pl = _upstream_ontologist.guess_from_makefile_pl
-guess_from_wscript = _upstream_ontologist.guess_from_wscript
-guess_from_metadata_json = _upstream_ontologist.guess_from_metadata_json
-guess_from_authors = _upstream_ontologist.guess_from_authors
-guess_from_package_yaml = _upstream_ontologist.guess_from_package_yaml
 
 
 def guess_upstream_metadata_items(

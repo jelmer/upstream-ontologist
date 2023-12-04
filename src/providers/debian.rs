@@ -626,6 +626,38 @@ pub fn guess_from_debian_watch(
     Ok(ret)
 }
 
+#[cfg(test)]
+mod watch_tests {
+    use super::*;
+
+    #[test]
+    fn test_empty() {
+        let td = tempfile::tempdir().unwrap();
+        let path = td.path().join("watch");
+        std::fs::write(&path, r#"
+# Blah
+"#).unwrap();
+        assert!(guess_from_debian_watch(&path, false).unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_simple() {
+        let td = tempfile::tempdir().unwrap();
+        let path = td.path().join("watch");
+        std::fs::write(&path, r#"version=4
+https://github.com/jelmer/dulwich/tags/dulwich-(.*).tar.gz
+"#).unwrap();
+        assert_eq!(
+            vec![
+                UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Repository("https://github.com/jelmer/dulwich".to_string()),
+                    certainty: Some(Certainty::Likely),
+                    origin: Some(path.to_string_lossy().to_string()),
+                }],
+            guess_from_debian_watch(&path, false).unwrap());
+    }
+}
+
 pub fn debian_is_native(path: &Path) -> std::io::Result<Option<bool>> {
     let format_file_path = path.join("source/format");
     match File::open(format_file_path) {

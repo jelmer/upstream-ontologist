@@ -185,3 +185,45 @@ pub fn guess_from_package_json(
 
     Ok(upstream_data)
 }
+
+#[cfg(test)]
+mod package_json_tests {
+    use super::*;
+
+    #[test]
+    fn test_dummy() {
+        let td = tempfile::tempdir().unwrap();
+        let path = td.path().join("package.json");
+
+        std::fs::write(&path, r#"{
+  "name": "mozillaeslintsetup",
+  "description": "This package file is for setup of ESLint.",
+  "repository": {},
+  "license": "MPL-2.0",
+  "dependencies": {
+    "eslint": "4.18.1",
+    "eslint-plugin-html": "4.0.2",
+    "eslint-plugin-mozilla": "file:tools/lint/eslint/eslint-plugin-mozilla",
+    "eslint-plugin-no-unsanitized": "2.0.2",
+    "eslint-plugin-react": "7.1.0",
+    "eslint-plugin-spidermonkey-js":
+        "file:tools/lint/eslint/eslint-plugin-spidermonkey-js"
+  },
+  "devDependencies": {}
+}
+"#).unwrap();
+        let ret = guess_from_package_json(&path, false).unwrap();
+        assert_eq!(
+            ret,
+            vec![
+                UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Summary("This package file is for setup of ESLint.".to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some("package.json".to_string()),
+                },
+                UpstreamDatumWithMetadata { datum: UpstreamDatum::License("MPL-2.0".to_string()), certainty: Some(Certainty::Certain), origin: Some("package.json".to_string())},
+                UpstreamDatumWithMetadata {datum: UpstreamDatum::Name("mozillaeslintsetup".to_string()), certainty: Some(Certainty::Certain), origin: Some("package.json".to_string())}
+            ]
+        );
+    }
+}

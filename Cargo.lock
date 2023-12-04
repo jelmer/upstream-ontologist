@@ -3633,6 +3633,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "shlex",
+ "tempfile",
  "textwrap",
  "toml 0.8.8",
  "url",
