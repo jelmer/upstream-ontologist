@@ -651,7 +651,7 @@ https://github.com/jelmer/dulwich/tags/dulwich-(.*).tar.gz
             vec![
                 UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Repository("https://github.com/jelmer/dulwich".to_string()),
-                    certainty: Some(Certainty::Likely),
+                    certainty: Some(Certainty::Confident),
                     origin: Some(path.to_string_lossy().to_string()),
                 }],
             guess_from_debian_watch(&path, false).unwrap());

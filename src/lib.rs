@@ -2486,7 +2486,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
         }).collect::<Vec<_>>();
 
         for filename in readme_filenames {
-            candidates.push((filename.to_string_lossy().to_string(), Box::new(|path, s| crate::guess_from_readme(path, s.trust_package))));
+            candidates.push((filename.to_string_lossy().to_string(), Box::new(|path, s| crate::readme::guess_from_readme(path, s.trust_package))));
         }
 
         let mut nuspec_filenames = std::fs::read_dir(&path).unwrap().filter_map(|entry| {
@@ -2607,31 +2607,4 @@ impl Iterator for UpstreamMetadataScanner {
 pub fn guess_upstream_info(
     path: &std::path::Path, trust_package: Option<bool>) -> impl Iterator<Item = Result<UpstreamDatumWithMetadata, ProviderError>> {
     UpstreamMetadataScanner::from_path(path, trust_package)
-}
-
-pub fn guess_from_readme(path: &std::path::Path, trust_package: bool) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
-    Python::with_gil(|py| -> PyResult<Vec<UpstreamDatumWithMetadata>> {
-        let m =py.import("upstream_ontologist.guess").unwrap();
-        let guess = m.getattr("guess_from_readme").unwrap();
-
-        let it = guess.call1((path.to_string_lossy().to_string(), trust_package))?;
-
-        let mut result = Vec::new();
-        loop {
-            match it.call_method0("__next__") {
-                Ok(v) => {
-                    let v: UpstreamDatumWithMetadata = v.extract().unwrap();
-                    result.push(v);
-                }
-                Err(e) => {
-                    if e.get_type(py).name().unwrap() == "StopIteration" {
-                        break;
-                    }
-                    return Err(e);
-                }
-            }
-        }
-
-        Ok(result)
-    }).map_err(ProviderError::Python)
 }
