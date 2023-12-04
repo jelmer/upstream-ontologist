@@ -962,6 +962,9 @@ fn guess_from_setup_py_parsed(
                         });
                     }
                 }
+                // Handled above
+                "author_email" | "maintainer_email" => {},
+                // Irrelevant
                 "rust_extensions" | "data_files" => {},
                 _ => {
                     warn!("Unknown key in setup.py: {}", key);
