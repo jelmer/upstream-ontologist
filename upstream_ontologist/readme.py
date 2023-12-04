@@ -282,6 +282,21 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[Upstream
     return None, metadata
 
 
+def description_from_html(html_text: str) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
+    """Description from HTML."""
+    try:
+        from bs4 import BeautifulSoup, FeatureNotFound
+    except ModuleNotFoundError:
+        logger.debug("BeautifulSoup not available, not parsing HTML")
+        return None, {}
+    try:
+        soup = BeautifulSoup(html_text, "lxml")
+    except FeatureNotFound:
+        logger.debug("lxml not available, not parsing HTML")
+        return None, {}
+    return _description_from_basic_soup(soup.body)
+
+
 def description_from_readme_md(
     md_text: str
 ) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
@@ -292,19 +307,7 @@ def description_from_readme_md(
         logger.debug("markdown not available, not parsing README.md")
         return None, {}
     html_text = markdown.markdown(md_text)
-    try:
-        from bs4 import BeautifulSoup, FeatureNotFound
-    except ModuleNotFoundError:
-        logger.debug("BeautifulSoup not available, not parsing README.md")
-        return None, {}
-    # Strip surrogates
-    html_text = html_text.encode("utf-8", "replace").decode("utf-8")
-    try:
-        soup = BeautifulSoup(html_text, "lxml")
-    except FeatureNotFound:
-        logger.debug("lxml not available, not parsing README.md")
-        return None, {}
-    return _description_from_basic_soup(soup.body)
+    return description_from_html(html_text)
 
 
 def description_from_readme_rst(
@@ -326,19 +329,7 @@ def description_from_readme_rst(
     html_text = publish_parts(
         rst_text, writer=Writer(), settings_overrides=settings
     ).get("html_body")
-    try:
-        from bs4 import BeautifulSoup, FeatureNotFound
-    except ModuleNotFoundError:
-        logger.debug("BeautifulSoup not available, not parsing README.rst")
-        return None, {}
-    try:
-        soup = BeautifulSoup(html_text, "lxml")
-    except FeatureNotFound:
-        logger.debug("lxml not available, not parsing README.rst")
-        return None, {}
-    if not soup.body:
-        return None, {}
-    return _description_from_basic_soup(list(soup.body.children)[0])
+    return description_from_html(html_text)
 
 
 def description_from_readme_plain(
