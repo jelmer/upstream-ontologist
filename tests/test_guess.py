@@ -28,21 +28,21 @@ class MetadataFromItpBugBody(TestCase):
         self.maxDiff = None
         self.assertEqual(
             [
-                UpstreamDatum("Name", "setuptools-gettext", "confident"),
-                UpstreamDatum("Version", "0.0.1", "possible"),
+                UpstreamDatum("Name", "setuptools-gettext", certainty="confident"),
+                UpstreamDatum("Version", "0.0.1", certainty="possible"),
                 UpstreamDatum(
                     "Author",
                     [Person.from_string("Breezy Team <breezy-core@googlegroups.com>")],
-                    "confident",
+                    certainty="confident",
                 ),
                 UpstreamDatum(
                     "Homepage",
                     "https://github.com/jelmer/setuptools-gettext",
-                    "confident",
+                    certainty="confident",
                 ),
-                UpstreamDatum("License", "GPL", "confident"),
+                UpstreamDatum("License", "GPL", certainty="confident"),
                 UpstreamDatum(
-                    "Summary", "Compile .po files into .mo files", "confident"
+                    "Summary", "Compile .po files into .mo files", certainty="confident"
                 ),
                 UpstreamDatum(
                     "Description",
@@ -50,7 +50,7 @@ class MetadataFromItpBugBody(TestCase):
 This extension for setuptools compiles gettext .po files
 found in the source directory into .mo files and installs them.
 """,
-                    "likely",
+                    certainty="likely",
                 ),
             ],
             list(

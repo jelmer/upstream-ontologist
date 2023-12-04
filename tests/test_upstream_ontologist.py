@@ -25,8 +25,6 @@ from unittest import (
 )
 
 from upstream_ontologist import (
-    Person,
-    UpstreamDatum,
     certainty_sufficient,
     certainty_to_confidence,
     confidence_to_certainty,
@@ -34,9 +32,6 @@ from upstream_ontologist import (
 )
 from upstream_ontologist.guess import (
     bug_database_url_from_bug_submit_url,
-    guess_from_debian_watch,
-    guess_from_package_json,
-    guess_from_r_description,
     guess_repo_from_url,
     url_from_fossil_clone_command,
     url_from_git_clone_command,
@@ -49,172 +44,6 @@ class TestCaseInTempDir(TestCase):
         self.testdir = tempfile.mkdtemp()
         os.chdir(self.testdir)
         self.addCleanup(shutil.rmtree, self.testdir)
-
-
-class GuessFromDebianWatchTests(TestCaseInTempDir):
-    def setUp(self):
-        super().setUp()
-        try:
-            import pcre  # noqa: F401
-        except ModuleNotFoundError:
-            self.skipTest("pcre not available")
-
-    def test_empty(self):
-        with open("watch", "w") as f:
-            f.write(
-                """\
-# Blah
-"""
-            )
-        self.assertEqual([], list(guess_from_debian_watch("watch", False)))
-
-    def test_simple(self):
-        with open("watch", "w") as f:
-            f.write(
-                """\
-version=4
-https://github.com/jelmer/dulwich/tags/dulwich-(.*).tar.gz
-"""
-            )
-        self.assertEqual(
-            [
-                UpstreamDatum(
-                    "Repository", "https://github.com/jelmer/dulwich", "likely", "watch"
-                )
-            ],
-            list(guess_from_debian_watch("watch", False)),
-        )
-
-
-class GuessFromPackageJsonTests(TestCaseInTempDir):
-    def test_dummy(self):
-        self.maxDiff = None
-        with open("package.json", "w") as f:
-            f.write(
-                """\
-{
-  "name": "mozillaeslintsetup",
-  "description": "This package file is for setup of ESLint.",
-  "repository": {},
-  "license": "MPL-2.0",
-  "dependencies": {
-    "eslint": "4.18.1",
-    "eslint-plugin-html": "4.0.2",
-    "eslint-plugin-mozilla": "file:tools/lint/eslint/eslint-plugin-mozilla",
-    "eslint-plugin-no-unsanitized": "2.0.2",
-    "eslint-plugin-react": "7.1.0",
-    "eslint-plugin-spidermonkey-js":
-        "file:tools/lint/eslint/eslint-plugin-spidermonkey-js"
-  },
-  "devDependencies": {}
-}
-"""
-            )
-        self.assertEqual(
-            [
-                UpstreamDatum(
-                    "Summary",
-                    "This package file is for setup of ESLint.",
-                    "certain",
-                    "package.json",
-                ),
-                UpstreamDatum("License", "MPL-2.0", "certain", "package.json"),
-                UpstreamDatum("Name", "mozillaeslintsetup", "certain", "package.json"),
-            ],
-            list(guess_from_package_json("package.json", False)),
-        )
-
-
-class GuessFromRDescriptionTests(TestCaseInTempDir):
-    def test_read(self):
-        self.maxDiff = None
-        with open("DESCRIPTION", "w") as f:
-            f.write(
-                """\
-Package: crul
-Title: HTTP Client
-Description: A simple HTTP client, with tools for making HTTP requests,
-    and mocking HTTP requests. The package is built on R6, and takes
-    inspiration from Ruby's 'faraday' gem (<https://rubygems.org/gems/faraday>)
-    The package name is a play on curl, the widely used command line tool
-    for HTTP, and this package is built on top of the R package 'curl', an
-    interface to 'libcurl' (<https://curl.haxx.se/libcurl>).
-Version: 0.8.4
-License: MIT + file LICENSE
-Authors@R: c(
-    person("Scott", "Chamberlain", role = c("aut", "cre"),
-    email = "myrmecocystus@gmail.com",
-    comment = c(ORCID = "0000-0003-1444-9135"))
-    )
-URL: https://github.com/ropensci/crul (devel)
-        https://ropenscilabs.github.io/http-testing-book/ (user manual)
-        https://www.example.com/crul (homepage)
-BugReports: https://github.com/ropensci/crul/issues
-Encoding: UTF-8
-Language: en-US
-Imports: curl (>= 3.3), R6 (>= 2.2.0), urltools (>= 1.6.0), httpcode
-        (>= 0.2.0), jsonlite, mime
-Suggests: testthat, fauxpas (>= 0.1.0), webmockr (>= 0.1.0), knitr
-VignetteBuilder: knitr
-RoxygenNote: 6.1.1
-X-schema.org-applicationCategory: Web
-X-schema.org-keywords: http, https, API, web-services, curl, download,
-        libcurl, async, mocking, caching
-X-schema.org-isPartOf: https://ropensci.org
-NeedsCompilation: no
-Packaged: 2019-08-02 19:58:21 UTC; sckott
-Author: Scott Chamberlain [aut, cre] (<https://orcid.org/0000-0003-1444-9135>)
-Maintainer: Scott Chamberlain <myrmecocystus@gmail.com>
-Repository: CRAN
-Date/Publication: 2019-08-02 20:30:02 UTC
-"""
-            )
-        ret = guess_from_r_description("DESCRIPTION", True)
-        self.assertEqual(
-            list(ret),
-            [
-                UpstreamDatum("Name", "crul", "certain", "DESCRIPTION"),
-                UpstreamDatum("Archive", "CRAN", "certain", "DESCRIPTION"),
-                UpstreamDatum(
-                    "Bug-Database",
-                    "https://github.com/ropensci/crul/issues",
-                    "certain",
-                    "DESCRIPTION",
-                ),
-                UpstreamDatum("Version", "0.8.4", "certain", "DESCRIPTION"),
-                UpstreamDatum(
-                    "License", "MIT + file LICENSE", "certain", "DESCRIPTION"
-                ),
-                UpstreamDatum("Summary", "HTTP Client", "certain", "DESCRIPTION"),
-                UpstreamDatum(
-                    "Description",
-                    """\
-A simple HTTP client, with tools for making HTTP requests,
-and mocking HTTP requests. The package is built on R6, and takes
-inspiration from Ruby's 'faraday' gem (<https://rubygems.org/gems/faraday>)
-The package name is a play on curl, the widely used command line tool
-for HTTP, and this package is built on top of the R package 'curl', an
-interface to 'libcurl' (<https://curl.haxx.se/libcurl>).""",
-                    "certain",
-                    "DESCRIPTION",
-                ),
-                UpstreamDatum(
-                    "Maintainer",
-                    Person("Scott Chamberlain", email="myrmecocystus@gmail.com"),
-                    "certain",
-                    "DESCRIPTION",
-                ),
-                UpstreamDatum(
-                    "Repository",
-                    "https://github.com/ropensci/crul",
-                    "certain",
-                    "DESCRIPTION",
-                ),
-                UpstreamDatum(
-                    "Homepage", "https://www.example.com/crul", "certain", "DESCRIPTION"
-                ),
-            ],
-        )
 
 
 class GuessRepoFromUrlTests(TestCase):

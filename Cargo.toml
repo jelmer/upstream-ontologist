@@ -44,7 +44,7 @@ members = [ "upstream-ontologist-py",]
 default = [ "git-config", "launchpad", "opam", "dist-ini", "cargo", "r-description", "pyproject-toml", "python-pkginfo", "default-tls", "debian", "pyo3"]
 default-tls = [ "reqwest/default-tls",]
 git-config = [ "dep:gix-config",]
-launchpad = [ "dep:distro-info",]
+launchpad = [ "dep:distro-info" ]
 opam = [ "dep:opam-file-rs",]
 dist-ini = [ "dep:rust-ini",]
 cargo = [ "dep:toml",]
@@ -57,6 +57,9 @@ debian = ["debcargo", "dep:debian-watch", "dep:makefile-lossless", "dep:debian-c
 pyo3 = []
 
 [lib]
+
+[dev-dependencies]
+tempfile = "3.8.1"
 
 [dependencies.pyo3]
 workspace = true

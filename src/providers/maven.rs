@@ -12,6 +12,8 @@ pub fn guess_from_pom_xml(
     use xmltree::Element;
     let file = File::open(path).expect("Failed to open file");
 
+    let file = std::io::BufReader::new(file);
+
     let root = Element::parse(file)
         .map_err(|e| ProviderError::ParseError(format!("Unable to parse package.xml: {}", e)))?;
 

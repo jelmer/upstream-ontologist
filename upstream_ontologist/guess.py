@@ -20,8 +20,7 @@ import os
 import re
 import socket
 import urllib.error
-from functools import partial
-from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Tuple, cast
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple, cast
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
@@ -60,6 +59,11 @@ get_sf_metadata = _upstream_ontologist.get_sf_metadata
 NoSuchForgeProject = _upstream_ontologist.NoSuchForgeProject
 NoSuchRepologyProject = _upstream_ontologist.NoSuchRepologyProject
 get_repology_metadata = _upstream_ontologist.get_repology_metadata
+guess_from_pod = _upstream_ontologist.guess_from_pod
+
+
+def guess_upstream_info(path, trust_package):
+    return iter(_upstream_ontologist.guess_upstream_info(path, trust_package))
 
 
 DATUM_TYPES = {
@@ -142,36 +146,19 @@ def update_from_guesses(
 
 
 extract_pecl_package_name = _upstream_ontologist.extract_pecl_package_name
-_metadata_from_url = _upstream_ontologist.metadata_from_url
 
 
-guess_from_debian_rules = _upstream_ontologist.guess_from_debian_rules
-guess_from_debian_watch = _upstream_ontologist.guess_from_debian_watch
 debian_is_native = _upstream_ontologist.debian_is_native
 
 
-guess_from_debian_control = _upstream_ontologist.guess_from_debian_control
-guess_from_debian_changelog = _upstream_ontologist.guess_from_debian_changelog
 metadata_from_itp_bug_body = _upstream_ontologist.metadata_from_itp_bug_body
 extract_sf_project_name = _upstream_ontologist.extract_sf_project_name
-guess_from_pkg_info = _upstream_ontologist.guess_from_pkg_info
-guess_from_composer_json = _upstream_ontologist.guess_from_composer_json
-guess_from_package_json = _upstream_ontologist.guess_from_package_json
-guess_from_package_xml = _upstream_ontologist.guess_from_package_xml
-guess_from_pod = _upstream_ontologist.guess_from_pod
-guess_from_perl_module = _upstream_ontologist.guess_from_perl_module
-guess_from_perl_dist_name = _upstream_ontologist.guess_from_perl_dist_name
-guess_from_dist_ini = _upstream_ontologist.guess_from_dist_ini
-guess_from_debian_copyright = _upstream_ontologist.guess_from_debian_copyright
 
 url_from_cvs_co_command = _upstream_ontologist.url_from_cvs_co_command
 url_from_svn_co_command = _upstream_ontologist.url_from_svn_co_command
 url_from_git_clone_command = _upstream_ontologist.url_from_git_clone_command
 url_from_fossil_clone_command = _upstream_ontologist.url_from_fossil_clone_command
 url_from_vcs_command = _upstream_ontologist.url_from_vcs_command
-guess_from_meson = _upstream_ontologist.guess_from_meson
-guess_from_pubspec_yaml = _upstream_ontologist.guess_from_pubspec_yaml
-guess_from_install = _upstream_ontologist.guess_from_install
 
 
 def guess_from_readme(path, trust_package):  # noqa: C901
@@ -216,7 +203,7 @@ def guess_from_readme(path, trust_package):  # noqa: C901
                         "https://github.com/{}/{}".format(
                             m.group(1).decode(), m.group(2).decode().rstrip()
                         ),
-                        "possible",
+                        certainty="possible",
                     )
                 for m in re.finditer(b"https://coveralls.io/r/" + project_re, line):
                     yield UpstreamDatum(
@@ -224,13 +211,13 @@ def guess_from_readme(path, trust_package):  # noqa: C901
                         "https://github.com/{}/{}".format(
                             m.group(1).decode(), m.group(2).decode().rstrip()
                         ),
-                        "possible",
+                        certainty="possible",
                     )
                 for m in re.finditer(
                     b"https://github.com/([^/]+)/([^/]+)/issues", line
                 ):
                     yield UpstreamDatum(
-                        "Bug-Database", m.group(0).decode().rstrip(), "possible"
+                        "Bug-Database", m.group(0).decode().rstrip(), certainty="possible"
                     )
                 for m in re.finditer(
                     b"https://github.com/" + project_re + b"(.git)?", line
@@ -238,17 +225,17 @@ def guess_from_readme(path, trust_package):  # noqa: C901
                     yield UpstreamDatum(
                         "Repository",
                         m.group(0).rstrip(b".").decode().rstrip(),
-                        "possible",
+                        certainty="possible",
                     )
                 m = re.fullmatch(b"https://github.com/" + project_re, line)
                 if m:
                     yield UpstreamDatum(
-                        "Repository", line.strip().rstrip(b".").decode(), "possible"
+                        "Repository", line.strip().rstrip(b".").decode(), certainty="possible"
                     )
                 m = re.fullmatch(b"git://([^ ]+)", line)
                 if m:
                     yield UpstreamDatum(
-                        "Repository", line.strip().rstrip(b".").decode(), "possible"
+                        "Repository", line.strip().rstrip(b".").decode(), certainty="possible"
                     )
                 for m in re.finditer(b'https://([^]/]+)/([^]\\s()"#]+)', line):
                     if is_gitlab_site(m.group(1).decode()):
@@ -259,7 +246,7 @@ def guess_from_readme(path, trust_package):  # noqa: C901
                             logger.warning("Ignoring invalid URL %s in %s", url, path)
                         else:
                             if repo_url:
-                                yield UpstreamDatum("Repository", repo_url, "possible")
+                                yield UpstreamDatum("Repository", repo_url, certainty="possible")
         if path.lower().endswith("readme.md"):
             with open(path, "rb") as f:
                 from .readme import description_from_readme_md
@@ -282,7 +269,7 @@ def guess_from_readme(path, trust_package):  # noqa: C901
             description = None
             extra_md = []
         if description is not None:
-            yield UpstreamDatum("Description", description, "possible")
+            yield UpstreamDatum("Description", description, certainty="possible")
         yield from extra_md
         if path.lower().endswith("readme.pod"):
             with open(path, "rb") as f:
@@ -298,205 +285,7 @@ def guess_from_readme(path, trust_package):  # noqa: C901
 
     urls.sort(key=prefer_public)
     if urls:
-        yield UpstreamDatum("Repository", urls[0], "possible")
-
-
-guess_from_debian_patch = _upstream_ontologist.guess_from_debian_patch
-guess_from_meta_json = _upstream_ontologist.guess_from_meta_json
-guess_from_travis_yml = _upstream_ontologist.guess_from_travis_yml
-guess_from_meta_yml = _upstream_ontologist.guess_from_meta_yml
-guess_from_metainfo = _upstream_ontologist.guess_from_metainfo
-guess_from_doap = _upstream_ontologist.guess_from_doap
-guess_from_opam = _upstream_ontologist.guess_from_opam
-guess_from_nuspec = _upstream_ontologist.guess_from_nuspec
-guess_from_cabal = _upstream_ontologist.guess_from_cabal
-guess_from_cabal_lines = _upstream_ontologist.guess_from_cabal_lines
-guess_from_configure = _upstream_ontologist.guess_from_configure
-guess_from_r_description = _upstream_ontologist.guess_from_r_description
-guess_from_environment = _upstream_ontologist.guess_from_environment
-guess_from_path = _upstream_ontologist.guess_from_path
-guess_from_cargo = _upstream_ontologist.guess_from_cargo
-guess_from_pyproject_toml = _upstream_ontologist.guess_from_pyproject_toml
-guess_from_setup_cfg = _upstream_ontologist.guess_from_setup_cfg
-guess_from_setup_py = _upstream_ontologist.guess_from_setup_py
-
-guess_from_pom_xml = _upstream_ontologist.guess_from_pom_xml
-guess_from_git_config = _upstream_ontologist.guess_from_git_config
-
-
-guess_from_get_orig_source = _upstream_ontologist.guess_from_get_orig_source
-guess_from_security_md = _upstream_ontologist.guess_from_security_md
-guess_from_go_mod = _upstream_ontologist.guess_from_go_mod
-guess_from_gemspec = _upstream_ontologist.guess_from_gemspec
-guess_from_makefile_pl = _upstream_ontologist.guess_from_makefile_pl
-guess_from_wscript = _upstream_ontologist.guess_from_wscript
-guess_from_metadata_json = _upstream_ontologist.guess_from_metadata_json
-guess_from_authors = _upstream_ontologist.guess_from_authors
-guess_from_package_yaml = _upstream_ontologist.guess_from_package_yaml
-
-
-def _get_guessers(path, trust_package=False):  # noqa: C901
-    CANDIDATES: List[Tuple[str, Callable[[str, bool], Iterator[UpstreamDatum]]]] = [
-        ("debian/watch", guess_from_debian_watch),
-        ("debian/control", guess_from_debian_control),
-        ("debian/changelog", guess_from_debian_changelog),
-        ("debian/rules", guess_from_debian_rules),
-        ("PKG-INFO", guess_from_pkg_info),
-        ("package.json", guess_from_package_json),
-        ("composer.json", guess_from_composer_json),
-        ("package.xml", guess_from_package_xml),
-        ("package.yaml", guess_from_package_yaml),
-        ("dist.ini", guess_from_dist_ini),
-        ("debian/copyright", guess_from_debian_copyright),
-        ("META.json", guess_from_meta_json),
-        ("MYMETA.json", guess_from_meta_json),
-        ("META.yml", guess_from_meta_yml),
-        ("MYMETA.yml", guess_from_meta_yml),
-        ("configure", guess_from_configure),
-        ("DESCRIPTION", guess_from_r_description),
-        ("Cargo.toml", guess_from_cargo),
-        ("pom.xml", guess_from_pom_xml),
-        (".git/config", guess_from_git_config),
-        ("debian/get-orig-source.sh", guess_from_get_orig_source),
-        ("pyproject.toml", guess_from_pyproject_toml),
-        ("setup.cfg", guess_from_setup_cfg),
-        ("go.mod", guess_from_go_mod),
-        ("Makefile.PL", guess_from_makefile_pl),
-        ("wscript", guess_from_wscript),
-        ("AUTHORS", guess_from_authors),
-        ("INSTALL", guess_from_install),
-        ("pubspec.yaml", guess_from_pubspec_yaml),
-        ("pubspec.yml", guess_from_pubspec_yaml),
-        ("meson.build", guess_from_meson),
-        ("metadata.json", guess_from_metadata_json),
-        (".travis.yml", guess_from_travis_yml),
-    ]
-
-    for name in ("SECURITY.md", ".github/SECURITY.md", "docs/SECURITY.md"):
-        CANDIDATES.append((name, partial(guess_from_security_md, name)))
-
-    # Search for something Python-y
-    found_pkg_info = os.path.exists(os.path.join(path, "PKG-INFO"))
-    for entry in os.scandir(path):
-        if entry.name.endswith(".egg-info"):
-            CANDIDATES.append(
-                (os.path.join(entry.name, "PKG-INFO"), guess_from_pkg_info)
-            )
-            found_pkg_info = True
-        if entry.name.endswith(".dist-info"):
-            CANDIDATES.append(
-                (os.path.join(entry.name, "METADATA"), guess_from_pkg_info)
-            )
-            found_pkg_info = True
-    if not found_pkg_info and os.path.exists(os.path.join(path, "setup.py")):
-        CANDIDATES.append(("setup.py", guess_from_setup_py))
-
-    for entry in os.scandir(path):
-        if entry.name.endswith(".gemspec"):
-            CANDIDATES.append((entry.name, guess_from_gemspec))
-
-    # TODO(jelmer): Perhaps scan all directories if no other primary project
-    # information file has been found?
-    for entry in os.scandir(path):
-        if entry.is_dir():
-            subpath = os.path.join(entry.path, "DESCRIPTION")
-            if os.path.exists(subpath):
-                CANDIDATES.append(
-                    (os.path.join(entry.name, "DESCRIPTION"), guess_from_r_description)
-                )
-
-    doap_filenames = [
-        n
-        for n in os.listdir(path)
-        if n.endswith(".doap") or (n.endswith(".xml") and n.startswith("doap_XML_"))
-    ]
-    if doap_filenames:
-        if len(doap_filenames) == 1:
-            CANDIDATES.append((doap_filenames[0], guess_from_doap))
-        else:
-            logger.warning(
-                "More than one doap filename, ignoring all: %r", doap_filenames
-            )
-
-    metainfo_filenames = [n for n in os.listdir(path) if n.endswith(".metainfo.xml")]
-    if metainfo_filenames:
-        if len(metainfo_filenames) == 1:
-            CANDIDATES.append((metainfo_filenames[0], guess_from_metainfo))
-        else:
-            logger.warning(
-                "More than one metainfo filename, ignoring all: %r", metainfo_filenames
-            )
-
-    cabal_filenames = [n for n in os.listdir(path) if n.endswith(".cabal")]
-    if cabal_filenames:
-        if len(cabal_filenames) == 1:
-            CANDIDATES.append((cabal_filenames[0], guess_from_cabal))
-        else:
-            logger.warning(
-                "More than one cabal filename, ignoring all: %r", cabal_filenames
-            )
-
-    readme_filenames = [
-        n
-        for n in os.listdir(path)
-        if any(
-            [
-                n.startswith(p)
-                for p in [
-                    "readme",
-                    "ReadMe",
-                    "Readme",
-                    "README",
-                    "HACKING",
-                    "CONTRIBUTING",
-                ]
-            ]
-        )
-        and os.path.splitext(n)[1] not in (".html", ".pdf", ".xml")
-        and not n.endswith("~")
-    ]
-    CANDIDATES.extend([(n, guess_from_readme) for n in readme_filenames])
-
-    nuspec_filenames = [n for n in os.listdir(path) if n.endswith(".nuspec")]
-    if nuspec_filenames:
-        if len(nuspec_filenames) == 1:
-            CANDIDATES.append((nuspec_filenames[0], guess_from_nuspec))
-        else:
-            logger.warning(
-                "More than one nuspec filename, ignoring all: %r", nuspec_filenames
-            )
-
-    opam_filenames = [n for n in os.listdir(path) if n.endswith(".opam")]
-    if opam_filenames:
-        if len(opam_filenames) == 1:
-            CANDIDATES.append((opam_filenames[0], guess_from_opam))
-        else:
-            logger.warning(
-                "More than one opam filename, ignoring all: %r", opam_filenames
-            )
-
-    try:
-        debian_patches = [
-            os.path.join("debian", "patches", n)
-            for n in os.listdir("debian/patches")
-            if os.path.isfile(os.path.join("debian/patches", n))
-        ]
-    except FileNotFoundError:
-        pass
-    else:
-        CANDIDATES.extend([(p, guess_from_debian_patch) for p in debian_patches])
-
-    yield "environment", guess_from_environment()
-    yield "path", guess_from_path(path, trust_package)
-
-    for relpath, guesser in CANDIDATES:
-        abspath = os.path.join(path, relpath)
-        if not os.path.exists(abspath):
-            continue
-        try:
-            yield relpath, guesser(abspath, trust_package)
-        except _upstream_ontologist.ParseError as err:
-            logging.debug("Parse Error in %s: %s", relpath, err)
+        yield UpstreamDatum("Repository", urls[0], certainty="possible")
 
 
 def guess_upstream_metadata_items(
@@ -515,17 +304,6 @@ def guess_upstream_metadata_items(
         if isinstance(entry, UpstreamDatum):
             if certainty_sufficient(entry.certainty, minimum_certainty):
                 yield entry
-
-
-def guess_upstream_info(
-    path: str, trust_package: bool = False
-) -> Iterable[UpstreamDatum]:
-    guessers = _get_guessers(path, trust_package=trust_package)
-    for name, guesser in guessers:
-        for entry in guesser:
-            if entry.origin is None:
-                entry.origin = name
-            yield entry
 
 
 def get_upstream_info(
@@ -632,7 +410,8 @@ def extend_from_external_guesser(
 
     update_from_guesses(
         upstream_metadata,
-        [UpstreamDatum(key, value, guesser_certainty) for (key, value) in guesser],
+        [UpstreamDatum(key, value, certainty=guesser_certainty)
+         for (key, value) in guesser],
     )
 
 
@@ -827,7 +606,7 @@ def _extrapolate_repository_from_homepage(upstream_metadata, net_access):
         yield UpstreamDatum(
             "Repository",
             repo,
-            min_certainty(["likely", upstream_metadata["Homepage"].certainty]),
+            certainty=min_certainty(["likely", upstream_metadata["Homepage"].certainty]),
         )
 
 
@@ -839,7 +618,7 @@ def _extrapolate_repository_from_download(upstream_metadata, net_access):
         yield UpstreamDatum(
             "Repository",
             repo,
-            min_certainty(["likely", upstream_metadata["Download"].certainty]),
+            certainty=min_certainty(["likely", upstream_metadata["Download"].certainty]),
         )
 
 
@@ -851,7 +630,7 @@ def _extrapolate_repository_from_bug_db(upstream_metadata, net_access):
         yield UpstreamDatum(
             "Repository",
             repo,
-            min_certainty(["likely", upstream_metadata["Bug-Database"].certainty]),
+            certainty=min_certainty(["likely", upstream_metadata["Bug-Database"].certainty]),
         )
 
 
@@ -868,7 +647,7 @@ def _extrapolate_name_from_repository(upstream_metadata, net_access):
             yield UpstreamDatum(
                 "Name",
                 name,
-                min_certainty(["likely", upstream_metadata["Repository"].certainty]),
+                certainty=min_certainty(["likely", upstream_metadata["Repository"].certainty]),
             )
 
 
@@ -876,7 +655,7 @@ def _extrapolate_repository_browse_from_repository(upstream_metadata, net_access
     browse_url = browse_url_from_repo_url(upstream_metadata["Repository"].value)
     if browse_url:
         yield UpstreamDatum(
-            "Repository-Browse", browse_url, upstream_metadata["Repository"].certainty
+            "Repository-Browse", browse_url, certainty=upstream_metadata["Repository"].certainty
         )
 
 
@@ -886,7 +665,7 @@ def _extrapolate_repository_from_repository_browse(upstream_metadata, net_access
     )
     if repo:
         yield UpstreamDatum(
-            "Repository", repo, upstream_metadata["Repository-Browse"].certainty
+            "Repository", repo, certainty=upstream_metadata["Repository-Browse"].certainty
         )
 
 
@@ -899,7 +678,7 @@ def _extrapolate_bug_database_from_repository(upstream_metadata, net_access):
         yield UpstreamDatum(
             "Bug-Database",
             bug_db_url,
-            min_certainty(["likely", upstream_metadata["Repository"].certainty]),
+            certainty=min_certainty(["likely", upstream_metadata["Repository"].certainty]),
         )
 
 
@@ -909,7 +688,7 @@ def _extrapolate_bug_submit_from_bug_db(upstream_metadata, net_access):
     )
     if bug_submit_url:
         yield UpstreamDatum(
-            "Bug-Submit", bug_submit_url, upstream_metadata["Bug-Database"].certainty
+            "Bug-Submit", bug_submit_url, certainty=upstream_metadata["Bug-Database"].certainty
         )
 
 
@@ -919,7 +698,7 @@ def _extrapolate_bug_db_from_bug_submit(upstream_metadata, net_access):
     )
     if bug_db_url:
         yield UpstreamDatum(
-            "Bug-Database", bug_db_url, upstream_metadata["Bug-Submit"].certainty
+            "Bug-Database", bug_db_url, certainty=upstream_metadata["Bug-Submit"].certainty
         )
 
 
@@ -927,8 +706,8 @@ def _copy_bug_db_field(upstream_metadata, net_access):
     ret = UpstreamDatum(
         "Bug-Database",
         upstream_metadata["Bugs-Database"].value,
-        upstream_metadata["Bugs-Database"].certainty,
-        upstream_metadata["Bugs-Database"].origin,
+        certainty=upstream_metadata["Bugs-Database"].certainty,
+        origin=upstream_metadata["Bugs-Database"].origin,
     )
     del upstream_metadata["Bugs-Database"]
     return ret
@@ -967,7 +746,7 @@ def _extrapolate_homepage_from_repository_browse(upstream_metadata, net_access):
     # can serve as index?
     forge = find_forge(browse_url)
     if forge and forge.repository_browse_can_be_homepage:
-        yield UpstreamDatum("Homepage", browse_url, "possible")
+        yield UpstreamDatum("Homepage", browse_url, certainty="possible")
 
 
 def _consult_homepage(upstream_metadata, net_access):
@@ -1035,10 +814,10 @@ def extend_upstream_metadata(
         if project:
             certainty = min_certainty(["likely", upstream_metadata[field].certainty])
             upstream_metadata["Archive"] = UpstreamDatum(
-                "Archive", "SourceForge", certainty
+                "Archive", "SourceForge", certainty=certainty
             )
             upstream_metadata["SourceForge-Project"] = UpstreamDatum(
-                "SourceForge-Project", project, certainty
+                "SourceForge-Project", project, certainty=certainty
             )
             break
 
@@ -1111,9 +890,7 @@ def extend_upstream_metadata(
             Gobo.extend_metadata(upstream_metadata, package, minimum_certainty)
             extend_from_repology(upstream_metadata, minimum_certainty, package)
 
-    _extrapolate_fields(
-        upstream_metadata, net_access=net_access, minimum_certainty=minimum_certainty
-    )
+    _extrapolate_fields(upstream_metadata, net_access=net_access)
 
 
 DEFAULT_ITERATION_LIMIT = 100
@@ -1122,7 +899,6 @@ DEFAULT_ITERATION_LIMIT = 100
 def _extrapolate_fields(
     upstream_metadata,
     net_access: bool = False,
-    minimum_certainty: Optional[str] = None,
     iteration_limit: int = DEFAULT_ITERATION_LIMIT,
 ):
     changed = True
@@ -1134,6 +910,7 @@ def _extrapolate_fields(
             raise Exception("hit iteration limit %d" % iteration_limit)
         for from_fields, to_fields, fn in EXTRAPOLATE_FNS:
             from_certainties: Optional[List[str]] = []
+            from_value = None
             for from_field in from_fields:
                 try:
                     from_value = upstream_metadata[from_field]
@@ -1144,10 +921,12 @@ def _extrapolate_fields(
             if not from_certainties:
                 # Nope
                 continue
+            assert from_value is not None
             from_certainty = min_certainty(from_certainties)
             old_to_values = {
                 to_field: upstream_metadata.get(to_field) for to_field in to_fields
             }
+            assert not [old_value for old_value in old_to_values.values() if old_value is not None and old_value.certainty is None], "%r" % old_to_values
             if all(
                 [
                     old_value is not None
