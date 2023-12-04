@@ -206,37 +206,68 @@ impl FromPyObject<'_> for Person {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum UpstreamDatum {
+    /// Name of the project
     Name(String),
+    /// URL to project homepage
     Homepage(String),
+    /// URL to the project's source code repository
     Repository(String),
+    /// URL to browse the project's source code repository
     RepositoryBrowse(String),
+    /// Long description of the project
     Description(String),
+    /// Short summary of the project (one line)
     Summary(String),
+    /// License name or SPDX identifier
     License(String),
+    /// List of authors
     Author(Vec<Person>),
+    /// List of maintainers
     Maintainer(Person),
+    /// URL of the project's issue tracker
     BugDatabase(String),
+    /// URL to submit a new bug
     BugSubmit(String),
+    /// URL to the project's contact page or email address
     Contact(String),
+    /// Cargo crate name
     CargoCrate(String),
+    /// Name of the security page name
     SecurityMD(String),
+    /// URL to the security page or email address
     SecurityContact(String),
+    /// Last version of the project
     Version(String),
+    /// List of keywords
     Keywords(Vec<String>),
+    /// Copyright notice
     Copyright(String),
+    /// URL to the project's documentation
     Documentation(String),
+    /// Go import path
     GoImportPath(String),
+    /// URL to the project's download page
     Download(String),
+    /// URL to the project's wiki
     Wiki(String),
+    /// URL to the project's mailing list
     MailingList(String),
+    /// SourceForge project name
     SourceForgeProject(String),
     Archive(String),
+    /// URL to a demo instance
     Demo(String),
+    /// PHP PECL package name
     PeclPackage(String),
+    /// URL to the funding page
     Funding(String),
+    /// URL to the changelog
     Changelog(String),
+    /// Haskell package name
     HaskellPackage(String),
+    /// Debian ITP (Intent To Package) bug number
     DebianITP(i32),
+    /// List of URLs to screenshots
     Screenshots(Vec<String>),
 }
 
