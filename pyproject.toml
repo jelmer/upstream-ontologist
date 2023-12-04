@@ -50,7 +50,6 @@ readme = [
     "docutils",
     "lxml",
     "bs4",
-    "markdown",
     "pygments",
 ]
 "setup.cfg" = ["setuptools"]

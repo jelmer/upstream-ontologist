@@ -126,9 +126,17 @@ pub fn guess_from_cabal_lines(
                 UpstreamDatum::Author(vec![Person::from(value.as_str())]),
                 Certainty::Certain,
             )),
+            (None, "synopsis") => results.push((
+                UpstreamDatum::Summary(value.to_owned()),
+                Certainty::Certain,
+            )),
+            (None, "cabal-version") => {},
+            (None, "build-depends") => {},
+            (None, "build-type") => {},
             (Some("source-repository head"), "location") => repo_url = Some(value.to_owned()),
             (Some("source-repository head"), "branch") => repo_branch = Some(value.to_owned()),
             (Some("source-repository head"), "subdir") => repo_subpath = Some(value.to_owned()),
+            (s, _) if s.is_some() && s.unwrap().starts_with("executable ") => {},
             _ => {
                 log::debug!("Unknown field {:?} in section {:?}", key, section);
             }

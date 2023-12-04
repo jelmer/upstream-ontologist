@@ -36,6 +36,7 @@ makefile-lossless = { version = "0.1.2", optional = true }
 debian-copyright = { version = "0.1.2", optional = true }
 debian-control = { version = "0.1.6", optional = true }
 select = "0.6.0"
+pulldown-cmark = "0.9.3"
 
 [workspace]
 members = [ "upstream-ontologist-py",]

@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 _skip_paragraph = _upstream_ontologist.readme.skip_paragraph  # type: ignore
+description_from_readme_md = _upstream_ontologist.description_from_readme_md  # type: ignore
 
 
 def _skip_paragraph_block(para):  # noqa: C901
@@ -251,7 +252,7 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[Upstream
     # Drop any headers
     metadata = []
     if soup is None:
-        return None, {}
+        return None, []
     # First, skip past the first header.
     for el in soup.children:
         if el.name in ("h1", "h2", "h3"):
@@ -282,7 +283,7 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[Upstream
     return None, metadata
 
 
-def description_from_html(html_text: str) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
+def description_from_readme_html(html_text: str) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
     """Description from HTML."""
     try:
         from bs4 import BeautifulSoup, FeatureNotFound
@@ -295,19 +296,6 @@ def description_from_html(html_text: str) -> Tuple[Optional[str], Iterable[Upstr
         logger.debug("lxml not available, not parsing HTML")
         return None, {}
     return _description_from_basic_soup(soup.body)
-
-
-def description_from_readme_md(
-    md_text: str
-) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
-    """Description from README.md."""
-    try:
-        import markdown
-    except ModuleNotFoundError:
-        logger.debug("markdown not available, not parsing README.md")
-        return None, {}
-    html_text = markdown.markdown(md_text)
-    return description_from_html(html_text)
 
 
 def description_from_readme_rst(
@@ -329,7 +317,7 @@ def description_from_readme_rst(
     html_text = publish_parts(
         rst_text, writer=Writer(), settings_overrides=settings
     ).get("html_body")
-    return description_from_html(html_text)
+    return description_from_readme_html(html_text)
 
 
 def description_from_readme_plain(

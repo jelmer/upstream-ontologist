@@ -65,10 +65,6 @@ class ReadmeTestCase(TestCase):
                 raise NotImplementedError(ext)
 
         if readme_md is not None:
-            try:
-                import markdown  # noqa: F401
-            except ModuleNotFoundError:
-                self.skipTest("Skipping README.md tests, markdown not available")
             actual_description, unused_md = description_from_readme_md(readme_md)
             self.assertEqual(actual_description, description)
 

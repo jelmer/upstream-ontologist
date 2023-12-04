@@ -204,16 +204,28 @@ pub fn description_from_readme_rst(
     })
 }
 
-pub fn description_from_readme_md(
+pub fn description_from_readme_html(
     long_description: &str,
 ) -> PyResult<(Option<String>, Vec<UpstreamDatumWithMetadata>)> {
     Python::with_gil(|py| {
         let readme_mod = Python::import(py, "upstream_ontologist.readme").unwrap();
         let (description, extra_md): (Option<String>, Vec<UpstreamDatumWithMetadata>) = readme_mod
-            .call_method1("description_from_readme_md", (long_description,))?
+            .call_method1("description_from_readme_html", (long_description,))?
             .extract()?;
+
         Ok((description, extra_md))
     })
+}
+
+pub fn description_from_readme_md(
+    long_description: &str,
+) -> PyResult<(Option<String>, Vec<UpstreamDatumWithMetadata>)> {
+    let parser = pulldown_cmark::Parser::new(long_description);
+
+    let mut html_output = String::new();
+    pulldown_cmark::html::push_html(&mut html_output, parser);
+
+    description_from_readme_html(&html_output)
 }
 
 pub fn description_from_readme_plain(

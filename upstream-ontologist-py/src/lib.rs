@@ -274,7 +274,7 @@ fn plausible_vcs_browse_url(url: &str) -> PyResult<bool> {
 fn guess_from_pod(py: Python, contents: &str) -> PyResult<PyObject> {
     let ret = upstream_ontologist::providers::perl::guess_from_pod(contents)?;
 
-Ok(ret.to_object(py))
+    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
@@ -805,6 +805,13 @@ fn guess_upstream_info(
     Ok(result)
 }
 
+#[pyfunction]
+fn description_from_readme_md(py: Python, contents: &str) -> PyResult<(Option<String>, Vec<PyObject>)> {
+    let (description, metadata) = upstream_ontologist::readme::description_from_readme_md(contents)?;
+    let metadata = metadata.into_iter().map(|datum| datum.to_object(py)).collect();
+    Ok((description, metadata))
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -860,6 +867,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(convert_cvs_list_to_str))?;
     m.add_wrapped(wrap_pyfunction!(fixup_broken_git_details))?;
     m.add_wrapped(wrap_pyfunction!(guess_upstream_info))?;
+    m.add_wrapped(wrap_pyfunction!(description_from_readme_md))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;
