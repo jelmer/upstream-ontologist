@@ -37,7 +37,7 @@ pub fn guess_from_r_description(
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Name(package),
             certainty: Some(Certainty::Certain),
-            origin: Some("DESCRIPTION".to_string()),
+            origin: Some(path.into()),
         });
     }
 
@@ -45,7 +45,7 @@ pub fn guess_from_r_description(
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Archive(repository),
             certainty: Some(Certainty::Certain),
-            origin: Some("DESCRIPTION".to_string()),
+            origin: Some(path.into()),
         });
     }
 
@@ -53,7 +53,7 @@ pub fn guess_from_r_description(
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::BugDatabase(bug_reports),
             certainty: Some(Certainty::Certain),
-            origin: Some("DESCRIPTION".to_string()),
+            origin: Some(path.into()),
         });
     }
 
@@ -61,7 +61,7 @@ pub fn guess_from_r_description(
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Version(version),
             certainty: Some(Certainty::Certain),
-            origin: Some("DESCRIPTION".to_string()),
+            origin: Some(path.into()),
         });
     }
 
@@ -69,7 +69,7 @@ pub fn guess_from_r_description(
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::License(license),
             certainty: Some(Certainty::Certain),
-            origin: Some("DESCRIPTION".to_string()),
+            origin: Some(path.into()),
         });
     }
 
@@ -77,7 +77,7 @@ pub fn guess_from_r_description(
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Summary(title),
             certainty: Some(Certainty::Certain),
-            origin: Some("DESCRIPTION".to_string()),
+            origin: Some(path.into()),
         });
     }
 
@@ -92,7 +92,7 @@ pub fn guess_from_r_description(
             results.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Description(reflowed),
                 certainty: Some(Certainty::Certain),
-                origin: Some("DESCRIPTION".to_string()),
+                origin: Some(path.into()),
             });
         }
     }
@@ -102,7 +102,7 @@ pub fn guess_from_r_description(
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Maintainer(person),
             certainty: Some(Certainty::Certain),
-            origin: Some("DESCRIPTION".to_string()),
+            origin: Some(path.into()),
         });
     }
 
@@ -124,7 +124,7 @@ pub fn guess_from_r_description(
             results.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Homepage(urls[0].1.to_string()),
                 certainty: Some(Certainty::Possible),
-                origin: Some("DESCRIPTION".to_string()),
+                origin: Some(path.into()),
             });
         }
 
@@ -141,7 +141,7 @@ pub fn guess_from_r_description(
                     results.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Archive("Bioconductor".to_string()),
                         certainty: Some(Certainty::Confident),
-                        origin: Some("DESCRIPTION".to_string()),
+                        origin: Some(path.into()),
                     });
                 }
 
@@ -151,19 +151,19 @@ pub fn guess_from_r_description(
                     results.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Repository(url.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some("DESCRIPTION".to_string()),
+                        origin: Some(path.into()),
                     });
                 } else if label.map(str::to_lowercase).as_deref() == Some("homepage") {
                     results.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Homepage(url.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some("DESCRIPTION".to_string()),
+                        origin: Some(path.into()),
                     });
                 } else if let Some(repo_url) = vcs::guess_repo_from_url(&url, None) {
                     results.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Repository(repo_url),
                         certainty: Some(Certainty::Certain),
-                        origin: Some("DESCRIPTION".to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }
@@ -183,7 +183,9 @@ mod description_tests {
         let td = tempfile::tempdir().unwrap();
         let path = td.path().join("DESCRIPTION");
 
-        std::fs::write(&path, r#"Package: crul
+        std::fs::write(
+            &path,
+            r#"Package: crul
 Title: HTTP Client
 Description: A simple HTTP client, with tools for making HTTP requests,
     and mocking HTTP requests. The package is built on R6, and takes
@@ -219,53 +221,78 @@ Author: Scott Chamberlain [aut, cre] (<https://orcid.org/0000-0003-1444-9135>)
 Maintainer: Scott Chamberlain <myrmecocystus@gmail.com>
 Repository: CRAN
 Date/Publication: 2019-08-02 20:30:02 UTC
-"#).unwrap();
+"#,
+        )
+        .unwrap();
         let ret = guess_from_r_description(&path, true).unwrap();
         assert_eq!(
             ret,
             vec![
-            UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Name("crul".to_string()),
-                certainty: Some(Certainty::Certain),
-                origin: Some("DESCRIPTION".to_string())
-            },
-            UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Archive("CRAN".to_string()),
-                certainty: Some(Certainty::Certain),
-                origin: Some("DESCRIPTION".to_string())},
                 UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::BugDatabase("https://github.com/ropensci/crul/issues".to_string()),
+                    datum: UpstreamDatum::Name("crul".to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some("DESCRIPTION".to_string()),
+                    origin: Some(path.into())
                 },
-                UpstreamDatumWithMetadata {datum: UpstreamDatum::Version("0.8.4".to_string()), certainty: Some(Certainty::Certain), origin: Some("DESCRIPTION".to_string())},
                 UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::License("MIT + file LICENSE".to_string()), certainty: Some(Certainty::Certain), origin: Some("DESCRIPTION".to_string())
+                    datum: UpstreamDatum::Archive("CRAN".to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(path.into())
                 },
-                UpstreamDatumWithMetadata {datum: UpstreamDatum::Summary("HTTP Client".to_string()), certainty: Some(Certainty::Certain), origin: Some("DESCRIPTION".to_string())},
                 UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Description(r#"A simple HTTP client, with tools for making HTTP requests,
+                    datum: UpstreamDatum::BugDatabase(
+                        "https://github.com/ropensci/crul/issues".to_string()
+                    ),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(path.into()),
+                },
+                UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Version("0.8.4".to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(path.into())
+                },
+                UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::License("MIT + file LICENSE".to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(path.into())
+                },
+                UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Summary("HTTP Client".to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(path.into())
+                },
+                UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Description(
+                        r#"A simple HTTP client, with tools for making HTTP requests,
 and mocking HTTP requests. The package is built on R6, and takes
 inspiration from Ruby's 'faraday' gem (<https://rubygems.org/gems/faraday>)
 The package name is a play on curl, the widely used command line tool
 for HTTP, and this package is built on top of the R package 'curl', an
-interface to 'libcurl' (<https://curl.haxx.se/libcurl>)."#.to_string()),
+interface to 'libcurl' (<https://curl.haxx.se/libcurl>)."#
+                            .to_string()
+                    ),
                     certainty: Some(Certainty::Certain),
-                    origin: Some("DESCRIPTION".to_string()),
+                    origin: Some(path.into()),
                 },
                 UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Maintainer(Person {
-                        name: Some("Scott Chamberlain".to_string()), email: Some("myrmecocystus@gmail.com".to_string()), url: None}),
+                        name: Some("Scott Chamberlain".to_string()),
+                        email: Some("myrmecocystus@gmail.com".to_string()),
+                        url: None
+                    }),
                     certainty: Some(Certainty::Certain),
-                    origin: Some("DESCRIPTION".to_string()),
+                    origin: Some(path.into()),
                 },
                 UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Repository("https://github.com/ropensci/crul".to_string()),
+                    datum: UpstreamDatum::Repository(
+                        "https://github.com/ropensci/crul".to_string()
+                    ),
                     certainty: Some(Certainty::Certain),
-                    origin: Some("DESCRIPTION".to_string()),
+                    origin: Some(path.into()),
                 },
                 UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Homepage("https://www.example.com/crul".to_string()), certainty: Some(Certainty::Certain), origin: Some("DESCRIPTION".to_string())
+                    datum: UpstreamDatum::Homepage("https://www.example.com/crul".to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(path.into())
                 },
             ]
         );

@@ -1,7 +1,7 @@
 //! Documentation: https://maven.apache.org/pom.html
 
 use crate::{vcs, Certainty, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
-use log::{warn};
+use log::warn;
 use std::fs::File;
 use std::path::Path;
 
@@ -25,7 +25,7 @@ pub fn guess_from_pom_xml(
                     result.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Name(name.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }
@@ -34,7 +34,7 @@ pub fn guess_from_pom_xml(
                 result.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Name(artifact_id.to_string()),
                     certainty: Some(Certainty::Possible),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
         }
@@ -44,7 +44,7 @@ pub fn guess_from_pom_xml(
                 result.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Summary(description.to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
         }
@@ -55,7 +55,7 @@ pub fn guess_from_pom_xml(
                     result.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Version(version.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }
@@ -73,7 +73,7 @@ pub fn guess_from_pom_xml(
                             result.push(UpstreamDatumWithMetadata {
                                 datum: UpstreamDatum::License(license_name.to_string()),
                                 certainty: Some(Certainty::Certain),
-                                origin: Some(path.to_string_lossy().to_string()),
+                                origin: Some(path.into()),
                             });
                         }
                     }
@@ -96,14 +96,14 @@ pub fn guess_from_pom_xml(
                                 result.push(UpstreamDatumWithMetadata {
                                     datum: UpstreamDatum::RepositoryBrowse(browse_url.to_owned()),
                                     certainty: Some(Certainty::Certain),
-                                    origin: Some(path.to_string_lossy().to_string()),
+                                    origin: Some(path.into()),
                                 });
                             }
                         } else {
                             result.push(UpstreamDatumWithMetadata {
                                 datum: UpstreamDatum::RepositoryBrowse(url.to_string()),
                                 certainty: Some(Certainty::Certain),
-                                origin: Some(path.to_string_lossy().to_string()),
+                                origin: Some(path.into()),
                             });
                         }
                     }
@@ -116,7 +116,7 @@ pub fn guess_from_pom_xml(
                             result.push(UpstreamDatumWithMetadata {
                                 datum: UpstreamDatum::Repository(connection_parts[2].to_owned()),
                                 certainty: Some(Certainty::Certain),
-                                origin: Some(path.to_string_lossy().to_string()),
+                                origin: Some(path.into()),
                             });
                         } else {
                             warn!("Invalid format for SCM connection: {}", connection);
@@ -136,7 +136,7 @@ pub fn guess_from_pom_xml(
                         result.push(UpstreamDatumWithMetadata {
                             datum: UpstreamDatum::BugDatabase(url.to_string()),
                             certainty: Some(Certainty::Certain),
-                            origin: Some(path.to_string_lossy().to_string()),
+                            origin: Some(path.into()),
                         });
                     }
                 }
@@ -149,7 +149,7 @@ pub fn guess_from_pom_xml(
                     result.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Homepage(url.into_owned()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }

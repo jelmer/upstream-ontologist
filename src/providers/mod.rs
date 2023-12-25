@@ -5,8 +5,8 @@ pub mod composer_json;
 pub mod debian;
 pub mod doap;
 pub mod git;
-pub mod gobo;
 pub mod go;
+pub mod gobo;
 pub mod haskell;
 pub mod launchpad;
 pub mod maven;
@@ -33,8 +33,10 @@ pub mod waf;
 use crate::{Certainty, UpstreamDatum, UpstreamDatumWithMetadata};
 use std::io::BufRead;
 
-
-pub fn guess_from_install(path: &std::path::Path, _trust_package: bool) -> Result<Vec<crate::UpstreamDatumWithMetadata>, crate::ProviderError> {
+pub fn guess_from_install(
+    path: &std::path::Path,
+    _trust_package: bool,
+) -> Result<Vec<crate::UpstreamDatumWithMetadata>, crate::ProviderError> {
     let mut ret = Vec::new();
 
     let f = std::fs::File::open(path)?;
@@ -47,9 +49,7 @@ pub fn guess_from_install(path: &std::path::Path, _trust_package: bool) -> Resul
         let oline = oline?;
         let line = oline.trim();
         let mut cmdline = line.trim().trim_start_matches('$').trim().to_string();
-        if cmdline.starts_with("git clone ") || cmdline.starts_with(
-            "fossil clone "
-        ) {
+        if cmdline.starts_with("git clone ") || cmdline.starts_with("fossil clone ") {
             while cmdline.ends_with('\\') {
                 cmdline.push_str(lines.next().unwrap()?.trim());
                 cmdline = cmdline.trim().to_string();
@@ -65,31 +65,40 @@ pub fn guess_from_install(path: &std::path::Path, _trust_package: bool) -> Resul
             }
         }
         for m in lazy_regex::regex!("[\"'`](git clone.*)[\"`']").find_iter(line) {
-            if let Some(url) = crate::vcs_command::url_from_git_clone_command(m.as_str().as_bytes()) {
+            if let Some(url) = crate::vcs_command::url_from_git_clone_command(m.as_str().as_bytes())
+            {
                 urls.push(url);
             }
         }
         let project_re = "([^/]+)/([^/?.()\"#>\\s]*[^-/?.()\"#>\\s])";
-        for m in regex::Regex::new(format!("https://github.com/{}/(.git)?", project_re).as_str()).unwrap().find_iter(line) {
+        for m in regex::Regex::new(format!("https://github.com/{}/(.git)?", project_re).as_str())
+            .unwrap()
+            .find_iter(line)
+        {
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Repository(m.as_str().trim_end_matches(".").to_string()),
                 certainty: Some(Certainty::Possible),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
 
-        if let Some(m) = regex::Regex::new(format!("https://github.com/{}", project_re).as_str()).unwrap().captures(line) {
+        if let Some(m) = regex::Regex::new(format!("https://github.com/{}", project_re).as_str())
+            .unwrap()
+            .captures(line)
+        {
             ret.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Repository(m.get(0).unwrap().as_str().trim_end_matches('.').to_string()),
+                datum: UpstreamDatum::Repository(
+                    m.get(0).unwrap().as_str().trim_end_matches('.').to_string(),
+                ),
                 certainty: Some(Certainty::Possible),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
         if let Some((url, _)) = lazy_regex::regex_captures!("git://([^ ]+)", line) {
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Repository(url.trim_end_matches('.').to_string()),
                 certainty: Some(Certainty::Possible),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
         for m in lazy_regex::regex!("https://([^]/]+)/([^]\\s()\"#]+)").find_iter(line) {
@@ -99,7 +108,7 @@ pub fn guess_from_install(path: &std::path::Path, _trust_package: bool) -> Resul
                     ret.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Repository(repo_url),
                         certainty: Some(Certainty::Possible),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }

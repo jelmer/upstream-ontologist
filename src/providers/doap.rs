@@ -58,7 +58,7 @@ pub fn guess_from_doap(
                     results.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Name(text.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }
@@ -67,7 +67,7 @@ pub fn guess_from_doap(
                     results.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Name(text.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }
@@ -76,7 +76,7 @@ pub fn guess_from_doap(
                     results.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::BugDatabase(url.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }
@@ -85,7 +85,7 @@ pub fn guess_from_doap(
                     results.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Homepage(url.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }
@@ -94,7 +94,7 @@ pub fn guess_from_doap(
                     results.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Download(url.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }
@@ -105,7 +105,7 @@ pub fn guess_from_doap(
                             results.push(UpstreamDatumWithMetadata {
                                 datum: UpstreamDatum::Summary(text.to_string()),
                                 certainty: Some(Certainty::Certain),
-                                origin: Some(path.to_string_lossy().to_string()),
+                                origin: Some(path.into()),
                             });
                         }
                     }
@@ -118,7 +118,7 @@ pub fn guess_from_doap(
                             results.push(UpstreamDatumWithMetadata {
                                 datum: UpstreamDatum::Description(text.to_string()),
                                 certainty: Some(Certainty::Certain),
-                                origin: Some(path.to_string_lossy().to_string()),
+                                origin: Some(path.into()),
                             });
                         }
                     }
@@ -141,7 +141,7 @@ pub fn guess_from_doap(
                                     results.push(UpstreamDatumWithMetadata {
                                         datum: UpstreamDatum::Repository(repo_url.to_string()),
                                         certainty: Some(Certainty::Certain),
-                                        origin: Some(path.to_string_lossy().to_string()),
+                                        origin: Some(path.into()),
                                     });
                                 }
                             }
@@ -150,7 +150,7 @@ pub fn guess_from_doap(
                                     results.push(UpstreamDatumWithMetadata {
                                         datum: UpstreamDatum::RepositoryBrowse(web_url.to_string()),
                                         certainty: Some(Certainty::Certain),
-                                        origin: Some(path.to_string_lossy().to_string()),
+                                        origin: Some(path.into()),
                                     });
                                 }
                             }
@@ -177,7 +177,7 @@ pub fn guess_from_doap(
                     results.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Wiki(url.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }
@@ -218,7 +218,7 @@ pub fn guess_from_doap(
                     results.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::MailingList(url.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }
@@ -233,14 +233,14 @@ pub fn guess_from_doap(
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Maintainer(maintainer),
             certainty: Some(Certainty::Certain),
-            origin: Some(path.to_string_lossy().to_string()),
+            origin: Some(path.into()),
         });
     } else {
         for maintainer in maintainers {
             results.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Maintainer(maintainer),
                 certainty: Some(Certainty::Possible),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
     }

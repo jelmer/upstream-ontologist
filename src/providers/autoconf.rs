@@ -62,21 +62,21 @@ pub fn guess_from_configure(
                     results.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Name(value.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some("./configure".to_string()),
+                        origin: Some(path.into()),
                     });
                 }
                 "PACKAGE_TARNAME" => {
                     results.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Name(value.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some("./configure".to_string()),
+                        origin: Some(path.into()),
                     });
                 }
                 "PACKAGE_VERSION" => {
                     results.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Version(value.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some("./configure".to_string()),
+                        origin: Some(path.into()),
                     });
                 }
                 "PACKAGE_BUGREPORT" => {
@@ -107,7 +107,7 @@ pub fn guess_from_configure(
                         results.push(UpstreamDatumWithMetadata {
                             datum: UpstreamDatum::BugSubmit(value.to_string()),
                             certainty,
-                            origin: Some("./configure".to_string()),
+                            origin: Some(path.into()),
                         });
                     }
                 }
@@ -115,7 +115,7 @@ pub fn guess_from_configure(
                     results.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Homepage(value.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some("./configure".to_string()),
+                        origin: Some(path.into()),
                     });
                 }
                 _ => {

@@ -1,4 +1,4 @@
-use crate::{Certainty, UpstreamDatum, UpstreamDatumWithMetadata, ProviderError};
+use crate::{Certainty, Origin, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use lazy_regex::regex;
 use pyo3::prelude::*;
 use std::io::BufRead;
@@ -240,11 +240,14 @@ pub fn description_from_readme_plain(
     })
 }
 
-pub fn guess_from_readme(path: &std::path::Path, _trust_package: bool) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+pub fn guess_from_readme(
+    path: &std::path::Path,
+    _trust_package: bool,
+) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut urls: Vec<url::Url> = vec![];
     let mut ret = vec![];
 
-    let f =std::fs::File::open(path)?;
+    let f = std::fs::File::open(path)?;
     let reader = std::io::BufReader::new(f);
 
     let mut line_iter = reader.lines();
@@ -260,7 +263,12 @@ pub fn guess_from_readme(path: &std::path::Path, _trust_package: bool) -> Result
 
         let mut cmdline = line.strip_prefix('$').unwrap_or(line).trim().to_string();
 
-        if cmdline.starts_with("git clone ") || cmdline.starts_with("fossil clone ") || cmdline.starts_with("hg clone ") || cmdline.starts_with("bzr co ") || cmdline.starts_with("bzr branch ") {
+        if cmdline.starts_with("git clone ")
+            || cmdline.starts_with("fossil clone ")
+            || cmdline.starts_with("hg clone ")
+            || cmdline.starts_with("bzr co ")
+            || cmdline.starts_with("bzr branch ")
+        {
             while cmdline.ends_with('\\') {
                 let next_line = line_iter.next().unwrap()?;
                 cmdline = format!("{} {}", cmdline, next_line.trim());
@@ -271,7 +279,9 @@ pub fn guess_from_readme(path: &std::path::Path, _trust_package: bool) -> Result
             }
         }
         for m in lazy_regex::regex!("[\"'`](git clone.*)[\"`']").captures_iter(line) {
-            if let Some(url) = crate::vcs_command::url_from_git_clone_command(m.get(1).unwrap().as_str().as_bytes()) {
+            if let Some(url) = crate::vcs_command::url_from_git_clone_command(
+                m.get(1).unwrap().as_str().as_bytes(),
+            ) {
                 urls.push(url.parse().unwrap());
             }
         }
@@ -281,65 +291,86 @@ pub fn guess_from_readme(path: &std::path::Path, _trust_package: bool) -> Result
             }
         }
         for m in lazy_regex::regex!("($ )?(svn co .*)").captures_iter(line) {
-            if let Some(url) = crate::vcs_command::url_from_svn_co_command(m.get(2).unwrap().as_str().as_bytes()) {
+            if let Some(url) =
+                crate::vcs_command::url_from_svn_co_command(m.get(2).unwrap().as_str().as_bytes())
+            {
                 urls.push(url.parse().unwrap());
             }
         }
         const PROJECT_RE: &str = "([^/]+)/([^/?.()\"#>\\s]*[^-,/?.()\"#>\\s])";
-        for m in regex::Regex::new(format!("https://travis-ci.org/{}", PROJECT_RE).as_str()).unwrap().captures_iter(line) {
+        for m in regex::Regex::new(format!("https://travis-ci.org/{}", PROJECT_RE).as_str())
+            .unwrap()
+            .captures_iter(line)
+        {
             ret.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Repository(
-                format!("https://github.com/{}/{}",
-                    m.get(1).unwrap().as_str(), m.get(2).unwrap().as_str())),
+                datum: UpstreamDatum::Repository(format!(
+                    "https://github.com/{}/{}",
+                    m.get(1).unwrap().as_str(),
+                    m.get(2).unwrap().as_str()
+                )),
                 certainty: Some(Certainty::Possible),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
-        for m in regex::Regex::new(format!("https://coveralls.io/r/{}", PROJECT_RE).as_str()).unwrap().captures_iter(line) {
+        for m in regex::Regex::new(format!("https://coveralls.io/r/{}", PROJECT_RE).as_str())
+            .unwrap()
+            .captures_iter(line)
+        {
             ret.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Repository(
-                format!("https://github.com/{}/{}",
-                    m.get(1).unwrap().as_str(), m.get(2).unwrap().as_str())),
+                datum: UpstreamDatum::Repository(format!(
+                    "https://github.com/{}/{}",
+                    m.get(1).unwrap().as_str(),
+                    m.get(2).unwrap().as_str()
+                )),
                 certainty: Some(Certainty::Possible),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
         for m in lazy_regex::regex!("https://github.com/([^/]+)/([^/]+)/issues").find_iter(line) {
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::BugDatabase(m.as_str().to_string()),
                 certainty: Some(Certainty::Possible),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
-        for m in regex::Regex::new(format!("https://github.com/{}/(.git)?", PROJECT_RE).as_str()).unwrap().find_iter(line) {
+        for m in regex::Regex::new(format!("https://github.com/{}/(.git)?", PROJECT_RE).as_str())
+            .unwrap()
+            .find_iter(line)
+        {
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Repository(m.as_str().trim_end_matches('.').to_string()),
                 certainty: Some(Certainty::Possible),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
-        for m in regex::Regex::new(format!("https://github.com/{}", PROJECT_RE).as_str()).unwrap().captures_iter(line) {
+        for m in regex::Regex::new(format!("https://github.com/{}", PROJECT_RE).as_str())
+            .unwrap()
+            .captures_iter(line)
+        {
             ret.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Repository(m.get(0).unwrap().as_str().trim_end_matches('.').to_string()),
+                datum: UpstreamDatum::Repository(
+                    m.get(0).unwrap().as_str().trim_end_matches('.').to_string(),
+                ),
                 certainty: Some(Certainty::Possible),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
         if let Some(m) = lazy_regex::regex_find!(r"git://([^ ]+)", line) {
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Repository(m.trim_end_matches('.').to_string()),
                 certainty: Some(Certainty::Possible),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
         for m in lazy_regex::regex_find!("https://([^]/]+)/([^]\\s()\"#]+)", line) {
             let url = m.trim_end_matches('.');
             if crate::vcs::is_gitlab_site(m, None) {
-                if let Some(repo_url) = crate::vcs::guess_repo_from_url(&url.parse().unwrap(), None) {
+                if let Some(repo_url) = crate::vcs::guess_repo_from_url(&url.parse().unwrap(), None)
+                {
                     ret.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Repository(repo_url),
                         certainty: Some(Certainty::Possible),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 } else {
                     log::warn!("Ignoring invalid URL {} in {}", url, path.display());
@@ -349,32 +380,34 @@ pub fn guess_from_readme(path: &std::path::Path, _trust_package: bool) -> Result
     }
 
     let (description, extra_metadata) = match path.extension().and_then(|s| s.to_str()) {
-        Some("md")  => {
+        Some("md") => {
             let contents = std::fs::read_to_string(path)?;
             description_from_readme_md(&contents)
-        },
+        }
         Some("rst") => {
             let contents = std::fs::read_to_string(path)?;
             description_from_readme_rst(&contents)
-        },
+        }
         None => {
             let contents = std::fs::read_to_string(path)?;
             description_from_readme_plain(&contents)
-        },
+        }
         Some("pod") => {
             let contents = std::fs::read_to_string(path)?;
-            let metadata = crate::providers::perl::guess_from_pod(&contents)?;
+            let metadata = crate::providers::perl::guess_from_pod(
+                &contents,
+                &Origin::Path(path.to_path_buf()),
+            )?;
             Ok((None, metadata))
         }
-        _ => {
-            Ok((None, vec![]))
-        },
-    }.map_err(ProviderError::Python)?;
+        _ => Ok((None, vec![])),
+    }
+    .map_err(ProviderError::Python)?;
     if let Some(description) = description {
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Description(description),
             certainty: Some(Certainty::Possible),
-            origin: Some(path.to_string_lossy().to_string()),
+            origin: Some(path.into()),
         });
     }
     ret.extend(extra_metadata.into_iter());
@@ -393,7 +426,7 @@ pub fn guess_from_readme(path: &std::path::Path, _trust_package: bool) -> Result
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Repository(urls.remove(0).to_string()),
             certainty: Some(Certainty::Possible),
-            origin: Some(path.to_string_lossy().to_string()),
+            origin: Some(path.into()),
         });
     }
     Ok(ret)

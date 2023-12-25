@@ -1,6 +1,6 @@
 use crate::{
-    bug_database_from_issue_url, repo_url_from_merge_request_url, Certainty, Person, ProviderError,
-    UpstreamDatum, UpstreamDatumWithMetadata,
+    bug_database_from_issue_url, repo_url_from_merge_request_url, Certainty, Origin, Person,
+    ProviderError, UpstreamDatum, UpstreamDatumWithMetadata,
 };
 use lazy_regex::regex_captures;
 use log::debug;
@@ -46,7 +46,7 @@ pub fn guess_from_debian_patch(
                 upstream_data.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::BugDatabase(bug_db.to_string()),
                     certainty: Some(Certainty::Possible),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
 
@@ -54,7 +54,7 @@ pub fn guess_from_debian_patch(
                 upstream_data.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Repository(repo_url.to_string()),
                     certainty: Some(Certainty::Possible),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
         }
@@ -204,14 +204,14 @@ pub fn guess_from_debian_changelog(
     ret.push(UpstreamDatumWithMetadata {
         datum: UpstreamDatum::Name(package.clone()),
         certainty: Some(Certainty::Confident),
-        origin: Some(path.to_string_lossy().to_string()),
+        origin: Some(path.into()),
     });
 
     if let Some(version) = first_entry.version() {
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Version(version.upstream_version),
             certainty: Some(Certainty::Confident),
-            origin: Some(path.to_string_lossy().to_string()),
+            origin: Some(path.into()),
         });
     }
 
@@ -251,13 +251,13 @@ pub fn guess_from_debian_changelog(
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Archive("crates.io".to_string()),
             certainty: Some(Certainty::Certain),
-            origin: Some(path.to_string_lossy().to_string()),
+            origin: Some(path.into()),
         });
 
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::CargoCrate(crate_name),
             certainty: Some(Certainty::Certain),
-            origin: Some(path.to_string_lossy().to_string()),
+            origin: Some(path.into()),
         });
     }
 
@@ -265,7 +265,7 @@ pub fn guess_from_debian_changelog(
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::DebianITP(itp),
             certainty: Some(Certainty::Certain),
-            origin: Some(path.to_string_lossy().to_string()),
+            origin: Some(path.into()),
         });
 
         ret.extend(guess_from_itp_bug(itp)?);
@@ -317,32 +317,39 @@ pub fn parse_debcargo_source_name(
     }
 }
 
-pub fn guess_from_debian_rules(path: &Path, _trust_package: bool) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+pub fn guess_from_debian_rules(
+    path: &Path,
+    _trust_package: bool,
+) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let f = std::fs::File::open(path)?;
     let mf = makefile_lossless::Makefile::read_relaxed(f)
         .map_err(|e| ProviderError::ParseError(format!("Failed to parse debian/rules: {}", e)))?;
 
     let mut ret = vec![];
 
-    if let Some(variable) = mf.variable_definitions().find(|v| v.name().as_deref() == Some("DEB_UPSTREAM_GIT")) {
-        let origin = Some(path.to_string_lossy().to_string());
+    if let Some(variable) = mf
+        .variable_definitions()
+        .find(|v| v.name().as_deref() == Some("DEB_UPSTREAM_GIT"))
+    {
         let certainty = Some(Certainty::Likely);
         let datum = UpstreamDatum::Repository(variable.raw_value().unwrap());
         ret.push(UpstreamDatumWithMetadata {
             datum,
             certainty,
-            origin,
+            origin: Some(Origin::Path(path.to_path_buf())),
         });
     }
 
-    if let Some(deb_upstream_url) = mf.variable_definitions().find(|v| v.name().as_deref() == Some("DEB_UPSTREAM_URL")) {
-        let origin = Some(path.to_string_lossy().to_string());
+    if let Some(deb_upstream_url) = mf
+        .variable_definitions()
+        .find(|v| v.name().as_deref() == Some("DEB_UPSTREAM_URL"))
+    {
         let certainty = Some(Certainty::Likely);
         let datum = UpstreamDatum::Download(deb_upstream_url.raw_value().unwrap());
         ret.push(UpstreamDatumWithMetadata {
             datum,
             certainty,
-            origin,
+            origin: Some(Origin::Path(path.to_path_buf())),
         });
     }
 
@@ -369,7 +376,7 @@ pub fn guess_from_debian_control(
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Homepage(homepage.to_string()),
             certainty: Some(Certainty::Certain),
-            origin: Some(path.to_string_lossy().to_string()),
+            origin: Some(path.into()),
         });
     }
 
@@ -377,22 +384,22 @@ pub fn guess_from_debian_control(
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::GoImportPath(go_import_path.to_string()),
             certainty: Some(Certainty::Certain),
-            origin: Some(path.to_string_lossy().to_string()),
+            origin: Some(path.into()),
         });
 
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Repository(format!("https://{}", go_import_path)),
             certainty: Some(Certainty::Likely),
-            origin: Some(path.to_string_lossy().to_string()),
+            origin: Some(path.into()),
         });
     }
 
-    if is_native == Some(true){
+    if is_native == Some(true) {
         if let Some(vcs_git) = source.vcs_git() {
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Repository(vcs_git),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
 
@@ -400,7 +407,7 @@ pub fn guess_from_debian_control(
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::RepositoryBrowse(vcs_browser),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
     }
@@ -426,8 +433,17 @@ pub fn guess_from_debian_control(
             let mut summary = lines[0].to_string();
             let mut description_lines = &lines[1..];
 
-            if !description_lines.is_empty() && description_lines.last().unwrap().starts_with("This package contains") {
-                summary = summary.split(" - ").next().unwrap_or(summary.as_str()).to_string();
+            if !description_lines.is_empty()
+                && description_lines
+                    .last()
+                    .unwrap()
+                    .starts_with("This package contains")
+            {
+                summary = summary
+                    .split(" - ")
+                    .next()
+                    .unwrap_or(summary.as_str())
+                    .to_string();
                 description_lines = description_lines.split_last().unwrap().1;
             }
 
@@ -435,7 +451,7 @@ pub fn guess_from_debian_control(
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Summary(summary),
                     certainty: Some(certainty),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
 
@@ -443,7 +459,7 @@ pub fn guess_from_debian_control(
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Description(description_lines.join("\n")),
                     certainty: Some(certainty),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
         }
@@ -459,9 +475,7 @@ pub fn guess_from_debian_copyright(
     let mut ret = vec![];
     let text = &std::fs::read_to_string(path)?;
     let mut urls = vec![];
-    match debian_copyright::Copyright::from_str_relaxed(
-        text
-    ) {
+    match debian_copyright::Copyright::from_str_relaxed(text) {
         Ok((c, _)) => {
             let header = c.header().unwrap();
             if let Some(upstream_name) = header.upstream_name() {
@@ -472,7 +486,7 @@ pub fn guess_from_debian_copyright(
                     } else {
                         Certainty::Certain
                     }),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
 
@@ -480,18 +494,25 @@ pub fn guess_from_debian_copyright(
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Contact(upstream_contact),
                     certainty: Some(Certainty::Possible),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
 
             if let Some(source) = header.source() {
                 if source.contains(' ') {
-                    urls.extend(source.split(|c| c == ' ' || c == '\n' || c == ',').filter(|s| !s.is_empty()).map(|s| s.to_string()));
+                    urls.extend(
+                        source
+                            .split(|c| c == ' ' || c == '\n' || c == ',')
+                            .filter(|s| !s.is_empty())
+                            .map(|s| s.to_string()),
+                    );
                 } else {
                     urls.push(source.clone());
                 }
 
-                for (m, _, _) in lazy_regex::regex_captures!(r"(http|https)://([^ ,]+)", source.as_str()) {
+                for (m, _, _) in
+                    lazy_regex::regex_captures!(r"(http|https)://([^ ,]+)", source.as_str())
+                {
                     urls.push(m.to_string());
                 }
             }
@@ -500,7 +521,7 @@ pub fn guess_from_debian_copyright(
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::BugDatabase(upstream_bugs),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
 
@@ -512,16 +533,19 @@ pub fn guess_from_debian_copyright(
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Download(source_downloaded_from),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
 
-            let referenced_licenses = c.iter_licenses().filter_map(|l| l.name()).collect::<std::collections::HashSet<_>>();
+            let referenced_licenses = c
+                .iter_licenses()
+                .filter_map(|l| l.name())
+                .collect::<std::collections::HashSet<_>>();
             if referenced_licenses.len() == 1 {
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::License(referenced_licenses.into_iter().next().unwrap()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
         }
@@ -537,20 +561,20 @@ pub fn guess_from_debian_copyright(
                     ret.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Name(name.to_string()),
                         certainty: Some(Certainty::Possible),
-                        origin: Some(path.to_str().unwrap().to_string()),
+                        origin: Some(Origin::Path(path.into())),
                     });
                 }
 
-                if let Some(url) = lazy_regex::regex_find!(r".* was downloaded from ([^\s]+)", line) {
+                if let Some(url) = lazy_regex::regex_find!(r".* was downloaded from ([^\s]+)", line)
+                {
                     urls.push(url.to_string());
                     ret.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Download(url.to_string()),
                         certainty: Some(Certainty::Possible),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }
-
         }
     }
 
@@ -560,12 +584,15 @@ pub fn guess_from_debian_copyright(
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Repository(repo_url),
                     certainty: Some(Certainty::Confident),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
         }
 
-        ret.extend(crate::metadata_from_url(url.as_str(), Some(path.to_str().unwrap())));
+        ret.extend(crate::metadata_from_url(
+            url.as_str(),
+            &Origin::Path(path.into()),
+        ));
     }
 
     Ok(ret)
@@ -590,7 +617,7 @@ pub fn guess_from_debian_watch(
         .parse()
         .map_err(|e| ProviderError::ParseError(format!("Failed to parse debian/watch: {}", e)))?;
 
-    let origin = Some(path.to_string_lossy().to_string());
+    let origin = Origin::Path(path.into());
 
     for entry in w.entries() {
         let url = entry.format_url(get_package_name);
@@ -599,14 +626,14 @@ pub fn guess_from_debian_watch(
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Repository(url.to_string()),
                     certainty: Some(Certainty::Confident),
-                    origin: origin.clone(),
+                    origin: Some(origin.clone()),
                 });
             }
             Mode::Svn => {
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Repository(url.to_string()),
                     certainty: Some(Certainty::Confident),
-                    origin: origin.clone(),
+                    origin: Some(origin.clone()),
                 });
             }
             Mode::LWP => {
@@ -615,13 +642,13 @@ pub fn guess_from_debian_watch(
                         ret.push(UpstreamDatumWithMetadata {
                             datum: UpstreamDatum::Repository(repo),
                             certainty: Some(Certainty::Confident),
-                            origin: origin.clone(),
+                            origin: Some(origin.clone()),
                         });
                     }
                 }
             }
         };
-        ret.extend(crate::metadata_from_url(url.as_str(), origin.as_deref()));
+        ret.extend(crate::metadata_from_url(url.as_str(), &origin));
     }
     Ok(ret)
 }
@@ -634,9 +661,13 @@ mod watch_tests {
     fn test_empty() {
         let td = tempfile::tempdir().unwrap();
         let path = td.path().join("watch");
-        std::fs::write(&path, r#"
+        std::fs::write(
+            &path,
+            r#"
 # Blah
-"#).unwrap();
+"#,
+        )
+        .unwrap();
         assert!(guess_from_debian_watch(&path, false).unwrap().is_empty());
     }
 
@@ -644,17 +675,21 @@ mod watch_tests {
     fn test_simple() {
         let td = tempfile::tempdir().unwrap();
         let path = td.path().join("watch");
-        std::fs::write(&path, r#"version=4
+        std::fs::write(
+            &path,
+            r#"version=4
 https://github.com/jelmer/dulwich/tags/dulwich-(.*).tar.gz
-"#).unwrap();
+"#,
+        )
+        .unwrap();
         assert_eq!(
-            vec![
-                UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Repository("https://github.com/jelmer/dulwich".to_string()),
-                    certainty: Some(Certainty::Confident),
-                    origin: Some(path.to_string_lossy().to_string()),
-                }],
-            guess_from_debian_watch(&path, false).unwrap());
+            vec![UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Repository("https://github.com/jelmer/dulwich".to_string()),
+                certainty: Some(Certainty::Confident),
+                origin: Some(path.into()),
+            }],
+            guess_from_debian_watch(&path, false).unwrap()
+        );
     }
 }
 
@@ -673,13 +708,14 @@ pub fn debian_is_native(path: &Path) -> std::io::Result<Option<bool>> {
     let changelog_file = path.join("changelog");
     match File::open(changelog_file) {
         Ok(mut file) => {
-            let cl = debian_changelog::ChangeLog::read(&mut file).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            let cl = debian_changelog::ChangeLog::read(&mut file)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
             let first_entry = cl.entries().next().unwrap();
             let version = first_entry.version().unwrap();
             return Ok(Some(version.debian_revision.is_none()));
         }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {},
-        Err(e) => { return Err(e) }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e),
     }
 
     Ok(None)

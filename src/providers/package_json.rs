@@ -29,42 +29,42 @@ pub fn guess_from_package_json(
                 upstream_data.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Name(value.as_str().unwrap().to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some("package.json".to_string()),
+                    origin: Some(path.into()),
                 });
             }
             "homepage" => {
                 upstream_data.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Homepage(value.as_str().unwrap().to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some("package.json".to_string()),
+                    origin: Some(path.into()),
                 });
             }
             "description" => {
                 upstream_data.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Summary(value.as_str().unwrap().to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some("package.json".to_string()),
+                    origin: Some(path.into()),
                 });
             }
             "license" => {
                 upstream_data.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::License(value.as_str().unwrap().to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some("package.json".to_string()),
+                    origin: Some(path.into()),
                 });
             }
             "demo" => {
                 upstream_data.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Demo(value.as_str().unwrap().to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some("package.json".to_string()),
+                    origin: Some(path.into()),
                 });
             }
             "version" => {
                 upstream_data.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Version(value.as_str().unwrap().to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some("package.json".to_string()),
+                    origin: Some(path.into()),
                 });
             }
             "repository" => {
@@ -88,7 +88,7 @@ pub fn guess_from_package_json(
                             upstream_data.push(UpstreamDatumWithMetadata {
                                 datum: UpstreamDatum::Repository(repo_url.to_string()),
                                 certainty: Some(Certainty::Likely),
-                                origin: Some("package.json".to_string()),
+                                origin: Some(path.into()),
                             });
                         }
                         Err(e) if e == url::ParseError::RelativeUrlWithoutBase => {
@@ -97,14 +97,14 @@ pub fn guess_from_package_json(
                             upstream_data.push(UpstreamDatumWithMetadata {
                                 datum: UpstreamDatum::Repository(repo_url.to_string()),
                                 certainty: Some(Certainty::Likely),
-                                origin: Some("package.json".to_string()),
+                                origin: Some(path.into()),
                             });
                         }
                         Ok(url) => {
                             upstream_data.push(UpstreamDatumWithMetadata {
                                 datum: UpstreamDatum::Repository(url.to_string()),
                                 certainty: Some(Certainty::Certain),
-                                origin: Some("package.json".to_string()),
+                                origin: Some(path.into()),
                             });
                         }
                         Err(e) => {
@@ -118,14 +118,14 @@ pub fn guess_from_package_json(
                     upstream_data.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::BugDatabase(url.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some("package.json".to_string()),
+                        origin: Some(path.into()),
                     });
                 } else if let Some(email) = value.get("email").and_then(serde_json::Value::as_str) {
                     let url = format!("mailto:{}", email);
                     upstream_data.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::BugDatabase(url.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some("package.json".to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }
@@ -139,7 +139,7 @@ pub fn guess_from_package_json(
                     upstream_data.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Keywords(keywords),
                         certainty: Some(Certainty::Certain),
-                        origin: Some("package.json".to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }
@@ -161,14 +161,14 @@ pub fn guess_from_package_json(
                     upstream_data.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Author(vec![person]),
                         certainty: Some(Certainty::Confident),
-                        origin: Some("package.json".to_string()),
+                        origin: Some(path.into()),
                     });
                 } else if let Some(author) = value.as_str() {
                     let person = Person::from(author);
                     upstream_data.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Author(vec![person]),
                         certainty: Some(Certainty::Confident),
-                        origin: Some("package.json".to_string()),
+                        origin: Some(path.into()),
                     });
                 } else {
                     error!("Unsupported type for author in package.json: {:?}", value);
@@ -195,7 +195,9 @@ mod package_json_tests {
         let td = tempfile::tempdir().unwrap();
         let path = td.path().join("package.json");
 
-        std::fs::write(&path, r#"{
+        std::fs::write(
+            &path,
+            r#"{
   "name": "mozillaeslintsetup",
   "description": "This package file is for setup of ESLint.",
   "repository": {},
@@ -211,18 +213,30 @@ mod package_json_tests {
   },
   "devDependencies": {}
 }
-"#).unwrap();
+"#,
+        )
+        .unwrap();
         let ret = guess_from_package_json(&path, false).unwrap();
         assert_eq!(
             ret,
             vec![
                 UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Summary("This package file is for setup of ESLint.".to_string()),
+                    datum: UpstreamDatum::Summary(
+                        "This package file is for setup of ESLint.".to_string()
+                    ),
                     certainty: Some(Certainty::Certain),
-                    origin: Some("package.json".to_string()),
+                    origin: Some(path.into()),
                 },
-                UpstreamDatumWithMetadata { datum: UpstreamDatum::License("MPL-2.0".to_string()), certainty: Some(Certainty::Certain), origin: Some("package.json".to_string())},
-                UpstreamDatumWithMetadata {datum: UpstreamDatum::Name("mozillaeslintsetup".to_string()), certainty: Some(Certainty::Certain), origin: Some("package.json".to_string())}
+                UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::License("MPL-2.0".to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(path.into())
+                },
+                UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Name("mozillaeslintsetup".to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(path.into())
+                }
             ]
         );
     }

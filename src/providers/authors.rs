@@ -53,6 +53,6 @@ pub fn guess_from_authors(
     Ok(vec![UpstreamDatumWithMetadata {
         datum: UpstreamDatum::Author(authors),
         certainty: Some(Certainty::Likely),
-        origin: Some(path.to_string_lossy().to_string()),
+        origin: Some(path.into()),
     }])
 }

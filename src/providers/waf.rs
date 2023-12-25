@@ -21,7 +21,7 @@ pub fn guess_from_wscript(
                 results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Name(name),
                     certainty: Some(Certainty::Confident),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
             if let Some(captures) = version_regex.captures(&line) {
@@ -29,7 +29,7 @@ pub fn guess_from_wscript(
                 results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Version(version),
                     certainty: Some(Certainty::Confident),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
         }

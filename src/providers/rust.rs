@@ -25,26 +25,26 @@ pub fn guess_from_cargo(
                 results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Name(value.as_str().unwrap().to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
                 results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::CargoCrate(value.as_str().unwrap().to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
             "description" => {
                 results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Summary(value.as_str().unwrap().to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
             "homepage" => {
                 results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Homepage(value.as_str().unwrap().to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
             "license" => {
@@ -52,7 +52,7 @@ pub fn guess_from_cargo(
                 results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::License(license.to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
             "repository" => {
@@ -60,7 +60,7 @@ pub fn guess_from_cargo(
                 results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Repository(repository.to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
             "version" => {
@@ -68,7 +68,7 @@ pub fn guess_from_cargo(
                     results.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Version(version.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }
@@ -81,7 +81,7 @@ pub fn guess_from_cargo(
                 results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Author(authors),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
             "edition" | "default-run" => {}
