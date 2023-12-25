@@ -292,7 +292,7 @@ interface to 'libcurl' (<https://curl.haxx.se/libcurl>)."#
                 UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Homepage("https://www.example.com/crul".to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.clone().into())
+                    origin: Some(path.into())
                 },
             ]
         );

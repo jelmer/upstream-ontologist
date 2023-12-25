@@ -76,7 +76,7 @@ pub fn guess_from_install(
             .find_iter(line)
         {
             ret.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Repository(m.as_str().trim_end_matches(".").to_string()),
+                datum: UpstreamDatum::Repository(m.as_str().trim_end_matches('.').to_string()),
                 certainty: Some(Certainty::Possible),
                 origin: Some(path.into()),
             });

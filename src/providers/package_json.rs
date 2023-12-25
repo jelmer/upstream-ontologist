@@ -235,7 +235,7 @@ mod package_json_tests {
                 UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Name("mozillaeslintsetup".to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.clone().into())
+                    origin: Some(path.into())
                 }
             ]
         );

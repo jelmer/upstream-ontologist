@@ -19,6 +19,7 @@ const DEFAULT_URLLIB_TIMEOUT: u64 = 3;
 
 pub mod debian;
 pub mod extrapolate;
+pub mod homepage;
 pub mod providers;
 pub mod readme;
 pub mod vcs;
@@ -35,6 +36,7 @@ pub enum Certainty {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Origin {
     Path(PathBuf),
+    Url(url::Url),
     Other(String),
 }
 
@@ -42,6 +44,7 @@ impl std::fmt::Display for Origin {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Origin::Path(path) => write!(f, "{}", path.display()),
+            Origin::Url(url) => write!(f, "{}", url),
             Origin::Other(s) => write!(f, "{}", s),
         }
     }
@@ -59,10 +62,17 @@ impl From<std::path::PathBuf> for Origin {
     }
 }
 
+impl From<url::Url> for Origin {
+    fn from(url: url::Url) -> Self {
+        Origin::Url(url)
+    }
+}
+
 impl ToPyObject for Origin {
     fn to_object(&self, py: Python) -> PyObject {
         match self {
             Origin::Path(path) => path.to_str().unwrap().to_object(py),
+            Origin::Url(url) => url.to_string().to_object(py),
             Origin::Other(s) => s.to_object(py),
         }
     }
@@ -72,6 +82,7 @@ impl IntoPy<PyObject> for Origin {
     fn into_py(self, py: Python) -> PyObject {
         match self {
             Origin::Path(path) => path.to_str().unwrap().to_object(py),
+            Origin::Url(url) => url.to_string().to_object(py),
             Origin::Other(s) => s.to_object(py),
         }
     }
@@ -190,7 +201,7 @@ impl From<&str> for Person {
             }
         } else if text.contains('@') && !text.contains(' ') {
             return Person {
-                email: Some(text.to_string()),
+                email: Some(text),
                 ..Default::default()
             };
         } else {
@@ -423,6 +434,43 @@ impl UpstreamDatum {
         }
     }
 
+    pub fn to_url(&self) -> Option<url::Url> {
+        match self {
+            UpstreamDatum::Name(..) => None,
+            UpstreamDatum::Homepage(s) => Some(s.parse().ok()?),
+            UpstreamDatum::Repository(s) => Some(s.parse().ok()?),
+            UpstreamDatum::RepositoryBrowse(s) => Some(s.parse().ok()?),
+            UpstreamDatum::Description(..) => None,
+            UpstreamDatum::Summary(..) => None,
+            UpstreamDatum::License(..) => None,
+            UpstreamDatum::BugDatabase(s) => Some(s.parse().ok()?),
+            UpstreamDatum::BugSubmit(s) => Some(s.parse().ok()?),
+            UpstreamDatum::Contact(..) => None,
+            UpstreamDatum::CargoCrate(s) => Some(s.parse().ok()?),
+            UpstreamDatum::SecurityMD(..) => None,
+            UpstreamDatum::SecurityContact(..) => None,
+            UpstreamDatum::Version(..) => None,
+            UpstreamDatum::Documentation(s) => Some(s.parse().ok()?),
+            UpstreamDatum::GoImportPath(_s) => None,
+            UpstreamDatum::Download(s) => Some(s.parse().ok()?),
+            UpstreamDatum::Wiki(s) => Some(s.parse().ok()?),
+            UpstreamDatum::MailingList(s) => Some(s.parse().ok()?),
+            UpstreamDatum::SourceForgeProject(s) => Some(s.parse().ok()?),
+            UpstreamDatum::Archive(s) => Some(s.parse().ok()?),
+            UpstreamDatum::Demo(s) => Some(s.parse().ok()?),
+            UpstreamDatum::PeclPackage(_s) => None,
+            UpstreamDatum::HaskellPackage(_s) => None,
+            UpstreamDatum::Author(..) => None,
+            UpstreamDatum::Maintainer(..) => None,
+            UpstreamDatum::Keywords(..) => None,
+            UpstreamDatum::Copyright(..) => None,
+            UpstreamDatum::Funding(s) => Some(s.parse().ok()?),
+            UpstreamDatum::Changelog(s) => Some(s.parse().ok()?),
+            UpstreamDatum::Screenshots(..) => None,
+            UpstreamDatum::DebianITP(_c) => None,
+        }
+    }
+
     pub fn known_bad_guess(&self) -> bool {
         match self {
             UpstreamDatum::BugDatabase(s) | UpstreamDatum::BugSubmit(s) => {
@@ -610,6 +658,10 @@ impl UpstreamMetadata {
         self.0.iter()
     }
 
+    pub fn mut_iter(&mut self) -> impl Iterator<Item = &mut UpstreamDatumWithMetadata> {
+        self.0.iter_mut()
+    }
+
     pub fn get(&self, field: &str) -> Option<&UpstreamDatumWithMetadata> {
         self.0.iter().find(|d| d.datum.field() == field)
     }
@@ -624,6 +676,26 @@ impl UpstreamMetadata {
 
     pub fn discard_known_bad(&mut self) {
         self.0.retain(|d| !d.datum.known_bad_guess());
+    }
+
+    pub fn update(
+        &mut self,
+        new_items: Vec<UpstreamDatumWithMetadata>,
+    ) -> Vec<UpstreamDatumWithMetadata> {
+        let mut changed = vec![];
+        for datum in new_items {
+            let current_datum = self.get(datum.datum.field());
+            if current_datum.is_none() || datum.certainty < current_datum.unwrap().certainty {
+                changed.push(datum.clone());
+                self.insert(datum);
+            }
+        }
+        changed
+    }
+
+    pub fn remove(&mut self, field: &str) -> Option<UpstreamDatumWithMetadata> {
+        let index = self.0.iter().position(|d| d.datum.field() == field)?;
+        Some(self.0.remove(index))
     }
 }
 
@@ -2192,6 +2264,7 @@ pub enum ProviderError {
     Other(String),
     HttpJsonError(HTTPJSONError),
     Python(PyErr),
+    ExtrapolationLimitExceeded(usize),
 }
 
 impl std::fmt::Display for ProviderError {
@@ -2202,6 +2275,9 @@ impl std::fmt::Display for ProviderError {
             ProviderError::Other(e) => write!(f, "Other error: {}", e),
             ProviderError::HttpJsonError(e) => write!(f, "HTTP JSON error: {}", e),
             ProviderError::Python(e) => write!(f, "Python error: {}", e),
+            ProviderError::ExtrapolationLimitExceeded(e) => {
+                write!(f, "Extrapolation limit exceeded: {}", e)
+            }
         }
     }
 }
@@ -2236,6 +2312,9 @@ impl From<ProviderError> for PyErr {
             ProviderError::Other(e) => PyRuntimeError::new_err((e,)),
             ProviderError::HttpJsonError(e) => PyRuntimeError::new_err((e.to_string(),)),
             ProviderError::Python(e) => e,
+            ProviderError::ExtrapolationLimitExceeded(e) => {
+                PyRuntimeError::new_err((e.to_string(),))
+            }
         }
     }
 }
@@ -2706,7 +2785,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
         .into_iter()
         .filter_map(|(name, cb)| {
             assert!(
-                name.len() > 0 && !name.starts_with('/'),
+                !name.is_empty() && !name.starts_with('/'),
                 "invalid name: {}",
                 name
             );
