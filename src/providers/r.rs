@@ -231,34 +231,34 @@ Date/Publication: 2019-08-02 20:30:02 UTC
                 UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Name("crul".to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.into())
+                    origin: Some(path.clone().into())
                 },
                 UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Archive("CRAN".to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.into())
+                    origin: Some(path.clone().into())
                 },
                 UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::BugDatabase(
                         "https://github.com/ropensci/crul/issues".to_string()
                     ),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
+                    origin: Some(path.clone().into()),
                 },
                 UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Version("0.8.4".to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.into())
+                    origin: Some(path.clone().into())
                 },
                 UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::License("MIT + file LICENSE".to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.into())
+                    origin: Some(path.clone().into())
                 },
                 UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Summary("HTTP Client".to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.into())
+                    origin: Some(path.clone().into())
                 },
                 UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Description(
@@ -271,7 +271,7 @@ interface to 'libcurl' (<https://curl.haxx.se/libcurl>)."#
                             .to_string()
                     ),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
+                    origin: Some(path.clone().into()),
                 },
                 UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Maintainer(Person {
@@ -280,19 +280,19 @@ interface to 'libcurl' (<https://curl.haxx.se/libcurl>)."#
                         url: None
                     }),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
+                    origin: Some(path.clone().into()),
                 },
                 UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Repository(
                         "https://github.com/ropensci/crul".to_string()
                     ),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
+                    origin: Some(path.clone().into()),
                 },
                 UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Homepage("https://www.example.com/crul".to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.into())
+                    origin: Some(path.clone().into())
                 },
             ]
         );

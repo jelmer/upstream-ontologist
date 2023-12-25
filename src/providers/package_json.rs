@@ -225,17 +225,17 @@ mod package_json_tests {
                         "This package file is for setup of ESLint.".to_string()
                     ),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
+                    origin: Some(path.clone().into()),
                 },
                 UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::License("MPL-2.0".to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.into())
+                    origin: Some(path.clone().into())
                 },
                 UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Name("mozillaeslintsetup".to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.into())
+                    origin: Some(path.clone().into())
                 }
             ]
         );
