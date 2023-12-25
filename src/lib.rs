@@ -38,6 +38,15 @@ pub enum Origin {
     Other(String),
 }
 
+impl std::fmt::Display for Origin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Origin::Path(path) => write!(f, "{}", path.display()),
+            Origin::Other(s) => write!(f, "{}", s),
+        }
+    }
+}
+
 impl From<&std::path::Path> for Origin {
     fn from(path: &std::path::Path) -> Self {
         Origin::Path(path.to_path_buf())
@@ -52,6 +61,15 @@ impl From<std::path::PathBuf> for Origin {
 
 impl ToPyObject for Origin {
     fn to_object(&self, py: Python) -> PyObject {
+        match self {
+            Origin::Path(path) => path.to_str().unwrap().to_object(py),
+            Origin::Other(s) => s.to_object(py),
+        }
+    }
+}
+
+impl IntoPy<PyObject> for Origin {
+    fn into_py(self, py: Python) -> PyObject {
         match self {
             Origin::Path(path) => path.to_str().unwrap().to_object(py),
             Origin::Other(s) => s.to_object(py),

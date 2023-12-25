@@ -1,15 +1,15 @@
 use log::debug;
 use pyo3::create_exception;
 use pyo3::exceptions::PyException;
-use pyo3::exceptions::{PyRuntimeError, PyValueError, PyKeyError};
+use pyo3::exceptions::{PyKeyError, PyRuntimeError, PyValueError};
 use pyo3::import_exception;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pyo3::types::PyTuple;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::collections::HashMap;
-use upstream_ontologist::{CanonicalizeError, UpstreamPackage};
+use upstream_ontologist::{CanonicalizeError, Origin, UpstreamPackage};
 use url::Url;
 
 import_exception!(urllib.error, HTTPError);
@@ -45,7 +45,8 @@ fn url_from_vcs_command(command: &[u8]) -> Option<String> {
 
 #[pyfunction]
 fn drop_vcs_in_scheme(url: &str) -> String {
-    upstream_ontologist::vcs::drop_vcs_in_scheme(&url.parse().unwrap()).map_or_else(|| url.to_string(), |u| u.to_string())
+    upstream_ontologist::vcs::drop_vcs_in_scheme(&url.parse().unwrap())
+        .map_or_else(|| url.to_string(), |u| u.to_string())
 }
 
 #[pyfunction]
@@ -56,9 +57,15 @@ fn debian_is_native(path: PathBuf) -> PyResult<Option<bool>> {
 }
 
 #[pyfunction]
-fn unsplit_vcs_url(repo_url: &str, branch: Option<&str>, subpath: Option<&str>) -> PyResult<String> {
+fn unsplit_vcs_url(
+    repo_url: &str,
+    branch: Option<&str>,
+    subpath: Option<&str>,
+) -> PyResult<String> {
     let location = upstream_ontologist::vcs::VcsLocation {
-        url: repo_url.parse().map_err(|e: url::ParseError| PyValueError::new_err(e.to_string()))?,
+        url: repo_url
+            .parse()
+            .map_err(|e: url::ParseError| PyValueError::new_err(e.to_string()))?,
         branch: branch.map(|b| b.to_string()),
         subpath: subpath.map(|b| b.to_string()),
     };
@@ -271,13 +278,6 @@ fn plausible_vcs_browse_url(url: &str) -> PyResult<bool> {
 }
 
 #[pyfunction]
-fn guess_from_pod(py: Python, contents: &str) -> PyResult<PyObject> {
-    let ret = upstream_ontologist::providers::perl::guess_from_pod(contents)?;
-
-    Ok(ret.to_object(py))
-}
-
-#[pyfunction]
 fn guess_from_pecl_package(py: Python, package: &str) -> PyResult<PyObject> {
     let ret = upstream_ontologist::providers::php::guess_from_pecl_package(package)?;
 
@@ -307,7 +307,9 @@ fn guess_from_hackage(py: Python, package: &str) -> PyResult<PyObject> {
 
 #[pyfunction]
 fn guess_from_gobo(package: &str) -> PyResult<Vec<(String, String)>> {
-    Ok(upstream_ontologist::providers::gobo::guess_from_gobo(package)?)
+    Ok(upstream_ontologist::providers::gobo::guess_from_gobo(
+        package,
+    )?)
 }
 
 #[pyfunction]
@@ -329,8 +331,7 @@ fn check_url_canonical(url: &str) -> PyResult<String> {
 fn guess_repo_from_url(url: &str, net_access: Option<bool>) -> PyResult<Option<String>> {
     if let Ok(url) = Url::parse(url) {
         Ok(upstream_ontologist::vcs::guess_repo_from_url(
-            &url,
-            net_access,
+            &url, net_access,
         ))
     } else {
         Ok(None)
@@ -403,14 +404,20 @@ fn browse_url_from_repo_url(
         branch: branch.map(|s| s.to_string()),
         subpath: subpath.map(|s| s.to_string()),
     };
-    Ok(upstream_ontologist::vcs::browse_url_from_repo_url(&location, net_access).map(|u| u.to_string()))
+    Ok(
+        upstream_ontologist::vcs::browse_url_from_repo_url(&location, net_access)
+            .map(|u| u.to_string()),
+    )
 }
 
 #[pyfunction]
 fn canonical_git_repo_url(url: &str, net_access: Option<bool>) -> PyResult<String> {
     let url =
         Url::parse(url).map_err(|e| PyRuntimeError::new_err(format!("Invalid URL: {}", e)))?;
-    Ok(upstream_ontologist::vcs::canonical_git_repo_url(&url, net_access).map_or_else(|| url.to_string(), |u| u.to_string()))
+    Ok(
+        upstream_ontologist::vcs::canonical_git_repo_url(&url, net_access)
+            .map_or_else(|| url.to_string(), |u| u.to_string()),
+    )
 }
 
 #[pyfunction]
@@ -511,11 +518,6 @@ fn extract_pecl_package_name(url: &str) -> Option<String> {
 }
 
 #[pyfunction]
-fn metadata_from_url(py: Python, url: &str, origin: Option<&str>) -> PyResult<PyObject> {
-    Ok(upstream_ontologist::metadata_from_url(url, origin).to_object(py))
-}
-
-#[pyfunction]
 fn get_repology_metadata(py: Python, name: &str, distro: Option<&str>) -> PyResult<PyObject> {
     let ret = upstream_ontologist::get_repology_metadata(name, distro);
 
@@ -549,7 +551,8 @@ fn readme_skip_paragraph(py: Python, para: &str) -> PyResult<(bool, PyObject)> {
 
 #[pyfunction]
 fn fixup_rcp_style_git_repo_url(url: &str) -> PyResult<String> {
-    Ok(upstream_ontologist::vcs::fixup_rcp_style_git_repo_url(url).map_or(url.to_string(), |u| u.to_string()))
+    Ok(upstream_ontologist::vcs::fixup_rcp_style_git_repo_url(url)
+        .map_or(url.to_string(), |u| u.to_string()))
 }
 
 #[pyfunction]
@@ -579,14 +582,19 @@ fn upstream_package_to_debian_source_name(package: UpstreamPackage) -> PyResult<
 
 #[pyfunction]
 pub fn find_secure_repo_url(
-    url: String, branch: Option<&str>, net_access: Option<bool>
+    url: String,
+    branch: Option<&str>,
+    net_access: Option<bool>,
 ) -> Option<String> {
-    upstream_ontologist::vcs::find_secure_repo_url(url.parse().unwrap(), branch, net_access).map(|u| u.to_string())
+    upstream_ontologist::vcs::find_secure_repo_url(url.parse().unwrap(), branch, net_access)
+        .map(|u| u.to_string())
 }
 
 #[pyfunction]
 fn sanitize_url(url: &str) -> PyResult<String> {
-    let url: url::Url = url.parse().map_err(|e| PyValueError::new_err(format!("{}", e)))?;
+    let url: url::Url = url
+        .parse()
+        .map_err(|e| PyValueError::new_err(format!("{}", e)))?;
     Ok(upstream_ontologist::vcs::sanitize_url(&url).to_string())
 }
 
@@ -597,7 +605,9 @@ fn convert_cvs_list_to_str(urls: Vec<&str>) -> Option<String> {
 
 #[pyfunction]
 fn fixup_broken_git_details(
-    location: &str, branch: Option<&str>, subpath: Option<&str>
+    location: &str,
+    branch: Option<&str>,
+    subpath: Option<&str>,
 ) -> (String, Option<String>, Option<String>) {
     let url = upstream_ontologist::vcs::fixup_git_url(location);
     let location = upstream_ontologist::vcs::VcsLocation {
@@ -606,7 +616,11 @@ fn fixup_broken_git_details(
         subpath: subpath.map(|s| s.to_string()),
     };
     let ret = upstream_ontologist::vcs::fixup_git_location(&location);
-    (ret.url.to_string(), ret.branch.as_ref().map(|s| s.to_string()), ret.subpath.as_ref().map(|s| s.to_string()))
+    (
+        ret.url.to_string(),
+        ret.branch.as_ref().map(|s| s.to_string()),
+        ret.subpath.as_ref().map(|s| s.to_string()),
+    )
 }
 
 #[derive(Clone)]
@@ -621,49 +635,95 @@ impl UpstreamDatum {
         field: String,
         value: PyObject,
         certainty: Option<String>,
-        origin: Option<String>,
+        origin: Option<Origin>,
     ) -> Self {
         UpstreamDatum(upstream_ontologist::UpstreamDatumWithMetadata {
             datum: match field.as_str() {
                 "Name" => upstream_ontologist::UpstreamDatum::Name(value.extract(py).unwrap()),
-                "Version" => upstream_ontologist::UpstreamDatum::Version(value.extract(py).unwrap()),
-                "Summary" => upstream_ontologist::UpstreamDatum::Summary(value.extract(py).unwrap()),
-                "Description" => upstream_ontologist::UpstreamDatum::Description(value.extract(py).unwrap()),
-                "Homepage" => upstream_ontologist::UpstreamDatum::Homepage(value.extract(py).unwrap()),
-                "Repository" => upstream_ontologist::UpstreamDatum::Repository(value.extract(py).unwrap()),
-                "Repository-Browse" => upstream_ontologist::UpstreamDatum::RepositoryBrowse(value.extract(py).unwrap()),
-                "License" => upstream_ontologist::UpstreamDatum::License(value.extract(py).unwrap()),
+                "Version" => {
+                    upstream_ontologist::UpstreamDatum::Version(value.extract(py).unwrap())
+                }
+                "Summary" => {
+                    upstream_ontologist::UpstreamDatum::Summary(value.extract(py).unwrap())
+                }
+                "Description" => {
+                    upstream_ontologist::UpstreamDatum::Description(value.extract(py).unwrap())
+                }
+                "Homepage" => {
+                    upstream_ontologist::UpstreamDatum::Homepage(value.extract(py).unwrap())
+                }
+                "Repository" => {
+                    upstream_ontologist::UpstreamDatum::Repository(value.extract(py).unwrap())
+                }
+                "Repository-Browse" => {
+                    upstream_ontologist::UpstreamDatum::RepositoryBrowse(value.extract(py).unwrap())
+                }
+                "License" => {
+                    upstream_ontologist::UpstreamDatum::License(value.extract(py).unwrap())
+                }
                 "Author" => upstream_ontologist::UpstreamDatum::Author(value.extract(py).unwrap()),
-                "Bug-Database" => upstream_ontologist::UpstreamDatum::BugDatabase(value.extract(py).unwrap()),
-                "Bug-Submit" => upstream_ontologist::UpstreamDatum::BugSubmit(value.extract(py).unwrap()),
-                "Contact" => upstream_ontologist::UpstreamDatum::Contact(value.extract(py).unwrap()),
-                "Cargo-Crate" => upstream_ontologist::UpstreamDatum::CargoCrate(value.extract(py).unwrap()),
-                "Security-MD" => upstream_ontologist::UpstreamDatum::SecurityMD(value.extract(py).unwrap()),
-                "Keywords" => upstream_ontologist::UpstreamDatum::Keywords(value.extract(py).unwrap()),
-                "Maintainer" => upstream_ontologist::UpstreamDatum::Maintainer(value.extract(py).unwrap()),
+                "Bug-Database" => {
+                    upstream_ontologist::UpstreamDatum::BugDatabase(value.extract(py).unwrap())
+                }
+                "Bug-Submit" => {
+                    upstream_ontologist::UpstreamDatum::BugSubmit(value.extract(py).unwrap())
+                }
+                "Contact" => {
+                    upstream_ontologist::UpstreamDatum::Contact(value.extract(py).unwrap())
+                }
+                "Cargo-Crate" => {
+                    upstream_ontologist::UpstreamDatum::CargoCrate(value.extract(py).unwrap())
+                }
+                "Security-MD" => {
+                    upstream_ontologist::UpstreamDatum::SecurityMD(value.extract(py).unwrap())
+                }
+                "Keywords" => {
+                    upstream_ontologist::UpstreamDatum::Keywords(value.extract(py).unwrap())
+                }
+                "Maintainer" => {
+                    upstream_ontologist::UpstreamDatum::Maintainer(value.extract(py).unwrap())
+                }
                 "Copyright" => {
-                    upstream_ontologist::UpstreamDatum::Copyright(
-                        value.extract(py).unwrap()
-                    )
+                    upstream_ontologist::UpstreamDatum::Copyright(value.extract(py).unwrap())
                 }
                 "Documentation" => {
-                    upstream_ontologist::UpstreamDatum::Documentation(
-                        value.extract(py).unwrap()
-                    )
+                    upstream_ontologist::UpstreamDatum::Documentation(value.extract(py).unwrap())
                 }
-                "Go-Import-Path" => upstream_ontologist::UpstreamDatum::GoImportPath(value.extract(py).unwrap()),
-                "Download" => upstream_ontologist::UpstreamDatum::Download(value.extract(py).unwrap()),
+                "Go-Import-Path" => {
+                    upstream_ontologist::UpstreamDatum::GoImportPath(value.extract(py).unwrap())
+                }
+                "Download" => {
+                    upstream_ontologist::UpstreamDatum::Download(value.extract(py).unwrap())
+                }
                 "Wiki" => upstream_ontologist::UpstreamDatum::Wiki(value.extract(py).unwrap()),
-                "MailingList" => upstream_ontologist::UpstreamDatum::MailingList(value.extract(py).unwrap()),
-                "SourceForge-Project" => upstream_ontologist::UpstreamDatum::SourceForgeProject(value.extract(py).unwrap()),
-                "Archive" => upstream_ontologist::UpstreamDatum::Archive(value.extract(py).unwrap()),
+                "MailingList" => {
+                    upstream_ontologist::UpstreamDatum::MailingList(value.extract(py).unwrap())
+                }
+                "SourceForge-Project" => upstream_ontologist::UpstreamDatum::SourceForgeProject(
+                    value.extract(py).unwrap(),
+                ),
+                "Archive" => {
+                    upstream_ontologist::UpstreamDatum::Archive(value.extract(py).unwrap())
+                }
                 "Demo" => upstream_ontologist::UpstreamDatum::Demo(value.extract(py).unwrap()),
-                "Pecl-Package" => upstream_ontologist::UpstreamDatum::PeclPackage(value.extract(py).unwrap()),
-                "Haskell-Package" => upstream_ontologist::UpstreamDatum::HaskellPackage(value.extract(py).unwrap()),
-                "Funding" => upstream_ontologist::UpstreamDatum::Funding(value.extract(py).unwrap()),
-                "Changelog" => upstream_ontologist::UpstreamDatum::Changelog(value.extract(py).unwrap()),
-                "Debian-ITP" => upstream_ontologist::UpstreamDatum::DebianITP(value.extract(py).unwrap()),
-                "Screenshots" => upstream_ontologist::UpstreamDatum::Screenshots(value.extract(py).unwrap()),
+                "Pecl-Package" => {
+                    upstream_ontologist::UpstreamDatum::PeclPackage(value.extract(py).unwrap())
+                }
+                "Haskell-Package" => {
+                    upstream_ontologist::UpstreamDatum::HaskellPackage(value.extract(py).unwrap())
+                }
+                "Funding" => {
+                    upstream_ontologist::UpstreamDatum::Funding(value.extract(py).unwrap())
+                }
+                "Changelog" => {
+                    upstream_ontologist::UpstreamDatum::Changelog(value.extract(py).unwrap())
+                }
+                "Debian-ITP" => {
+                    upstream_ontologist::UpstreamDatum::DebianITP(value.extract(py).unwrap())
+                }
+                "Screenshots" => {
+                    upstream_ontologist::UpstreamDatum::Screenshots(value.extract(py).unwrap())
+                }
                 _ => panic!("Unknown field: {}", field),
             },
             origin,
@@ -684,12 +744,12 @@ impl UpstreamDatum {
     }
 
     #[getter]
-    fn origin(&self) -> Option<String> {
+    fn origin(&self) -> Option<Origin> {
         self.0.origin.clone()
     }
 
     #[setter]
-    fn set_origin(&mut self, origin: Option<String>) {
+    fn set_origin(&mut self, origin: Option<Origin>) {
         self.0.origin = origin;
     }
 
@@ -712,7 +772,11 @@ impl UpstreamDatum {
     }
 
     fn __str__(&self) -> PyResult<String> {
-        Ok(format!("{}: {}", self.0.datum.field(), self.0.datum.to_string()))
+        Ok(format!(
+            "{}: {}",
+            self.0.datum.field(),
+            self.0.datum.to_string()
+        ))
     }
 
     fn __repr__(slf: PyRef<Self>) -> PyResult<String> {
@@ -720,8 +784,16 @@ impl UpstreamDatum {
             "UpstreamDatum({}, {}, {}, certainty={})",
             slf.0.datum.field(),
             slf.0.datum.to_string(),
-            slf.0.origin.as_ref().map(|s| format!("Some({})", s)).unwrap_or_else(|| "None".to_string()),
-            slf.0.certainty.as_ref().map(|c| format!("Some({})", c.to_string())).unwrap_or_else(|| "None".to_string()),
+            slf.0
+                .origin
+                .as_ref()
+                .map(|s| format!("Some({})", s))
+                .unwrap_or_else(|| "None".to_string()),
+            slf.0
+                .certainty
+                .as_ref()
+                .map(|c| format!("Some({})", c.to_string()))
+                .unwrap_or_else(|| "None".to_string()),
         ))
     }
 }
@@ -732,31 +804,36 @@ struct UpstreamMetadata(upstream_ontologist::UpstreamMetadata);
 #[allow(non_snake_case)]
 #[pymethods]
 impl UpstreamMetadata {
-    fn __getitem__(
-        &self,
-        field: &str,
-    ) -> PyResult<UpstreamDatum> {
-        self.0.get(&field).map(|datum| UpstreamDatum(datum.clone())).ok_or_else(|| {
-            PyKeyError::new_err(format!("No such field: {}", field))
-        })
+    fn __getitem__(&self, field: &str) -> PyResult<UpstreamDatum> {
+        self.0
+            .get(&field)
+            .map(|datum| UpstreamDatum(datum.clone()))
+            .ok_or_else(|| PyKeyError::new_err(format!("No such field: {}", field)))
     }
 
     pub fn items(&self) -> Vec<(String, UpstreamDatum)> {
-        self.0.iter().map(| datum| (datum.datum.field().to_string(), UpstreamDatum(datum.clone()))).collect()
+        self.0
+            .iter()
+            .map(|datum| {
+                (
+                    datum.datum.field().to_string(),
+                    UpstreamDatum(datum.clone()),
+                )
+            })
+            .collect()
     }
 
     pub fn get(&self, py: Python, field: &str, default: Option<PyObject>) -> PyObject {
         let default = default.unwrap_or_else(|| py.None());
-        let value = self.0.get(&field).map(|datum| UpstreamDatum(datum.clone()).into_py(py));
+        let value = self
+            .0
+            .get(&field)
+            .map(|datum| UpstreamDatum(datum.clone()).into_py(py));
 
         value.unwrap_or(default)
     }
 
-    fn __setitem__(
-        &mut self,
-        field: &str,
-        datum: UpstreamDatum,
-    ) -> PyResult<()> {
+    fn __setitem__(&mut self, field: &str, datum: UpstreamDatum) -> PyResult<()> {
         assert_eq!(field, datum.0.datum.field());
         self.0.insert(datum.0);
         Ok(())
@@ -770,7 +847,7 @@ impl UpstreamMetadata {
     pub fn __iter__(slf: PyRef<Self>) -> PyResult<PyObject> {
         #[pyclass]
         struct UpstreamDatumIter {
-            inner: Vec<upstream_ontologist::UpstreamDatumWithMetadata>
+            inner: Vec<upstream_ontologist::UpstreamDatumWithMetadata>,
         }
         #[pymethods]
         impl UpstreamDatumIter {
@@ -780,7 +857,8 @@ impl UpstreamMetadata {
         }
         Ok(UpstreamDatumIter {
             inner: slf.0.iter().cloned().collect::<Vec<_>>(),
-        }.into_py(slf.py()))
+        }
+        .into_py(slf.py()))
     }
 }
 
@@ -788,7 +866,8 @@ impl UpstreamMetadata {
 fn guess_upstream_info(
     py: Python,
     path: std::path::PathBuf,
-    trust_package: Option<bool>) -> PyResult<Vec<PyObject>> {
+    trust_package: Option<bool>,
+) -> PyResult<Vec<PyObject>> {
     let mut result = Vec::new();
 
     for datum in upstream_ontologist::guess_upstream_info(&path, trust_package) {
@@ -806,9 +885,16 @@ fn guess_upstream_info(
 }
 
 #[pyfunction]
-fn description_from_readme_md(py: Python, contents: &str) -> PyResult<(Option<String>, Vec<PyObject>)> {
-    let (description, metadata) = upstream_ontologist::readme::description_from_readme_md(contents)?;
-    let metadata = metadata.into_iter().map(|datum| datum.to_object(py)).collect();
+fn description_from_readme_md(
+    py: Python,
+    contents: &str,
+) -> PyResult<(Option<String>, Vec<PyObject>)> {
+    let (description, metadata) =
+        upstream_ontologist::readme::description_from_readme_md(contents)?;
+    let metadata = metadata
+        .into_iter()
+        .map(|datum| datum.to_object(py))
+        .collect();
     Ok((description, metadata))
 }
 
@@ -829,7 +915,6 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(plausible_vcs_browse_url))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_aur))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_pecl_package))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_pod))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_repology))?;
     m.add_wrapped(wrap_pyfunction!(check_url_canonical))?;
     m.add_wrapped(wrap_pyfunction!(guess_repo_from_url))?;
@@ -851,7 +936,6 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(check_bug_submit_url_canonical))?;
     m.add_wrapped(wrap_pyfunction!(extract_sf_project_name))?;
     m.add_wrapped(wrap_pyfunction!(extract_pecl_package_name))?;
-    m.add_wrapped(wrap_pyfunction!(metadata_from_url))?;
     m.add_wrapped(wrap_pyfunction!(get_repology_metadata))?;
     m.add_wrapped(wrap_pyfunction!(get_sf_metadata))?;
     m.add_wrapped(wrap_pyfunction!(fixup_rcp_style_git_repo_url))?;
@@ -892,9 +976,11 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     )?;
     m.add(
         "KNOWN_GITLAB_SITES",
-        upstream_ontologist::vcs::KNOWN_GITLAB_SITES.to_vec())?;
+        upstream_ontologist::vcs::KNOWN_GITLAB_SITES.to_vec(),
+    )?;
     m.add(
         "SECURE_SCHEMES",
-        upstream_ontologist::vcs::SECURE_SCHEMES.to_vec())?;
+        upstream_ontologist::vcs::SECURE_SCHEMES.to_vec(),
+    )?;
     Ok(())
 }
