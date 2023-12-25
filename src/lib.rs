@@ -32,6 +32,63 @@ pub enum Certainty {
     Possible,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Origin {
+    Path(PathBuf),
+    Other(String),
+}
+
+impl std::fmt::Display for Origin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Origin::Path(path) => write!(f, "{}", path.display()),
+            Origin::Other(s) => write!(f, "{}", s),
+        }
+    }
+}
+
+impl From<&std::path::Path> for Origin {
+    fn from(path: &std::path::Path) -> Self {
+        Origin::Path(path.to_path_buf())
+    }
+}
+
+impl From<std::path::PathBuf> for Origin {
+    fn from(path: std::path::PathBuf) -> Self {
+        Origin::Path(path)
+    }
+}
+
+impl ToPyObject for Origin {
+    fn to_object(&self, py: Python) -> PyObject {
+        match self {
+            Origin::Path(path) => path.to_str().unwrap().to_object(py),
+            Origin::Other(s) => s.to_object(py),
+        }
+    }
+}
+
+impl IntoPy<PyObject> for Origin {
+    fn into_py(self, py: Python) -> PyObject {
+        match self {
+            Origin::Path(path) => path.to_str().unwrap().to_object(py),
+            Origin::Other(s) => s.to_object(py),
+        }
+    }
+}
+
+impl FromPyObject<'_> for Origin {
+    fn extract(ob: &PyAny) -> PyResult<Self> {
+        if let Ok(path) = ob.extract::<PathBuf>() {
+            Ok(Origin::Path(path))
+        } else if let Ok(s) = ob.extract::<String>() {
+            Ok(Origin::Other(s))
+        } else {
+            Err(PyTypeError::new_err("expected str or Path"))
+        }
+    }
+}
+
 impl FromStr for Certainty {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -121,7 +178,7 @@ impl From<&str> for Person {
         } else if text.contains('<') {
             if let Some((name, email)) = parseaddr(text.as_str()) {
                 return Person {
-                name: Some(name),
+                    name: Some(name),
                     email: Some(email),
                     ..Default::default()
                 };
@@ -152,23 +209,29 @@ mod person_tests {
     #[test]
     fn test_from_str() {
         assert_eq!(
-            Person::from("Foo Bar <foo@example.com>"), Person {
+            Person::from("Foo Bar <foo@example.com>"),
+            Person {
                 name: Some("Foo Bar".to_string()),
                 email: Some("foo@example.com".to_string()),
                 url: None
-            });
+            }
+        );
         assert_eq!(
-            Person::from("Foo Bar"), Person {
+            Person::from("Foo Bar"),
+            Person {
                 name: Some("Foo Bar".to_string()),
                 email: None,
                 url: None
-            });
+            }
+        );
         assert_eq!(
-            Person::from("foo@example.com"), Person {
+            Person::from("foo@example.com"),
+            Person {
                 name: None,
                 email: Some("foo@example.com".to_string()),
                 url: None
-            });
+            }
+        );
     }
 }
 
@@ -274,7 +337,7 @@ pub enum UpstreamDatum {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct UpstreamDatumWithMetadata {
     pub datum: UpstreamDatum,
-    pub origin: Option<String>,
+    pub origin: Option<Origin>,
     pub certainty: Option<Certainty>,
 }
 
@@ -490,23 +553,39 @@ impl std::fmt::Display for UpstreamDatum {
             UpstreamDatum::Demo(s) => write!(f, "Demo: {}", s),
             UpstreamDatum::PeclPackage(s) => write!(f, "PeclPackage: {}", s),
             UpstreamDatum::Author(authors) => {
-                write!(f, "Author: {}", authors.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", "))
+                write!(
+                    f,
+                    "Author: {}",
+                    authors
+                        .iter()
+                        .map(|a| a.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
             }
             UpstreamDatum::Maintainer(maintainer) => {
                 write!(f, "Maintainer: {}", maintainer)
-            },
+            }
             UpstreamDatum::Keywords(keywords) => {
-                write!(f, "Keywords: {}", keywords.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", "))
-            },
+                write!(
+                    f,
+                    "Keywords: {}",
+                    keywords
+                        .iter()
+                        .map(|a| a.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
             UpstreamDatum::Copyright(s) => {
                 write!(f, "Copyright: {}", s)
-            },
+            }
             UpstreamDatum::Funding(s) => {
                 write!(f, "Funding: {}", s)
-            },
+            }
             UpstreamDatum::Changelog(s) => {
                 write!(f, "Changelog: {}", s)
-            },
+            }
             UpstreamDatum::DebianITP(s) => {
                 write!(f, "DebianITP: {}", s)
             }
@@ -567,16 +646,12 @@ impl ToPyObject for UpstreamDatumWithMetadata {
             .unwrap();
 
         let kwargs = pyo3::types::PyDict::new(py);
-        kwargs.set_item("certainty", self.certainty.map(|x| x.to_string())).unwrap();
+        kwargs
+            .set_item("certainty", self.certainty.map(|x| x.to_string()))
+            .unwrap();
         kwargs.set_item("origin", self.origin.as_ref()).unwrap();
 
-
-        let datum = cls
-            .call((
-                field,
-                py_datum,
-            ), Some(kwargs))
-            .unwrap();
+        let datum = cls.call((field, py_datum), Some(kwargs)).unwrap();
 
         datum.to_object(py)
     }
@@ -786,7 +861,7 @@ pub fn guess_from_metadata_json(
                     upstream_data.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Description(description.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }
@@ -795,7 +870,7 @@ pub fn guess_from_metadata_json(
                     upstream_data.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Name(name.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }
@@ -804,7 +879,7 @@ pub fn guess_from_metadata_json(
                     upstream_data.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Version(version.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }
@@ -813,7 +888,7 @@ pub fn guess_from_metadata_json(
                     upstream_data.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Homepage(url.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }
@@ -822,7 +897,7 @@ pub fn guess_from_metadata_json(
                     upstream_data.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::License(license.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }
@@ -831,7 +906,7 @@ pub fn guess_from_metadata_json(
                     upstream_data.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Repository(repository.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }
@@ -840,7 +915,7 @@ pub fn guess_from_metadata_json(
                     upstream_data.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Summary(summary.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }
@@ -849,7 +924,7 @@ pub fn guess_from_metadata_json(
                     upstream_data.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::BugDatabase(issues_url.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }
@@ -858,7 +933,7 @@ pub fn guess_from_metadata_json(
                     upstream_data.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Homepage(project_page.to_string()),
                         certainty: Some(Certainty::Likely),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }
@@ -868,7 +943,7 @@ pub fn guess_from_metadata_json(
                     upstream_data.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Author(vec![author]),
                         certainty: Some(Certainty::Likely),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 } else if let Some(author_values) = value.as_array() {
                     let authors: Vec<Person> = match author_values
@@ -889,7 +964,7 @@ pub fn guess_from_metadata_json(
                     upstream_data.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Author(authors),
                         certainty: Some(Certainty::Likely),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }
@@ -1432,7 +1507,7 @@ pub fn guess_from_travis_yml(
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::GoImportPath(go_import_path.to_string()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
     }
@@ -1447,7 +1522,7 @@ pub fn guess_from_environment() -> std::result::Result<Vec<UpstreamDatumWithMeta
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Repository(url),
             certainty: Some(Certainty::Certain),
-            origin: Some("environment".to_string()),
+            origin: Some(Origin::Other("environment".to_string())),
         });
     }
     Ok(results)
@@ -1895,18 +1970,18 @@ pub fn extract_hackage_package(url: &str) -> Option<String> {
 }
 
 /// Obtain metadata from a URL related to the project
-pub fn metadata_from_url(url: &str, origin: Option<&str>) -> Vec<UpstreamDatumWithMetadata> {
+pub fn metadata_from_url(url: &str, origin: &Origin) -> Vec<UpstreamDatumWithMetadata> {
     let mut results = Vec::new();
     if let Some(sf_project) = extract_sf_project_name(url) {
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::SourceForgeProject(sf_project),
             certainty: Some(Certainty::Certain),
-            origin: origin.map(|s| s.to_string()),
+            origin: Some(origin.clone()),
         });
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Archive("SourceForge".to_string()),
             certainty: Some(Certainty::Certain),
-            origin: origin.map(|s| s.to_string()),
+            origin: Some(origin.clone()),
         });
     }
 
@@ -1914,12 +1989,12 @@ pub fn metadata_from_url(url: &str, origin: Option<&str>) -> Vec<UpstreamDatumWi
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::PeclPackage(pecl_package),
             certainty: Some(Certainty::Certain),
-            origin: origin.map(|s| s.to_string()),
+            origin: Some(origin.clone()),
         });
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Archive("Pecl".to_string()),
             certainty: Some(Certainty::Certain),
-            origin: origin.map(|s| s.to_string()),
+            origin: Some(origin.clone()),
         });
     }
 
@@ -1927,12 +2002,12 @@ pub fn metadata_from_url(url: &str, origin: Option<&str>) -> Vec<UpstreamDatumWi
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::HaskellPackage(haskell_package),
             certainty: Some(Certainty::Certain),
-            origin: origin.map(|s| s.to_string()),
+            origin: Some(origin.clone()),
         });
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Archive("Hackage".to_string()),
             certainty: Some(Certainty::Certain),
-            origin: origin.map(|s| s.to_string()),
+            origin: Some(origin.clone()),
         });
     }
     results
@@ -1969,21 +2044,21 @@ pub fn guess_from_path(
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Name(name.as_str().to_string()),
                     certainty: Some(Certainty::Possible),
-                    origin: Some(path.display().to_string()),
+                    origin: Some(path.into()),
                 });
             }
             if let Some(version) = captures.get(2) {
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Version(version.as_str().to_string()),
                     certainty: Some(Certainty::Possible),
-                    origin: Some(path.display().to_string()),
+                    origin: Some(path.into()),
                 });
             }
         } else {
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Name(basename_str.to_string()),
                 certainty: Some(Certainty::Possible),
-                origin: Some(path.display().to_string()),
+                origin: Some(path.into()),
             });
         }
     }
@@ -2095,7 +2170,7 @@ impl ToPyObject for UpstreamDatum {
 impl FromPyObject<'_> for UpstreamDatumWithMetadata {
     fn extract(obj: &PyAny) -> PyResult<Self> {
         let certainty = obj.getattr("certainty")?.extract::<Option<String>>()?;
-        let origin = obj.getattr("origin")?.extract::<Option<String>>()?;
+        let origin = obj.getattr("origin")?.extract::<Option<Origin>>()?;
         let datum = if obj.hasattr("datum")? {
             obj.getattr("datum")?.extract::<UpstreamDatum>()
         } else {
@@ -2116,7 +2191,7 @@ pub enum ProviderError {
     IoError(std::io::Error),
     Other(String),
     HttpJsonError(HTTPJSONError),
-    Python(PyErr)
+    Python(PyErr),
 }
 
 impl std::fmt::Display for ProviderError {
@@ -2160,7 +2235,7 @@ impl From<ProviderError> for PyErr {
             ProviderError::ParseError(e) => ParseError::new_err((e,)),
             ProviderError::Other(e) => PyRuntimeError::new_err((e,)),
             ProviderError::HttpJsonError(e) => PyRuntimeError::new_err((e.to_string(),)),
-            ProviderError::Python(e) => e
+            ProviderError::Python(e) => e,
         }
     }
 }
@@ -2168,7 +2243,7 @@ impl From<ProviderError> for PyErr {
 #[derive(Debug)]
 pub struct UpstreamPackage {
     pub family: String,
-    pub name: String
+    pub name: String,
 }
 
 impl FromPyObject<'_> for UpstreamPackage {
@@ -2211,7 +2286,8 @@ pub struct GuesserSettings {
 
 pub struct UpstreamMetadataGuesser {
     pub name: std::path::PathBuf,
-    pub guess: Box<dyn FnOnce(&GuesserSettings) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>>,
+    pub guess:
+        Box<dyn FnOnce(&GuesserSettings) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>>,
 }
 
 impl std::fmt::Debug for UpstreamMetadataGuesser {
@@ -2222,151 +2298,296 @@ impl std::fmt::Debug for UpstreamMetadataGuesser {
     }
 }
 
-const STATIC_GUESSERS: &[(&str, fn(&std::path::Path, bool) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>)] = &[
-        ("debian/watch", crate::providers::debian::guess_from_debian_watch),
-        ("debian/control", crate::providers::debian::guess_from_debian_control),
-        ("debian/changelog", crate::providers::debian::guess_from_debian_changelog),
-        ("debian/rules", crate::providers::debian::guess_from_debian_rules),
-        ("PKG-INFO", crate::providers::python::guess_from_pkg_info),
-        ("package.json", crate::providers::package_json::guess_from_package_json),
-        ("composer.json", crate::providers::composer_json::guess_from_composer_json),
-        ("package.xml", crate::providers::package_xml::guess_from_package_xml),
-        ("package.yaml", crate::providers::package_yaml::guess_from_package_yaml),
-        ("dist.ini", crate::providers::perl::guess_from_dist_ini),
-        ("debian/copyright", crate::providers::debian::guess_from_debian_copyright),
-        ("META.json", crate::providers::perl::guess_from_meta_json),
-        ("MYMETA.json", crate::providers::perl::guess_from_meta_json),
-        ("META.yml", crate::providers::perl::guess_from_meta_yml),
-        ("MYMETA.yml", crate::providers::perl::guess_from_meta_yml),
-        ("configure", crate::providers::autoconf::guess_from_configure),
-        ("DESCRIPTION", crate::providers::r::guess_from_r_description),
-        ("Cargo.toml", crate::providers::rust::guess_from_cargo),
-        ("pom.xml", crate::providers::maven::guess_from_pom_xml),
-        (".git/config", crate::providers::git::guess_from_git_config),
-        ("debian/get-orig-source.sh", crate::vcs_command::guess_from_get_orig_source),
-        ("pyproject.toml", crate::providers::python::guess_from_pyproject_toml),
-        ("setup.cfg", crate::providers::python::guess_from_setup_cfg),
-        ("go.mod", crate::providers::go::guess_from_go_mod),
-        ("Makefile.PL", crate::providers::perl::guess_from_makefile_pl),
-        ("wscript", crate::providers::waf::guess_from_wscript),
-        ("AUTHORS", crate::providers::authors::guess_from_authors),
-        ("INSTALL", crate::providers::guess_from_install),
-        ("pubspec.yaml", crate::providers::pubspec::guess_from_pubspec_yaml),
-        ("pubspec.yml", crate::providers::pubspec::guess_from_pubspec_yaml),
-        ("meson.build", crate::providers::meson::guess_from_meson),
-        ("metadata.json", crate::guess_from_metadata_json),
-        (".travis.yml", crate::guess_from_travis_yml),
+const STATIC_GUESSERS: &[(
+    &str,
+    fn(&std::path::Path, bool) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>,
+)] = &[
+    (
+        "debian/watch",
+        crate::providers::debian::guess_from_debian_watch,
+    ),
+    (
+        "debian/control",
+        crate::providers::debian::guess_from_debian_control,
+    ),
+    (
+        "debian/changelog",
+        crate::providers::debian::guess_from_debian_changelog,
+    ),
+    (
+        "debian/rules",
+        crate::providers::debian::guess_from_debian_rules,
+    ),
+    ("PKG-INFO", crate::providers::python::guess_from_pkg_info),
+    (
+        "package.json",
+        crate::providers::package_json::guess_from_package_json,
+    ),
+    (
+        "composer.json",
+        crate::providers::composer_json::guess_from_composer_json,
+    ),
+    (
+        "package.xml",
+        crate::providers::package_xml::guess_from_package_xml,
+    ),
+    (
+        "package.yaml",
+        crate::providers::package_yaml::guess_from_package_yaml,
+    ),
+    ("dist.ini", crate::providers::perl::guess_from_dist_ini),
+    (
+        "debian/copyright",
+        crate::providers::debian::guess_from_debian_copyright,
+    ),
+    ("META.json", crate::providers::perl::guess_from_meta_json),
+    ("MYMETA.json", crate::providers::perl::guess_from_meta_json),
+    ("META.yml", crate::providers::perl::guess_from_meta_yml),
+    ("MYMETA.yml", crate::providers::perl::guess_from_meta_yml),
+    (
+        "configure",
+        crate::providers::autoconf::guess_from_configure,
+    ),
+    ("DESCRIPTION", crate::providers::r::guess_from_r_description),
+    ("Cargo.toml", crate::providers::rust::guess_from_cargo),
+    ("pom.xml", crate::providers::maven::guess_from_pom_xml),
+    (".git/config", crate::providers::git::guess_from_git_config),
+    (
+        "debian/get-orig-source.sh",
+        crate::vcs_command::guess_from_get_orig_source,
+    ),
+    (
+        "pyproject.toml",
+        crate::providers::python::guess_from_pyproject_toml,
+    ),
+    ("setup.cfg", crate::providers::python::guess_from_setup_cfg),
+    ("go.mod", crate::providers::go::guess_from_go_mod),
+    (
+        "Makefile.PL",
+        crate::providers::perl::guess_from_makefile_pl,
+    ),
+    ("wscript", crate::providers::waf::guess_from_wscript),
+    ("AUTHORS", crate::providers::authors::guess_from_authors),
+    ("INSTALL", crate::providers::guess_from_install),
+    (
+        "pubspec.yaml",
+        crate::providers::pubspec::guess_from_pubspec_yaml,
+    ),
+    (
+        "pubspec.yml",
+        crate::providers::pubspec::guess_from_pubspec_yaml,
+    ),
+    ("meson.build", crate::providers::meson::guess_from_meson),
+    ("metadata.json", crate::guess_from_metadata_json),
+    (".travis.yml", crate::guess_from_travis_yml),
 ];
 
 fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
-    let mut candidates: Vec<(String, Box<dyn FnOnce(&std::path::Path, &GuesserSettings) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>>)> = Vec::new();
+    let mut candidates: Vec<(
+        String,
+        Box<
+            dyn FnOnce(
+                &std::path::Path,
+                &GuesserSettings,
+            ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>,
+        >,
+    )> = Vec::new();
 
     let path = path.canonicalize().unwrap();
 
     for (name, cb) in STATIC_GUESSERS {
         let subpath = path.join(name);
         if subpath.exists() {
-            candidates.push((name.to_string(), Box::new(move |_path, s: &GuesserSettings| cb(&subpath, s.trust_package))));
+            candidates.push((
+                name.to_string(),
+                Box::new(move |_path, s: &GuesserSettings| cb(&subpath, s.trust_package)),
+            ));
         }
     }
 
     for name in ["SECURITY.md", ".github/SECURITY.md", "docs/SECURITY.md"].iter() {
         if path.join(name).exists() {
-            candidates.push((name.to_string(), Box::new(move |path, s: &GuesserSettings| crate::providers::security_md::guess_from_security_md(name, path, s.trust_package))));
+            candidates.push((
+                name.to_string(),
+                Box::new(move |path, s: &GuesserSettings| {
+                    crate::providers::security_md::guess_from_security_md(
+                        name,
+                        path,
+                        s.trust_package,
+                    )
+                }),
+            ));
         }
     }
 
-        let mut found_pkg_info = path.join("PKG-INFO").exists();
-        for entry in std::fs::read_dir(&path).unwrap() {
+    let mut found_pkg_info = path.join("PKG-INFO").exists();
+    for entry in std::fs::read_dir(&path).unwrap() {
+        let entry = entry.unwrap();
+        let filename = entry.file_name().to_string_lossy().to_string();
+        if filename.ends_with(".egg-info") {
+            candidates.push((
+                format!("{}/PKG-INFO", filename),
+                Box::new(move |_path, s| {
+                    crate::providers::python::guess_from_pkg_info(
+                        entry.path().join("PKG-INFO").as_path(),
+                        s.trust_package,
+                    )
+                }),
+            ));
+            found_pkg_info = true;
+        } else if filename.ends_with(".dist-info") {
+            candidates.push((
+                format!("{}/METADATA", filename),
+                Box::new(move |_path, s| {
+                    crate::providers::python::guess_from_pkg_info(
+                        entry.path().join("PKG-INFO").as_path(),
+                        s.trust_package,
+                    )
+                }),
+            ));
+            found_pkg_info = true;
+        }
+    }
+
+    if !found_pkg_info && path.join("setup.py").exists() {
+        candidates.push((
+            "setup.py".to_string(),
+            Box::new(|path, s| {
+                crate::providers::python::guess_from_setup_py(path, s.trust_package)
+            }),
+        ));
+    }
+
+    for entry in std::fs::read_dir(&path).unwrap() {
+        let entry = entry.unwrap();
+
+        if entry.file_name().to_string_lossy().ends_with(".gemspec") {
+            candidates.push((
+                entry.file_name().to_string_lossy().to_string(),
+                Box::new(move |_path, s| {
+                    crate::providers::ruby::guess_from_gemspec(
+                        entry.path().as_path(),
+                        s.trust_package,
+                    )
+                }),
+            ));
+        }
+    }
+
+    // TODO(jelmer): Perhaps scan all directories if no other primary project information file has been found?
+    for entry in std::fs::read_dir(&path).unwrap() {
+        let entry = entry.unwrap();
+        let path = entry.path();
+
+        if entry.file_type().unwrap().is_dir() {
+            let description_name = format!("{}/DESCRIPTION", entry.file_name().to_string_lossy());
+            if path.join(&description_name).exists() {
+                candidates.push((
+                    description_name,
+                    Box::new(move |_path, s| {
+                        crate::providers::r::guess_from_r_description(
+                            entry.path().as_path(),
+                            s.trust_package,
+                        )
+                    }),
+                ));
+            }
+        }
+    }
+
+    let mut doap_filenames = std::fs::read_dir(&path)
+        .unwrap()
+        .filter_map(|entry| {
             let entry = entry.unwrap();
             let filename = entry.file_name().to_string_lossy().to_string();
-            if filename.ends_with(".egg-info") {
-                candidates.push((format!("{}/PKG-INFO", filename), Box::new(move |_path, s| crate::providers::python::guess_from_pkg_info(entry.path().join("PKG-INFO").as_path(), s.trust_package))));
-                found_pkg_info = true;
-            } else if filename.ends_with(".dist-info") {
-                candidates.push((format!("{}/METADATA", filename), Box::new(move |_path, s| crate::providers::python::guess_from_pkg_info(entry.path().join("PKG-INFO").as_path(), s.trust_package))));
-                found_pkg_info = true;
-            }
-        }
-
-        if !found_pkg_info && path.join("setup.py").exists(){
-            candidates.push(("setup.py".to_string(), Box::new(|path, s| crate::providers::python::guess_from_setup_py(path, s.trust_package))));
-        }
-
-        for entry in std::fs::read_dir(&path).unwrap() {
-            let entry = entry.unwrap();
-
-            if entry.file_name().to_string_lossy().ends_with(".gemspec") {
-                candidates.push((entry.file_name().to_string_lossy().to_string(), Box::new(move |_path, s| crate::providers::ruby::guess_from_gemspec(entry.path().as_path(), s.trust_package))));
-            }
-        }
-
-        // TODO(jelmer): Perhaps scan all directories if no other primary project information file has been found?
-        for entry in std::fs::read_dir(&path).unwrap() {
-            let entry = entry.unwrap();
-            let path = entry.path();
-
-            if entry.file_type().unwrap().is_dir() {
-                let description_name = format!("{}/DESCRIPTION", entry.file_name().to_string_lossy());
-                if path.join(&description_name).exists() {
-                    candidates.push((description_name, Box::new(move |_path, s| crate::providers::r::guess_from_r_description(entry.path().as_path(), s.trust_package))));
-                }
-            }
-        }
-
-        let mut doap_filenames = std::fs::read_dir(&path).unwrap().filter_map(|entry| {
-            let entry = entry.unwrap();
-            let filename = entry.file_name().to_string_lossy().to_string();
-            if filename.ends_with(".doap") || (filename.ends_with(".xml") && filename.starts_with("doap_XML_")) {
+            if filename.ends_with(".doap")
+                || (filename.ends_with(".xml") && filename.starts_with("doap_XML_"))
+            {
                 Some(entry.file_name())
             } else {
                 None
             }
-        }).collect::<Vec<_>>();
+        })
+        .collect::<Vec<_>>();
 
-        if doap_filenames.len() == 1 {
-            let doap_filename = doap_filenames.remove(0);
-            candidates.push((doap_filename.to_string_lossy().to_string(), Box::new(|path, s| crate::providers::doap::guess_from_doap(path, s.trust_package))));
-        } else if doap_filenames.len() > 1 {
-            log::warn!("Multiple DOAP files found: {:?}, ignoring all.", doap_filenames);
-        }
+    if doap_filenames.len() == 1 {
+        let doap_filename = doap_filenames.remove(0);
+        candidates.push((
+            doap_filename.to_string_lossy().to_string(),
+            Box::new(|path, s| crate::providers::doap::guess_from_doap(path, s.trust_package)),
+        ));
+    } else if doap_filenames.len() > 1 {
+        log::warn!(
+            "Multiple DOAP files found: {:?}, ignoring all.",
+            doap_filenames
+        );
+    }
 
-        let mut metainfo_filenames = std::fs::read_dir(&path).unwrap().filter_map(|entry| {
+    let mut metainfo_filenames = std::fs::read_dir(&path)
+        .unwrap()
+        .filter_map(|entry| {
             let entry = entry.unwrap();
-            if entry.file_name().to_string_lossy().ends_with(".metainfo.xml") {
+            if entry
+                .file_name()
+                .to_string_lossy()
+                .ends_with(".metainfo.xml")
+            {
                 Some(entry.file_name())
             } else {
                 None
             }
-        }).collect::<Vec<_>>();
+        })
+        .collect::<Vec<_>>();
 
-        if metainfo_filenames.len() == 1 {
-            let metainfo_filename = metainfo_filenames.remove(0);
-            candidates.push((metainfo_filename.to_string_lossy().to_string(), Box::new(|path, s| crate::providers::metainfo::guess_from_metainfo(path, s.trust_package))));
-        } else if metainfo_filenames.len() > 1 {
-            log::warn!("Multiple metainfo files found: {:?}, ignoring all.", metainfo_filenames);
-        }
+    if metainfo_filenames.len() == 1 {
+        let metainfo_filename = metainfo_filenames.remove(0);
+        candidates.push((
+            metainfo_filename.to_string_lossy().to_string(),
+            Box::new(|path, s| {
+                crate::providers::metainfo::guess_from_metainfo(path, s.trust_package)
+            }),
+        ));
+    } else if metainfo_filenames.len() > 1 {
+        log::warn!(
+            "Multiple metainfo files found: {:?}, ignoring all.",
+            metainfo_filenames
+        );
+    }
 
-        let mut cabal_filenames = std::fs::read_dir(&path).unwrap().filter_map(|entry| {
+    let mut cabal_filenames = std::fs::read_dir(&path)
+        .unwrap()
+        .filter_map(|entry| {
             let entry = entry.unwrap();
             if entry.file_name().to_string_lossy().ends_with(".cabal") {
                 Some(entry.file_name())
             } else {
                 None
             }
-        }).collect::<Vec<_>>();
+        })
+        .collect::<Vec<_>>();
 
-        if cabal_filenames.len() == 1 {
-            let cabal_filename = cabal_filenames.remove(0);
-            candidates.push((cabal_filename.to_string_lossy().to_string(), Box::new(|path, s| crate::providers::haskell::guess_from_cabal(path, s.trust_package))));
-        } else if cabal_filenames.len() > 1 {
-            log::warn!("Multiple cabal files found: {:?}, ignoring all.", cabal_filenames);
-        }
+    if cabal_filenames.len() == 1 {
+        let cabal_filename = cabal_filenames.remove(0);
+        candidates.push((
+            cabal_filename.to_string_lossy().to_string(),
+            Box::new(|path, s| crate::providers::haskell::guess_from_cabal(path, s.trust_package)),
+        ));
+    } else if cabal_filenames.len() > 1 {
+        log::warn!(
+            "Multiple cabal files found: {:?}, ignoring all.",
+            cabal_filenames
+        );
+    }
 
-        let readme_filenames = std::fs::read_dir(&path).unwrap().filter_map(|entry| {
+    let readme_filenames = std::fs::read_dir(&path)
+        .unwrap()
+        .filter_map(|entry| {
             let entry = entry.unwrap();
             let filename = entry.file_name().to_string_lossy().to_string();
-            if !(filename.to_lowercase().starts_with("readme") || filename.to_lowercase().starts_with("hacking") || filename.to_lowercase().starts_with("contributing")) {
+            if !(filename.to_lowercase().starts_with("readme")
+                || filename.to_lowercase().starts_with("hacking")
+                || filename.to_lowercase().starts_with("contributing"))
+            {
                 return None;
             }
 
@@ -2374,82 +2595,131 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
                 return None;
             }
 
-            let extension = entry.path().extension().map(|s| s.to_string_lossy().to_string());
+            let extension = entry
+                .path()
+                .extension()
+                .map(|s| s.to_string_lossy().to_string());
 
-            if extension.as_deref() == Some("html") || extension.as_deref() == Some("pdf") || extension.as_deref() == Some("xml") {
+            if extension.as_deref() == Some("html")
+                || extension.as_deref() == Some("pdf")
+                || extension.as_deref() == Some("xml")
+            {
                 return None;
             }
             Some(entry.file_name())
-        }).collect::<Vec<_>>();
+        })
+        .collect::<Vec<_>>();
 
-        for filename in readme_filenames {
-            candidates.push((filename.to_string_lossy().to_string(), Box::new(|path, s| crate::readme::guess_from_readme(path, s.trust_package))));
-        }
+    for filename in readme_filenames {
+        candidates.push((
+            filename.to_string_lossy().to_string(),
+            Box::new(|path, s| crate::readme::guess_from_readme(path, s.trust_package)),
+        ));
+    }
 
-        let mut nuspec_filenames = std::fs::read_dir(&path).unwrap().filter_map(|entry| {
+    let mut nuspec_filenames = std::fs::read_dir(&path)
+        .unwrap()
+        .filter_map(|entry| {
             let entry = entry.unwrap();
             if entry.file_name().to_string_lossy().ends_with(".nuspec") {
                 Some(entry.file_name())
             } else {
                 None
             }
-        }).collect::<Vec<_>>();
+        })
+        .collect::<Vec<_>>();
 
-        if nuspec_filenames.len() == 1 {
-            let nuspec_filename = nuspec_filenames.remove(0);
-            candidates.push((nuspec_filename.to_string_lossy().to_string(), Box::new(|path, s| crate::providers::nuspec::guess_from_nuspec(path, s.trust_package))));
-        } else if nuspec_filenames.len() > 1 {
-            log::warn!("Multiple nuspec files found: {:?}, ignoring all.", nuspec_filenames);
-        }
+    if nuspec_filenames.len() == 1 {
+        let nuspec_filename = nuspec_filenames.remove(0);
+        candidates.push((
+            nuspec_filename.to_string_lossy().to_string(),
+            Box::new(|path, s| crate::providers::nuspec::guess_from_nuspec(path, s.trust_package)),
+        ));
+    } else if nuspec_filenames.len() > 1 {
+        log::warn!(
+            "Multiple nuspec files found: {:?}, ignoring all.",
+            nuspec_filenames
+        );
+    }
 
-        let mut opam_filenames = std::fs::read_dir(&path).unwrap().filter_map(|entry| {
+    let mut opam_filenames = std::fs::read_dir(&path)
+        .unwrap()
+        .filter_map(|entry| {
             let entry = entry.unwrap();
             if entry.file_name().to_string_lossy().ends_with(".opam") {
                 Some(entry.file_name())
             } else {
                 None
             }
-        }).collect::<Vec<_>>();
-
-        if opam_filenames.len() == 1 {
-            let opam_filename = opam_filenames.remove(0);
-            candidates.push((opam_filename.to_string_lossy().to_string(), Box::new(|path, s| crate::providers::ocaml::guess_from_opam(path, s.trust_package))));
-        } else if opam_filenames.len() > 1 {
-            log::warn!("Multiple opam files found: {:?}, ignoring all.", opam_filenames);
-        }
-
-        let debian_patches = match std::fs::read_dir(path.join("debian").join("patches")) {
-            Ok(patches) => {
-                patches.filter_map(|entry| {
-                    let entry = entry.unwrap();
-                    if entry.file_name().to_string_lossy().ends_with(".patch") {
-                        Some(format!("debian/patches/{}", entry.file_name().to_string_lossy()))
-                    } else {
-                        None
-                    }
-                }).collect::<Vec<_>>()
-            },
-            Err(_) => Vec::new(),
-        };
-
-        for filename in debian_patches {
-            candidates.push((filename.clone(), Box::new(|path, s| crate::providers::debian::guess_from_debian_patch(path, s.trust_package))));
-        }
-
-    candidates.push(("environment".to_string(), Box::new(|_path, _| crate::guess_from_environment())));
-    candidates.push((".".to_string(), Box::new(|path, s| crate::guess_from_path(path, s.trust_package))));
-
-    candidates.into_iter().filter_map(|(name, cb)| {
-        assert!(name.len() > 0 && !name.starts_with('/'), "invalid name: {}", name);
-        let path = path.join(name);
-        Some(UpstreamMetadataGuesser {
-            name: path.clone(),
-            guess: Box::new(move |s| cb(&path, s)),
         })
-    }).collect()
+        .collect::<Vec<_>>();
+
+    if opam_filenames.len() == 1 {
+        let opam_filename = opam_filenames.remove(0);
+        candidates.push((
+            opam_filename.to_string_lossy().to_string(),
+            Box::new(|path, s| crate::providers::ocaml::guess_from_opam(path, s.trust_package)),
+        ));
+    } else if opam_filenames.len() > 1 {
+        log::warn!(
+            "Multiple opam files found: {:?}, ignoring all.",
+            opam_filenames
+        );
+    }
+
+    let debian_patches = match std::fs::read_dir(path.join("debian").join("patches")) {
+        Ok(patches) => patches
+            .filter_map(|entry| {
+                let entry = entry.unwrap();
+                if entry.file_name().to_string_lossy().ends_with(".patch") {
+                    Some(format!(
+                        "debian/patches/{}",
+                        entry.file_name().to_string_lossy()
+                    ))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>(),
+        Err(_) => Vec::new(),
+    };
+
+    for filename in debian_patches {
+        candidates.push((
+            filename.clone(),
+            Box::new(|path, s| {
+                crate::providers::debian::guess_from_debian_patch(path, s.trust_package)
+            }),
+        ));
+    }
+
+    candidates.push((
+        "environment".to_string(),
+        Box::new(|_path, _| crate::guess_from_environment()),
+    ));
+    candidates.push((
+        ".".to_string(),
+        Box::new(|path, s| crate::guess_from_path(path, s.trust_package)),
+    ));
+
+    candidates
+        .into_iter()
+        .filter_map(|(name, cb)| {
+            assert!(
+                name.len() > 0 && !name.starts_with('/'),
+                "invalid name: {}",
+                name
+            );
+            let path = path.join(name);
+            Some(UpstreamMetadataGuesser {
+                name: path.clone(),
+                guess: Box::new(move |s| cb(&path, s)),
+            })
+        })
+        .collect()
 }
 
-pub struct UpstreamMetadataScanner{
+pub struct UpstreamMetadataScanner {
     path: std::path::PathBuf,
     config: GuesserSettings,
     pending: Vec<UpstreamDatumWithMetadata>,
@@ -2465,12 +2735,9 @@ impl UpstreamMetadataScanner {
         Self {
             path: path.to_path_buf(),
             pending: Vec::new(),
-            config: GuesserSettings {
-                trust_package,
-            },
+            config: GuesserSettings { trust_package },
             guessers,
         }
-
     }
 }
 
@@ -2492,16 +2759,24 @@ impl Iterator for UpstreamMetadataScanner {
             let guess = (guesser.guess)(&self.config);
             match guess {
                 Ok(entries) => {
-                    self.pending.extend(entries.into_iter().map(|mut e| { e.origin = e.origin.or(Some(guesser.name.display().to_string())); e} ));
+                    self.pending.extend(entries.into_iter().map(|mut e| {
+                        e.origin = e
+                            .origin
+                            .or(Some(Origin::Other(guesser.name.display().to_string())));
+                        e
+                    }));
                 }
-                Err(e) => { return Some(Err(e)); }
+                Err(e) => {
+                    return Some(Err(e));
+                }
             }
         }
     }
 }
 
-
 pub fn guess_upstream_info(
-    path: &std::path::Path, trust_package: Option<bool>) -> impl Iterator<Item = Result<UpstreamDatumWithMetadata, ProviderError>> {
+    path: &std::path::Path,
+    trust_package: Option<bool>,
+) -> impl Iterator<Item = Result<UpstreamDatumWithMetadata, ProviderError>> {
     UpstreamMetadataScanner::from_path(path, trust_package)
 }

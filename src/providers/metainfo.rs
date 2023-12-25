@@ -24,14 +24,14 @@ pub fn guess_from_metainfo(
             results.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Name(child.get_text().unwrap().to_string()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
         if child.name == "project_license" {
             results.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::License(child.get_text().unwrap().to_string()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
         if child.name == "url" {
@@ -40,13 +40,13 @@ pub fn guess_from_metainfo(
                     results.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Homepage(child.get_text().unwrap().to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 } else if urltype == "bugtracker" {
                     results.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::BugDatabase(child.get_text().unwrap().to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
+                        origin: Some(path.into()),
                     });
                 }
             }
@@ -55,21 +55,21 @@ pub fn guess_from_metainfo(
             results.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Description(child.get_text().unwrap().to_string()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
         if child.name == "summary" {
             results.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Summary(child.get_text().unwrap().to_string()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
         if child.name == "name" {
             results.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Name(child.get_text().unwrap().to_string()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
     }

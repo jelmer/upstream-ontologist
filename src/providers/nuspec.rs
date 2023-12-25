@@ -1,6 +1,6 @@
-use crate::{Certainty, UpstreamDatum, UpstreamDatumWithMetadata, ProviderError, Person};
-use std::path::Path;
 use crate::xmlparse_simplify_namespaces;
+use crate::{Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
+use std::path::Path;
 
 // Documentation: https://docs.microsoft.com/en-us/nuget/reference/nuspec
 pub fn guess_from_nuspec(
@@ -34,7 +34,7 @@ pub fn guess_from_nuspec(
             result.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Version(version.into_owned()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
     }
@@ -44,7 +44,7 @@ pub fn guess_from_nuspec(
             result.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Description(description.into_owned()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
     }
@@ -55,25 +55,26 @@ pub fn guess_from_nuspec(
             result.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Author(authors),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
     }
 
     if let Some(project_url_tag) = metadata.get_child("projectUrl") {
         if let Some(project_url) = project_url_tag.get_text() {
-            let repo_url = crate::vcs::guess_repo_from_url(&url::Url::parse(&project_url).unwrap(), None);
+            let repo_url =
+                crate::vcs::guess_repo_from_url(&url::Url::parse(&project_url).unwrap(), None);
             if let Some(repo_url) = repo_url {
                 result.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Repository(repo_url),
                     certainty: Some(Certainty::Confident),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
             result.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Homepage(project_url.into_owned()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
     }
@@ -83,7 +84,7 @@ pub fn guess_from_nuspec(
             result.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::License(license.into_owned()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
     }
@@ -93,7 +94,7 @@ pub fn guess_from_nuspec(
             result.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Copyright(copyright.into_owned()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
     }
@@ -103,7 +104,7 @@ pub fn guess_from_nuspec(
             result.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Name(title.into_owned()),
                 certainty: Some(Certainty::Likely),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
     }
@@ -113,7 +114,7 @@ pub fn guess_from_nuspec(
             result.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Summary(summary.into_owned()),
                 certainty: Some(Certainty::Likely),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
     }
@@ -122,18 +123,18 @@ pub fn guess_from_nuspec(
         if let Some(repo_url) = repository_tag.attributes.get("url") {
             let branch = repository_tag.attributes.get("branch");
             result.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Repository(crate::vcs::unsplit_vcs_url(&crate::vcs::VcsLocation {
-                    url: repo_url.parse().unwrap(),
-                    branch: branch.cloned(),
-                    subpath: None,
-                })),
+                datum: UpstreamDatum::Repository(crate::vcs::unsplit_vcs_url(
+                    &crate::vcs::VcsLocation {
+                        url: repo_url.parse().unwrap(),
+                        branch: branch.cloned(),
+                        subpath: None,
+                    },
+                )),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
     }
 
     Ok(result)
 }
-
-

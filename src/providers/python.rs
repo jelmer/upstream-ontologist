@@ -1,11 +1,11 @@
-
-use crate::{vcs, Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{
+    vcs, Certainty, Origin, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata,
+};
 use log::{debug, warn};
 
 use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::path::Path;
-
 
 pub fn guess_from_pkg_info(
     path: &Path,
@@ -21,20 +21,20 @@ pub fn guess_from_pkg_info(
     ret.push(UpstreamDatumWithMetadata {
         datum: UpstreamDatum::Name(dist.name),
         certainty: Some(Certainty::Certain),
-        origin: Some(path.display().to_string()),
+        origin: Some(path.into()),
     });
 
     ret.push(UpstreamDatumWithMetadata {
         datum: UpstreamDatum::Version(dist.version),
         certainty: Some(Certainty::Certain),
-        origin: Some(path.display().to_string()),
+        origin: Some(path.into()),
     });
 
     if let Some(homepage) = dist.home_page {
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Homepage(homepage),
             certainty: Some(Certainty::Certain),
-            origin: Some(path.display().to_string()),
+            origin: Some(path.into()),
         });
     }
 
@@ -42,7 +42,7 @@ pub fn guess_from_pkg_info(
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Summary(summary),
             certainty: Some(Certainty::Certain),
-            origin: Some(path.display().to_string()),
+            origin: Some(path.into()),
         });
     }
 
@@ -50,6 +50,7 @@ pub fn guess_from_pkg_info(
         ret.extend(parse_python_long_description(
             description.as_str(),
             dist.description_content_type.as_deref(),
+            &Origin::Path(path.to_path_buf()),
         )?);
     }
 
@@ -58,6 +59,7 @@ pub fn guess_from_pkg_info(
             .iter()
             .map(|k| k.split_once(", ").unwrap())
             .map(|(k, v)| (k.to_string(), v.to_string())),
+        &Origin::Path(path.to_path_buf()),
     ));
 
     if dist.author.is_some() || dist.author_email.is_some() {
@@ -69,7 +71,7 @@ pub fn guess_from_pkg_info(
             }]),
 
             certainty: Some(Certainty::Certain),
-            origin: Some(path.display().to_string()),
+            origin: Some(path.into()),
         });
     }
 
@@ -81,7 +83,7 @@ pub fn guess_from_pkg_info(
                 url: None,
             }),
             certainty: Some(Certainty::Certain),
-            origin: Some(path.display().to_string()),
+            origin: Some(path.into()),
         });
     }
 
@@ -89,7 +91,7 @@ pub fn guess_from_pkg_info(
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::License(license),
             certainty: Some(Certainty::Certain),
-            origin: Some(path.display().to_string()),
+            origin: Some(path.into()),
         });
     }
 
@@ -97,7 +99,7 @@ pub fn guess_from_pkg_info(
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Keywords(keywords.split(", ").map(|s| s.to_string()).collect()),
             certainty: Some(Certainty::Certain),
-            origin: Some(path.display().to_string()),
+            origin: Some(path.into()),
         });
     }
 
@@ -105,7 +107,7 @@ pub fn guess_from_pkg_info(
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Download(download_url),
             certainty: Some(Certainty::Certain),
-            origin: Some(path.display().to_string()),
+            origin: Some(path.into()),
         });
     }
 
@@ -162,14 +164,14 @@ pub fn guess_from_pyproject_toml(
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Name(inner_project.name),
             certainty: Some(Certainty::Certain),
-            origin: Some(path.display().to_string()),
+            origin: Some(path.into()),
         });
 
         if let Some(version) = inner_project.version {
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Version(version.to_string()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.display().to_string()),
+                origin: Some(path.into()),
             });
         }
 
@@ -179,7 +181,7 @@ pub fn guess_from_pyproject_toml(
                     ret.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::License(license),
                         certainty: Some(Certainty::Certain),
-                        origin: Some(path.display().to_string()),
+                        origin: Some(path.into()),
                     });
                 }
                 _ => {}
@@ -198,7 +200,7 @@ pub fn guess_from_pyproject_toml(
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Author(authors.iter().map(contact_to_person).collect()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.display().to_string()),
+                origin: Some(path.into()),
             });
         }
 
@@ -212,7 +214,7 @@ pub fn guess_from_pyproject_toml(
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Maintainer(maintainers[0].clone()),
                 certainty: Some(certainty),
-                origin: Some(path.display().to_string()),
+                origin: Some(path.into()),
             });
         }
 
@@ -220,12 +222,15 @@ pub fn guess_from_pyproject_toml(
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Keywords(keywords),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.display().to_string()),
+                origin: Some(path.into()),
             });
         }
 
         if let Some(urls) = inner_project.urls {
-            ret.extend(parse_python_project_urls(urls.into_iter()));
+            ret.extend(parse_python_project_urls(
+                urls.into_iter(),
+                &Origin::Path(path.to_path_buf()),
+            ));
         }
     }
 
@@ -235,7 +240,7 @@ pub fn guess_from_pyproject_toml(
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Version(version),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.display().to_string()),
+                    origin: Some(path.into()),
                 });
             }
 
@@ -243,7 +248,7 @@ pub fn guess_from_pyproject_toml(
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Summary(description),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.display().to_string()),
+                    origin: Some(path.into()),
                 });
             }
 
@@ -251,7 +256,7 @@ pub fn guess_from_pyproject_toml(
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::License(license),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.display().to_string()),
+                    origin: Some(path.into()),
                 });
             }
 
@@ -259,25 +264,28 @@ pub fn guess_from_pyproject_toml(
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Repository(repository),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.display().to_string()),
+                    origin: Some(path.into()),
                 });
             }
 
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Name(poetry.name.to_string()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.display().to_string()),
+                origin: Some(path.into()),
             });
 
             if let Some(urls) = poetry.urls {
-                ret.extend(parse_python_project_urls(urls.into_iter()));
+                ret.extend(parse_python_project_urls(
+                    urls.into_iter(),
+                    &Origin::Path(path.to_path_buf()),
+                ));
             }
 
             if let Some(keywords) = poetry.keywords {
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Keywords(keywords),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.display().to_string()),
+                    origin: Some(path.into()),
                 });
             }
 
@@ -287,7 +295,7 @@ pub fn guess_from_pyproject_toml(
                         authors.iter().map(|p| Person::from(p.as_str())).collect(),
                     ),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.display().to_string()),
+                    origin: Some(path.into()),
                 });
             }
 
@@ -295,7 +303,7 @@ pub fn guess_from_pyproject_toml(
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Homepage(homepage),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.display().to_string()),
+                    origin: Some(path.into()),
                 });
             }
 
@@ -303,7 +311,7 @@ pub fn guess_from_pyproject_toml(
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Documentation(documentation),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.display().to_string()),
+                    origin: Some(path.into()),
                 });
             }
         }
@@ -314,6 +322,7 @@ pub fn guess_from_pyproject_toml(
 
 fn parse_python_project_urls(
     urls: impl Iterator<Item = (String, String)>,
+    origin: &Origin,
 ) -> Vec<UpstreamDatumWithMetadata> {
     let mut ret = Vec::new();
     for (url_type, url) in urls {
@@ -322,35 +331,35 @@ fn parse_python_project_urls(
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Repository(url.to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: None,
+                    origin: Some(origin.clone()),
                 });
             }
             "Bug Tracker" | "Bug Reports" => {
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::BugDatabase(url.to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: None,
+                    origin: Some(origin.clone()),
                 });
             }
             "Documentation" => {
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Documentation(url.to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: None,
+                    origin: Some(origin.clone()),
                 });
             }
             "Funding" => {
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Funding(url.to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: None,
+                    origin: Some(origin.clone()),
                 });
             }
             "Homepage" => {
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Homepage(url.to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: None,
+                    origin: Some(origin.clone()),
                 });
             }
             _u => {
@@ -364,6 +373,7 @@ fn parse_python_project_urls(
 fn parse_python_long_description(
     long_description: &str,
     content_type: Option<&str>,
+    origin: &Origin,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     if long_description.is_empty() {
         return Ok(vec![]);
@@ -385,7 +395,7 @@ fn parse_python_long_description(
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Description(long_description.to_string()),
                 certainty: Some(Certainty::Possible),
-                origin: None,
+                origin: Some(origin.clone()),
             });
         }
         "text/restructured-text" | "text/x-rst" => {
@@ -396,7 +406,9 @@ fn parse_python_long_description(
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Description(description),
                     certainty: Some(Certainty::Possible),
-                    origin: Some("python long description (restructuredText)".to_string()),
+                    origin: Some(Origin::Other(
+                        "python long description (restructuredText)".to_string(),
+                    )),
                 });
             }
             ret.extend(extra_md);
@@ -409,7 +421,9 @@ fn parse_python_long_description(
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Description(description),
                     certainty: Some(Certainty::Possible),
-                    origin: Some("python long description (markdown)".to_string()),
+                    origin: Some(Origin::Other(
+                        "python long description (markdown)".to_string(),
+                    )),
                 });
             }
             ret.extend(extra_md);
@@ -453,6 +467,8 @@ pub fn guess_from_setup_cfg(
         }
     };
 
+    let origin = Origin::Path(path.to_path_buf());
+
     let mut ret = vec![];
 
     for (field, value) in metadata.iter() {
@@ -461,14 +477,14 @@ pub fn guess_from_setup_cfg(
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Name(value.to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: None,
+                    origin: Some(origin.clone()),
                 });
             }
             "version" => {
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Version(value.to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: None,
+                    origin: Some(origin.clone()),
                 });
             }
             "url" => {
@@ -478,7 +494,7 @@ pub fn guess_from_setup_cfg(
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Summary(value.to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: None,
+                    origin: Some(origin.clone()),
                 });
             }
             "long_description" => {
@@ -497,11 +513,13 @@ pub fn guess_from_setup_cfg(
                     ret.extend(parse_python_long_description(
                         &value,
                         metadata.get("long_description_content_type"),
+                        &origin,
                     )?);
                 } else {
                     ret.extend(parse_python_long_description(
                         value,
                         metadata.get("long_description_content_type"),
+                        &origin,
                     )?);
                 }
             }
@@ -541,7 +559,7 @@ pub fn guess_from_setup_cfg(
                     };
                     Some((key.to_string(), value.to_string()))
                 });
-                ret.extend(parse_python_project_urls(urls));
+                ret.extend(parse_python_project_urls(urls, &origin));
             }
             "license" => {
                 ret.push(UpstreamDatumWithMetadata {
@@ -633,7 +651,7 @@ fn guess_from_setup_py_executed(
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::License(license),
                 certainty: Some(Certainty::Likely),
-                origin: None,
+                origin: Some(Origin::Path(path.to_path_buf())),
             });
         }
 
@@ -648,7 +666,7 @@ fn guess_from_setup_py_executed(
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Contact(contact),
                 certainty: Some(Certainty::Certain),
-                origin: None,
+                origin: Some(Origin::Path(path.to_path_buf())),
             });
         }
 
@@ -656,7 +674,7 @@ fn guess_from_setup_py_executed(
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Summary(description),
                 certainty: Some(Certainty::Certain),
-                origin: None,
+                origin: Some(Origin::Path(path.to_path_buf())),
             });
         }
 
@@ -678,6 +696,7 @@ fn guess_from_setup_py_executed(
                     project_urls
                         .extract::<HashMap<String, String>>()?
                         .into_iter(),
+                    &Origin::Path(path.to_path_buf()),
                 ));
             }
         }
@@ -692,6 +711,7 @@ fn guess_from_setup_py_executed(
         ret.extend(parse_python_long_description(
             long_description.as_str(),
             long_description_content_type.as_deref(),
+            &Origin::Path(path.to_path_buf()),
         )?);
     }
 
@@ -846,7 +866,7 @@ fn guess_from_setup_py_parsed(
                         ret.push(UpstreamDatumWithMetadata {
                             datum: UpstreamDatum::Name(name),
                             certainty: Some(Certainty::Certain),
-                            origin: Some("setup.py".to_string()),
+                            origin: Some(path.into())
                         });
                     }
                 }
@@ -855,7 +875,7 @@ fn guess_from_setup_py_parsed(
                         ret.push(UpstreamDatumWithMetadata {
                             datum: UpstreamDatum::Version(version),
                             certainty: Some(Certainty::Certain),
-                            origin: Some("setup.py".to_string()),
+                            origin: Some(path.into())
                         });
                     }
                 }
@@ -864,7 +884,7 @@ fn guess_from_setup_py_parsed(
                         ret.push(UpstreamDatumWithMetadata {
                             datum: UpstreamDatum::Summary(description),
                             certainty: Some(Certainty::Certain),
-                            origin: Some("setup.py".to_string()),
+                            origin: Some(path.into())
                         });
                     }
                 }
@@ -884,7 +904,7 @@ fn guess_from_setup_py_parsed(
                         ret.push(UpstreamDatumWithMetadata {
                             datum: UpstreamDatum::License(license),
                             certainty: Some(Certainty::Certain),
-                            origin: Some("setup.py".to_string()),
+                            origin: Some(path.into()),
                         });
                     }
                 }
@@ -893,7 +913,7 @@ fn guess_from_setup_py_parsed(
                         ret.push(UpstreamDatumWithMetadata {
                             datum: UpstreamDatum::Download(download_url),
                             certainty: Some(Certainty::Certain),
-                            origin: Some("setup.py".to_string()),
+                            origin: Some(path.into()),
                         });
                     }
                 }
@@ -904,7 +924,7 @@ fn guess_from_setup_py_parsed(
                 }
                 "project_urls" => {
                     if let Some(project_urls) = get_dict_from_expr(value) {
-                        ret.extend(parse_python_project_urls(project_urls.into_iter()));
+                        ret.extend(parse_python_project_urls(project_urls.into_iter(), &Origin::Path(path.into())));
                     }
                 }
                 "maintainer" => {
@@ -922,7 +942,7 @@ fn guess_from_setup_py_parsed(
                                 url: None
                             }),
                             certainty: Some(Certainty::Certain),
-                            origin: Some("setup.py".to_string()),
+                            origin: Some(path.into()),
                         });
                     }
                 }
@@ -941,7 +961,7 @@ fn guess_from_setup_py_parsed(
                                 url: None
                             }]),
                             certainty: Some(Certainty::Certain),
-                            origin: Some("setup.py".to_string()),
+                            origin: Some(path.into()),
                         });
                     } else if let Some(author) = get_str_list_from_expr(value) {
                         let author_emails = setup_args.get("author_email");
@@ -958,7 +978,7 @@ fn guess_from_setup_py_parsed(
                         ret.push(UpstreamDatumWithMetadata {
                             datum: UpstreamDatum::Author(persons),
                             certainty: Some(Certainty::Certain),
-                            origin: Some("setup.py".to_string()),
+                            origin: Some(path.into()),
                         });
                     }
                 }
@@ -988,6 +1008,7 @@ fn guess_from_setup_py_parsed(
         ret.extend(parse_python_long_description(
             description.as_str(),
             content_type.as_deref(),
+            &Origin::Path(path.into()),
         )?);
     }
 

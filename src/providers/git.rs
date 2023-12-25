@@ -18,7 +18,7 @@ pub fn guess_from_git_config(
             results.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Repository(url),
                 certainty: Some(Certainty::Likely),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
     }
@@ -31,7 +31,7 @@ pub fn guess_from_git_config(
                 results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Repository(url),
                     certainty: Some(Certainty::Possible),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
         }

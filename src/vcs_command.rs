@@ -178,7 +178,7 @@ pub fn guess_from_get_orig_source(
             result.push(crate::UpstreamDatumWithMetadata {
                 datum: crate::UpstreamDatum::Repository(url),
                 certainty: Some(certainty),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
     }

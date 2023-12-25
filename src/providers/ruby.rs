@@ -81,32 +81,32 @@ pub fn guess_from_gemspec(
                 "name" => results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Name(val.as_str().unwrap().to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 }),
                 "version" => results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Version(val.as_str().unwrap().to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 }),
                 "homepage" => results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Homepage(val.as_str().unwrap().to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 }),
                 "summary" => results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Summary(val.as_str().unwrap().to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 }),
                 "description" => results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Description(val.as_str().unwrap().to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 }),
                 "license" => results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::License(val.as_str().unwrap().to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 }),
                 "authors" => results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Author(
@@ -117,7 +117,7 @@ pub fn guess_from_gemspec(
                             .collect(),
                     ),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 }),
                 _ => debug!("unknown field {} ({:?}) in gemspec", key, val),
             }

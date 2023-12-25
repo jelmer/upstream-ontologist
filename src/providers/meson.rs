@@ -30,7 +30,7 @@ pub fn guess_from_meson(
             results.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Name(name.to_owned()),
                 certainty: Some(Certainty::Certain),
-                origin: Some("meson.build".to_owned()),
+                origin: Some(path.into()),
             });
         }
     }
@@ -39,7 +39,7 @@ pub fn guess_from_meson(
             results.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Version(version_str.to_owned()),
                 certainty: Some(Certainty::Certain),
-                origin: Some("meson.build".to_owned()),
+                origin: Some(path.into()),
             });
         }
     }

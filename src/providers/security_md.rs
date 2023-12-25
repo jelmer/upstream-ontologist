@@ -1,7 +1,7 @@
 //! https://docs.github.com/en/free-pro-team@latest/github/\
 //! managing-security-vulnerabilities/adding-a-security-policy-to-your-repository
 
-use crate::{Certainty, UpstreamDatum, UpstreamDatumWithMetadata, ProviderError};
+use crate::{Certainty, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 
 pub fn guess_from_security_md(
     name: &str,
@@ -14,7 +14,7 @@ pub fn guess_from_security_md(
     results.push(UpstreamDatumWithMetadata {
         datum: UpstreamDatum::SecurityMD(name.to_string()),
         certainty: Some(Certainty::Certain),
-        origin: Some(path.to_string_lossy().to_string()),
+        origin: Some(path.into()),
     });
     Ok(results)
 }

@@ -40,7 +40,7 @@ pub fn guess_from_opam(
                 results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Maintainer(Person::from(value.as_str())),
                     certainty: Some(Certainty::Confident),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
             OpamFileItem::Variable(_, name, value) if name == "license" => {
@@ -54,7 +54,7 @@ pub fn guess_from_opam(
                 results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::License(value),
                     certainty: Some(Certainty::Confident),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
             OpamFileItem::Variable(_, name, value) if name == "homepage" => {
@@ -68,7 +68,7 @@ pub fn guess_from_opam(
                 results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Homepage(value),
                     certainty: Some(Certainty::Confident),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
             OpamFileItem::Section(_, section)
@@ -86,7 +86,7 @@ pub fn guess_from_opam(
                         results.push(UpstreamDatumWithMetadata {
                             datum: UpstreamDatum::Repository(value.to_string()),
                             certainty: Some(Certainty::Confident),
-                            origin: Some(path.to_string_lossy().to_string()),
+                            origin: Some(path.into()),
                         });
                     }
                     Some(o) => {
@@ -110,7 +110,7 @@ pub fn guess_from_opam(
                 results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::BugDatabase(value),
                     certainty: Some(Certainty::Confident),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
             OpamFileItem::Variable(_, name, value) if name == "synopsis" => {
@@ -124,7 +124,7 @@ pub fn guess_from_opam(
                 results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Summary(value),
                     certainty: Some(Certainty::Confident),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
             OpamFileItem::Variable(_, name, value) if name == "description" => {
@@ -138,7 +138,7 @@ pub fn guess_from_opam(
                 results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Description(value),
                     certainty: Some(Certainty::Confident),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
             OpamFileItem::Variable(_, name, value) if name == "doc" => {
@@ -152,7 +152,7 @@ pub fn guess_from_opam(
                 results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Documentation(value),
                     certainty: Some(Certainty::Confident),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
             OpamFileItem::Variable(_, name, value) if name == "version" => {
@@ -166,7 +166,7 @@ pub fn guess_from_opam(
                 results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Version(value),
                     certainty: Some(Certainty::Confident),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
             OpamFileItem::Variable(_, name, value) if name == "authors" => {
@@ -190,7 +190,7 @@ pub fn guess_from_opam(
                 results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Author(value),
                     certainty: Some(Certainty::Confident),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
             OpamFileItem::Variable(_, name, _) => {

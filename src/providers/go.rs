@@ -26,7 +26,7 @@ pub fn guess_from_go_mod(
                 results.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Name(modname.to_owned()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
         }

@@ -30,21 +30,21 @@ pub fn guess_from_package_xml(
                     upstream_data.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Name(element.get_text().unwrap().to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some("package.xml".to_string()),
+                        origin: Some(path.into()),
                     });
                 }
                 "summary" => {
                     upstream_data.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Summary(element.get_text().unwrap().to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some("package.xml".to_string()),
+                        origin: Some(path.into()),
                     });
                 }
                 "description" => {
                     upstream_data.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Description(element.get_text().unwrap().to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some("package.xml".to_string()),
+                        origin: Some(path.into()),
                     });
                 }
                 "version" => {
@@ -54,7 +54,7 @@ pub fn guess_from_package_xml(
                                 release_tag.get_text().unwrap().to_string(),
                             ),
                             certainty: Some(Certainty::Certain),
-                            origin: Some("package.xml".to_string()),
+                            origin: Some(path.into()),
                         });
                     }
                 }
@@ -62,7 +62,7 @@ pub fn guess_from_package_xml(
                     upstream_data.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::License(element.get_text().unwrap().to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some("package.xml".to_string()),
+                        origin: Some(path.into()),
                     });
                 }
                 "url" => {
@@ -74,7 +74,7 @@ pub fn guess_from_package_xml(
                                         element.get_text().unwrap().to_string(),
                                     ),
                                     certainty: Some(Certainty::Certain),
-                                    origin: Some("package.xml".to_string()),
+                                    origin: Some(path.into()),
                                 });
                             }
                             "bugtracker" => {
@@ -83,7 +83,7 @@ pub fn guess_from_package_xml(
                                         element.get_text().unwrap().to_string(),
                                     ),
                                     certainty: Some(Certainty::Certain),
-                                    origin: Some("package.xml".to_string()),
+                                    origin: Some(path.into()),
                                 });
                             }
                             _ => {}
@@ -132,7 +132,7 @@ pub fn guess_from_package_xml(
         upstream_data.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Maintainer(person),
             certainty: Some(Certainty::Confident),
-            origin: Some("package.xml".to_string()),
+            origin: Some(path.into()),
         });
     }
 
@@ -148,7 +148,7 @@ pub fn guess_from_package_xml(
         upstream_data.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Maintainer(person),
             certainty: Some(Certainty::Confident),
-            origin: Some("package.xml".to_string()),
+            origin: Some(path.into()),
         });
     }
 
@@ -168,7 +168,7 @@ pub fn guess_from_package_xml(
         upstream_data.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Author(persons),
             certainty: Some(Certainty::Confident),
-            origin: Some("package.xml".to_string()),
+            origin: Some(path.into()),
         });
     }
 
