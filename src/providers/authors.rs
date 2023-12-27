@@ -1,11 +1,13 @@
-use crate::{Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{
+    Certainty, GuesserSettings, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata,
+};
 use std::fs::File;
 use std::io::BufRead;
 use std::path::Path;
 
 pub fn guess_from_authors(
     path: &Path,
-    _trust_package: bool,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let file = File::open(path)?;
     let reader = std::io::BufReader::new(file);

@@ -1,47 +1,10 @@
 use clap::Parser;
-use pyo3::types::PyDict;
 use serde::Serialize;
 use std::collections::HashSet;
 use std::io::Write;
-use std::path::Path;
+
 use std::path::PathBuf;
 use upstream_ontologist::UpstreamDatum;
-
-fn get_upstream_info(
-    path: &Path,
-    trust_package: Option<bool>,
-    net_access: Option<bool>,
-    check: Option<bool>,
-) -> Vec<UpstreamDatum> {
-    pyo3::Python::with_gil(|py| {
-        let m = py.import("upstream_ontologist.guess").unwrap();
-        let get_upstream_info = m.getattr("get_upstream_info").unwrap();
-
-        let kwargs = PyDict::new(py);
-
-        if let Some(trust_package) = trust_package {
-            kwargs.set_item("trust_package", trust_package).unwrap();
-        }
-
-        if let Some(check) = check {
-            kwargs.set_item("check", check).unwrap();
-        }
-
-        if let Some(net_access) = net_access {
-            kwargs.set_item("net_access", net_access).unwrap();
-        }
-
-        get_upstream_info
-            .call((path,), Some(kwargs))
-            .unwrap()
-            .call_method0("items")
-            .unwrap()
-            .iter()
-            .unwrap()
-            .map(|x| x.unwrap().extract::<UpstreamDatum>().unwrap())
-            .collect()
-    })
-}
 
 #[derive(Serialize, Default)]
 struct SoftwareSourceCode {
@@ -148,6 +111,10 @@ struct Args {
     /// Path to sources
     #[clap(default_value = ".")]
     path: PathBuf,
+
+    /// Consult external directory for metadata
+    #[clap(long)]
+    consult_external_directory: bool,
 }
 
 fn main() {
@@ -169,14 +136,16 @@ fn main() {
 
     let path = args.path.canonicalize().unwrap();
 
-    let upstream_info = get_upstream_info(
+    let upstream_info = upstream_ontologist::get_upstream_info(
         path.as_path(),
         Some(args.trust),
         Some(!args.disable_net_access),
+        Some(args.consult_external_directory),
         Some(args.check),
-    );
+    )
+    .unwrap();
 
-    let codemeta = codemeta_file_from_upstream_info(upstream_info);
+    let codemeta = codemeta_file_from_upstream_info(upstream_info.into());
 
     std::io::stdout()
         .write_all(serde_json::to_string_pretty(&codemeta).unwrap().as_bytes())

@@ -6,7 +6,6 @@ use pyo3::import_exception;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pyo3::types::PyTuple;
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::FromStr;
 use upstream_ontologist::{CanonicalizeError, Origin, UpstreamPackage};
@@ -303,13 +302,6 @@ fn guess_from_hackage(py: Python, package: &str) -> PyResult<PyObject> {
     let ret = upstream_ontologist::providers::haskell::guess_from_hackage(package)?;
 
     Ok(ret.to_object(py))
-}
-
-#[pyfunction]
-fn guess_from_gobo(package: &str) -> PyResult<Vec<(String, String)>> {
-    Ok(upstream_ontologist::providers::gobo::guess_from_gobo(
-        package,
-    )?)
 }
 
 #[pyfunction]
@@ -898,6 +890,36 @@ fn description_from_readme_md(
     Ok((description, metadata))
 }
 
+#[pyfunction]
+fn get_upstream_info(
+    py: Python,
+    path: std::path::PathBuf,
+    trust_package: Option<bool>,
+    net_access: Option<bool>,
+    consult_external_directory: Option<bool>,
+    check: Option<bool>,
+) -> PyResult<&PyDict> {
+    let metadata = upstream_ontologist::get_upstream_info(
+        path.as_path(),
+        trust_package,
+        net_access,
+        consult_external_directory,
+        check,
+    )?;
+    let ret = PyDict::new(py);
+    for datum in metadata.iter() {
+        ret.set_item(
+            datum.datum.field(),
+            datum
+                .datum
+                .to_object(py)
+                .extract::<(String, PyObject)>(py)?
+                .1,
+        )?;
+    }
+    Ok(ret)
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -939,7 +961,6 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(get_repology_metadata))?;
     m.add_wrapped(wrap_pyfunction!(get_sf_metadata))?;
     m.add_wrapped(wrap_pyfunction!(fixup_rcp_style_git_repo_url))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_gobo))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_hackage))?;
     m.add_wrapped(wrap_pyfunction!(valid_debian_package_name))?;
     m.add_wrapped(wrap_pyfunction!(debian_to_upstream_version))?;
@@ -951,6 +972,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(convert_cvs_list_to_str))?;
     m.add_wrapped(wrap_pyfunction!(fixup_broken_git_details))?;
     m.add_wrapped(wrap_pyfunction!(guess_upstream_info))?;
+    m.add_wrapped(wrap_pyfunction!(get_upstream_info))?;
     m.add_wrapped(wrap_pyfunction!(description_from_readme_md))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;

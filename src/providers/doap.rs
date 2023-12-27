@@ -222,6 +222,7 @@ pub fn guess_from_doap(
                     });
                 }
             }
+            (Some(DOAP_NAMESPACE), "release") => {}
             _ => {
                 error!("Unknown tag {} in DOAP file", child.name);
             }

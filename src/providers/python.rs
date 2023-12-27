@@ -1,5 +1,6 @@
 use crate::{
-    vcs, Certainty, Origin, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata,
+    vcs, Certainty, GuesserSettings, Origin, Person, ProviderError, UpstreamDatum,
+    UpstreamDatumWithMetadata,
 };
 use log::{debug, warn};
 
@@ -9,7 +10,7 @@ use std::path::Path;
 
 pub fn guess_from_pkg_info(
     path: &Path,
-    _trust_package: bool,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let contents = std::fs::read(path)?;
     let dist = python_pkginfo::Metadata::parse(contents.as_slice()).map_err(|e| {
@@ -116,7 +117,7 @@ pub fn guess_from_pkg_info(
 
 pub fn guess_from_pyproject_toml(
     path: &Path,
-    _trust_package: bool,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let content = std::fs::read_to_string(path)?;
     let mut ret = Vec::new();
@@ -229,6 +230,13 @@ pub fn guess_from_pyproject_toml(
         if let Some(urls) = inner_project.urls {
             ret.extend(parse_python_project_urls(
                 urls.into_iter(),
+                &Origin::Path(path.to_path_buf()),
+            ));
+        }
+
+        if let Some(classifiers) = inner_project.classifiers {
+            ret.extend(parse_python_classifiers(
+                classifiers.iter().map(|s| s.as_str()),
                 &Origin::Path(path.to_path_buf()),
             ));
         }
@@ -454,7 +462,7 @@ pub fn parse_python_url(url: &str) -> Vec<UpstreamDatumWithMetadata> {
 
 pub fn guess_from_setup_cfg(
     path: &Path,
-    _trust_package: bool,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let setup_cfg =
         ini::Ini::load_from_file(path).map_err(|e| ProviderError::ParseError(e.to_string()))?;
@@ -497,6 +505,13 @@ pub fn guess_from_setup_cfg(
                     origin: Some(origin.clone()),
                 });
             }
+            "summary" => {
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Summary(value.to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(origin.clone()),
+                });
+            }
             "long_description" => {
                 if let Some(path) = value.strip_prefix(value) {
                     if path.contains('/') {
@@ -527,22 +542,28 @@ pub fn guess_from_setup_cfg(
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Maintainer(Person {
                         name: Some(value.to_string()),
-                        email: metadata.get("maintainer_email").map(|s| s.to_string()),
+                        email: metadata
+                            .get("maintainer_email")
+                            .or_else(|| metadata.get("maintainer-email"))
+                            .map(|s| s.to_string()),
                         url: None,
                     }),
                     certainty: Some(Certainty::Certain),
-                    origin: None,
+                    origin: Some(origin.clone()),
                 });
             }
             "author" => {
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Author(vec![Person {
                         name: Some(value.to_string()),
-                        email: metadata.get("author_email").map(|s| s.to_string()),
+                        email: metadata
+                            .get("author_email")
+                            .or_else(|| metadata.get("author-email"))
+                            .map(|s| s.to_string()),
                         url: None,
                     }]),
                     certainty: Some(Certainty::Certain),
-                    origin: None,
+                    origin: Some(origin.clone()),
                 });
             }
             "project_urls" => {
@@ -565,10 +586,21 @@ pub fn guess_from_setup_cfg(
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::License(value.to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: None,
+                    origin: Some(origin.clone()),
                 });
             }
-            "long_description_content_type" | "maintainer_email" | "author_email" => {
+            "home-page" => {
+                ret.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Homepage(value.to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(origin.clone()),
+                });
+            }
+            "long_description_content_type"
+            | "maintainer_email"
+            | "author_email"
+            | "maintainer-email"
+            | "author-email" => {
                 // Ignore these, they are handled elsewhere
             }
             _ => {
@@ -982,10 +1014,26 @@ fn guess_from_setup_py_parsed(
                         });
                     }
                 }
+                "keywords" => {
+                    if let Some(keywords) = get_str_list_from_expr(value) {
+                        ret.push(UpstreamDatumWithMetadata {
+                            datum: UpstreamDatum::Keywords(keywords),
+                            certainty: Some(Certainty::Certain),
+                            origin: Some(path.into()),
+                        });
+                    }
+                }
+                "classifiers" => {
+                    if let Some(classifiers) = get_str_list_from_expr(value) {
+                        ret.extend(parse_python_classifiers(classifiers.iter().map(|s| s.as_str()), &Origin::Path(path.into())));
+                    }
+                }
                 // Handled above
                 "author_email" | "maintainer_email" => {},
                 // Irrelevant
-                "rust_extensions" | "data_files" => {},
+                "rust_extensions" | "data_files" | "packages" | "package_dir" | "entry_points" => {},
+                // Irrelevant: dependencies
+                t if t.ends_with("_requires") || t.ends_with("_require") => {},
                 _ => {
                     warn!("Unknown key in setup.py: {}", key);
                 }
@@ -1013,4 +1061,37 @@ fn guess_from_setup_py_parsed(
     }
 
     Ok(ret)
+}
+
+fn parse_python_classifiers<'a>(
+    classifiers: impl Iterator<Item = &'a str> + 'a,
+    origin: &'a Origin,
+) -> impl Iterator<Item = UpstreamDatumWithMetadata> + 'a {
+    classifiers.filter_map(|classifier| {
+        let mut parts = classifier.split(" :: ");
+        let category = parts.next()?;
+        let subcategory = parts.next()?;
+        let value = parts.next()?;
+        let certainty = Some(Certainty::Certain);
+        let origin = Some(origin.clone());
+        match (category, subcategory) {
+            ("Development Status", _) => None,
+            ("Intended Audience", _) => None,
+            ("License", "OSI Approved") => {
+                Some(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::License(value.into()),
+                    certainty,
+                    origin: origin,
+                })
+            }
+            ("Natural Language", _) => None,
+            ("Operating System", _) => None,
+            ("Programming Language", _) => None,
+            ("Topic", _) => None,
+            _ => {
+                warn!("Unknown classifier: {}", classifier);
+                None
+            }
+        }
+    })
 }

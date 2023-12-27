@@ -1,21 +1,25 @@
-use crate::{Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{
+    Certainty, GuesserSettings, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata,
+};
 use log::debug;
 
 pub fn guess_from_cargo(
     path: &std::path::Path,
-    _trust_package: bool,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     // see https://doc.rust-lang.org/cargo/reference/manifest.html
     let doc: toml::Table = toml::from_str(&std::fs::read_to_string(path)?)
         .map_err(|e| ProviderError::ParseError(e.to_string()))?;
 
-    let package = doc
-        .get("package")
-        .ok_or_else(|| ProviderError::ParseError("No [package] section in Cargo.toml".to_string()))?
-        .as_table()
-        .ok_or_else(|| {
+    let package = match doc.get("package") {
+        Some(package) => package.as_table().ok_or_else(|| {
             ProviderError::ParseError("[package] section in Cargo.toml is not a table".to_string())
-        })?;
+        })?,
+        None => {
+            log::debug!("No [package] section in Cargo.toml");
+            return Ok(Vec::new());
+        }
+    };
 
     let mut results = Vec::new();
 
@@ -110,4 +114,71 @@ pub fn cargo_translate_dashes(crate_name: &str) -> Result<Option<String>, crate:
     }
 
     Ok(None)
+}
+
+fn parse_crates_io(data: serde_json::Value) -> Vec<UpstreamDatum> {
+    let crate_data = &data["crate"];
+    let mut results = Vec::new();
+    results.push(UpstreamDatum::Name(
+        crate_data["name"].as_str().unwrap().to_string(),
+    ));
+    if let Some(homepage) = crate_data.get("homepage") {
+        results.push(UpstreamDatum::Homepage(
+            homepage.as_str().unwrap().to_string(),
+        ));
+    }
+    if let Some(repository) = crate_data.get("repository") {
+        results.push(UpstreamDatum::Repository(
+            repository.as_str().unwrap().to_string(),
+        ));
+    }
+    if let Some(description) = crate_data.get("description") {
+        results.push(UpstreamDatum::Summary(
+            description.as_str().unwrap().to_string(),
+        ));
+    }
+    if let Some(license) = crate_data.get("license") {
+        results.push(UpstreamDatum::License(
+            license.as_str().unwrap().to_string(),
+        ));
+    }
+    if let Some(version) = crate_data.get("newest_version") {
+        results.push(UpstreamDatum::Version(
+            version.as_str().unwrap().to_string(),
+        ));
+    }
+
+    results
+}
+
+pub struct CratesIo;
+
+impl CratesIo {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl crate::ThirdPartyRepository for CratesIo {
+    fn name(&self) -> &'static str {
+        "crates.io"
+    }
+
+    fn max_supported_certainty(&self) -> Certainty {
+        Certainty::Certain
+    }
+
+    fn supported_fields(&self) -> &'static [&'static str] {
+        &["Homepage", "Name", "Repository", "Version", "Summary"][..]
+    }
+
+    fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, ProviderError> {
+        let data = crate::load_json_url(
+            &format!("https://crates.io/api/v1/crates/{}", name)
+                .parse()
+                .unwrap(),
+            None,
+        )?;
+        Ok(parse_crates_io(data))
+    }
 }

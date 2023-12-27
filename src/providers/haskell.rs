@@ -34,7 +34,11 @@ pub fn parse_cabal_lines(
         if section.is_none() && !field.starts_with(' ') {
             ret.push((None, field.trim().to_string(), value.to_owned()));
         } else if field.starts_with(' ') {
-            ret.push((section.clone(), field.trim().to_lowercase(), value.to_owned()));
+            ret.push((
+                section.clone(),
+                field.trim().to_lowercase(),
+                value.to_owned(),
+            ));
         } else {
             log::debug!("Invalid field {}", field);
         }
@@ -78,16 +82,34 @@ source-repository head
                     "maintainer".to_owned(),
                     "John Doe <joe@example.com>".to_owned()
                 ),
+                (None, "cabal-version".to_owned(), ">= 1.10".to_owned()),
                 (
                     None,
-                    "cabal-version".to_owned(),
-                    ">= 1.10".to_owned()
+                    "homepage".to_owned(),
+                    "https://example.com".to_owned()
                 ),
-                (None, "homepage".to_owned(), "https://example.com".to_owned()),
-                (Some("executable program1".to_owned()), "build-depends".to_owned(), "HUnit".to_owned()),
-                (Some("executable program1".to_owned()), "main-is".to_owned(), "Main.hs".to_owned()),
-                (Some("source-repository head".to_owned()), "type".to_owned(), "git".to_owned()),
-                (Some("source-repository head".to_owned()), "location".to_owned(), "https://github.com/example/blah".to_owned())]);
+                (
+                    Some("executable program1".to_owned()),
+                    "build-depends".to_owned(),
+                    "HUnit".to_owned()
+                ),
+                (
+                    Some("executable program1".to_owned()),
+                    "main-is".to_owned(),
+                    "Main.hs".to_owned()
+                ),
+                (
+                    Some("source-repository head".to_owned()),
+                    "type".to_owned(),
+                    "git".to_owned()
+                ),
+                (
+                    Some("source-repository head".to_owned()),
+                    "location".to_owned(),
+                    "https://github.com/example/blah".to_owned()
+                )
+            ]
+        );
     }
 }
 
@@ -110,7 +132,9 @@ pub fn guess_from_cabal_lines(
                 UpstreamDatum::BugDatabase(value.to_owned()),
                 Certainty::Certain,
             )),
-            (None, "name") => results.push((UpstreamDatum::Name(value.to_owned()), Certainty::Certain)),
+            (None, "name") => {
+                results.push((UpstreamDatum::Name(value.to_owned()), Certainty::Certain))
+            }
             (None, "maintainer") => results.push((
                 UpstreamDatum::Maintainer(Person::from(value.as_str())),
                 Certainty::Certain,
@@ -126,23 +150,21 @@ pub fn guess_from_cabal_lines(
                 UpstreamDatum::Author(vec![Person::from(value.as_str())]),
                 Certainty::Certain,
             )),
-            (None, "synopsis") => results.push((
-                UpstreamDatum::Summary(value.to_owned()),
-                Certainty::Certain,
-            )),
-            (None, "cabal-version") => {},
-            (None, "build-depends") => {},
-            (None, "build-type") => {},
+            (None, "synopsis") => {
+                results.push((UpstreamDatum::Summary(value.to_owned()), Certainty::Certain))
+            }
+            (None, "cabal-version") => {}
+            (None, "build-depends") => {}
+            (None, "build-type") => {}
             (Some("source-repository head"), "location") => repo_url = Some(value.to_owned()),
             (Some("source-repository head"), "branch") => repo_branch = Some(value.to_owned()),
             (Some("source-repository head"), "subdir") => repo_subpath = Some(value.to_owned()),
-            (s, _) if s.is_some() && s.unwrap().starts_with("executable ") => {},
+            (s, _) if s.is_some() && s.unwrap().starts_with("executable ") => {}
             _ => {
                 log::debug!("Unknown field {:?} in section {:?}", key, section);
             }
         }
     }
-
 
     if let Some(repo_url) = repo_url {
         results.push((
@@ -179,12 +201,20 @@ pub fn guess_from_cabal(
     )
 }
 
-pub fn guess_from_hackage(package: &str) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+pub fn guess_from_hackage(
+    package: &str,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let client = reqwest::blocking::Client::builder()
         .user_agent(crate::USER_AGENT)
-        .build().unwrap();
+        .build()
+        .unwrap();
 
-    let url: url::Url = format!("https://hackage.haskell.org/package/{}/{}.cabal", package, package).parse().unwrap();
+    let url: url::Url = format!(
+        "https://hackage.haskell.org/package/{}/{}.cabal",
+        package, package
+    )
+    .parse()
+    .unwrap();
 
     match client.get(url).send() {
         Ok(response) => {
@@ -195,17 +225,55 @@ pub fn guess_from_hackage(package: &str) -> std::result::Result<Vec<UpstreamDatu
                     .map(|line| line.expect("Failed to read line")),
             )
         }
-        Err(e) => {
-            match e.status() {
-                Some(reqwest::StatusCode::NOT_FOUND) => {
-                    log::warn!("Package {} not found on Hackage", package);
-                    Ok(Vec::new())
-                }
-                _ => {
-                    log::warn!("Failed to fetch package {} from Hackage: {}", package, e);
-                    Err(ProviderError::Other(format!("Failed to fetch package {} from Hackage: {}", package, e)))
-                }
+        Err(e) => match e.status() {
+            Some(reqwest::StatusCode::NOT_FOUND) => {
+                log::warn!("Package {} not found on Hackage", package);
+                Ok(Vec::new())
             }
-        }
+            _ => {
+                log::warn!("Failed to fetch package {} from Hackage: {}", package, e);
+                Err(ProviderError::Other(format!(
+                    "Failed to fetch package {} from Hackage: {}",
+                    package, e
+                )))
+            }
+        },
+    }
+}
+
+pub struct Hackage;
+
+impl Hackage {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl crate::ThirdPartyRepository for Hackage {
+    fn name(&self) -> &'static str {
+        "Hackage"
+    }
+
+    fn max_supported_certainty(&self) -> Certainty {
+        Certainty::Certain
+    }
+
+    fn supported_fields(&self) -> &'static [&'static str] {
+        &[
+            "Homepage",
+            "Name",
+            "Repository",
+            "Maintainer",
+            "Copyright",
+            "License",
+            "Bug-Database",
+        ][..]
+    }
+
+    fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, ProviderError> {
+        Ok(guess_from_hackage(name)?
+            .into_iter()
+            .map(|v| v.datum)
+            .collect())
     }
 }

@@ -1,11 +1,13 @@
-use crate::{Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{
+    Certainty, GuesserSettings, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata,
+};
 use log::error;
 use std::path::Path;
 use url::Url;
 
 pub fn guess_from_package_json(
     path: &Path,
-    _trust_package: bool,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     // see https://docs.npmjs.com/cli/v7/configuring-npm/package-json
     let file = std::fs::File::open(path)?;
@@ -216,7 +218,7 @@ mod package_json_tests {
 "#,
         )
         .unwrap();
-        let ret = guess_from_package_json(&path, false).unwrap();
+        let ret = guess_from_package_json(&path, &GuesserSettings::default()).unwrap();
         assert_eq!(
             ret,
             vec![
@@ -235,7 +237,7 @@ mod package_json_tests {
                 UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Name("mozillaeslintsetup".to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.clone().into())
+                    origin: Some(path.into())
                 }
             ]
         );

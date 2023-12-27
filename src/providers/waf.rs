@@ -1,4 +1,4 @@
-use crate::{Certainty, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{Certainty, GuesserSettings, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use lazy_regex::regex;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -6,7 +6,7 @@ use std::path::Path;
 
 pub fn guess_from_wscript(
     path: &Path,
-    _trust_package: bool,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);

@@ -1,7 +1,6 @@
 use crate::with_path_segments;
 use lazy_regex::regex;
 use log::{debug, warn};
-use pyo3::prelude::*;
 use std::borrow::Cow;
 
 use std::collections::HashMap;
@@ -9,11 +8,7 @@ use url::Url;
 
 pub const VCSES: &[&str] = &["git", "bzr", "hg"];
 
-pub const KNOWN_GITLAB_SITES: &[&str] = &[
-    "salsa.debian.org",
-    "invent.kde.org",
-    "0xacab.org",
-];
+pub const KNOWN_GITLAB_SITES: &[&str] = &["salsa.debian.org", "invent.kde.org", "0xacab.org"];
 
 pub const SECURE_SCHEMES: &[&str] = &["https", "git+ssh", "bzr+ssh", "hg+ssh", "ssh", "svn+ssh"];
 
@@ -34,12 +29,8 @@ pub fn drop_vcs_in_scheme(url: &Url) -> Option<Url> {
         "git+http" | "git+https" => {
             Some(derive_with_scheme(url, scheme.trim_start_matches("git+")))
         }
-        "hg+http" | "hg+https" => {
-            Some(derive_with_scheme(url, scheme.trim_start_matches("hg+")))
-        }
-        "bzr+lp" | "bzr+http" => {
-            Some(derive_with_scheme(url, scheme.trim_start_matches("bzr+")))
-        }
+        "hg+http" | "hg+https" => Some(derive_with_scheme(url, scheme.trim_start_matches("hg+"))),
+        "bzr+lp" | "bzr+http" => Some(derive_with_scheme(url, scheme.trim_start_matches("bzr+"))),
         _ => None,
     }
 }
@@ -160,7 +151,7 @@ fn version_in_tags(version: &str, tag_names: &[&str]) -> bool {
 }
 
 fn probe_upstream_breezy_branch_url(url: &url::Url, version: Option<&str>) -> Option<bool> {
-    let tags: HashMap<String, Vec<u8>> = Python::with_gil(|py| {
+    let tags: HashMap<String, Vec<u8>> = pyo3::Python::with_gil(|py| {
         let breezy_ui = py.import("breezy.ui")?;
         let branch_mod = py.import("breezy.branch")?;
         py.import("breezy.bzr")?;
@@ -631,7 +622,8 @@ pub fn browse_url_from_repo_url(
     net_access: Option<bool>,
 ) -> Option<url::Url> {
     if location.url.host_str() == Some("github.com") {
-        let mut path = location.url
+        let mut path = location
+            .url
             .path_segments()
             .unwrap()
             .take(3)
@@ -641,7 +633,10 @@ pub fn browse_url_from_repo_url(
             path = path[..path.len() - 4].to_string();
         }
         if location.subpath.is_some() || location.branch.is_some() {
-            path.push_str(&format!("/tree/{}", location.branch.as_deref().unwrap_or("HEAD")));
+            path.push_str(&format!(
+                "/tree/{}",
+                location.branch.as_deref().unwrap_or("HEAD")
+            ));
         }
         if let Some(subpath_str) = location.subpath.as_deref() {
             path.push_str(&format!("/{}", subpath_str));
@@ -650,10 +645,11 @@ pub fn browse_url_from_repo_url(
             Url::parse("https://github.com")
                 .unwrap()
                 .join(&path)
-                .unwrap()
+                .unwrap(),
         )
     } else if location.url.host_str() == Some("gopkg.in") {
-        let mut els = location.url
+        let mut els = location
+            .url
             .path_segments()
             .unwrap()
             .take(3)
@@ -672,7 +668,7 @@ pub fn browse_url_from_repo_url(
                 Url::parse("https://github.com")
                     .unwrap()
                     .join(&path)
-                    .unwrap()
+                    .unwrap(),
             )
         } else {
             None
@@ -684,32 +680,28 @@ pub fn browse_url_from_repo_url(
         if let Some(subpath_str) = location.subpath.as_deref() {
             path.push_str(&format!("/view/head:{}", subpath_str));
             return Some(
-                Url::parse(format!("https://bazaar.launchpad.net{}", path).as_str())
-                    .unwrap()
+                Url::parse(format!("https://bazaar.launchpad.net{}", path).as_str()).unwrap(),
             );
         } else {
             return Some(
-                Url::parse(format!("https://code.launchpad.net{}", path).as_str())
-                    .unwrap()
+                Url::parse(format!("https://code.launchpad.net{}", path).as_str()).unwrap(),
             );
         }
     } else if location.url.host_str() == Some("svn.apache.org") {
-        let path_elements = location.url
+        let path_elements = location
+            .url
             .path_segments()
             .map(|segments| segments.into_iter().collect::<Vec<&str>>())
             .unwrap_or_else(Vec::new);
-        if path_elements.len() >= 2 && path_elements[0] == "repos" && path_elements[1] == "asf"
-        {
+        if path_elements.len() >= 2 && path_elements[0] == "repos" && path_elements[1] == "asf" {
             let mut path_elements = path_elements.into_iter().skip(1).collect::<Vec<&str>>();
             path_elements[0] = "viewvc";
             if let Some(subpath_str) = location.subpath.as_deref() {
                 path_elements.push(subpath_str);
             }
             return Some(
-                Url::parse(
-                    format!("https://svn.apache.org{}", path_elements.join("/")).as_str(),
-                )
-                .unwrap()
+                Url::parse(format!("https://svn.apache.org{}", path_elements.join("/")).as_str())
+                    .unwrap(),
             );
         } else {
             None
@@ -727,12 +719,12 @@ pub fn browse_url_from_repo_url(
             path_elements.push(subpath_str);
         }
         Some(
-            Url::parse(
-                format!("https://git.savannah.gnu.org{}", path_elements.join("/")).as_str(),
-            )
-            .unwrap()
+            Url::parse(format!("https://git.savannah.gnu.org{}", path_elements.join("/")).as_str())
+                .unwrap(),
         )
-    } else if location.url.host_str().is_some() && is_gitlab_site(location.url.host_str().unwrap(), net_access) {
+    } else if location.url.host_str().is_some()
+        && is_gitlab_site(location.url.host_str().unwrap(), net_access)
+    {
         let mut path = location.url.path().to_string();
         if path.ends_with(".git") {
             path = path[..path.len() - 4].to_string();
@@ -742,7 +734,7 @@ pub fn browse_url_from_repo_url(
         }
         Some(
             Url::parse(format!("https://{}{}", location.url.host_str().unwrap(), path).as_str())
-                .unwrap()
+                .unwrap(),
         )
     } else {
         None
@@ -820,7 +812,11 @@ pub fn fixup_rcp_style_git_repo_url(url: &str) -> Option<Url> {
     breezyshim::location::rcp_location_to_url(url).ok()
 }
 
-pub fn try_open_branch(url: &url::Url, branch_name: Option<&str>) -> Option<Box<dyn breezyshim::branch::Branch>> {
+pub fn try_open_branch(
+    url: &url::Url,
+    branch_name: Option<&str>,
+) -> Option<Box<dyn breezyshim::branch::Branch>> {
+    use pyo3::prelude::*;
     match Python::with_gil(|py| {
         let uim = py.import("breezy.ui")?;
         let controldirm = py.import("breezy.controldir")?;
@@ -829,9 +825,9 @@ pub fn try_open_branch(url: &url::Url, branch_name: Option<&str>) -> Option<Box<
         let old_ui_factory = uim.getattr("ui_factory")?;
         uim.setattr("ui_factory", uim.call_method0("SilentUIFactory")?)?;
 
-        let r = || -> PyResult<PyObject>{
+        let r = || -> PyResult<PyObject> {
             let c = controldir_cls.call_method1("open", (url.to_string(),))?;
-            let b = c.call_method1("open_branch", (branch_name, ))?;
+            let b = c.call_method1("open_branch", (branch_name,))?;
 
             b.call_method0("last_revision")?;
             Ok(b.to_object(py))
@@ -841,16 +837,23 @@ pub fn try_open_branch(url: &url::Url, branch_name: Option<&str>) -> Option<Box<
 
         match r {
             Ok(b) => Ok(b),
-            Err(e) => Err(e)
+            Err(e) => Err(e),
         }
     }) {
-        Ok(b) => Python::with_gil(|py| Some(Box::new(breezyshim::branch::RegularBranch::new(b.to_object(py))) as Box<dyn breezyshim::branch::Branch>)),
-        Err(_) => None
+        Ok(b) => Python::with_gil(|py| {
+            Some(
+                Box::new(breezyshim::branch::RegularBranch::new(b.to_object(py)))
+                    as Box<dyn breezyshim::branch::Branch>,
+            )
+        }),
+        Err(_) => None,
     }
 }
 
 pub fn find_secure_repo_url(
-    mut url: url::Url, branch: Option<&str>, net_access: Option<bool>
+    mut url: url::Url,
+    branch: Option<&str>,
+    net_access: Option<bool>,
 ) -> Option<url::Url> {
     if SECURE_SCHEMES.contains(&url.scheme()) {
         return Some(url);
@@ -858,7 +861,15 @@ pub fn find_secure_repo_url(
 
     // Sites we know to be available over https
     if let Some(hostname) = url.host_str() {
-        if is_gitlab_site(hostname, net_access) || vec![ "github.com", "git.launchpad.net", "bazaar.launchpad.net", "code.launchpad.net", ].contains(&hostname) {
+        if is_gitlab_site(hostname, net_access)
+            || vec![
+                "github.com",
+                "git.launchpad.net",
+                "bazaar.launchpad.net",
+                "code.launchpad.net",
+            ]
+            .contains(&hostname)
+        {
             url = derive_with_scheme(&url, "https");
         }
     }
@@ -881,13 +892,14 @@ pub fn find_secure_repo_url(
         return None;
     }
 
-
     if net_access.unwrap_or(true) {
         let secure_repo_url = derive_with_scheme(&url, "https");
         let insecure_branch = try_open_branch(&url, branch);
         let secure_branch = try_open_branch(&secure_repo_url, branch);
         if let Some(secure_branch) = secure_branch {
-            if insecure_branch.is_none() || secure_branch.last_revision() == insecure_branch.unwrap().last_revision() {
+            if insecure_branch.is_none()
+                || secure_branch.last_revision() == insecure_branch.unwrap().last_revision()
+            {
                 url = secure_repo_url;
             }
         }
@@ -937,7 +949,7 @@ impl From<&str> for VcsLocation {
         VcsLocation {
             url: url.parse().unwrap(),
             branch,
-            subpath
+            subpath,
         }
     }
 }
@@ -949,10 +961,11 @@ fn derive_with_scheme(url: &url::Url, scheme: &str) -> url::Url {
 }
 
 fn fix_path_in_port(url: &str) -> Option<String> {
-    let (_, scheme, host, port, rest)  = match lazy_regex::regex_captures!(r"^([^:]+)://([^:]+):([^/]+)(/.*)$", url) {
-        Some(c) => c,
-        None => return None,
-    };
+    let (_, scheme, host, port, rest) =
+        match lazy_regex::regex_captures!(r"^([^:]+)://([^:]+):([^/]+)(/.*)$", url) {
+            Some(c) => c,
+            None => return None,
+        };
 
     if port.ends_with(']') {
         return None;
@@ -975,7 +988,6 @@ fn fix_gitlab_scheme(url: &str) -> Option<String> {
     }
     None
 }
-
 
 fn fix_github_scheme(url: &str) -> Option<String> {
     // GitHub no longer supports the git:// scheme
@@ -1018,11 +1030,15 @@ fn fix_gitlab_tree_in_url(location: &VcsLocation) -> Option<VcsLocation> {
     None
 }
 
-
 fn fix_double_slash(url: &str) -> Option<String> {
     if let Ok(mut url) = url::Url::parse(url) {
         if url.path().starts_with("//") {
-            let path = url.path().to_string().strip_prefix("//").unwrap().to_string();
+            let path = url
+                .path()
+                .to_string()
+                .strip_prefix("//")
+                .unwrap()
+                .to_string();
             url.set_path(path.as_str());
             return Some(url.to_string());
         }
@@ -1033,14 +1049,18 @@ fn fix_double_slash(url: &str) -> Option<String> {
 fn fix_extra_colon(url: &str) -> Option<String> {
     if let Ok(mut url) = url::Url::parse(url) {
         if url.path().starts_with(':') {
-            let path = url.path().to_string().strip_prefix(':').unwrap().to_string();
+            let path = url
+                .path()
+                .to_string()
+                .strip_prefix(':')
+                .unwrap()
+                .to_string();
             url.set_path(&path);
             return Some(url.to_string());
         }
     }
     None
 }
-
 
 fn drop_git_username(url: &str) -> Option<String> {
     if let Ok(mut url) = url::Url::parse(url) {
@@ -1056,12 +1076,11 @@ fn drop_git_username(url: &str) -> Option<String> {
         }
         if url.username() == "git" {
             url.set_username("").unwrap();
-            return Some( url.to_string());
+            return Some(url.to_string());
         }
     }
     None
 }
-
 
 fn fix_branch_argument(location: &VcsLocation) -> Option<VcsLocation> {
     if location.url.host_str() == Some("github.com") {
@@ -1085,7 +1104,6 @@ fn fix_branch_argument(location: &VcsLocation) -> Option<VcsLocation> {
     }
 }
 
-
 fn fix_git_gnome_org_url(url: &str) -> Option<String> {
     if let Ok(url) = url::Url::parse(url) {
         if url.host_str() == Some("git.gnome.org") {
@@ -1102,7 +1120,6 @@ fn fix_git_gnome_org_url(url: &str) -> Option<String> {
     }
     None
 }
-
 
 fn fix_kde_anongit_url(url: &str) -> Option<String> {
     if let Ok(url) = url::Url::parse(url) {
@@ -1129,18 +1146,14 @@ fn fix_freedesktop_org_url(url: &str) -> Option<String> {
     None
 }
 
-const LOCATION_FIXERS: &[fn(&VcsLocation) -> Option<VcsLocation>] = &[
-    fix_gitlab_tree_in_url,
-    fix_branch_argument,
-];
+const LOCATION_FIXERS: &[fn(&VcsLocation) -> Option<VcsLocation>] =
+    &[fix_gitlab_tree_in_url, fix_branch_argument];
 
 /// Attempt to fix up broken Git URLs.
-pub fn fixup_git_location(
-    location: &VcsLocation,
-) -> Cow<'_, VcsLocation> {
+pub fn fixup_git_location(location: &VcsLocation) -> Cow<'_, VcsLocation> {
     let mut location = Cow::Borrowed(location);
     for cb in LOCATION_FIXERS {
-        location =  cb(&location).map_or(location, Cow::Owned);
+        location = cb(&location).map_or(location, Cow::Owned);
     }
     location
 }
@@ -1175,7 +1188,6 @@ pub fn convert_cvs_list_to_str(urls: &[&str]) -> Option<String> {
     }
 }
 
-
 pub const SANITIZERS: &[fn(&str) -> Option<Url>] = &[
     |url| drop_vcs_in_scheme(&url.parse().unwrap()),
     |url| Some(fixup_git_location(&VcsLocation::from(url)).url.clone()),
@@ -1185,7 +1197,7 @@ pub const SANITIZERS: &[fn(&str) -> Option<Url>] = &[
     |url| find_secure_repo_url(url.parse().unwrap(), None, Some(false)),
 ];
 
-pub fn sanitize_url(url: &Url)-> Url {
+pub fn sanitize_url(url: &Url) -> Url {
     let mut url: Cow<'_, Url> = Cow::Borrowed(url);
     for sanitizer in SANITIZERS {
         url = sanitizer(url.to_string().as_str()).map_or(url, Cow::Owned);
@@ -1211,7 +1223,6 @@ mod tests {
         assert!(plausible_url("https://foo/blah"));
     }
 
-
     #[test]
     fn test_is_gitlab_site() {
         use super::is_gitlab_site;
@@ -1228,8 +1239,15 @@ mod tests {
         use super::canonical_git_repo_url;
         use url::Url;
         assert_eq!(
-            Some("https://github.com/jelmer/example.git".parse::<Url>().unwrap()),
-            canonical_git_repo_url(&"https://github.com/jelmer/example".parse::<Url>().unwrap(), Some(false))
+            Some(
+                "https://github.com/jelmer/example.git"
+                    .parse::<Url>()
+                    .unwrap()
+            ),
+            canonical_git_repo_url(
+                &"https://github.com/jelmer/example".parse::<Url>().unwrap(),
+                Some(false)
+            )
         );
     }
 
@@ -1238,12 +1256,26 @@ mod tests {
         use super::canonical_git_repo_url;
         use url::Url;
         assert_eq!(
-            Some("https://salsa.debian.org/jelmer/example.git".parse::<Url>().unwrap()),
-            canonical_git_repo_url(&"https://salsa.debian.org/jelmer/example".parse::<Url>().unwrap(), Some(false))
+            Some(
+                "https://salsa.debian.org/jelmer/example.git"
+                    .parse::<Url>()
+                    .unwrap()
+            ),
+            canonical_git_repo_url(
+                &"https://salsa.debian.org/jelmer/example"
+                    .parse::<Url>()
+                    .unwrap(),
+                Some(false)
+            )
         );
         assert_eq!(
             None,
-            canonical_git_repo_url(&"https://salsa.debian.org/jelmer/example.git".parse::<Url>().unwrap(), Some(false))
+            canonical_git_repo_url(
+                &"https://salsa.debian.org/jelmer/example.git"
+                    .parse::<Url>()
+                    .unwrap(),
+                Some(false)
+            )
         );
     }
 
@@ -1260,7 +1292,9 @@ mod tests {
         );
         assert_eq!(
             "https://github.com/jelmer/example",
-            find_public_repo_url("git@github.com:jelmer/example", Some(false)).unwrap().as_str()
+            find_public_repo_url("git@github.com:jelmer/example", Some(false))
+                .unwrap()
+                .as_str()
         );
     }
 
@@ -1269,11 +1303,15 @@ mod tests {
         use super::find_public_repo_url;
         assert_eq!(
             "https://salsa.debian.org/jelmer/example",
-            find_public_repo_url("ssh://salsa.debian.org/jelmer/example", Some(false)).unwrap().as_str()
+            find_public_repo_url("ssh://salsa.debian.org/jelmer/example", Some(false))
+                .unwrap()
+                .as_str()
         );
         assert_eq!(
             "https://salsa.debian.org/jelmer/example",
-            find_public_repo_url("https://salsa.debian.org/jelmer/example", Some(false)).unwrap().as_str()
+            find_public_repo_url("https://salsa.debian.org/jelmer/example", Some(false))
+                .unwrap()
+                .as_str()
         );
     }
     #[test]
@@ -1281,7 +1319,11 @@ mod tests {
         use super::fixup_rcp_style_git_repo_url;
         use url::Url;
         assert_eq!(
-            Some("ssh://git@github.com/jelmer/example".parse::<Url>().unwrap()),
+            Some(
+                "ssh://git@github.com/jelmer/example"
+                    .parse::<Url>()
+                    .unwrap()
+            ),
             fixup_rcp_style_git_repo_url("git@github.com:jelmer/example")
         );
 
@@ -1309,7 +1351,11 @@ mod tests {
         use super::guess_repo_from_url;
         assert_eq!(
             Some("https://github.com/jelmer/dulwich"),
-            guess_repo_from_url(&"https://travis-ci.org/jelmer/dulwich".parse().unwrap(), Some(false)).as_deref(),
+            guess_repo_from_url(
+                &"https://travis-ci.org/jelmer/dulwich".parse().unwrap(),
+                Some(false)
+            )
+            .as_deref(),
         );
     }
 
@@ -1318,7 +1364,11 @@ mod tests {
         use super::guess_repo_from_url;
         assert_eq!(
             Some("https://github.com/jelmer/dulwich"),
-            guess_repo_from_url(&"https://coveralls.io/r/jelmer/dulwich".parse().unwrap(), Some(false)).as_deref(),
+            guess_repo_from_url(
+                &"https://coveralls.io/r/jelmer/dulwich".parse().unwrap(),
+                Some(false)
+            )
+            .as_deref(),
         );
     }
 
@@ -1327,11 +1377,19 @@ mod tests {
         use super::guess_repo_from_url;
         assert_eq!(
             Some("https://gitlab.com/jelmer/dulwich"),
-            guess_repo_from_url(&"https://gitlab.com/jelmer/dulwich".parse().unwrap(), Some(false)).as_deref(),
+            guess_repo_from_url(
+                &"https://gitlab.com/jelmer/dulwich".parse().unwrap(),
+                Some(false)
+            )
+            .as_deref(),
         );
         assert_eq!(
             Some("https://gitlab.com/jelmer/dulwich"),
-            guess_repo_from_url(&"https://gitlab.com/jelmer/dulwich/tags".parse().unwrap(), Some(false)).as_deref(),
+            guess_repo_from_url(
+                &"https://gitlab.com/jelmer/dulwich/tags".parse().unwrap(),
+                Some(false)
+            )
+            .as_deref(),
         );
     }
 
@@ -1348,7 +1406,8 @@ mod tests {
                 url: "https://github.com/jelmer/dulwich".parse().unwrap(),
                 branch: None,
                 subpath: None,
-            }).into_owned()
+            })
+            .into_owned()
         );
     }
 
@@ -1357,37 +1416,54 @@ mod tests {
         use super::browse_url_from_repo_url;
         assert_eq!(
             Some("https://github.com/jelmer/dulwich".parse().unwrap()),
-            browse_url_from_repo_url(&super::VcsLocation {
-                url: "https://github.com/jelmer/dulwich".parse().unwrap(),
-                branch: None,
-                subpath: None,
-            },
-            Some(false)),
+            browse_url_from_repo_url(
+                &super::VcsLocation {
+                    url: "https://github.com/jelmer/dulwich".parse().unwrap(),
+                    branch: None,
+                    subpath: None,
+                },
+                Some(false)
+            ),
         );
         assert_eq!(
             Some("https://github.com/jelmer/dulwich".parse().unwrap()),
-            browse_url_from_repo_url(&super::VcsLocation {
-                url: "https://github.com/jelmer/dulwich.git".parse().unwrap(),
-                branch: None,
-                subpath: None,
-            }, Some(false))
+            browse_url_from_repo_url(
+                &super::VcsLocation {
+                    url: "https://github.com/jelmer/dulwich.git".parse().unwrap(),
+                    branch: None,
+                    subpath: None,
+                },
+                Some(false)
+            )
         );
         assert_eq!(
-            Some("https://github.com/jelmer/dulwich/tree/foo".parse().unwrap()),
-            browse_url_from_repo_url(&super::VcsLocation {
-                url: "https://github.com/jelmer/dulwich.git".parse().unwrap(),
-                branch: Some("foo".to_string()),
-                subpath: None,
-            }, Some(false))
+            Some(
+                "https://github.com/jelmer/dulwich/tree/foo"
+                    .parse()
+                    .unwrap()
+            ),
+            browse_url_from_repo_url(
+                &super::VcsLocation {
+                    url: "https://github.com/jelmer/dulwich.git".parse().unwrap(),
+                    branch: Some("foo".to_string()),
+                    subpath: None,
+                },
+                Some(false)
+            )
         );
         assert_eq!(
-            Some("https://github.com/jelmer/dulwich/tree/HEAD/foo".parse().unwrap()),
+            Some(
+                "https://github.com/jelmer/dulwich/tree/HEAD/foo"
+                    .parse()
+                    .unwrap()
+            ),
             browse_url_from_repo_url(
                 &super::VcsLocation {
                     url: "https://github.com/jelmer/dulwich.git".parse().unwrap(),
                     branch: None,
                     subpath: Some("foo".to_string()),
-                }, Some(false)
+                },
+                Some(false)
             )
         );
     }
@@ -1446,9 +1522,7 @@ mod tests {
     fn test_salsa_uses_cgit() {
         assert_eq!(
             "https://salsa.debian.org/jelmer/dulwich",
-            fixup_git_url(
-                "https://salsa.debian.org/cgit/jelmer/dulwich"
-            ),
+            fixup_git_url("https://salsa.debian.org/cgit/jelmer/dulwich"),
         );
     }
 
@@ -1456,9 +1530,7 @@ mod tests {
     fn test_salsa_tree_branch() {
         assert_eq!(
             "https://salsa.debian.org/jelmer/dulwich -b master",
-            fixup_git_location(
-                "https://salsa.debian.org/jelmer/dulwich/tree/master"
-            ),
+            fixup_git_location("https://salsa.debian.org/jelmer/dulwich/tree/master"),
         );
     }
 
@@ -1474,9 +1546,7 @@ mod tests {
     fn test_strip_extra_colon() {
         assert_eq!(
             "https://salsa.debian.org/mckinstry/lcov.git",
-            fixup_git_url(
-                "https://salsa.debian.org:/mckinstry/lcov.git"
-            ),
+            fixup_git_url("https://salsa.debian.org:/mckinstry/lcov.git"),
         );
     }
 
@@ -1488,9 +1558,7 @@ mod tests {
         );
         assert_eq!(
             "https://salsa.debian.org/debian-astro-team/pyavm.git",
-            fixup_git_url(
-                "https://git@salsa.debian.org:debian-astro-team/pyavm.git"
-            ),
+            fixup_git_url("https://git@salsa.debian.org:debian-astro-team/pyavm.git"),
         );
     }
 
@@ -1510,9 +1578,7 @@ mod tests {
         );
         assert_eq!(
             "https://gitlab.freedesktop.org/xorg/lib/libSM",
-            fixup_git_url(
-                "git://anongit.freedesktop.org/git/xorg/lib/libSM"
-            ),
+            fixup_git_url("git://anongit.freedesktop.org/git/xorg/lib/libSM"),
         );
     }
 

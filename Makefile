@@ -1,4 +1,4 @@
-.PHONY: build check unittest coverage coverage-html flake8 typing
+.PHONY: build check unittest coverage coverage-html typing
 
 build:
 	python3 setup.py build_ext -i
@@ -13,11 +13,6 @@ coverage: build
 
 coverage-html: coverage
 	python3 -m coverage html
-
-check:: flake8
-
-flake8:
-	flake8 .
 
 check:: typing
 

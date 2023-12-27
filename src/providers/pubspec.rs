@@ -1,4 +1,4 @@
-use crate::{Certainty, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{Certainty, GuesserSettings, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 
 use std::fs::File;
 use std::path::Path;
@@ -16,7 +16,7 @@ struct Pubspec {
 
 pub fn guess_from_pubspec_yaml(
     path: &Path,
-    _trust_package: bool,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let file = File::open(path)?;
 

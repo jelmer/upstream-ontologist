@@ -1,6 +1,9 @@
 //! See https://r-pkgs.org/description.html
 
-use crate::{vcs, Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{
+    vcs, Certainty, GuesserSettings, Person, ProviderError, UpstreamDatum,
+    UpstreamDatumWithMetadata,
+};
 use log::debug;
 use std::fs::File;
 use std::io::Read;
@@ -9,7 +12,7 @@ use url::Url;
 #[cfg(feature = "r-description")]
 pub fn guess_from_r_description(
     path: &std::path::Path,
-    _trust_package: bool,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     use mailparse::MailHeaderMap;
     let mut file = File::open(path)?;
@@ -224,7 +227,7 @@ Date/Publication: 2019-08-02 20:30:02 UTC
 "#,
         )
         .unwrap();
-        let ret = guess_from_r_description(&path, true).unwrap();
+        let ret = guess_from_r_description(&path, &GuesserSettings::default()).unwrap();
         assert_eq!(
             ret,
             vec![
@@ -292,7 +295,7 @@ interface to 'libcurl' (<https://curl.haxx.se/libcurl>)."#
                 UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Homepage("https://www.example.com/crul".to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.clone().into())
+                    origin: Some(path.into())
                 },
             ]
         );

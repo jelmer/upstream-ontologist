@@ -11,6 +11,7 @@ pub mod haskell;
 pub mod launchpad;
 pub mod maven;
 pub mod meson;
+pub mod metadata_json;
 pub mod metainfo;
 pub mod nuspec;
 #[cfg(feature = "opam")]
@@ -30,12 +31,12 @@ pub mod rust;
 pub mod security_md;
 pub mod waf;
 
-use crate::{Certainty, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{Certainty, GuesserSettings, UpstreamDatum, UpstreamDatumWithMetadata};
 use std::io::BufRead;
 
 pub fn guess_from_install(
     path: &std::path::Path,
-    _trust_package: bool,
+    _settings: &GuesserSettings,
 ) -> Result<Vec<crate::UpstreamDatumWithMetadata>, crate::ProviderError> {
     let mut ret = Vec::new();
 
@@ -76,7 +77,7 @@ pub fn guess_from_install(
             .find_iter(line)
         {
             ret.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Repository(m.as_str().trim_end_matches(".").to_string()),
+                datum: UpstreamDatum::Repository(m.as_str().trim_end_matches('.').to_string()),
                 certainty: Some(Certainty::Possible),
                 origin: Some(path.into()),
             });
