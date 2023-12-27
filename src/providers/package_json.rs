@@ -218,7 +218,7 @@ mod package_json_tests {
 "#,
         )
         .unwrap();
-        let ret = guess_from_package_json(&path, false).unwrap();
+        let ret = guess_from_package_json(&path, &GuesserSettings::default()).unwrap();
         assert_eq!(
             ret,
             vec![

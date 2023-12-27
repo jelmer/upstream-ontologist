@@ -227,7 +227,7 @@ Date/Publication: 2019-08-02 20:30:02 UTC
 "#,
         )
         .unwrap();
-        let ret = guess_from_r_description(&path, true).unwrap();
+        let ret = guess_from_r_description(&path, &GuesserSettings::default()).unwrap();
         assert_eq!(
             ret,
             vec![

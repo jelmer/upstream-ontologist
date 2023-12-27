@@ -668,7 +668,7 @@ mod watch_tests {
 "#,
         )
         .unwrap();
-        assert!(guess_from_debian_watch(&path, false).unwrap().is_empty());
+        assert!(guess_from_debian_watch(&path, &GuesserSettings::default()).unwrap().is_empty());
     }
 
     #[test]
@@ -688,7 +688,7 @@ https://github.com/jelmer/dulwich/tags/dulwich-(.*).tar.gz
                 certainty: Some(Certainty::Confident),
                 origin: Some(path.clone().into())
             }],
-            guess_from_debian_watch(&path, false).unwrap()
+            guess_from_debian_watch(&path, &GuesserSettings::default()).unwrap()
         );
     }
 }

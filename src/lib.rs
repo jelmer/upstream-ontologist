@@ -2268,6 +2268,14 @@ pub struct GuesserSettings {
     pub trust_package: bool,
 }
 
+impl Default for GuesserSettings {
+    fn default() -> Self {
+        GuesserSettings {
+            trust_package: false,
+        }
+    }
+}
+
 pub struct UpstreamMetadataGuesser {
     pub name: std::path::PathBuf,
     pub guess:
