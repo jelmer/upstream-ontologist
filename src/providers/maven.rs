@@ -1,13 +1,15 @@
 //! Documentation: https://maven.apache.org/pom.html
 
-use crate::{vcs, Certainty, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{
+    vcs, Certainty, GuesserSettings, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata,
+};
 use log::warn;
 use std::fs::File;
 use std::path::Path;
 
 pub fn guess_from_pom_xml(
     path: &Path,
-    _trust_package: bool,
+    settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     use xmltree::Element;
     let file = File::open(path).expect("Failed to open file");

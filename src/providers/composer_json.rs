@@ -1,10 +1,10 @@
-use crate::{Certainty, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{Certainty, GuesserSettings, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use log::error;
 use std::path::Path;
 
 pub fn guess_from_composer_json(
     path: &Path,
-    _trust_package: bool,
+    settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     // https://getcomposer.org/doc/04-schema.md
     let file = std::fs::File::open(path)?;

@@ -1,4 +1,6 @@
-use crate::{Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{
+    Certainty, GuesserSettings, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata,
+};
 use log::debug;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -6,7 +8,7 @@ use std::path::Path;
 
 pub fn guess_from_gemspec(
     path: &Path,
-    _trust_package: bool,
+    settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let file = File::open(path)?;
 

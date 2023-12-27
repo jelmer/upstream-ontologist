@@ -1,4 +1,6 @@
-use crate::{Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{
+    Certainty, GuesserSettings, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata,
+};
 use log::warn;
 use std::fs::File;
 use std::io::Read;
@@ -6,7 +8,7 @@ use std::path::Path;
 
 pub fn guess_from_metadata_json(
     path: &Path,
-    _trust_package: bool,
+    settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut file = File::open(path)?;
     let mut contents = String::new();

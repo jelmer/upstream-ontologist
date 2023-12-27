@@ -1466,7 +1466,7 @@ impl Forge for GitLab {
 
 pub fn guess_from_travis_yml(
     path: &Path,
-    _trust_package: bool,
+    settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut file = File::open(path)?;
 
@@ -2010,7 +2010,7 @@ pub fn get_repology_metadata(srcname: &str, repo: Option<&str>) -> Option<serde_
 
 pub fn guess_from_path(
     path: &Path,
-    _trust_package: bool,
+    settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let basename = path.file_name().and_then(|s| s.to_str());
     let mut ret = Vec::new();
@@ -2284,7 +2284,7 @@ impl std::fmt::Debug for UpstreamMetadataGuesser {
 
 const STATIC_GUESSERS: &[(
     &str,
-    fn(&std::path::Path, bool) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>,
+    fn(&std::path::Path, &GuesserSettings) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>,
 )] = &[
     (
         "debian/watch",
@@ -2387,7 +2387,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
         if subpath.exists() {
             candidates.push((
                 name.to_string(),
-                Box::new(move |_path, s: &GuesserSettings| cb(&subpath, s.trust_package)),
+                Box::new(move |_path, s: &GuesserSettings| cb(&subpath, s)),
             ));
         }
     }
@@ -2397,11 +2397,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
             candidates.push((
                 name.to_string(),
                 Box::new(move |path, s: &GuesserSettings| {
-                    crate::providers::security_md::guess_from_security_md(
-                        name,
-                        path,
-                        s.trust_package,
-                    )
+                    crate::providers::security_md::guess_from_security_md(name, path, &s)
                 }),
             ));
         }
@@ -2417,7 +2413,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
                 Box::new(move |_path, s| {
                     crate::providers::python::guess_from_pkg_info(
                         entry.path().join("PKG-INFO").as_path(),
-                        s.trust_package,
+                        &s,
                     )
                 }),
             ));
@@ -2428,7 +2424,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
                 Box::new(move |_path, s| {
                     crate::providers::python::guess_from_pkg_info(
                         entry.path().join("PKG-INFO").as_path(),
-                        s.trust_package,
+                        &s,
                     )
                 }),
             ));
@@ -2452,10 +2448,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
             candidates.push((
                 entry.file_name().to_string_lossy().to_string(),
                 Box::new(move |_path, s| {
-                    crate::providers::ruby::guess_from_gemspec(
-                        entry.path().as_path(),
-                        s.trust_package,
-                    )
+                    crate::providers::ruby::guess_from_gemspec(entry.path().as_path(), &s)
                 }),
             ));
         }
@@ -2472,10 +2465,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
                 candidates.push((
                     description_name,
                     Box::new(move |_path, s| {
-                        crate::providers::r::guess_from_r_description(
-                            entry.path().as_path(),
-                            s.trust_package,
-                        )
+                        crate::providers::r::guess_from_r_description(entry.path().as_path(), &s)
                     }),
                 ));
             }
@@ -2674,9 +2664,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
     for filename in debian_patches {
         candidates.push((
             filename.clone(),
-            Box::new(|path, s| {
-                crate::providers::debian::guess_from_debian_patch(path, s.trust_package)
-            }),
+            Box::new(|path, s| crate::providers::debian::guess_from_debian_patch(path, &s)),
         ));
     }
 
@@ -2686,7 +2674,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
     ));
     candidates.push((
         ".".to_string(),
-        Box::new(|path, s| crate::guess_from_path(path, s.trust_package)),
+        Box::new(|path, s| crate::guess_from_path(path, &s)),
     ));
 
     candidates

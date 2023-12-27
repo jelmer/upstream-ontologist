@@ -1,4 +1,4 @@
-use crate::{Certainty, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{Certainty, GuesserSettings, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use log::debug;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -18,7 +18,7 @@ fn is_email_address(email: &str) -> bool {
 
 pub fn guess_from_configure(
     path: &std::path::Path,
-    _trust_package: bool,
+    settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     if std::path::Path::new(path).is_dir() {
         return Ok(Vec::new());

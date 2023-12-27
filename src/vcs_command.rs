@@ -1,4 +1,5 @@
 use crate::vcs;
+use crate::GuesserSettings;
 use log::warn;
 
 fn parse_command_bytes(command: &[u8]) -> Option<Vec<String>> {
@@ -162,7 +163,7 @@ pub fn url_from_svn_co_command(command: &[u8]) -> Option<String> {
 
 pub fn guess_from_get_orig_source(
     path: &std::path::Path,
-    _trust_package: bool,
+    settings: &GuesserSettings,
 ) -> Result<Vec<crate::UpstreamDatumWithMetadata>, crate::ProviderError> {
     let text = std::fs::read(path)?;
     let mut result = Vec::new();

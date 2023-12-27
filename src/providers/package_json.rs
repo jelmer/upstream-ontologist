@@ -1,11 +1,13 @@
-use crate::{Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{
+    Certainty, GuesserSettings, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata,
+};
 use log::error;
 use std::path::Path;
 use url::Url;
 
 pub fn guess_from_package_json(
     path: &Path,
-    _trust_package: bool,
+    settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     // see https://docs.npmjs.com/cli/v7/configuring-npm/package-json
     let file = std::fs::File::open(path)?;

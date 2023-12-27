@@ -1,11 +1,13 @@
 use crate::xmlparse_simplify_namespaces;
-use crate::{Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{
+    Certainty, GuesserSettings, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata,
+};
 use log::error;
 use std::path::Path;
 
 pub fn guess_from_package_xml(
     path: &Path,
-    _trust_package: bool,
+    settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     use xmltree::{Element, XMLNode};
     const NAMESPACES: &[&str] = &[

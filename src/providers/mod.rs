@@ -31,12 +31,12 @@ pub mod rust;
 pub mod security_md;
 pub mod waf;
 
-use crate::{Certainty, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{Certainty, GuesserSettings, UpstreamDatum, UpstreamDatumWithMetadata};
 use std::io::BufRead;
 
 pub fn guess_from_install(
     path: &std::path::Path,
-    _trust_package: bool,
+    settings: &GuesserSettings,
 ) -> Result<Vec<crate::UpstreamDatumWithMetadata>, crate::ProviderError> {
     let mut ret = Vec::new();
 
