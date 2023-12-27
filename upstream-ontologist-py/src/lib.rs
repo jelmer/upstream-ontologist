@@ -14,7 +14,6 @@ use url::Url;
 import_exception!(urllib.error, HTTPError);
 create_exception!(upstream_ontologist, UnverifiableUrl, PyException);
 create_exception!(upstream_ontologist, InvalidUrl, PyException);
-create_exception!(upstream_ontologist, NoSuchRepologyProject, PyException);
 create_exception!(upstream_ontologist, NoSuchForgeProject, PyException);
 
 #[pyfunction]
@@ -46,13 +45,6 @@ fn url_from_vcs_command(command: &[u8]) -> Option<String> {
 fn drop_vcs_in_scheme(url: &str) -> String {
     upstream_ontologist::vcs::drop_vcs_in_scheme(&url.parse().unwrap())
         .map_or_else(|| url.to_string(), |u| u.to_string())
-}
-
-#[pyfunction]
-fn debian_is_native(path: PathBuf) -> PyResult<Option<bool>> {
-    Ok(upstream_ontologist::providers::debian::debian_is_native(
-        path.as_path(),
-    )?)
 }
 
 #[pyfunction]
@@ -91,30 +83,6 @@ fn json_to_py(py: Python, data: serde_json::Value) -> PyResult<PyObject> {
             d.into_py(py)
         }),
     }
-}
-
-#[pyfunction]
-fn load_json_url(py: Python, http_url: &str, timeout: Option<u64>) -> PyResult<PyObject> {
-    debug!("Loading JSON from {}", http_url);
-    let http_url = http_url
-        .parse::<reqwest::Url>()
-        .map_err(|e| PyRuntimeError::new_err(format!("{}: {}", e, http_url)))?;
-    Ok(json_to_py(
-        py,
-        upstream_ontologist::load_json_url(&http_url, timeout.map(std::time::Duration::from_secs))
-            .map_err(|e| match e {
-                upstream_ontologist::HTTPJSONError::Error {
-                    url,
-                    status,
-                    response,
-                } => {
-                    HTTPError::new_err((url.as_str().to_string(), status, response.text().unwrap()))
-                }
-                upstream_ontologist::HTTPJSONError::HTTPError(e) => {
-                    PyRuntimeError::new_err(e.to_string())
-                }
-            })?,
-    )?)
 }
 
 #[pyclass(subclass)]
@@ -260,13 +228,6 @@ impl SourceForge {
 }
 
 #[pyfunction]
-fn metadata_from_itp_bug_body(py: Python, body: &str) -> PyResult<PyObject> {
-    let ret = upstream_ontologist::providers::debian::metadata_from_itp_bug_body(body)?;
-
-    Ok(ret.to_object(py))
-}
-
-#[pyfunction]
 fn plausible_vcs_url(url: &str) -> PyResult<bool> {
     Ok(upstream_ontologist::vcs::plausible_url(url))
 }
@@ -274,34 +235,6 @@ fn plausible_vcs_url(url: &str) -> PyResult<bool> {
 #[pyfunction]
 fn plausible_vcs_browse_url(url: &str) -> PyResult<bool> {
     Ok(upstream_ontologist::vcs::plausible_browse_url(url))
-}
-
-#[pyfunction]
-fn guess_from_pecl_package(py: Python, package: &str) -> PyResult<PyObject> {
-    let ret = upstream_ontologist::providers::php::guess_from_pecl_package(package)?;
-
-    Ok(ret.to_object(py))
-}
-
-#[pyfunction]
-fn guess_from_aur(py: Python, package: &str) -> PyResult<PyObject> {
-    let ret = upstream_ontologist::providers::arch::guess_from_aur(package);
-
-    Ok(ret.to_object(py))
-}
-
-#[pyfunction]
-fn guess_from_repology(py: Python, package: &str) -> PyResult<PyObject> {
-    let ret = upstream_ontologist::providers::repology::guess_from_repology(package)?;
-
-    Ok(ret.to_object(py))
-}
-
-#[pyfunction]
-fn guess_from_hackage(py: Python, package: &str) -> PyResult<PyObject> {
-    let ret = upstream_ontologist::providers::haskell::guess_from_hackage(package)?;
-
-    Ok(ret.to_object(py))
 }
 
 #[pyfunction]
@@ -497,36 +430,6 @@ fn check_bug_submit_url_canonical(url: &str, net_access: Option<bool>) -> PyResu
             }
         })
         .map(|x| x.to_string())
-}
-
-#[pyfunction]
-fn extract_sf_project_name(url: &str) -> Option<String> {
-    upstream_ontologist::extract_sf_project_name(url)
-}
-
-#[pyfunction]
-fn extract_pecl_package_name(url: &str) -> Option<String> {
-    upstream_ontologist::extract_pecl_package_name(url)
-}
-
-#[pyfunction]
-fn get_repology_metadata(py: Python, name: &str, distro: Option<&str>) -> PyResult<PyObject> {
-    let ret = upstream_ontologist::get_repology_metadata(name, distro);
-
-    if ret.is_none() {
-        return Ok(py.None());
-    }
-
-    Ok(json_to_py(py, ret.unwrap())?)
-}
-
-#[pyfunction]
-fn get_sf_metadata(project: &str) -> PyResult<PyObject> {
-    if let Some(ret) = upstream_ontologist::get_sf_metadata(project) {
-        Python::with_gil(|py| Ok(json_to_py(py, ret)?))
-    } else {
-        return Err(NoSuchForgeProject::new_err((project.to_string(),)));
-    }
 }
 
 #[pyfunction]
@@ -928,16 +831,10 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(url_from_fossil_clone_command))?;
     m.add_wrapped(wrap_pyfunction!(url_from_svn_co_command))?;
     m.add_wrapped(wrap_pyfunction!(url_from_cvs_co_command))?;
-    m.add_wrapped(wrap_pyfunction!(debian_is_native))?;
     m.add_wrapped(wrap_pyfunction!(drop_vcs_in_scheme))?;
     m.add_wrapped(wrap_pyfunction!(unsplit_vcs_url))?;
-    m.add_wrapped(wrap_pyfunction!(load_json_url))?;
-    m.add_wrapped(wrap_pyfunction!(metadata_from_itp_bug_body))?;
     m.add_wrapped(wrap_pyfunction!(plausible_vcs_url))?;
     m.add_wrapped(wrap_pyfunction!(plausible_vcs_browse_url))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_aur))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_pecl_package))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_repology))?;
     m.add_wrapped(wrap_pyfunction!(check_url_canonical))?;
     m.add_wrapped(wrap_pyfunction!(guess_repo_from_url))?;
     m.add_wrapped(wrap_pyfunction!(probe_gitlab_host))?;
@@ -956,17 +853,14 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(bug_submit_url_from_bug_database_url))?;
     m.add_wrapped(wrap_pyfunction!(check_bug_database_canonical))?;
     m.add_wrapped(wrap_pyfunction!(check_bug_submit_url_canonical))?;
-    m.add_wrapped(wrap_pyfunction!(extract_sf_project_name))?;
-    m.add_wrapped(wrap_pyfunction!(extract_pecl_package_name))?;
-    m.add_wrapped(wrap_pyfunction!(get_repology_metadata))?;
-    m.add_wrapped(wrap_pyfunction!(get_sf_metadata))?;
     m.add_wrapped(wrap_pyfunction!(fixup_rcp_style_git_repo_url))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_hackage))?;
-    m.add_wrapped(wrap_pyfunction!(valid_debian_package_name))?;
-    m.add_wrapped(wrap_pyfunction!(debian_to_upstream_version))?;
-    m.add_wrapped(wrap_pyfunction!(upstream_name_to_debian_source_name))?;
-    m.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_source_name))?;
-    m.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_binary_name))?;
+    let debianm = PyModule::new(py, "debian")?;
+    debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_source_name))?;
+    debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_binary_name))?;
+    debianm.add_wrapped(wrap_pyfunction!(valid_debian_package_name))?;
+    debianm.add_wrapped(wrap_pyfunction!(debian_to_upstream_version))?;
+    debianm.add_wrapped(wrap_pyfunction!(upstream_name_to_debian_source_name))?;
+    m.add("debian", debianm)?;
     m.add_wrapped(wrap_pyfunction!(find_secure_repo_url))?;
     m.add_wrapped(wrap_pyfunction!(sanitize_url))?;
     m.add_wrapped(wrap_pyfunction!(convert_cvs_list_to_str))?;
@@ -983,10 +877,6 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<UpstreamDatum>()?;
     m.add("InvalidUrl", py.get_type::<InvalidUrl>())?;
     m.add("UnverifiableUrl", py.get_type::<UnverifiableUrl>())?;
-    m.add(
-        "NoSuchRepologyProject",
-        py.get_type::<NoSuchRepologyProject>(),
-    )?;
     m.add("NoSuchForgeProject", py.get_type::<NoSuchForgeProject>())?;
     m.add_wrapped(wrap_pyfunction!(known_bad_guess))?;
     let readmem = PyModule::new(py, "readme")?;
