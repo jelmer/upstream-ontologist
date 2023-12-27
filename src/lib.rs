@@ -1466,7 +1466,7 @@ impl Forge for GitLab {
 
 pub fn guess_from_travis_yml(
     path: &Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut file = File::open(path)?;
 
@@ -2010,7 +2010,7 @@ pub fn get_repology_metadata(srcname: &str, repo: Option<&str>) -> Option<serde_
 
 pub fn guess_from_path(
     path: &Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let basename = path.file_name().and_then(|s| s.to_str());
     let mut ret = Vec::new();
@@ -2397,7 +2397,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
             candidates.push((
                 name.to_string(),
                 Box::new(move |path, s: &GuesserSettings| {
-                    crate::providers::security_md::guess_from_security_md(name, path, &s)
+                    crate::providers::security_md::guess_from_security_md(name, path, s)
                 }),
             ));
         }
@@ -2413,7 +2413,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
                 Box::new(move |_path, s| {
                     crate::providers::python::guess_from_pkg_info(
                         entry.path().join("PKG-INFO").as_path(),
-                        &s,
+                        s,
                     )
                 }),
             ));
@@ -2424,7 +2424,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
                 Box::new(move |_path, s| {
                     crate::providers::python::guess_from_pkg_info(
                         entry.path().join("PKG-INFO").as_path(),
-                        &s,
+                        s,
                     )
                 }),
             ));
@@ -2448,7 +2448,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
             candidates.push((
                 entry.file_name().to_string_lossy().to_string(),
                 Box::new(move |_path, s| {
-                    crate::providers::ruby::guess_from_gemspec(entry.path().as_path(), &s)
+                    crate::providers::ruby::guess_from_gemspec(entry.path().as_path(), s)
                 }),
             ));
         }
@@ -2465,7 +2465,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
                 candidates.push((
                     description_name,
                     Box::new(move |_path, s| {
-                        crate::providers::r::guess_from_r_description(entry.path().as_path(), &s)
+                        crate::providers::r::guess_from_r_description(entry.path().as_path(), s)
                     }),
                 ));
             }
@@ -2664,7 +2664,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
     for filename in debian_patches {
         candidates.push((
             filename.clone(),
-            Box::new(|path, s| crate::providers::debian::guess_from_debian_patch(path, &s)),
+            Box::new(crate::providers::debian::guess_from_debian_patch),
         ));
     }
 
@@ -2672,24 +2672,21 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
         "environment".to_string(),
         Box::new(|_path, _| crate::guess_from_environment()),
     ));
-    candidates.push((
-        ".".to_string(),
-        Box::new(|path, s| crate::guess_from_path(path, &s)),
-    ));
+    candidates.push((".".to_string(), Box::new(crate::guess_from_path)));
 
     candidates
         .into_iter()
-        .filter_map(|(name, cb)| {
+        .map(|(name, cb)| {
             assert!(
                 !name.is_empty() && !name.starts_with('/'),
                 "invalid name: {}",
                 name
             );
             let path = path.join(name);
-            Some(UpstreamMetadataGuesser {
+            UpstreamMetadataGuesser {
                 name: path.clone(),
                 guess: Box::new(move |s| cb(&path, s)),
-            })
+            }
         })
         .collect()
 }
@@ -3095,7 +3092,13 @@ pub fn get_upstream_info(
 ) -> Result<UpstreamMetadata, ProviderError> {
     let metadata_items = guess_upstream_info(path, trust_package);
     summarize_upstream_metadata(
-        metadata_items.collect::<Result<Vec<_>, _>>()?.into_iter(),
+        metadata_items.filter_map(|x| match x {
+            Ok(x) => Some(x),
+            Err(e) => {
+                log::error!("{}", e);
+                None
+            }
+        }),
         path,
         net_access,
         consult_external_directory,
@@ -3117,9 +3120,14 @@ pub fn guess_upstream_metadata(
     consult_external_directory: Option<bool>,
     check: Option<bool>,
 ) -> Result<UpstreamMetadata, ProviderError> {
-    let metadata_items = guess_upstream_metadata_items(path, trust_package, None)
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter();
+    let metadata_items =
+        guess_upstream_metadata_items(path, trust_package, None).filter_map(|x| match x {
+            Ok(x) => Some(x),
+            Err(e) => {
+                log::error!("{}", e);
+                None
+            }
+        });
     summarize_upstream_metadata(
         metadata_items,
         path,

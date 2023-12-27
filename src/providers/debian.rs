@@ -12,7 +12,7 @@ use url::Url;
 
 pub fn guess_from_debian_patch(
     path: &Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let file = File::open(path)?;
     let reader = std::io::BufReader::new(file);
@@ -181,7 +181,7 @@ pub fn metadata_from_itp_bug_body(
 
 pub fn guess_from_debian_changelog(
     path: &Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let cl = debian_changelog::ChangeLog::read_path(path).map_err(|e| {
         ProviderError::ParseError(format!(
@@ -319,7 +319,7 @@ pub fn parse_debcargo_source_name(
 
 pub fn guess_from_debian_rules(
     path: &Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let f = std::fs::File::open(path)?;
     let mf = makefile_lossless::Makefile::read_relaxed(f)
@@ -358,7 +358,7 @@ pub fn guess_from_debian_rules(
 
 pub fn guess_from_debian_control(
     path: &Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut ret = vec![];
     use std::str::FromStr;
@@ -470,7 +470,7 @@ pub fn guess_from_debian_control(
 
 pub fn guess_from_debian_copyright(
     path: &Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut ret = vec![];
     let text = &std::fs::read_to_string(path)?;
@@ -600,7 +600,7 @@ pub fn guess_from_debian_copyright(
 
 pub fn guess_from_debian_watch(
     path: &Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut ret = vec![];
     use debian_changelog::ChangeLog;

@@ -7,7 +7,7 @@ use std::path::Path;
 
 pub fn guess_from_package_xml(
     path: &Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     use xmltree::{Element, XMLNode};
     const NAMESPACES: &[&str] = &[

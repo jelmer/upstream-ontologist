@@ -7,7 +7,7 @@ use url::Url;
 
 pub fn guess_from_package_json(
     path: &Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     // see https://docs.npmjs.com/cli/v7/configuring-npm/package-json
     let file = std::fs::File::open(path)?;

@@ -36,7 +36,7 @@ use std::io::BufRead;
 
 pub fn guess_from_install(
     path: &std::path::Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> Result<Vec<crate::UpstreamDatumWithMetadata>, crate::ProviderError> {
     let mut ret = Vec::new();
 

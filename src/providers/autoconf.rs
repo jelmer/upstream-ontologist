@@ -18,7 +18,7 @@ fn is_email_address(email: &str) -> bool {
 
 pub fn guess_from_configure(
     path: &std::path::Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     if std::path::Path::new(path).is_dir() {
         return Ok(Vec::new());

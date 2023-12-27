@@ -6,7 +6,7 @@ use crate::{Certainty, GuesserSettings, ProviderError, UpstreamDatum, UpstreamDa
 pub fn guess_from_security_md(
     name: &str,
     path: &std::path::Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let path = path.strip_prefix("./").unwrap_or(path);
     let mut results = Vec::new();

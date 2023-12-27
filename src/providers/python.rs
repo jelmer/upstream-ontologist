@@ -10,7 +10,7 @@ use std::path::Path;
 
 pub fn guess_from_pkg_info(
     path: &Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let contents = std::fs::read(path)?;
     let dist = python_pkginfo::Metadata::parse(contents.as_slice()).map_err(|e| {
@@ -117,7 +117,7 @@ pub fn guess_from_pkg_info(
 
 pub fn guess_from_pyproject_toml(
     path: &Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let content = std::fs::read_to_string(path)?;
     let mut ret = Vec::new();
@@ -462,7 +462,7 @@ pub fn parse_python_url(url: &str) -> Vec<UpstreamDatumWithMetadata> {
 
 pub fn guess_from_setup_cfg(
     path: &Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let setup_cfg =
         ini::Ini::load_from_file(path).map_err(|e| ProviderError::ParseError(e.to_string()))?;
@@ -1078,11 +1078,11 @@ fn parse_python_classifiers<'a>(
             ("Development Status", _) => None,
             ("Intended Audience", _) => None,
             ("License", "OSI Approved") => {
-                return Some(UpstreamDatumWithMetadata {
+                Some(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::License(value.into()),
                     certainty,
-                    origin: origin.clone(),
-                });
+                    origin: origin,
+                })
             }
             ("Natural Language", _) => None,
             ("Operating System", _) => None,

@@ -9,7 +9,7 @@ use std::path::Path;
 
 pub fn guess_from_pom_xml(
     path: &Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     use xmltree::Element;
     let file = File::open(path).expect("Failed to open file");

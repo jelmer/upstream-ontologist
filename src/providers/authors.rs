@@ -7,7 +7,7 @@ use std::path::Path;
 
 pub fn guess_from_authors(
     path: &Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let file = File::open(path)?;
     let reader = std::io::BufReader::new(file);

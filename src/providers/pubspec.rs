@@ -16,7 +16,7 @@ struct Pubspec {
 
 pub fn guess_from_pubspec_yaml(
     path: &Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let file = File::open(path)?;
 

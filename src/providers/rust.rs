@@ -5,7 +5,7 @@ use log::debug;
 
 pub fn guess_from_cargo(
     path: &std::path::Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     // see https://doc.rust-lang.org/cargo/reference/manifest.html
     let doc: toml::Table = toml::from_str(&std::fs::read_to_string(path)?)

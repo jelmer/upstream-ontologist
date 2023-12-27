@@ -7,7 +7,7 @@ use std::path::Path;
 
 pub fn guess_from_go_mod(
     path: &Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let file = File::open(path).expect("Failed to open file");
     let reader = BufReader::new(file);

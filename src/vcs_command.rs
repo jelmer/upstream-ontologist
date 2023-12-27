@@ -163,7 +163,7 @@ pub fn url_from_svn_co_command(command: &[u8]) -> Option<String> {
 
 pub fn guess_from_get_orig_source(
     path: &std::path::Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> Result<Vec<crate::UpstreamDatumWithMetadata>, crate::ProviderError> {
     let text = std::fs::read(path)?;
     let mut result = Vec::new();

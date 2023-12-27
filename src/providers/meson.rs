@@ -4,7 +4,7 @@ use std::process::Command;
 
 pub fn guess_from_meson(
     path: &std::path::Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     // TODO(jelmer): consider looking for a meson build directory to call "meson
     // introspect" on

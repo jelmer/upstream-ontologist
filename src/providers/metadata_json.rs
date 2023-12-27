@@ -8,7 +8,7 @@ use std::path::Path;
 
 pub fn guess_from_metadata_json(
     path: &Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut file = File::open(path)?;
     let mut contents = String::new();

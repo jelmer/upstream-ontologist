@@ -4,7 +4,7 @@ use std::path::Path;
 
 pub fn guess_from_composer_json(
     path: &Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     // https://getcomposer.org/doc/04-schema.md
     let file = std::fs::File::open(path)?;

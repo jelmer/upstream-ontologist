@@ -113,7 +113,7 @@ pub fn guess_from_perl_dist_name(
 #[cfg(feature = "dist-ini")]
 pub fn guess_from_dist_ini(
     path: &Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let parser = ini::Ini::load_from_file(path)
         .map_err(|e| ProviderError::ParseError(format!("Error parsing dist.ini: {}", e)))?;
@@ -214,7 +214,7 @@ pub fn guess_from_dist_ini(
 
 pub fn guess_from_meta_json(
     path: &Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut file = File::open(path)?;
     let mut contents = String::new();
@@ -312,7 +312,7 @@ pub fn guess_from_meta_json(
 /// specification of the format.
 pub fn guess_from_meta_yml(
     path: &Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut file = File::open(path)?;
 
@@ -400,7 +400,7 @@ pub fn guess_from_meta_yml(
 
 pub fn guess_from_makefile_pl(
     path: &Path,
-    settings: &GuesserSettings,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut dist_name = None;
     let file = File::open(path)?;
