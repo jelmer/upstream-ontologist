@@ -45,7 +45,7 @@ fn extrapolate_homepage_from_repository_browse(
     let forge = crate::find_forge(&browse_url.datum.to_url().unwrap(), Some(net_access));
     if forge.is_some() && forge.unwrap().repository_browse_can_be_homepage() {
         ret.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::Homepage(browse_url.datum.to_string()),
+            datum: UpstreamDatum::Homepage(browse_url.datum.as_str().unwrap().to_string()),
             certainty: Some(
                 std::cmp::min(browse_url.certainty, Some(Certainty::Possible))
                     .unwrap_or(Certainty::Possible),
@@ -65,7 +65,7 @@ fn copy_bug_db_field(
     let old_bug_db = upstream_metadata.get("Bugs-Database").unwrap();
 
     ret.push(UpstreamDatumWithMetadata {
-        datum: UpstreamDatum::BugDatabase(old_bug_db.datum.to_string()),
+        datum: UpstreamDatum::BugDatabase(old_bug_db.datum.as_str().unwrap().to_string()),
         certainty: old_bug_db.certainty,
         origin: old_bug_db.origin.clone(),
     });
@@ -190,10 +190,12 @@ fn extrapolate_bug_db_from_bug_submit(
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let old_value = upstream_metadata.get("Bug-Submit").unwrap();
 
-    let bug_db_url = crate::bug_database_url_from_bug_submit_url(
-        &old_value.datum.to_url().unwrap(),
-        Some(net_access),
-    );
+    let old_value_url = match old_value.datum.to_url() {
+        Some(url) => url,
+        None => return Ok(vec![]),
+    };
+
+    let bug_db_url = crate::bug_database_url_from_bug_submit_url(&old_value_url, Some(net_access));
 
     Ok(if let Some(bug_db_url) = bug_db_url {
         vec![UpstreamDatumWithMetadata {
@@ -264,7 +266,7 @@ fn extrapolate_security_contact_from_security_md(
         &crate::vcs::VcsLocation {
             url: repository_url.datum.to_url().unwrap(),
             branch: None,
-            subpath: Some(security_md_path.datum.to_string()),
+            subpath: security_md_path.datum.as_str().map(|x| x.to_string()),
         },
         Some(net_access),
     );
@@ -287,7 +289,7 @@ fn extrapolate_contact_from_maintainer(
     let maintainer = upstream_metadata.get("Maintainer").unwrap();
 
     Ok(vec![UpstreamDatumWithMetadata {
-        datum: UpstreamDatum::Contact(maintainer.datum.to_string()),
+        datum: UpstreamDatum::Contact(maintainer.datum.as_person().unwrap().to_string()),
         certainty: maintainer.certainty,
         origin: maintainer.origin.clone(),
     }])
@@ -412,6 +414,11 @@ pub fn extrapolate_fields(
                 .map(|f| upstream_metadata.get(f))
                 .collect::<Vec<_>>();
             if !from_values.iter().all(|v| v.is_some()) {
+                log::trace!(
+                    "Not enough values for extrapolation from {:?} to {:?}",
+                    from_fields,
+                    to_fields
+                );
                 continue;
             }
 
@@ -434,12 +441,29 @@ pub fn extrapolate_fields(
 
             assert!(old_to_values.values().all(|v| v.certainty.is_some()));
 
-            if !old_to_values.values().all(|v| v.certainty < from_certainty) {
+            // If any of the to_fields already exist in old_to_values with a better or same
+            // certainty, then we don't need to extrapolate.
+            if to_fields.iter().any(|f| {
+                old_to_values
+                    .get(f)
+                    .map(|v| v.certainty <= from_certainty)
+                    .unwrap_or(false)
+            }) {
+                log::trace!(
+                    "Not extrapolating from {:?} to {:?} because of certainty ({:?} >= {:?})",
+                    from_fields,
+                    to_fields,
+                    old_to_values
+                        .values()
+                        .map(|v| v.certainty)
+                        .collect::<Vec<_>>(),
+                    from_certainty
+                );
                 continue;
             }
 
             let extra_upstream_metadata = cb(upstream_metadata, net_access)?;
-            let changes = upstream_metadata.update(extra_upstream_metadata);
+            let changes = upstream_metadata.update(extra_upstream_metadata.into_iter());
 
             if !changes.is_empty() {
                 log::debug!(

@@ -7,6 +7,7 @@ license = "GPL-2.0+"
 description = "tracking of upstream project metadata"
 repository = "https://github.com/jelmer/upstream-ontologist.git"
 homepage = "https://github.com/jelmer/upstream-ontologist"
+default-run = "guess-upstream-metadata"
 
 [dependencies]
 log = "0.4"

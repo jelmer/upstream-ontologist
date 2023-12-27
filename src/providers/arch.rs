@@ -155,3 +155,29 @@ pub fn guess_from_aur(package: &str) -> Vec<UpstreamDatum> {
 
     results
 }
+
+pub struct Aur;
+
+impl Aur {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl crate::ThirdPartyRepository for Aur {
+    fn name(&self) -> &'static str {
+        "AUR"
+    }
+
+    fn supported_fields(&self) -> &'static [&'static str] {
+        &["Homepage", "Repository"]
+    }
+
+    fn max_supported_certainty(&self) -> crate::Certainty {
+        crate::Certainty::Possible
+    }
+
+    fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, crate::ProviderError> {
+        Ok(guess_from_aur(name))
+    }
+}
