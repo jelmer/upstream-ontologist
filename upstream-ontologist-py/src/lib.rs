@@ -6,7 +6,6 @@ use pyo3::import_exception;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pyo3::types::PyTuple;
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::FromStr;
 use upstream_ontologist::{CanonicalizeError, Origin, UpstreamPackage};
@@ -900,7 +899,7 @@ fn get_upstream_info(
     consult_external_directory: Option<bool>,
     check: Option<bool>,
 ) -> PyResult<&PyDict> {
-    let mut metadata = upstream_ontologist::get_upstream_info(
+    let metadata = upstream_ontologist::get_upstream_info(
         path.as_path(),
         trust_package,
         net_access,

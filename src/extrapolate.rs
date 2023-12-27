@@ -443,10 +443,10 @@ pub fn extrapolate_fields(
 
             // If any of the to_fields already exist in old_to_values with a better or same
             // certainty, then we don't need to extrapolate.
-            if to_fields.iter().any(|f| {
+            if to_fields.iter().all(|f| {
                 old_to_values
                     .get(f)
-                    .map(|v| v.certainty <= from_certainty)
+                    .map(|v| v.certainty >= from_certainty)
                     .unwrap_or(false)
             }) {
                 log::trace!(
