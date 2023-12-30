@@ -17,8 +17,8 @@
 
 from . import _upstream_ontologist
 
-upstream_package_to_debian_source_name = _upstream_ontologist.debian.upstream_package_to_debian_source_name
-upstream_package_to_debian_binary_name = _upstream_ontologist.debian.upstream_package_to_debian_binary_name
-valid_debian_package_name = _upstream_ontologist.debian.valid_debian_package_name
-debian_to_upstream_version = _upstream_ontologist.debian.debian_to_upstream_version
-upstream_name_to_debian_source_name = _upstream_ontologist.debian.upstream_name_to_debian_source_name
+upstream_package_to_debian_source_name = _upstream_ontologist.debian.upstream_package_to_debian_source_name  # type: ignore
+upstream_package_to_debian_binary_name = _upstream_ontologist.debian.upstream_package_to_debian_binary_name  # type: ignore
+valid_debian_package_name = _upstream_ontologist.debian.valid_debian_package_name  # type: ignore
+debian_to_upstream_version = _upstream_ontologist.debian.debian_to_upstream_version  # type: ignore
+upstream_name_to_debian_source_name = _upstream_ontologist.debian.upstream_name_to_debian_source_name  # type: ignore
