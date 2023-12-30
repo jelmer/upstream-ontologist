@@ -30,11 +30,7 @@ from . import (
     UpstreamDatum,
     UpstreamMetadata,
     UrlUnverifiable,
-    _load_json_url,
     _upstream_ontologist,
-    certainty_sufficient,
-    certainty_to_confidence,
-    min_certainty,
 )
 from .vcs import (
     browse_url_from_repo_url,
@@ -48,24 +44,12 @@ from .vcs import (
 logger = logging.getLogger(__name__)
 
 
-get_sf_metadata = _upstream_ontologist.get_sf_metadata
 NoSuchForgeProject = _upstream_ontologist.NoSuchForgeProject
-NoSuchRepologyProject = _upstream_ontologist.NoSuchRepologyProject
-get_repology_metadata = _upstream_ontologist.get_repology_metadata
 
 
 def guess_upstream_info(path, trust_package):
     return iter(_upstream_ontologist.guess_upstream_info(path, trust_package))
 
-
-extract_pecl_package_name = _upstream_ontologist.extract_pecl_package_name
-
-
-debian_is_native = _upstream_ontologist.debian_is_native
-
-
-metadata_from_itp_bug_body = _upstream_ontologist.metadata_from_itp_bug_body
-extract_sf_project_name = _upstream_ontologist.extract_sf_project_name
 
 url_from_cvs_co_command = _upstream_ontologist.url_from_cvs_co_command
 url_from_svn_co_command = _upstream_ontologist.url_from_svn_co_command

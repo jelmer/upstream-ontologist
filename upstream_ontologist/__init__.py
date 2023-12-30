@@ -211,51 +211,6 @@ def upstream_metadata_sort_key(x):
     }.get(k, k)
 
 
-def min_certainty(certainties: Sequence[str]) -> str:
-    confidences = [certainty_to_confidence(c) for c in certainties]
-    return confidence_to_certainty(max([c for c in confidences if c is not None] + [0]))
-
-
-def certainty_to_confidence(certainty: Optional[str]) -> Optional[int]:
-    if certainty in ("unknown", None):
-        return None
-    return SUPPORTED_CERTAINTIES.index(certainty)
-
-
-def confidence_to_certainty(confidence: Optional[int]) -> str:
-    if confidence is None:
-        return "unknown"
-    try:
-        return SUPPORTED_CERTAINTIES[confidence] or "unknown"
-    except IndexError as e:
-        raise ValueError(confidence) from e
-
-
-def certainty_sufficient(
-    actual_certainty: Optional[str], minimum_certainty: Optional[str]
-) -> bool:
-    """Check if the actual certainty is sufficient.
-
-    Args:
-      actual_certainty: Actual certainty with which changes were made
-      minimum_certainty: Minimum certainty to keep changes
-    Returns:
-      boolean
-    """
-    actual_confidence = certainty_to_confidence(actual_certainty)
-    if actual_confidence is None:
-        # Actual confidence is unknown.
-        # TODO(jelmer): Should we really be ignoring this?
-        return True
-    minimum_confidence = certainty_to_confidence(minimum_certainty)
-    if minimum_confidence is None:
-        return True
-    return actual_confidence <= minimum_confidence
-
-
-_load_json_url = _upstream_ontologist.load_json_url  # noqa: F401
-
-
 class UrlUnverifiable(Exception):
     """Unable to check specified URL."""
 

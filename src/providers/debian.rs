@@ -65,6 +65,7 @@ pub fn guess_from_debian_patch(
 
 pub fn metadata_from_itp_bug_body(
     body: &str,
+    origin: Option<Origin>,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut results: Vec<UpstreamDatumWithMetadata> = Vec::new();
     // Skip first few lines with bug metadata (severity, owner, etc)
@@ -111,42 +112,42 @@ pub fn metadata_from_itp_bug_body(
                         results.push(UpstreamDatumWithMetadata {
                             datum: UpstreamDatum::Name(value.to_string()),
                             certainty: Some(Certainty::Confident),
-                            origin: None,
+                            origin: origin.clone(),
                         });
                     }
                     "Version" => {
                         results.push(UpstreamDatumWithMetadata {
                             datum: UpstreamDatum::Version(value.to_string()),
                             certainty: Some(Certainty::Possible),
-                            origin: None,
+                            origin: origin.clone(),
                         });
                     }
                     "Upstream Author" if !value.is_empty() => {
                         results.push(UpstreamDatumWithMetadata {
                             datum: UpstreamDatum::Author(vec![Person::from(value)]),
                             certainty: Some(Certainty::Confident),
-                            origin: None,
+                            origin: origin.clone(),
                         });
                     }
                     "URL" => {
                         results.push(UpstreamDatumWithMetadata {
                             datum: UpstreamDatum::Homepage(value.to_string()),
                             certainty: Some(Certainty::Confident),
-                            origin: None,
+                            origin: origin.clone(),
                         });
                     }
                     "License" => {
                         results.push(UpstreamDatumWithMetadata {
                             datum: UpstreamDatum::License(value.to_string()),
                             certainty: Some(Certainty::Confident),
-                            origin: None,
+                            origin: origin.clone(),
                         });
                     }
                     "Description" => {
                         results.push(UpstreamDatumWithMetadata {
                             datum: UpstreamDatum::Summary(value.to_string()),
                             certainty: Some(Certainty::Confident),
-                            origin: None,
+                            origin: origin.clone(),
                         });
                     }
                     _ => {
@@ -173,10 +174,73 @@ pub fn metadata_from_itp_bug_body(
     results.push(UpstreamDatumWithMetadata {
         datum: UpstreamDatum::Description(rest.join("\n")),
         certainty: Some(Certainty::Likely),
-        origin: None,
+        origin: origin.clone(),
     });
 
     Ok(results)
+}
+
+#[test]
+fn test_metadata_from_itp_bug_body() {
+    assert_eq!(
+        vec![
+            UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Name("setuptools-gettext".to_string()),
+                certainty: Some(Certainty::Confident),
+                origin: None,
+            },
+            UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Version("0.0.1".to_string()),
+                certainty: Some(Certainty::Possible),
+                origin: None,
+            },
+            UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Author(vec![Person::from("Breezy Team <breezy-core@googlegroups.com>")]),
+                certainty: Some(Certainty::Confident),
+                origin: None,
+            },
+            UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Homepage("https://github.com/jelmer/setuptools-gettext".to_string()),
+                certainty: Some(Certainty::Confident),
+                origin: None,
+            },
+            UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::License("GPL".to_string()),
+                certainty: Some(Certainty::Confident),
+                origin: None,
+            },
+            UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Summary("Compile .po files into .mo files".to_string()),
+                certainty: Some(Certainty::Confident),
+                origin: None,
+            },
+            UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Description("This extension for setuptools compiles gettext .po files\nfound in the source directory into .mo files and installs them.\n".to_string()),
+                certainty: Some(Certainty::Likely),
+                origin: None,
+            },
+        ],
+        metadata_from_itp_bug_body(
+            r#"Package: wnpp
+Severity: wishlist
+Owner: Jelmer Vernooij <jelmer@debian.org>
+Debbugs-Cc: debian-devel@lists.debian.org
+
+* Package name    : setuptools-gettext
+  Version         : 0.0.1
+  Upstream Author : Breezy Team <breezy-core@googlegroups.com>
+* URL             : https://github.com/jelmer/setuptools-gettext
+* License         : GPL
+  Programming Lang: Python
+  Description     : Compile .po files into .mo files
+
+This extension for setuptools compiles gettext .po files
+found in the source directory into .mo files and installs them.
+
+"#, None
+        )
+        .unwrap()
+    );
 }
 
 pub fn guess_from_debian_changelog(
@@ -292,7 +356,10 @@ pub fn guess_from_itp_bug(
         ProviderError::ParseError(format!("Failed to get bug log for bug {}: {}", bugno, e))
     })?;
 
-    metadata_from_itp_bug_body(log[0].body.as_str())
+    metadata_from_itp_bug_body(
+        log[0].body.as_str(),
+        Some(Origin::Other(format!("Debian bug #{}", bugno))),
+    )
 }
 
 /// Parse a debcargo source name and return crate.
@@ -668,7 +735,9 @@ mod watch_tests {
 "#,
         )
         .unwrap();
-        assert!(guess_from_debian_watch(&path, &GuesserSettings::default()).unwrap().is_empty());
+        assert!(guess_from_debian_watch(&path, &GuesserSettings::default())
+            .unwrap()
+            .is_empty());
     }
 
     #[test]
