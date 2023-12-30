@@ -215,7 +215,7 @@ fn test_metadata_from_itp_bug_body() {
                 origin: None,
             },
             UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Description("This extension for setuptools compiles gettext .po files\nfound in the source directory into .mo files and installs them.".to_string()),
+                datum: UpstreamDatum::Description("This extension for setuptools compiles gettext .po files\nfound in the source directory into .mo files and installs them.\n".to_string()),
                 certainty: Some(Certainty::Likely),
                 origin: None,
             },
