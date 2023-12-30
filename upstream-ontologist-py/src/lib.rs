@@ -1,4 +1,3 @@
-use log::debug;
 use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::exceptions::{PyKeyError, PyRuntimeError, PyValueError};
@@ -6,7 +5,6 @@ use pyo3::import_exception;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pyo3::types::PyTuple;
-use std::path::PathBuf;
 use std::str::FromStr;
 use upstream_ontologist::{CanonicalizeError, Origin, UpstreamPackage};
 use url::Url;
