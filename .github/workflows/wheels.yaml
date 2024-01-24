@@ -16,8 +16,8 @@ jobs:
       fail-fast: true
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
       - name: Install native dependencies (Ubuntu)
         run: sudo apt-get update && sudo apt-get install -y libgpgme-dev
         if: "matrix.os == 'ubuntu-latest'"
@@ -39,7 +39,7 @@ jobs:
         run: pip install -U gpg
         if: "matrix.os != 'windows-latest'"
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
+        uses: docker/setup-qemu-action@v3
         if: "matrix.os == 'ubuntu-latest'"
       - name: Build wheels
         run: python -m cibuildwheel --output-dir wheelhouse
@@ -76,7 +76,7 @@ jobs:
             rustup show
           CIBW_ENVIRONMENT_WINDOWS: 'CMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake"'
       - name: Upload wheels
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           path: ./wheelhouse/*.whl
 
@@ -91,10 +91,10 @@ jobs:
       name: pypi
       url: https://pypi.org/p/upstream-ontologist
     steps:
-      - uses: actions/setup-python@v3
+      - uses: actions/setup-python@v5
 
       - name: Download wheels
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           path: dist
       - name: Publish package distributions to PyPI
