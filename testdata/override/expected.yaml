@@ -1,0 +1,19 @@
+Bug-Database: https://github.com/jackmoore/autosize/issues
+Bug-Submit: https://github.com/jackmoore/autosize/issues/new
+Demo: http://www.jacklmoore.com/autosize
+Homepage: http://www.jacklmoore.com/autosize
+Name: autosize
+Keywords:
+ - textarea
+ - form
+ - ui
+Repository: https://github.com/jackmoore/autosize.git
+Repository-Browse: https://github.com/jackmoore/autosize
+Author:
+ - !Person
+   name: Jack Moore
+   email: hello@jacklmoore.com
+   url: http://www.jacklmoore.com
+License: MIT
+Summary: Autosize is a small, stand-alone script to automatically adjust textarea height to fit text
+Version: 4.0.2

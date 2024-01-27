@@ -1,0 +1,15 @@
+Author:
+ - !Person
+   name: Author 1
+   email: author1@example.com
+ - !Person
+   name: Author 2
+   email: author2@example.com
+Bug-Database: https://github.com/example/tracker/issues
+Bug-Submit: https://github.com/example/tracker/issues/new
+Homepage: https://github.com/example/repo
+Name: blah
+Repository: https://github.com/example/repo.git
+Repository-Browse: https://github.com/example/repo
+Description: "\n     This package does something\n  "
+License: BSD

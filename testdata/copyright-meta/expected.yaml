@@ -1,0 +1,8 @@
+{"Bug-Database": "https://github.com/example/example/issues",
+ "Bug-Submit": "https://github.com/example/example/issues/new",
+ "Contact": "An upstream contact <contact@contact.com>",
+ "Homepage": "https://github.com/example/example",
+ "Name": "Blah",
+ "Repository": "https://github.com/example/example.git",
+ "Repository-Browse": "https://github.com/example/example",
+ "License": "GPL-2+"}

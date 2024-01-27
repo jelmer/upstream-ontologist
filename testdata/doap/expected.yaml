@@ -1,0 +1,12 @@
+Bug-Database: http://example.com/blah/trac/newticket
+Contact: Joe Maintainer
+Homepage: http://example.com/blah/trac/
+Name: blah
+Repository: http://example.com/blah/svn/trunk/
+Repository-Browse: http://example.com/blah/trac/browser/
+Description: "\n Lorem ipsum.\n "
+Download: http://example.com/projects/blah/
+Maintainer: !Person
+  name: Joe Maintainer
+Summary: "\nblah is a swiss army knife for project maintainers and developers"
+Wiki: http://example.com/blah/trac/

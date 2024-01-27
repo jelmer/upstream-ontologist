@@ -1,0 +1,12 @@
+Name: puppet-nginx
+Version: 4.3.1-rc0
+Author:
+- !Person
+  name: Vox Pupuli
+Summary: Puppet NGINX management module
+License: MIT
+Repository: https://github.com/voxpupuli/puppet-nginx.git
+Homepage: http://github.com/voxpupuli/puppet-nginx
+Bug-Database: https://github.com/voxpupuli/puppet-nginx/issues
+Repository-Browse: https://github.com/voxpupuli/puppet-nginx
+Bug-Submit: https://github.com/voxpupuli/puppet-nginx/issues/new

@@ -1,0 +1,12 @@
+Author:
+ - !Person
+   name: Angela Author
+Bug-Database: https://github.com/example/blah/issues
+Bug-Submit: https://github.com/example/blah/issues/new
+Homepage: https://github.com/example/blah
+Name: TestPackage
+Repository: https://github.com/example/blah.git
+Repository-Browse: https://github.com/example/blah
+Description: blah blah
+License: BSD3
+Summary: blah blah

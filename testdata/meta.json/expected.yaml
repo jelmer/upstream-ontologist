@@ -1,0 +1,8 @@
+{"Bug-Database": "https://github.com/blah/Blie/issues",
+ "Bug-Submit": "https://github.com/blah/Blie/issues/new",
+ "Homepage": "https://github.com/blah/Blie",
+ "Name": "Some-Blah",
+ "Repository": "https://github.com/blah/Blie.git",
+ "Repository-Browse": "https://github.com/blah/Blie",
+ "Summary": "parse and validate simple name/value option pairs",
+ "Version": "0.110"}
