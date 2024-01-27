@@ -1,5 +1,7 @@
 #!/usr/bin/make -f
 
+export CARGO_HOME=$(shell pwd)/debian/cargo_home
+
 %:
 	dh $@ --buildsystem=pybuild --with=python3
 
