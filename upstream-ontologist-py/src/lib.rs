@@ -61,28 +61,6 @@ fn unsplit_vcs_url(
     Ok(upstream_ontologist::vcs::unsplit_vcs_url(&location))
 }
 
-fn json_to_py(py: Python, data: serde_json::Value) -> PyResult<PyObject> {
-    match data {
-        serde_json::Value::Null => Ok(py.None()),
-        serde_json::Value::Bool(b) => Ok(b.into_py(py)),
-        serde_json::Value::Number(i) => Ok(i.as_i64().unwrap().into_py(py)),
-        serde_json::Value::String(s) => Ok(s.into_py(py)),
-        serde_json::Value::Array(a) => Ok(a
-            .into_iter()
-            .map(|x| json_to_py(py, x))
-            .collect::<PyResult<Vec<PyObject>>>()?
-            .into_py(py)),
-        serde_json::Value::Object(o) => Ok({
-            let d = PyDict::new(py);
-
-            for (k, v) in o {
-                d.set_item(k.into_py(py), json_to_py(py, v)?)?;
-            }
-            d.into_py(py)
-        }),
-    }
-}
-
 #[pyclass(subclass)]
 struct Forge(Box<dyn upstream_ontologist::Forge>);
 
