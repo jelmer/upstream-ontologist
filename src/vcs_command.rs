@@ -4,13 +4,19 @@ use log::warn;
 
 fn parse_command_bytes(command: &[u8]) -> Option<Vec<String>> {
     if command.ends_with(&[b'\\']) {
-        warn!("Ignoring command with line break: {:?}", command);
+        warn!(
+            "Ignoring command with line break: {}",
+            String::from_utf8_lossy(command)
+        );
         return None;
     }
     let command_str = match String::from_utf8(command.to_vec()) {
         Ok(s) => s,
         Err(_) => {
-            warn!("Ignoring command with non-UTF-8: {:?}", command);
+            warn!(
+                "Ignoring command with non-UTF-8: {}",
+                String::from_utf8_lossy(command)
+            );
             return None;
         }
     };
