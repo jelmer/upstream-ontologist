@@ -1,0 +1,25 @@
+language: go
+go_import_path: github.com/ethereum/go-ethereum
+sudo: false
+jobs:
+  allow_failures:
+    - stage: build
+      os: osx
+      go: 1.17.x
+      env:
+        - azure-osx
+        - azure-ios
+        - cocoapods-ios
+
+  include:
+    # This builder only tests code linters on latest version of Go
+    - stage: lint
+      os: linux
+      dist: bionic
+      go: 1.19.x
+      env:
+        - lint
+      git:
+        submodules: false # avoid cloning ethereum/tests
+      script:
+        - go run build/ci.go lint

@@ -1,0 +1,15 @@
+Archive: CRAN
+Bug-Database: https://github.com/jdonaldson/rtsne/issues
+Bug-Submit: https://github.com/jdonaldson/rtsne/issues/new
+Contact: Justin Donaldson <jdonaldson@gmail.com>
+Homepage: https://github.com/jdonaldson/rtsne/
+Name: tsne
+Repository: https://github.com/jdonaldson/rtsne.git
+Repository-Browse: https://github.com/jdonaldson/rtsne
+Description: A "pure R" implementation of the t-SNE algorithm.
+License: GPL
+Maintainer: !Person
+   name: Justin Donaldson
+   email: jdonaldson@gmail.com
+Summary: T-Distributed Stochastic Neighbor Embedding for R (t-SNE)
+Version: 0.1-3

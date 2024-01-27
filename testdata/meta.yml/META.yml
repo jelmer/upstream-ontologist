@@ -1,0 +1,197 @@
+---
+abstract: 'do things'
+author:
+  - 'Somebody <somebody@cpan.org>'
+build_requires:
+  ExtUtils::MakeMaker: '0'
+  File::Spec: '0'
+  Test::More: '0.96'
+configure_requires:
+  ExtUtils::MakeMaker: '0'
+dynamic_config: 0
+generated_by: 'Dist::Zilla version 5.043, CPAN::Meta::Converter version 2.150005'
+license: perl
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: '1.4'
+name: Blah-Blieh
+requires:
+  List::Util: '0'
+  Params::Util: '0'
+  Sub::Install: '0.921'
+  strict: '0'
+  warnings: '0'
+resources:
+  bugtracker: https://github.com/example/Blah/issues
+  homepage: https://github.com/example/Blah
+  repository: https://github.com/example/Blah.git
+version: '0.110'
+x_Dist_Zilla:
+  perl:
+    version: '5.023008'
+  plugins:
+    -
+      class: Dist::Zilla::Plugin::Git::GatherDir
+      config:
+        Dist::Zilla::Plugin::GatherDir:
+          exclude_filename: []
+          exclude_match: []
+          follow_symlinks: 0
+          include_dotfiles: 0
+          prefix: ''
+          prune_directory: []
+          root: .
+        Dist::Zilla::Plugin::Git::GatherDir:
+          include_untracked: 0
+      name: '@RJBS/Git::GatherDir'
+      version: '2.036'
+    -
+      class: Dist::Zilla::Plugin::PromptIfStale
+      config:
+        Dist::Zilla::Plugin::PromptIfStale:
+          check_all_plugins: 1
+          check_all_prereqs: 0
+          modules: []
+          phase: release
+          skip: []
+      name: '@RJBS/CPAN-Outdated'
+      version: '0.047'
+    -
+      class: Dist::Zilla::Plugin::MakeMaker
+      config:
+        Dist::Zilla::Role::TestRunner:
+          default_jobs: 9
+      name: '@RJBS/MakeMaker'
+      version: '5.043'
+    -
+      class: Dist::Zilla::Plugin::AutoPrereqs
+      name: '@RJBS/AutoPrereqs'
+      version: '5.043'
+    -
+      class: Dist::Zilla::Plugin::Prereqs
+      config:
+        Dist::Zilla::Plugin::Prereqs:
+          phase: test
+          type: requires
+      name: '@RJBS/TestMoreWithSubtests'
+      version: '5.043'
+    -
+      class: Dist::Zilla::Plugin::PodWeaver
+      config:
+        Dist::Zilla::Plugin::PodWeaver:
+          config_plugins:
+            - '@RJBS'
+          finder:
+            - ':InstallModules'
+            - ':ExecFiles'
+          plugins:
+            -
+              class: Pod::Weaver::Section::Legal
+              name: '@RJBS/Legal'
+              version: '4.012'
+            -
+              class: Pod::Weaver::Plugin::Transformer
+              name: '@RJBS/List'
+              version: '4.012'
+      name: '@RJBS/PodWeaver'
+      version: '4.006'
+    -
+      class: Dist::Zilla::Plugin::GithubMeta
+      name: '@RJBS/GithubMeta'
+      version: '0.54'
+    -
+      class: Dist::Zilla::Plugin::Git::Check
+      config:
+        Dist::Zilla::Plugin::Git::Check:
+          untracked_files: die
+        Dist::Zilla::Role::Git::DirtyFiles:
+          allow_dirty:
+            - Changes
+            - dist.ini
+          allow_dirty_match: []
+          changelog: Changes
+        Dist::Zilla::Role::Git::Repo:
+          repo_root: .
+      name: '@RJBS/@Git/Check'
+      version: '2.036'
+    -
+      class: Dist::Zilla::Plugin::Git::Commit
+      config:
+        Dist::Zilla::Plugin::Git::Commit:
+          add_files_in: []
+          commit_msg: v%v%n%n%c
+        Dist::Zilla::Role::Git::DirtyFiles:
+          allow_dirty:
+            - Changes
+            - dist.ini
+          allow_dirty_match: []
+          changelog: Changes
+        Dist::Zilla::Role::Git::Repo:
+          repo_root: .
+        Dist::Zilla::Role::Git::StringFormatter:
+          time_zone: local
+      name: '@RJBS/@Git/Commit'
+      version: '2.036'
+    -
+      class: Dist::Zilla::Plugin::Git::Tag
+      config:
+        Dist::Zilla::Plugin::Git::Tag:
+          branch: ~
+          changelog: Changes
+          signed: 0
+          tag: '0.110'
+          tag_format: '%v'
+          tag_message: v%v
+        Dist::Zilla::Role::Git::Repo:
+          repo_root: .
+        Dist::Zilla::Role::Git::StringFormatter:
+          time_zone: local
+      name: '@RJBS/@Git/Tag'
+      version: '2.036'
+    -
+      class: Dist::Zilla::Plugin::Git::Push
+      config:
+        Dist::Zilla::Plugin::Git::Push:
+          push_to:
+            - 'origin :'
+            - 'github :'
+          remotes_must_exist: 0
+        Dist::Zilla::Role::Git::Repo:
+          repo_root: .
+      name: '@RJBS/@Git/Push'
+      version: '2.036'
+    -
+      class: Dist::Zilla::Plugin::Git::Contributors
+      config:
+        Dist::Zilla::Plugin::Git::Contributors:
+          include_authors: 0
+          include_releaser: 1
+          order_by: name
+          paths:
+            - .
+      name: '@RJBS/Git::Contributors'
+      version: '0.020'
+    -
+      class: Dist::Zilla::Plugin::FinderCode
+      name: ':ShareFiles'
+      version: '5.043'
+    -
+      class: Dist::Zilla::Plugin::FinderCode
+      name: ':MainModule'
+      version: '5.043'
+    -
+      class: Dist::Zilla::Plugin::FinderCode
+      name: ':AllFiles'
+      version: '5.043'
+    -
+      class: Dist::Zilla::Plugin::FinderCode
+      name: ':NoFiles'
+      version: '5.043'
+  zilla:
+    class: Dist::Zilla::Dist::Builder
+    config:
+      is_trial: '0'
+    version: '5.043'
+x_contributors:
+  - 'Contributor 1 <contrib1@cpan.org>'
+  - 'Contributor 2 <contrib2@cpan.org>'

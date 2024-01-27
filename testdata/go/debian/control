@@ -1,0 +1,17 @@
+Source: golang-github-blah-blah
+Section: devel
+Priority: optional
+Standards-Version: 4.2.0
+Maintainer: Some Maintainer <example@example.com>
+Build-Depends: debhelper (>= 11~),
+               dh-golang,
+               golang-any
+XS-Go-Import-Path: github.com/blah/blah
+Testsuite: autopkgtest-pkg-go
+
+Package: golang-github-blah-blah
+Architecture: all
+Depends: ${misc:Depends}
+Description: blah blah
+ blah blah
+

@@ -1,0 +1,9 @@
+{"Bug-Database": "https://github.com/blah/blah/issues",
+ "Bug-Submit": "https://github.com/blah/blah/issues/new",
+ "Homepage": "https://github.com/blah/blah",
+ "Name": "blah",
+ "Go-Import-Path": "github.com/blah/blah",
+ "Repository": "https://github.com/blah/blah.git",
+ "Repository-Browse": "https://github.com/blah/blah",
+ "Description": "blah blah",
+ "Summary": "blah blah"}

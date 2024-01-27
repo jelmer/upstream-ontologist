@@ -1,0 +1,25 @@
+[package]
+name = "upstream-ontologist-py"
+version = "0.0.0"
+authors = ["Jelmer Vernooĳ <jelmer@jelmer.uk>"]
+edition = "2018"
+license = "Apache-2.0"
+repository = "https://github.com/jelmer/upstream-ontologist.git"
+homepage = "https://github.com/jelmer/upstream-ontologist"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+upstream-ontologist = { path = ".." }
+pyo3 = { workspace = true, features = ["extension-module"] }
+pyo3-log = { workspace = true }
+reqwest = { version = "^0.11", features=["blocking", "json"], default-features = false }
+url = "2.2"
+serde_json = "1"
+log = "0.4"
+
+[features]
+default = []
+default-tls = ["upstream-ontologist/default-tls", "reqwest/default-tls"]
+rustls-tls = ["upstream-ontologist/rustls-tls", "reqwest/rustls-tls"]

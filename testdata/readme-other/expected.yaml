@@ -1,0 +1,7 @@
+{"Bug-Database": "https://github.com/blah/blah/issues",
+ "Bug-Submit": "https://github.com/blah/blah/issues/new",
+ "Homepage": "https://github.com/blah/blah",
+ "Name": "readme-other",
+ "Repository": "https://github.com/blah/blah.git",
+ "Repository-Browse": "https://github.com/blah/blah",
+ "Description": "This is a project. One of the dependencies is blah, which you can install from:\n\nhttps://github.com/blah/blah.git\n"}

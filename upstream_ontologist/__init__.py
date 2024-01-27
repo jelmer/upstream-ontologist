@@ -36,14 +36,14 @@ Supported fields:
 - Security-Contact
 
 Extensions for upstream-ontologist.
-- X-SourceForge-Project: Name of the SourceForge project
-- X-Wiki: URL to a wiki
-- X-Summary: A one-line description
-- X-Description: Multi-line description
-- X-License: Short description of the license
-- X-Copyright
-- X-Maintainer
-- X-Authors
+- SourceForge-Project: Name of the SourceForge project
+- Wiki: URL to a wiki
+- Summary: A one-line description
+- Description: Multi-line description
+- License: Short description of the license
+- Copyright
+- Maintainer
+- Authors
 
 Supported, but currently not set.
 - FAQ
@@ -53,11 +53,10 @@ Supported, but currently not set.
 - Webservice
 """
 
-import os
 from typing import Optional, Sequence, TypeVar, Generic, List
 from dataclasses import dataclass
 from email.utils import parseaddr
-from urllib.parse import urlparse
+import ruamel.yaml
 
 
 try:
@@ -66,17 +65,25 @@ except ImportError:
     from typing_extensions import TypedDict  # type: ignore
 
 
+from . import _upstream_ontologist
+
+
 SUPPORTED_CERTAINTIES = ["certain", "confident", "likely", "possible", None]
 
-version_string = "0.1.35"
+version_string = "0.1.36"
 
 USER_AGENT = "upstream-ontologist/" + version_string
 # Too aggressive?
 DEFAULT_URLLIB_TIMEOUT = 3
 
 
+yaml = ruamel.yaml.YAML(typ='safe')
+
+
 @dataclass
+@yaml.register_class
 class Person:
+    yaml_tag = '!Person'
 
     name: str
     email: Optional[str] = None
@@ -90,6 +97,16 @@ class Person:
             self.url = None
         else:
             self.url = url
+
+    @classmethod
+    def from_yaml(cls, constructor, node):
+        d = {}
+        for k, v in node.value:
+            d[k.value] = v.value
+        return cls(
+            name=d.get('name'),
+            email=d.get('email'),
+            url=d.get('url'))
 
     @classmethod
     def from_string(cls, text):
@@ -116,7 +133,7 @@ class Person:
 
     def __str__(self):
         if self.email:
-            return '{} <{}>'.format(self.name, self.email)
+            return f'{self.name} <{self.email}>'
         return self.name
 
 
@@ -171,7 +188,7 @@ UpstreamMetadata = TypedDict('UpstreamMetadata', {
     'Contact': UpstreamDatum[str],
     'Repository': UpstreamDatum[str],
     'Repository-Browse': UpstreamDatum[str],
-    'X-Summary': UpstreamDatum[str],
+    'Summary': UpstreamDatum[str],
     'Bug-Database': UpstreamDatum[str],
     'Bug-Submit': UpstreamDatum[str],
     'Homepage': UpstreamDatum[str],
@@ -236,24 +253,7 @@ def certainty_sufficient(
     return actual_confidence <= minimum_confidence
 
 
-def _load_json_url(http_url: str, timeout: int = DEFAULT_URLLIB_TIMEOUT):
-    from urllib.request import urlopen, Request
-    import json
-    headers = {
-        'User-Agent': USER_AGENT,
-        'Accept': 'application/json',
-    }
-    if urlparse(http_url).hostname in (
-            'github.com', 'raw.githubusercontent.com'):
-        try:
-            headers['WWW-Authenticate'] = 'Bearer %s' % (
-                os.environ['GITHUB_TOKEN'])
-        except KeyError:
-            pass
-    http_contents = urlopen(
-        Request(http_url, headers=headers),
-        timeout=timeout).read()
-    return json.loads(http_contents)
+_load_json_url = _upstream_ontologist.load_json_url  # noqa: F401
 
 
 class UrlUnverifiable(Exception):

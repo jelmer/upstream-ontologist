@@ -1,0 +1,26 @@
+<package format="2">
+  <name>blah</name>
+  <version>1.12.4</version>
+  <description>
+     This package does something
+  </description>
+
+  <author email="author1@example.com">Author 1</author>
+  <author email="author2@example.com">Author 2</author>
+  <maintainer email="maintainer@example.com">Maintainer 1</maintainer>
+  <maintainer email="maintainer2@example.com">Other maintainer</maintainer>
+
+  <license>BSD</license>
+
+  <url type="website">http://website.example.com/</url>
+  <url type="repository">https://github.com/example/repo</url>
+  <url type="bugtracker">https://github.com/example/tracker/issues</url>
+
+  <buildtool_depend version_gte="0.5.68">catkin</buildtool_depend>
+
+  <depend>curl</depend>
+  <depend>boost</depend>
+
+  <exec_depend>python-rospkg</exec_depend>
+
+</package>

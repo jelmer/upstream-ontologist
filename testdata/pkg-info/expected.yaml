@@ -1,0 +1,13 @@
+Name: swh.loader.git
+Version: 2.1.1.dev2+g0002d5a.d20230125
+Summary: Software Heritage git loader
+Homepage: https://forge.softwareheritage.org/diffusion/DLDG/
+Author:
+ - !Person
+   name: Software Heritage developers
+   email: swh-devel@inria.fr
+Bug-Database: https://forge.softwareheritage.org/maniphest
+Funding: https://www.softwareheritage.org/donate
+Repository: https://forge.softwareheritage.org/source/swh-loader-git
+Documentation: https://docs.softwareheritage.org/devel/swh-loader-git/
+Description: "The Software Heritage Git Loader is a tool and a library to walk a local\nGit repository and inject into the SWH dataset all contained files that\nweren't known before.\n\nThe main entry points are:\n\n* \n:class:swh.loader.git.loader.GitLoader for the main loader which can ingest either\n  local or remote git repository's contents. This is the main implementation deployed in\n  production.\n\n* \n:class:swh.loader.git.from_disk.GitLoaderFromDisk which ingests only local git clone\n  repository.\n\n* \n:class:swh.loader.git.loader.GitLoaderFromArchive which ingests a git repository\n  wrapped in an archive.\n\n"

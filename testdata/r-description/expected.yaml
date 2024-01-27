@@ -1,0 +1,20 @@
+Archive: CRAN
+Bug-Database: https://github.com/tidyverse/readxl/issues
+Bug-Submit: https://github.com/tidyverse/readxl/issues/new
+Contact: Jennifer Bryan <jenny@rstudio.com>
+Homepage: https://github.com/tidyverse/readxl
+Name: readxl
+Repository: https://github.com/tidyverse/readxl.git
+Repository-Browse: https://github.com/tidyverse/readxl
+Description: |-
+ Import excel files into R. Supports '.xls' via the
+ embedded 'libxls' C library <https://github.com/libxls/libxls> and
+ '.xlsx' via the embedded 'RapidXML' C++ library
+ <http://rapidxml.sourceforge.net>.  Works on Windows, Mac and Linux
+ without external dependencies.
+License: GPL-3
+Maintainer: !Person
+  name: Jennifer Bryan
+  email: jenny@rstudio.com
+Summary: Read Excel Files
+Version: 1.3.1

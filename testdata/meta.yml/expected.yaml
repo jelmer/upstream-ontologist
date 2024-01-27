@@ -1,0 +1,8 @@
+{"Bug-Database": "https://github.com/example/Blah/issues",
+ "Bug-Submit": "https://github.com/example/Blah/issues/new",
+ "Homepage": "https://github.com/example/Blah",
+ "Name": "Blah-Blieh",
+ "Repository": "https://github.com/example/Blah.git",
+ "Repository-Browse": "https://github.com/example/Blah",
+ "License": "perl",
+ "Version": "0.110"}

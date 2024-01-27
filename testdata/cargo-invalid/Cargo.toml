@@ -1,0 +1,23 @@
+[package]
+name = "something"
+version = "0.1.0"
+homepage = http://www.example.com/something
+authors = ["Somebody <somebody@example.com>"]
+edition = "2018"
+default-run = "test"
+description = "Something something"
+license = "Apache-2.0"
+
+[dependencies]
+tokio = { version = "0.2", features = ["full"] }
+async-std = { version = "", features = ["unstable"] }
+rand = ""
+futures = ""
+mio = { version = "0.6.20" }
+rusqlite = { version = "0.23.0" }
+tokio-util = { version="", features= ["codec"] }
+bytes = ""
+
+[lib]
+name = "something"
+path = "src/lib.rs"

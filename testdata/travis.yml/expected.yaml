@@ -1,0 +1,2 @@
+Name: travis.yml
+Go-Import-Path: github.com/ethereum/go-ethereum

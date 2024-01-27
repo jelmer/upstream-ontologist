@@ -1,0 +1,15 @@
+Name: phalcon
+Summary: Phalcon is a full stack PHP framework offering low resource consumption
+  and high performance
+Description: |2-
+
+      Phalcon is an open source full stack framework for PHP, written as a C-extension. Phalcon is optimized for high
+      performance. Its unique architecture allows the framework to always be memory resident, offering its functionality
+      whenever its needed, without expensive file stats and file reads that traditional PHP frameworks employ.
+    
+Version: 5.1.4
+License: BSD 3-Clause License
+Maintainer: !Person
+  name: Anton Vasiliev
+  email: anton@phalcon.io
+Contact: Anton Vasiliev <anton@phalcon.io>

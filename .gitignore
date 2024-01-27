@@ -7,3 +7,9 @@ dist
 upstream_ontologist.egg-info
 .eggs
 .tox
+.coverage
+htmlcov
+target
+*.swp
+src/vcs.rs
+upstream_ontologist/_upstream_ontologist.*.so

@@ -1,0 +1,12 @@
+Name: jekyll
+License: MIT
+Summary: A simple, blog aware, static site generator
+Description: Jekyll is a simple, blog aware, static site generator.
+Author:
+- !Person
+  name: Tom Preston-Werner
+Homepage: http://github.com/jekyll/jekyll
+Repository: https://github.com/jekyll/jekyll.git
+Repository-Browse: https://github.com/jekyll/jekyll
+Bug-Database: https://github.com/jekyll/jekyll/issues
+Bug-Submit: https://github.com/jekyll/jekyll/issues/new

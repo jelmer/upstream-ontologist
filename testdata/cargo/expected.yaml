@@ -1,0 +1,14 @@
+Bug-Database: https://github.com/jelmer/example/issues
+Bug-Submit: https://github.com/jelmer/example/issues/new
+Homepage: http://www.example.com/something
+Name: something
+Repository: https://github.com/jelmer/example.git
+Repository-Browse: https://github.com/jelmer/example
+Author:
+ - !Person
+   name: Somebody
+   email: somebody@example.com
+Cargo-Crate: something
+License: Apache-2.0
+Summary: Something something
+Version: 0.1.0
