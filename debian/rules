@@ -7,3 +7,11 @@ export CARGO_HOME=$(shell pwd)/debian/cargo_home
 
 override_dh_auto_test:
 	python3 -m unittest tests.test_suite
+
+override_dh_auto_clean:
+	if test -f Cargo.lock.saved; then mv Cargo.lock.saved Cargo.lock; fi
+	dh_auto_clean
+
+override_dh_auto_build:
+	mv Cargo.lock Cargo.lock.saved
+	dh_auto_build
