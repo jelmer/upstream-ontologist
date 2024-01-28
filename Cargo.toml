@@ -109,5 +109,5 @@ version = ">=0.5"
 optional = true
 
 [workspace.dependencies]
-pyo3 = "0.19"
+pyo3 = "0.20"
 pyo3-log = "0.8"
