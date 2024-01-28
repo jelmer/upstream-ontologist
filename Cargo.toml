@@ -73,7 +73,7 @@ features = [ "blocking", "json",]
 default-features = false
 
 [dependencies.rust-ini]
-version = "0.19"
+version = "0.18"
 optional = true
 
 [dependencies.serde]
@@ -89,7 +89,7 @@ version = ">=0.20"
 optional = true
 
 [dependencies.distro-info]
-version = "0.3"
+version = "0.4"
 optional = true
 
 [dependencies.toml]
@@ -101,7 +101,7 @@ version = "0.14"
 optional = true
 
 [dependencies.pyproject-toml]
-version = "0.6"
+version = "0.7"
 optional = true
 
 [dependencies.python-pkginfo]

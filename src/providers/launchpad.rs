@@ -8,6 +8,7 @@ pub fn guess_from_launchpad(
     suite: Option<&str>,
 ) -> Option<Vec<UpstreamDatum>> {
     use distro_info::UbuntuDistroInfo;
+    use distro_info::DistroInfo;
     let distribution = distribution.unwrap_or("ubuntu");
     let suite = suite.map_or_else(
         || {
@@ -15,7 +16,7 @@ pub fn guess_from_launchpad(
                 let ubuntu = UbuntuDistroInfo::new().unwrap();
                 Some(
                     ubuntu
-                        .devel(chrono::Utc::now().date_naive())
+                        .ubuntu_devel(chrono::Utc::now().date_naive())
                         .last()?
                         .codename()
                         .clone(),
