@@ -1,6 +1,6 @@
 from typing import Iterator
 
-from upstream_ontologist import UpstreamDatum, UpstreamMetadata, UpstreamPackage
+from upstream_ontologist import UpstreamPackage
 
 def drop_vcs_in_scheme(url: str) -> str: ...
 def unsplit_vcs_url(repo_url: str, branch: str | None, subpath: str | None) -> str: ...
@@ -86,3 +86,36 @@ def guess_upstream_info(
 def get_upstream_info(
         path: str, trust_package: bool = False, net_access: bool | None = None, consult_external_directory: bool = True, check: bool = True
 ) -> UpstreamMetadata: ...
+
+def guess_upstream_metadata(
+    path: str, trust_package: bool = False, net_access: bool | None = None, consult_external_directory: bool = True, check: bool = True
+) -> dict[str, UpstreamDatum]: ...
+
+def guess_upstream_metadata_items(
+    path: str, trust_package: bool = False, net_access: bool | None = None, consult_external_directory: bool = True, check: bool = True
+) -> Iterator[tuple[str, UpstreamDatum]]: ...
+
+def check_upstream_metadata(
+    metadata: UpstreamMetadata, net_access: bool | None = None
+) -> None: ...
+
+def extend_upstream_metadata(
+    metadata: UpstreamMetadata,
+    path: str,
+    minimum_certainty: str = "possible",
+    net_access: bool | None = None,
+    consult_external_directory: bool = True,
+) -> None: ...
+
+def fix_upstream_metadata(
+    metadata: UpstreamMetadata,
+) -> None: ...
+
+def update_from_guesses(
+    metadata: UpstreamMetadata,
+    items: Iterator[UpstreamDatum]
+) -> None: ...
+
+class UpstreamMetadata: ...
+
+class UpstreamDatum: ...
