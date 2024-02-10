@@ -1717,6 +1717,29 @@ pub fn bug_database_url_from_bug_submit_url(url: &Url, net_access: Option<bool>)
     }
 }
 
+#[test]
+fn test_bug_database_url_from_bug_submit_url() {
+    let url = Url::parse("https://bugs.launchpad.net/bugs/+filebug").unwrap();
+    assert_eq!(
+        bug_database_url_from_bug_submit_url(&url, None).unwrap(),
+        Url::parse("https://bugs.launchpad.net/bugs").unwrap()
+    );
+
+    let url = Url::parse("https://github.com/dulwich/dulwich/issues/new").unwrap();
+
+    assert_eq!(
+        bug_database_url_from_bug_submit_url(&url, None).unwrap(),
+        Url::parse("https://github.com/dulwich/dulwich/issues").unwrap()
+    );
+
+    let url = Url::parse("https://sourceforge.net/p/dulwich/bugs/new").unwrap();
+
+    assert_eq!(
+        bug_database_url_from_bug_submit_url(&url, None).unwrap(),
+        Url::parse("https://sourceforge.net/p/dulwich/bugs").unwrap()
+    );
+}
+
 pub fn guess_bug_database_url_from_repo_url(url: &Url, net_access: Option<bool>) -> Option<Url> {
     if let Some(forge) = find_forge(url, net_access) {
         forge.bug_database_url_from_repo_url(url)

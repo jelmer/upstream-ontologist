@@ -20,7 +20,6 @@ import unittest
 
 def test_suite():
     names = [
-        "upstream_ontologist",
         "vcs",
     ]
     module_names = [__name__ + ".test_" + name for name in names]

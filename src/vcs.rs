@@ -604,6 +604,50 @@ pub fn guess_repo_from_url(url: &url::Url, net_access: Option<bool>) -> Option<S
     }
 }
 
+#[test]
+fn test_guess_repo_url() {
+    assert_eq!(
+            Some("https://github.com/jelmer/blah".to_string()),
+            guess_repo_from_url(&"https://github.com/jelmer/blah".parse().unwrap(), Some(false)));
+
+    assert_eq!(
+            Some("https://github.com/jelmer/blah".to_string()),
+        guess_repo_from_url(&"https://github.com/jelmer/blah/blob/README".parse().unwrap(), Some(false))
+    );
+    assert_eq!(
+            None, guess_repo_from_url(&"https://github.com/jelmer".parse().unwrap(), Some(false)));
+
+    assert_eq!(
+            None, guess_repo_from_url(&"https://www.jelmer.uk/".parse().unwrap(), Some(false)));
+
+    assert_eq!(
+        Some("http://code.launchpad.net/blah".to_string()),
+        guess_repo_from_url(&"http://code.launchpad.net/blah".parse().unwrap(), Some(false)),
+    );
+
+    assert_eq!(
+        Some("https://code.launchpad.net/bzr".to_string()),
+        guess_repo_from_url(&"http://launchpad.net/bzr/+download".parse().unwrap(), Some(false)),
+    );
+
+    assert_eq!(
+        Some("https://git.savannah.gnu.org/git/auctex.git".to_string()),
+        guess_repo_from_url(&"https://git.savannah.gnu.org/git/auctex.git".parse().unwrap(), Some(false)),
+    );
+
+    assert_eq!(
+        None,
+        guess_repo_from_url(&"https://git.savannah.gnu.org/blah/auctex.git".parse().unwrap(), Some(false)),
+    );
+
+    assert_eq!(
+        Some("https://bitbucket.org/fenics-project/dolfin".to_string()),
+        guess_repo_from_url(
+            &"https://bitbucket.org/fenics-project/dolfin/downloads/".parse().unwrap(), Some(false)
+        ),
+    );
+}
+
 pub fn canonical_git_repo_url(repo_url: &Url, net_access: Option<bool>) -> Option<Url> {
     if let Some(hostname) = repo_url.host_str() {
         if (is_gitlab_site(hostname, net_access) || hostname == "github.com")

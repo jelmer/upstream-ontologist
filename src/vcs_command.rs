@@ -88,6 +88,30 @@ fn test_url_from_git_clone_command() {
         url_from_git_clone_command(b"git clone https://github.com/foo/bar foo"),
         Some("https://github.com/foo/bar".to_string())
     );
+
+    assert_eq!(
+        Some("https://github.com/jelmer/blah".to_string()),
+        url_from_git_clone_command(b"git clone https://github.com/jelmer/blah"),
+    );
+
+    assert_eq!(
+        Some("https://github.com/jelmer/blah".to_string()),
+        url_from_git_clone_command(
+            b"git clone https://github.com/jelmer/blah target"
+        ),
+    );
+
+    assert_eq!(
+        Some("https://github.com/jelmer/blah".to_string()),
+        url_from_git_clone_command(
+            b"git clone -b foo https://github.com/jelmer/blah target"
+        ),
+    );
+
+    assert_eq!(
+        None,
+        url_from_git_clone_command(
+            b"git ls-tree"));
 }
 
 pub fn url_from_fossil_clone_command(command: &[u8]) -> Option<String> {
@@ -116,6 +140,16 @@ pub fn url_from_fossil_clone_command(command: &[u8]) -> Option<String> {
     } else {
         None
     }
+}
+
+#[test]
+fn test_url_from_fossil_clone_command() {
+    assert_eq!(
+        Some("https://example.com/repo/blah".to_string()),
+        url_from_fossil_clone_command(
+            b"fossil clone https://example.com/repo/blah blah.fossil"
+        ),
+    );
 }
 
 pub fn url_from_cvs_co_command(command: &[u8]) -> Option<String> {
