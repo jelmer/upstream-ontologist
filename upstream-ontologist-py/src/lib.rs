@@ -848,6 +848,12 @@ fn guess_upstream_metadata(
     ))
 }
 
+#[pyfunction]
+fn fix_upstream_metadata(metadata: &mut UpstreamMetadata) -> PyResult<()> {
+    upstream_ontologist::fix_upstream_metadata(&mut metadata.0);
+    Ok(())
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -882,6 +888,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(check_upstream_metadata))?;
     m.add_wrapped(wrap_pyfunction!(extend_upstream_metadata))?;
     m.add_wrapped(wrap_pyfunction!(guess_upstream_metadata))?;
+    m.add_wrapped(wrap_pyfunction!(fix_upstream_metadata))?;
     let debianm = PyModule::new(py, "debian")?;
     debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_source_name))?;
     debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_binary_name))?;

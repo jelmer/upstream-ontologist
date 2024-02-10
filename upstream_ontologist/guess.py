@@ -96,3 +96,5 @@ def filter_bad_guesses(
     guesses: Iterable[UpstreamDatum],
 ) -> Iterator[UpstreamDatum]:
     return (guess for guess in guesses if not known_bad_guess(guess))
+
+fix_upstream_metadata = _upstream_ontologist.fix_upstream_metadata
