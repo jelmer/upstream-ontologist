@@ -85,3 +85,14 @@ check_bug_submit_url_canonical = _upstream_ontologist.check_bug_submit_url_canon
 check_url_canonical = _upstream_ontologist.check_url_canonical
 
 get_upstream_info = _upstream_ontologist.get_upstream_info
+guess_upstream_metadata = _upstream_ontologist.guess_upstream_metadata
+guess_upstream_metadata_items = _upstream_ontologist.guess_upstream_metadata_items
+known_bad_guess = _upstream_ontologist.known_bad_guess
+check_upstream_metadata = _upstream_ontologist.check_upstream_metadata
+extend_upstream_metadata = _upstream_ontologist.extend_upstream_metadata
+fix_upstream_metadata = _upstream_ontologist.fix_upstream_metadata
+update_from_guesses = _upstream_ontologist.update_from_guesses
+
+
+def filter_bad_guesses(items):
+    return list(filter(lambda x: not known_bad_guess(x), items))

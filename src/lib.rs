@@ -33,6 +33,22 @@ pub enum Certainty {
     Certain,
 }
 
+impl pyo3::FromPyObject<'_> for Certainty {
+    fn extract(ob: &PyAny) -> PyResult<Self> {
+        if let Ok(s) = ob.extract::<String>() {
+            Ok(Certainty::from_str(&s).unwrap())
+        } else {
+            Err(PyTypeError::new_err("expected str"))
+        }
+    }
+}
+
+impl pyo3::ToPyObject for Certainty {
+    fn to_object(&self, py: Python) -> PyObject {
+        self.to_string().to_object(py)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Origin {
     Path(PathBuf),
@@ -819,30 +835,6 @@ impl serde::ser::Serialize for UpstreamMetadata {
     }
 }
 
-impl ToPyObject for UpstreamDatumWithMetadata {
-    fn to_object(&self, py: Python) -> PyObject {
-        let m = PyModule::import(py, "upstream_ontologist.guess").unwrap();
-
-        let cls = m.getattr("UpstreamDatum").unwrap();
-
-        let (field, py_datum) = self
-            .datum
-            .to_object(py)
-            .extract::<(String, PyObject)>(py)
-            .unwrap();
-
-        let kwargs = pyo3::types::PyDict::new(py);
-        kwargs
-            .set_item("certainty", self.certainty.map(|x| x.to_string()))
-            .unwrap();
-        kwargs.set_item("origin", self.origin.as_ref()).unwrap();
-
-        let datum = cls.call((field, py_datum), Some(kwargs)).unwrap();
-
-        datum.to_object(py)
-    }
-}
-
 impl serde::ser::Serialize for UpstreamDatumWithMetadata {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -1522,7 +1514,7 @@ fn set_datum(metadata: &mut Vec<UpstreamDatumWithMetadata>, datum: UpstreamDatum
     }
 }
 
-fn update_from_guesses(
+pub fn update_from_guesses(
     metadata: &mut Vec<UpstreamDatumWithMetadata>,
     new_items: impl Iterator<Item = UpstreamDatumWithMetadata>,
 ) -> Vec<UpstreamDatumWithMetadata> {
@@ -3179,7 +3171,7 @@ pub fn verify_screenshots(urls: &[&str]) -> Vec<(String, Option<bool>)> {
 /// Check upstream metadata.
 ///
 /// This will make network connections, etc.
-fn check_upstream_metadata(upstream_metadata: &mut UpstreamMetadata, version: Option<&str>) {
+pub fn check_upstream_metadata(upstream_metadata: &mut UpstreamMetadata, version: Option<&str>) {
     let repository = upstream_metadata.get_mut("Repository");
     if let Some(repository) = repository {
         match vcs::check_repository_url_canonical(repository.datum.to_url().unwrap(), version) {
