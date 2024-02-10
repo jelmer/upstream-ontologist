@@ -829,6 +829,25 @@ fn extend_upstream_metadata(
     Ok(())
 }
 
+#[pyfunction]
+fn guess_upstream_metadata(
+    path: std::path::PathBuf,
+    trust_package: Option<bool>,
+    net_access: Option<bool>,
+    consult_external_directory: Option<bool>,
+    check: Option<bool>,
+) -> PyResult<UpstreamMetadata> {
+    Ok(UpstreamMetadata(
+        upstream_ontologist::guess_upstream_metadata(
+            path.as_path(),
+            trust_package,
+            net_access,
+            consult_external_directory,
+            check,
+        )?,
+    ))
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -862,6 +881,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(fixup_rcp_style_git_repo_url))?;
     m.add_wrapped(wrap_pyfunction!(check_upstream_metadata))?;
     m.add_wrapped(wrap_pyfunction!(extend_upstream_metadata))?;
+    m.add_wrapped(wrap_pyfunction!(guess_upstream_metadata))?;
     let debianm = PyModule::new(py, "debian")?;
     debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_source_name))?;
     debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_binary_name))?;

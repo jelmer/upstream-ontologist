@@ -96,3 +96,10 @@ def extend_upstream_metadata(
     net_access: bool | None = None,
     consult_external_directory: bool = True,
 ) -> None: ...
+
+def guess_upstream_metadata(
+    path: str,
+    trust_package: bool | None = None,
+    net_access: bool | None = None,
+    consult_external_directory: bool | None = None,
+    check: bool | None = None) -> UpstreamMetadata: ...

@@ -88,3 +88,4 @@ get_upstream_info = _upstream_ontologist.get_upstream_info
 
 check_upstream_metadata = _upstream_ontologist.check_upstream_metadata
 extend_upstream_metadata = _upstream_ontologist.extend_upstream_metadata
+guess_upstream_metadata = _upstream_ontologist.guess_upstream_metadata
