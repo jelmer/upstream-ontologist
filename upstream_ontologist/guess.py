@@ -89,3 +89,10 @@ get_upstream_info = _upstream_ontologist.get_upstream_info
 check_upstream_metadata = _upstream_ontologist.check_upstream_metadata
 extend_upstream_metadata = _upstream_ontologist.extend_upstream_metadata
 guess_upstream_metadata = _upstream_ontologist.guess_upstream_metadata
+known_bad_guess = _upstream_ontologist.known_bad_guess
+
+
+def filter_bad_guesses(
+    guesses: Iterable[UpstreamDatum],
+) -> Iterator[UpstreamDatum]:
+    return (guess for guess in guesses if not known_bad_guess(guess))
