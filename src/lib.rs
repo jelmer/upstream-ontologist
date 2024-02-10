@@ -3202,7 +3202,7 @@ pub fn verify_screenshots(urls: &[&str]) -> Vec<(String, Option<bool>)> {
 /// Check upstream metadata.
 ///
 /// This will make network connections, etc.
-fn check_upstream_metadata(upstream_metadata: &mut UpstreamMetadata, version: Option<&str>) {
+pub fn check_upstream_metadata(upstream_metadata: &mut UpstreamMetadata, version: Option<&str>) {
     let repository = upstream_metadata.get_mut("Repository");
     if let Some(repository) = repository {
         match vcs::check_repository_url_canonical(repository.datum.to_url().unwrap(), version) {

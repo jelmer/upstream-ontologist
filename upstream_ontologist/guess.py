@@ -85,3 +85,5 @@ check_bug_submit_url_canonical = _upstream_ontologist.check_bug_submit_url_canon
 check_url_canonical = _upstream_ontologist.check_url_canonical
 
 get_upstream_info = _upstream_ontologist.get_upstream_info
+
+check_upstream_metadata = _upstream_ontologist.check_upstream_metadata

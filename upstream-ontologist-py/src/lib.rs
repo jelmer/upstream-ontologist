@@ -496,7 +496,7 @@ fn fixup_broken_git_details(
 
 #[derive(Clone)]
 #[pyclass]
-struct UpstreamDatum(upstream_ontologist::UpstreamDatumWithMetadata);
+struct UpstreamDatum(pub(crate) upstream_ontologist::UpstreamDatumWithMetadata);
 
 #[pymethods]
 impl UpstreamDatum {
@@ -670,7 +670,7 @@ impl UpstreamDatum {
 }
 
 #[pyclass]
-struct UpstreamMetadata(upstream_ontologist::UpstreamMetadata);
+struct UpstreamMetadata(pub(crate) upstream_ontologist::UpstreamMetadata);
 
 #[allow(non_snake_case)]
 #[pymethods]
@@ -799,6 +799,12 @@ fn get_upstream_info(
     Ok(ret)
 }
 
+#[pyfunction]
+fn check_upstream_metadata(metadata: &mut UpstreamMetadata) -> PyResult<()> {
+    upstream_ontologist::check_upstream_metadata(&mut metadata.0, None);
+    Ok(())
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -830,6 +836,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(check_bug_database_canonical))?;
     m.add_wrapped(wrap_pyfunction!(check_bug_submit_url_canonical))?;
     m.add_wrapped(wrap_pyfunction!(fixup_rcp_style_git_repo_url))?;
+    m.add_wrapped(wrap_pyfunction!(check_upstream_metadata))?;
     let debianm = PyModule::new(py, "debian")?;
     debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_source_name))?;
     debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_binary_name))?;
