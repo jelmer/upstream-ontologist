@@ -88,3 +88,11 @@ def guess_upstream_info(
 def get_upstream_info(
         path: str, trust_package: bool = False, net_access: bool | None = None, consult_external_directory: bool = True, check: bool = True
 ) -> UpstreamMetadata: ...
+
+def extend_upstream_metadata(
+    upstream_metadata: UpstreamMetadata,
+    path: str,
+    minimum_certainty: str,
+    net_access: bool | None = None,
+    consult_external_directory: bool = True,
+) -> None: ...

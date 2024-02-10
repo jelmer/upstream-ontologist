@@ -805,6 +805,30 @@ fn check_upstream_metadata(metadata: &mut UpstreamMetadata) -> PyResult<()> {
     Ok(())
 }
 
+#[pyfunction]
+fn extend_upstream_metadata(
+    metadata: &mut UpstreamMetadata,
+    path: std::path::PathBuf,
+    minimum_certainty: Option<String>,
+    net_access: Option<bool>,
+    consult_external_directory: Option<bool>,
+) -> PyResult<()> {
+    let minimum_certainty = minimum_certainty.map(|s| s.parse()).transpose().map_err(|e: String| {
+        PyValueError::new_err(format!(
+            "Invalid minimum_certainty: {}",
+            e.to_string()
+        ))
+    })?;
+    upstream_ontologist::extend_upstream_metadata(
+        &mut metadata.0,
+        path.as_path(),
+        minimum_certainty,
+        net_access,
+        consult_external_directory,
+    )?;
+    Ok(())
+}
+
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
@@ -837,6 +861,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(check_bug_submit_url_canonical))?;
     m.add_wrapped(wrap_pyfunction!(fixup_rcp_style_git_repo_url))?;
     m.add_wrapped(wrap_pyfunction!(check_upstream_metadata))?;
+    m.add_wrapped(wrap_pyfunction!(extend_upstream_metadata))?;
     let debianm = PyModule::new(py, "debian")?;
     debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_source_name))?;
     debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_binary_name))?;
