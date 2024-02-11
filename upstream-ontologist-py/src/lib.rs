@@ -1,13 +1,11 @@
 use pyo3::create_exception;
-use pyo3::exceptions::PyException;
-use pyo3::exceptions::{PyKeyError, PyRuntimeError, PyValueError};
+use pyo3::exceptions::{PyException, PyKeyError, PyRuntimeError, PyValueError, PyStopIteration};
 use pyo3::import_exception;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pyo3::types::PyTuple;
-use std::collections::HashMap;
 use std::str::FromStr;
-use upstream_ontologist::{CanonicalizeError, Origin, UpstreamPackage, Certainty};
+use upstream_ontologist::{CanonicalizeError, Origin, UpstreamPackage};
 use url::Url;
 
 import_exception!(urllib.error, HTTPError);
@@ -410,14 +408,15 @@ fn check_bug_submit_url_canonical(url: &str, net_access: Option<bool>) -> PyResu
 }
 
 #[pyfunction]
-fn known_bad_guess(datum: UpstreamDatum) -> PyResult<bool> {
-    Ok(datum.0.datum.known_bad_guess())
+fn known_bad_guess(py: Python, datum: PyObject) -> PyResult<bool> {
+    let datum: upstream_ontologist::UpstreamDatum = datum.extract(py)?;
+    Ok(datum.known_bad_guess())
 }
 
 #[pyfunction(name = "skip_paragraph")]
-fn readme_skip_paragraph(py: Python, para: &str) -> PyResult<(bool, Vec<UpstreamDatum>)> {
+fn readme_skip_paragraph(py: Python, para: &str) -> PyResult<(bool, PyObject)> {
     let (skip, para) = upstream_ontologist::readme::skip_paragraph(para);
-    Ok((skip, para.into_iter().map(UpstreamDatum).collect()))
+    Ok((skip, para.to_object(py)))
 }
 
 #[pyfunction]
@@ -496,7 +495,7 @@ fn fixup_broken_git_details(
 
 #[derive(Clone)]
 #[pyclass]
-struct UpstreamDatum(upstream_ontologist::UpstreamDatumWithMetadata);
+struct UpstreamDatum(pub(crate) upstream_ontologist::UpstreamDatumWithMetadata);
 
 #[pymethods]
 impl UpstreamDatum {
@@ -598,7 +597,7 @@ impl UpstreamDatum {
                 _ => panic!("Unknown field: {}", field),
             },
             origin,
-            certainty: certainty.map(|s| Certainty::from_str(&s).unwrap()),
+            certainty: certainty.map(|s| upstream_ontologist::Certainty::from_str(&s).unwrap()),
         })
     }
 
@@ -609,8 +608,8 @@ impl UpstreamDatum {
 
     #[getter]
     fn value(&self, py: Python) -> PyResult<PyObject> {
-        let value = self.0.datum.to_object(py);
-        assert!(value.as_ref(py).is_instance_of::<PyTuple>());
+        let value = self.0.datum.to_object(py).extract::<(String, PyObject)>(py).unwrap().1;
+        assert!(!value.as_ref(py).is_instance_of::<PyTuple>());
         Ok(value)
     }
 
@@ -670,7 +669,7 @@ impl UpstreamDatum {
 }
 
 #[pyclass]
-struct UpstreamMetadata(upstream_ontologist::UpstreamMetadata);
+struct UpstreamMetadata(pub(crate) upstream_ontologist::UpstreamMetadata);
 
 #[allow(non_snake_case)]
 #[pymethods]
@@ -680,6 +679,11 @@ impl UpstreamMetadata {
             .get(&field)
             .map(|datum| UpstreamDatum(datum.clone()))
             .ok_or_else(|| PyKeyError::new_err(format!("No such field: {}", field)))
+    }
+
+    fn __delitem__(&mut self, field: &str) -> PyResult<()> {
+        self.0.remove(&field);
+        Ok(())
     }
 
     pub fn items(&self) -> Vec<(String, UpstreamDatum)> {
@@ -692,6 +696,10 @@ impl UpstreamMetadata {
                 )
             })
             .collect()
+    }
+
+    pub fn values(&self) -> Vec<UpstreamDatum> {
+        self.0.iter().map(|datum| UpstreamDatum(datum.clone())).collect()
     }
 
     pub fn get(&self, py: Python, field: &str, default: Option<PyObject>) -> PyObject {
@@ -711,18 +719,18 @@ impl UpstreamMetadata {
     }
 
     #[new]
-    fn new(py: Python, items: Option<HashMap<String, PyObject>>) -> Self {
-        let mut metadata = upstream_ontologist::UpstreamMetadata::new();
+    #[pyo3(signature = (**kwargs))]
+    fn new(kwargs: Option<&PyDict>) -> Self {
+        let mut ret = UpstreamMetadata(upstream_ontologist::UpstreamMetadata::new());
 
-        if let Some(items) = items {
-            for (field, value) in items {
-                let datum = value.extract::<UpstreamDatum>(py).unwrap();
-                assert_eq!(field, datum.0.datum.field());
-                metadata.insert(datum.0);
+        if let Some(kwargs) = kwargs {
+            for item in kwargs.items() {
+                let datum = item.extract::<UpstreamDatum>().unwrap();
+                ret.0.insert(datum.0);
             }
         }
 
-        UpstreamMetadata(metadata)
+        ret
     }
 
     pub fn __iter__(slf: PyRef<Self>) -> PyResult<PyObject> {
@@ -748,7 +756,7 @@ fn guess_upstream_info(
     py: Python,
     path: std::path::PathBuf,
     trust_package: Option<bool>,
-) -> PyResult<Vec<UpstreamDatum>> {
+) -> PyResult<Vec<PyObject>> {
     let mut result = Vec::new();
 
     for datum in upstream_ontologist::guess_upstream_info(&path, trust_package) {
@@ -759,7 +767,7 @@ fn guess_upstream_info(
                 continue;
             }
         };
-        result.push(UpstreamDatum(datum));
+        result.push(datum.to_object(py));
     }
 
     Ok(result)
@@ -774,7 +782,7 @@ fn description_from_readme_md(
         upstream_ontologist::readme::description_from_readme_md(contents)?;
     let metadata = metadata
         .into_iter()
-        .map(|datum| UpstreamDatum(datum).into_py(py))
+        .map(|datum| datum.to_object(py))
         .collect();
     Ok((description, metadata))
 }
@@ -796,70 +804,22 @@ fn get_upstream_info(
         check,
     )?;
     let ret = PyDict::new(py);
-    for datum in metadata.into_iter() {
+    for datum in metadata.iter() {
         ret.set_item(
-            datum.datum.field().clone(),
-            UpstreamDatum(datum).into_py(py),
+            datum.datum.field(),
+            datum
+                .datum
+                .to_object(py)
+                .extract::<(String, PyObject)>(py)?
+                .1,
         )?;
     }
     Ok(ret)
 }
 
 #[pyfunction]
-fn guess_upstream_metadata(
-    py: Python,
-    path: std::path::PathBuf,
-    trust_package: Option<bool>,
-    net_access: Option<bool>,
-    consult_external_directory: Option<bool>,
-    check: Option<bool>,
-) -> PyResult<&PyDict> {
-    let metadata = upstream_ontologist::guess_upstream_metadata(
-        path.as_path(),
-        trust_package,
-        net_access,
-        consult_external_directory,
-        check,
-    )?;
-    let ret = PyDict::new(py);
-    for datum in metadata.into_iter() {
-        ret.set_item(
-            datum.datum.field().clone(),
-            UpstreamDatum(datum).into_py(py),
-        )?;
-    }
-    Ok(ret)
-}
-
-#[pyfunction]
-fn guess_upstream_metadata_items(
-    path: std::path::PathBuf,
-    trust_package: Option<bool>,
-    minimum_certainty: Option<Certainty>,
-) -> PyResult<Vec<UpstreamDatum>> {
-    let metadata = upstream_ontologist::guess_upstream_metadata_items(
-        path.as_path(),
-        trust_package,
-        minimum_certainty,
-    );
-    let mut ret = Vec::new();
-    for item in metadata {
-        ret.push(
-            UpstreamDatum(item?)
-        );
-    }
-    Ok(ret)
-}
-
-#[pyfunction]
-fn check_upstream_metadata(metadata: &mut UpstreamMetadata, version: Option<&str>) -> PyResult<()> {
-    upstream_ontologist::check_upstream_metadata(&mut metadata.0, version);
-    Ok(())
-}
-
-#[pyfunction]
-fn fix_upstream_metadata(metadata: &mut UpstreamMetadata) -> PyResult<()> {
-    upstream_ontologist::fix_upstream_metadata(&mut metadata.0);
+fn check_upstream_metadata(metadata: &mut UpstreamMetadata) -> PyResult<()> {
+    upstream_ontologist::check_upstream_metadata(&mut metadata.0, None);
     Ok(())
 }
 
@@ -867,10 +827,16 @@ fn fix_upstream_metadata(metadata: &mut UpstreamMetadata) -> PyResult<()> {
 fn extend_upstream_metadata(
     metadata: &mut UpstreamMetadata,
     path: std::path::PathBuf,
-    minimum_certainty: Option<Certainty>,
+    minimum_certainty: Option<String>,
     net_access: Option<bool>,
     consult_external_directory: Option<bool>,
 ) -> PyResult<()> {
+    let minimum_certainty = minimum_certainty.map(|s| s.parse()).transpose().map_err(|e: String| {
+        PyValueError::new_err(format!(
+            "Invalid minimum_certainty: {}",
+            e.to_string()
+        ))
+    })?;
     upstream_ontologist::extend_upstream_metadata(
         &mut metadata.0,
         path.as_path(),
@@ -882,11 +848,77 @@ fn extend_upstream_metadata(
 }
 
 #[pyfunction]
-fn update_from_guesses(
-    metadata: &mut UpstreamMetadata,
-    items: Vec<UpstreamDatum>) -> PyResult<()> {
-    upstream_ontologist::update_from_guesses(&mut metadata.0.mut_items(), items.into_iter().map(|item| item.0));
+fn guess_upstream_metadata(
+    path: std::path::PathBuf,
+    trust_package: Option<bool>,
+    net_access: Option<bool>,
+    consult_external_directory: Option<bool>,
+    check: Option<bool>,
+) -> PyResult<UpstreamMetadata> {
+    Ok(UpstreamMetadata(
+        upstream_ontologist::guess_upstream_metadata(
+            path.as_path(),
+            trust_package,
+            net_access,
+            consult_external_directory,
+            check,
+        )?,
+    ))
+}
+
+#[pyfunction]
+fn guess_upstream_metadata_items(
+    py: Python,
+    path: std::path::PathBuf,
+    trust_package: Option<bool>,
+    minimum_certainty: Option<String>,
+) -> PyResult<Vec<PyObject>> {
+    let metadata = upstream_ontologist::guess_upstream_metadata_items(
+        path.as_path(),
+        trust_package,
+        minimum_certainty.map(|s| s.parse()).transpose().map_err(|e: String| {
+            PyValueError::new_err(format!(
+                "Invalid minimum_certainty: {}",
+                e.to_string()
+            ))
+        })?,
+    );
+    Ok(metadata
+        .into_iter()
+        .map(|datum| datum.map(|o| o.to_object(py)))
+        .collect::<Result<Vec<PyObject>, upstream_ontologist::ProviderError>>()?)
+}
+
+#[pyfunction]
+fn fix_upstream_metadata(metadata: &mut UpstreamMetadata) -> PyResult<()> {
+    upstream_ontologist::fix_upstream_metadata(&mut metadata.0);
     Ok(())
+}
+
+#[pyfunction]
+fn update_from_guesses(
+    py: Python,
+    metadata: &mut UpstreamMetadata,
+    items_iter: PyObject
+) -> PyResult<Vec<UpstreamDatum>> {
+    let mut items = vec![];
+    loop {
+        let item = match items_iter.call_method0(py, "__next__") {
+            Ok(item) => item,
+            Err(e) => {
+                if e.is_instance_of::<PyStopIteration>(py) {
+                    break;
+                } else {
+                    return Err(e);
+                }
+            }
+        };
+        items.push(item.extract::<UpstreamDatum>(py)?);
+    }
+    Ok(upstream_ontologist::update_from_guesses(
+        metadata.0.mut_items(),
+        items.into_iter().map(|datum| datum.0),
+    ).into_iter().map(UpstreamDatum).collect())
 }
 
 #[pymodule]
@@ -920,6 +952,12 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(check_bug_database_canonical))?;
     m.add_wrapped(wrap_pyfunction!(check_bug_submit_url_canonical))?;
     m.add_wrapped(wrap_pyfunction!(fixup_rcp_style_git_repo_url))?;
+    m.add_wrapped(wrap_pyfunction!(check_upstream_metadata))?;
+    m.add_wrapped(wrap_pyfunction!(extend_upstream_metadata))?;
+    m.add_wrapped(wrap_pyfunction!(guess_upstream_metadata))?;
+    m.add_wrapped(wrap_pyfunction!(fix_upstream_metadata))?;
+    m.add_wrapped(wrap_pyfunction!(guess_upstream_metadata_items))?;
+    m.add_wrapped(wrap_pyfunction!(update_from_guesses))?;
     let debianm = PyModule::new(py, "debian")?;
     debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_source_name))?;
     debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_binary_name))?;
@@ -933,13 +971,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(fixup_broken_git_details))?;
     m.add_wrapped(wrap_pyfunction!(guess_upstream_info))?;
     m.add_wrapped(wrap_pyfunction!(get_upstream_info))?;
-    m.add_wrapped(wrap_pyfunction!(guess_upstream_metadata))?;
-    m.add_wrapped(wrap_pyfunction!(guess_upstream_metadata_items))?;
-    m.add_wrapped(wrap_pyfunction!(check_upstream_metadata))?;
-    m.add_wrapped(wrap_pyfunction!(fix_upstream_metadata))?;
     m.add_wrapped(wrap_pyfunction!(description_from_readme_md))?;
-    m.add_wrapped(wrap_pyfunction!(extend_upstream_metadata))?;
-    m.add_wrapped(wrap_pyfunction!(update_from_guesses))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;
@@ -966,6 +998,5 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
         "SECURE_SCHEMES",
         upstream_ontologist::vcs::SECURE_SCHEMES.to_vec(),
     )?;
-
     Ok(())
 }

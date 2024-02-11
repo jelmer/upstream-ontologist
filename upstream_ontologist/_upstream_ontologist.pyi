@@ -1,4 +1,4 @@
-from typing import Iterator
+from typing import Iterator, Any
 
 from upstream_ontologist import UpstreamPackage
 
@@ -53,6 +53,8 @@ def upstream_version_to_debian_upstream_version(
     version: str, family: str | None = None
 ) -> str: ...
 
+def check_upstream_metadata(data: UpstreamMetadata) -> None: ...
+
 def upstream_package_to_debian_source_name(package: UpstreamPackage) -> str: ...
 def upstream_package_to_debian_binary_name(package: UpstreamPackage) -> str: ...
 
@@ -87,35 +89,37 @@ def get_upstream_info(
         path: str, trust_package: bool = False, net_access: bool | None = None, consult_external_directory: bool = True, check: bool = True
 ) -> UpstreamMetadata: ...
 
-def guess_upstream_metadata(
-    path: str, trust_package: bool = False, net_access: bool | None = None, consult_external_directory: bool = True, check: bool = True
-) -> dict[str, UpstreamDatum]: ...
-
-def guess_upstream_metadata_items(
-    path: str, trust_package: bool = False, net_access: bool | None = None, consult_external_directory: bool = True, check: bool = True
-) -> Iterator[tuple[str, UpstreamDatum]]: ...
-
-def check_upstream_metadata(
-    metadata: UpstreamMetadata, net_access: bool | None = None
-) -> None: ...
-
 def extend_upstream_metadata(
-    metadata: UpstreamMetadata,
+    upstream_metadata: UpstreamMetadata,
     path: str,
-    minimum_certainty: str = "possible",
+    minimum_certainty: str,
     net_access: bool | None = None,
     consult_external_directory: bool = True,
 ) -> None: ...
 
-def fix_upstream_metadata(
-    metadata: UpstreamMetadata,
-) -> None: ...
+def guess_upstream_metadata(
+    path: str,
+    trust_package: bool | None = None,
+    net_access: bool | None = None,
+    consult_external_directory: bool | None = None,
+    check: bool | None = None) -> UpstreamMetadata: ...
+
+def fix_upstream_metadata(upstream_metadata: UpstreamMetadata) -> None: ...
+
+def guess_upstream_metadata_items(path: str, trust_package: bool | None = None, minimum_certainty: str | None = None) -> Iterator[UpstreamDatum]: ...
 
 def update_from_guesses(
-    metadata: UpstreamMetadata,
-    items: Iterator[UpstreamDatum]
-) -> None: ...
+    upstream_metadata: UpstreamMetadata,
+    items: list[UpstreamDatum],
+) -> list[UpstreamDatum]: ...
 
-class UpstreamMetadata: ...
+class UpstreamMetadata:
 
-class UpstreamDatum: ...
+    def __init__(self, **kwargs):
+        ...
+    ...
+
+
+class UpstreamDatum:
+
+    def __init__(self, name, value: Any, certainty: str | None = None): ...

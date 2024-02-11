@@ -33,22 +33,6 @@ pub enum Certainty {
     Certain,
 }
 
-impl pyo3::FromPyObject<'_> for Certainty {
-    fn extract(ob: &PyAny) -> PyResult<Self> {
-        if let Ok(s) = ob.extract::<String>() {
-            Ok(Certainty::from_str(&s).unwrap())
-        } else {
-            Err(PyTypeError::new_err("expected str"))
-        }
-    }
-}
-
-impl pyo3::ToPyObject for Certainty {
-    fn to_object(&self, py: Python) -> PyObject {
-        self.to_string().to_object(py)
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Origin {
     Path(PathBuf),
@@ -832,6 +816,30 @@ impl serde::ser::Serialize for UpstreamMetadata {
             );
         }
         map.serialize(serializer)
+    }
+}
+
+impl ToPyObject for UpstreamDatumWithMetadata {
+    fn to_object(&self, py: Python) -> PyObject {
+        let m = PyModule::import(py, "upstream_ontologist.guess").unwrap();
+
+        let cls = m.getattr("UpstreamDatum").unwrap();
+
+        let (field, py_datum) = self
+            .datum
+            .to_object(py)
+            .extract::<(String, PyObject)>(py)
+            .unwrap();
+
+        let kwargs = pyo3::types::PyDict::new(py);
+        kwargs
+            .set_item("certainty", self.certainty.map(|x| x.to_string()))
+            .unwrap();
+        kwargs.set_item("origin", self.origin.as_ref()).unwrap();
+
+        let datum = cls.call((field, py_datum), Some(kwargs)).unwrap();
+
+        datum.to_object(py)
     }
 }
 
@@ -1707,6 +1715,29 @@ pub fn bug_database_url_from_bug_submit_url(url: &Url, net_access: Option<bool>)
     } else {
         None
     }
+}
+
+#[test]
+fn test_bug_database_url_from_bug_submit_url() {
+    let url = Url::parse("https://bugs.launchpad.net/bugs/+filebug").unwrap();
+    assert_eq!(
+        bug_database_url_from_bug_submit_url(&url, None).unwrap(),
+        Url::parse("https://bugs.launchpad.net/bugs").unwrap()
+    );
+
+    let url = Url::parse("https://github.com/dulwich/dulwich/issues/new").unwrap();
+
+    assert_eq!(
+        bug_database_url_from_bug_submit_url(&url, None).unwrap(),
+        Url::parse("https://github.com/dulwich/dulwich/issues").unwrap()
+    );
+
+    let url = Url::parse("https://sourceforge.net/p/dulwich/bugs/new").unwrap();
+
+    assert_eq!(
+        bug_database_url_from_bug_submit_url(&url, None).unwrap(),
+        Url::parse("https://sourceforge.net/p/dulwich/bugs").unwrap()
+    );
 }
 
 pub fn guess_bug_database_url_from_repo_url(url: &Url, net_access: Option<bool>) -> Option<Url> {

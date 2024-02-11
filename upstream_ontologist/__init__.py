@@ -55,14 +55,13 @@ Supported, but currently not set.
 
 from dataclasses import dataclass
 from email.utils import parseaddr
-from typing import Optional, TypeVar
+from typing import Generic, List, Optional, Sequence, TypedDict, TypeVar
 
 import ruamel.yaml
 
 from . import _upstream_ontologist
-extend_upstream_metadata = _upstream_ontologist.extend_upstream_metadata
-UpstreamMetadata = _upstream_ontologist.UpstreamMetadata
-UpstreamDatum = _upstream_ontologist.UpstreamDatum
+
+get_upstream_info = _upstream_ontologist.get_upstream_info
 
 SUPPORTED_CERTAINTIES = ["certain", "confident", "likely", "possible", None]
 
@@ -130,7 +129,8 @@ class Person:
         return self.name
 
 
-T = TypeVar("T")
+UpstreamDatum = _upstream_ontologist.UpstreamDatum
+UpstreamMetadata = _upstream_ontologist.UpstreamMetadata
 
 
 class UpstreamPackage:
