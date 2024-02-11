@@ -1522,7 +1522,7 @@ fn set_datum(metadata: &mut Vec<UpstreamDatumWithMetadata>, datum: UpstreamDatum
     }
 }
 
-fn update_from_guesses(
+pub fn update_from_guesses(
     metadata: &mut Vec<UpstreamDatumWithMetadata>,
     new_items: impl Iterator<Item = UpstreamDatumWithMetadata>,
 ) -> Vec<UpstreamDatumWithMetadata> {

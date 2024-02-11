@@ -98,3 +98,6 @@ def filter_bad_guesses(
     return (guess for guess in guesses if not known_bad_guess(guess))
 
 fix_upstream_metadata = _upstream_ontologist.fix_upstream_metadata
+
+guess_upstream_metadata_items = _upstream_ontologist.guess_upstream_metadata_items
+update_from_guesses = _upstream_ontologist.update_from_guesses

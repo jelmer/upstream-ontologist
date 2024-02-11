@@ -849,9 +849,43 @@ fn guess_upstream_metadata(
 }
 
 #[pyfunction]
+fn guess_upstream_metadata_items(
+    py: Python,
+    path: std::path::PathBuf,
+    trust_package: Option<bool>,
+    minimum_certainty: Option<String>,
+) -> PyResult<Vec<PyObject>> {
+    let metadata = upstream_ontologist::guess_upstream_metadata_items(
+        path.as_path(),
+        trust_package,
+        minimum_certainty.map(|s| s.parse()).transpose().map_err(|e: String| {
+            PyValueError::new_err(format!(
+                "Invalid minimum_certainty: {}",
+                e.to_string()
+            ))
+        })?,
+    );
+    Ok(metadata
+        .into_iter()
+        .map(|datum| datum.map(|o| o.to_object(py)))
+        .collect::<Result<Vec<PyObject>, upstream_ontologist::ProviderError>>()?)
+}
+
+#[pyfunction]
 fn fix_upstream_metadata(metadata: &mut UpstreamMetadata) -> PyResult<()> {
     upstream_ontologist::fix_upstream_metadata(&mut metadata.0);
     Ok(())
+}
+
+#[pyfunction]
+fn update_from_guesses(
+    metadata: &mut UpstreamMetadata,
+    items: Vec<UpstreamDatum>
+) -> Vec<UpstreamDatum> {
+    upstream_ontologist::update_from_guesses(
+        metadata.0.mut_items(),
+        items.into_iter().map(|datum| datum.0),
+    ).into_iter().map(UpstreamDatum).collect()
 }
 
 #[pymodule]
@@ -889,6 +923,8 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(extend_upstream_metadata))?;
     m.add_wrapped(wrap_pyfunction!(guess_upstream_metadata))?;
     m.add_wrapped(wrap_pyfunction!(fix_upstream_metadata))?;
+    m.add_wrapped(wrap_pyfunction!(guess_upstream_metadata_items))?;
+    m.add_wrapped(wrap_pyfunction!(update_from_guesses))?;
     let debianm = PyModule::new(py, "debian")?;
     debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_source_name))?;
     debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_binary_name))?;
