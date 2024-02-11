@@ -1233,18 +1233,18 @@ pub fn convert_cvs_list_to_str(urls: &[&str]) -> Option<String> {
 }
 
 pub const SANITIZERS: &[fn(&str) -> Option<Url>] = &[
-    |url| drop_vcs_in_scheme(&url.parse().unwrap()),
+    |url| drop_vcs_in_scheme(&url.parse().ok()?),
     |url| Some(fixup_git_location(&VcsLocation::from(url)).url.clone()),
     fixup_rcp_style_git_repo_url,
-    |url| find_public_repo_url(url.to_string().as_str(), None).map(|u| u.parse().unwrap()),
-    |url| canonical_git_repo_url(&url.parse().unwrap(), None),
-    |url| find_secure_repo_url(url.parse().unwrap(), None, Some(false)),
+    |url| find_public_repo_url(url.to_string().as_str(), None).and_then(|u| u.parse().ok()),
+    |url| canonical_git_repo_url(&url.parse().ok()?, None),
+    |url| find_secure_repo_url(url.parse().ok()?, None, Some(false)),
 ];
 
-pub fn sanitize_url(url: &Url) -> Url {
-    let mut url: Cow<'_, Url> = Cow::Borrowed(url);
+pub fn sanitize_url(url: &str) -> String {
+    let mut url: Cow<'_, str> = Cow::Borrowed(url);
     for sanitizer in SANITIZERS {
-        url = sanitizer(url.to_string().as_str()).map_or(url, Cow::Owned);
+        url = sanitizer(url.as_ref()).map_or(url, |f| Cow::Owned(f.to_string()));
     }
     url.into_owned()
 }

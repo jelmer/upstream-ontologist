@@ -462,10 +462,7 @@ pub fn find_secure_repo_url(
 
 #[pyfunction]
 fn sanitize_url(url: &str) -> PyResult<String> {
-    let url: url::Url = url
-        .parse()
-        .map_err(|e| PyValueError::new_err(format!("{}", e)))?;
-    Ok(upstream_ontologist::vcs::sanitize_url(&url).to_string())
+    Ok(upstream_ontologist::vcs::sanitize_url(url))
 }
 
 #[pyfunction]
