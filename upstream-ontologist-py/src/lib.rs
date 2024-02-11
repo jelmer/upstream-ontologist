@@ -506,8 +506,8 @@ impl UpstreamDatum {
         value: PyObject,
         certainty: Option<String>,
         origin: Option<Origin>,
-    ) -> Self {
-        UpstreamDatum(upstream_ontologist::UpstreamDatumWithMetadata {
+    ) -> PyResult<Self> {
+        Ok(UpstreamDatum(upstream_ontologist::UpstreamDatumWithMetadata {
             datum: match field.as_str() {
                 "Name" => upstream_ontologist::UpstreamDatum::Name(value.extract(py).unwrap()),
                 "Version" => {
@@ -594,11 +594,11 @@ impl UpstreamDatum {
                 "Screenshots" => {
                     upstream_ontologist::UpstreamDatum::Screenshots(value.extract(py).unwrap())
                 }
-                _ => panic!("Unknown field: {}", field),
+                _ => { return Err(PyValueError::new_err(format!("Unknown field: {}", field))); }
             },
             origin,
             certainty: certainty.map(|s| upstream_ontologist::Certainty::from_str(&s).unwrap()),
-        })
+        }))
     }
 
     #[getter]

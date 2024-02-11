@@ -152,12 +152,6 @@ pub fn guess_from_pyproject_toml(
         documentation: Option<String>,
     }
 
-    impl PyProjectToml {
-        pub fn new(content: &str) -> Result<Self, toml::de::Error> {
-            toml::from_str(content)
-        }
-    }
-
     let pyproject: PyProjectToml =
         toml::from_str(content.as_str()).map_err(|e| ProviderError::ParseError(e.to_string()))?;
 

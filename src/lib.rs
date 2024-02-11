@@ -3034,9 +3034,15 @@ fn extend_from_repology(
 /// Fix existing upstream metadata.
 pub fn fix_upstream_metadata(upstream_metadata: &mut UpstreamMetadata) {
     if let Some(repository) = upstream_metadata.get_mut("Repository") {
-        let url = repository.datum.to_url().unwrap();
-        let url = crate::vcs::sanitize_url(&url);
-        repository.datum = UpstreamDatum::Repository(url.to_string());
+        match repository.datum.to_url().as_ref() {
+            Some(url) => {
+                let url = crate::vcs::sanitize_url(url);
+                repository.datum = UpstreamDatum::Repository(url.to_string());
+            }
+            None => {
+                // Not a URL, leave it alone
+            }
+        }
     }
 
     if let Some(summary) = upstream_metadata.get_mut("Summary") {
