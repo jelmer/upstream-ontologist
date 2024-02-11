@@ -3034,8 +3034,7 @@ fn extend_from_repology(
 /// Fix existing upstream metadata.
 pub fn fix_upstream_metadata(upstream_metadata: &mut UpstreamMetadata) {
     if let Some(repository) = upstream_metadata.get_mut("Repository") {
-        let url = repository.datum.to_url().unwrap();
-        let url = crate::vcs::sanitize_url(&url);
+        let url = crate::vcs::sanitize_url(repository.datum.as_str().unwrap());
         repository.datum = UpstreamDatum::Repository(url.to_string());
     }
 

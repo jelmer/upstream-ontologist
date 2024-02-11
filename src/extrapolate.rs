@@ -1,5 +1,6 @@
 use crate::{Certainty, UpstreamDatum, UpstreamDatumWithMetadata};
 use crate::{ProviderError, UpstreamMetadata};
+use log::warn;
 
 const DEFAULT_ITERATION_LIMIT: usize = 10;
 
@@ -17,8 +18,16 @@ fn extrapolate_repository_from_homepage(
 
     let homepage = upstream_metadata.get("Homepage").unwrap();
 
+    let url = match homepage.datum.to_url() {
+        Some(url) => url,
+        None => return {
+            warn!("Homepage field is not a URL");
+            Ok(vec![])
+        }
+    };
+
     if let Some(repo) =
-        crate::vcs::guess_repo_from_url(&homepage.datum.to_url().unwrap(), Some(net_access))
+        crate::vcs::guess_repo_from_url(&url, Some(net_access))
     {
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Repository(repo),
@@ -39,10 +48,18 @@ fn extrapolate_homepage_from_repository_browse(
     let mut ret = vec![];
     let browse_url = upstream_metadata.get("Repository-Browse").unwrap();
 
+    let url = match browse_url.datum.to_url() {
+        Some(url) => url,
+        None => return {
+            warn!("Repository-Browse field is not a URL");
+            Ok(vec![])
+        }
+    };
+
     // Some hosting sites are commonly used as Homepage
     // TODO(jelmer): Maybe check that there is a README file that
     // can serve as index?
-    let forge = crate::find_forge(&browse_url.datum.to_url().unwrap(), Some(net_access));
+    let forge = crate::find_forge(&url, Some(net_access));
     if forge.is_some() && forge.unwrap().repository_browse_can_be_homepage() {
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Homepage(browse_url.datum.as_str().unwrap().to_string()),
@@ -79,8 +96,15 @@ fn extrapolate_repository_from_bug_db(
     net_access: bool,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let old_value = upstream_metadata.get("Bug-Database").unwrap();
+    let url = match old_value.datum.to_url() {
+        Some(url) => url,
+        None => return {
+            warn!("Bug-Database field is not a URL");
+            Ok(vec![])
+        }
+    };
     let repo =
-        crate::vcs::guess_repo_from_url(&old_value.datum.to_url().unwrap(), Some(net_access));
+        crate::vcs::guess_repo_from_url(&url, Some(net_access));
 
     Ok(if let Some(repo) = repo {
         vec![UpstreamDatumWithMetadata {
@@ -101,9 +125,16 @@ fn extrapolate_repository_browse_from_repository(
     net_access: bool,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let old_value = upstream_metadata.get("Repository").unwrap();
+    let url = match old_value.datum.to_url() {
+        Some(url) => url,
+        None => return {
+            warn!("Repository field is not a URL");
+            Ok(vec![])
+        }
+    };
     let browse_url = crate::vcs::browse_url_from_repo_url(
         &crate::vcs::VcsLocation {
-            url: old_value.datum.to_url().unwrap(),
+            url,
             branch: None,
             subpath: None,
         },
@@ -125,8 +156,15 @@ fn extrapolate_repository_from_repository_browse(
     net_access: bool,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let old_value = upstream_metadata.get("Repository-Browse").unwrap();
+    let url = match old_value.datum.to_url() {
+        Some(url) => url,
+        None => return {
+            warn!("Repository-Browse field is not a URL");
+            Ok(vec![])
+        }
+    };
     let repo =
-        crate::vcs::guess_repo_from_url(&old_value.datum.to_url().unwrap(), Some(net_access));
+        crate::vcs::guess_repo_from_url(&url, Some(net_access));
     Ok(if let Some(repo) = repo {
         vec![UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Repository(repo),
@@ -144,9 +182,17 @@ fn extrapolate_bug_database_from_repository(
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let old_value = upstream_metadata.get("Repository").unwrap();
 
+    let url = match old_value.datum.to_url() {
+        Some(url) => url,
+        None => return {
+            warn!("Repository field is not a URL");
+            Ok(vec![])
+        }
+    };
+
     Ok(
         if let Some(bug_db_url) = crate::guess_bug_database_url_from_repo_url(
-            &old_value.datum.to_url().unwrap(),
+            &url,
             Some(net_access),
         ) {
             vec![UpstreamDatumWithMetadata {
@@ -168,8 +214,17 @@ fn extrapolate_bug_submit_from_bug_db(
     net_access: bool,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let old_value = upstream_metadata.get("Bug-Database").unwrap();
+
+    let url = match old_value.datum.to_url() {
+        Some(url) => url,
+        None => return {
+            warn!("Bug-Database field is not a URL");
+            Ok(vec![])
+        }
+    };
+
     let bug_submit_url = crate::bug_submit_url_from_bug_database_url(
-        &old_value.datum.to_url().unwrap(),
+        &url,
         Some(net_access),
     );
 
@@ -213,8 +268,17 @@ fn extrapolate_repository_from_download(
     net_access: bool,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let old_value = upstream_metadata.get("Download").unwrap();
+
+    let url = match old_value.datum.to_url() {
+        Some(url) => url,
+        None => return {
+            warn!("Download field is not a URL");
+            Ok(vec![])
+        }
+    };
+
     let repo =
-        crate::vcs::guess_repo_from_url(&old_value.datum.to_url().unwrap(), Some(net_access));
+        crate::vcs::guess_repo_from_url(&url, Some(net_access));
     Ok(if let Some(repo) = repo {
         vec![UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Repository(repo),
@@ -235,8 +299,15 @@ fn extrapolate_name_from_repository(
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut ret = vec![];
     let old_value = upstream_metadata.get("Repository").unwrap();
+    let url = match old_value.datum.to_url() {
+        Some(url) => url,
+        None => return {
+            warn!("Repository field is not a URL");
+            Ok(vec![])
+        }
+    };
     let repo =
-        crate::vcs::guess_repo_from_url(&old_value.datum.to_url().unwrap(), Some(net_access));
+        crate::vcs::guess_repo_from_url(&url, Some(net_access));
     if let Some(repo) = repo {
         let parsed: url::Url = repo.parse().unwrap();
         let name = parsed.path_segments().unwrap().last().unwrap();
@@ -262,9 +333,17 @@ fn extrapolate_security_contact_from_security_md(
     let repository_url = upstream_metadata.get("Repository").unwrap();
     let security_md_path = upstream_metadata.get("Security-MD").unwrap();
 
+    let url = match repository_url.datum.to_url() {
+        Some(url) => url,
+        None => return {
+            warn!("Repository field is not a URL");
+            Ok(vec![])
+        }
+    };
+
     let security_url = crate::vcs::browse_url_from_repo_url(
         &crate::vcs::VcsLocation {
-            url: repository_url.datum.to_url().unwrap(),
+            url,
             branch: None,
             subpath: security_md_path.datum.as_str().map(|x| x.to_string()),
         },
@@ -304,9 +383,17 @@ fn consult_homepage(
     }
     let homepage = upstream_metadata.get("Homepage").unwrap();
 
+    let url = match homepage.datum.to_url() {
+        Some(url) => url,
+        None => return {
+            warn!("Homepage field is not a URL");
+            Ok(vec![])
+        }
+    };
+
     let mut ret = vec![];
 
-    for mut entry in crate::homepage::guess_from_homepage(&homepage.datum.to_url().unwrap())? {
+    for mut entry in crate::homepage::guess_from_homepage(&url)? {
         entry.certainty = std::cmp::min(homepage.certainty, entry.certainty);
         ret.push(entry);
     }
