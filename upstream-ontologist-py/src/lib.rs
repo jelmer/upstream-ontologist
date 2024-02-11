@@ -608,7 +608,7 @@ impl UpstreamDatum {
 
     #[getter]
     fn value(&self, py: Python) -> PyResult<PyObject> {
-        let value = self.0.datum.to_object(py);
+        let value = self.0.datum.to_object(py).extract::<(String, PyObject)>(py).unwrap().1;
         assert!(!value.as_ref(py).is_instance_of::<PyTuple>());
         Ok(value)
     }
@@ -681,6 +681,11 @@ impl UpstreamMetadata {
             .ok_or_else(|| PyKeyError::new_err(format!("No such field: {}", field)))
     }
 
+    fn __delitem__(&mut self, field: &str) -> PyResult<()> {
+        self.0.remove(&field);
+        Ok(())
+    }
+
     pub fn items(&self) -> Vec<(String, UpstreamDatum)> {
         self.0
             .iter()
@@ -691,6 +696,10 @@ impl UpstreamMetadata {
                 )
             })
             .collect()
+    }
+
+    pub fn values(&self) -> Vec<UpstreamDatum> {
+        self.0.iter().map(|datum| UpstreamDatum(datum.clone())).collect()
     }
 
     pub fn get(&self, py: Python, field: &str, default: Option<PyObject>) -> PyObject {

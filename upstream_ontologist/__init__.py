@@ -129,58 +129,7 @@ class Person:
         return self.name
 
 
-T = TypeVar("T")
-
-
-class UpstreamDatum(Generic[T]):
-    """A single piece of upstream metadata."""
-
-    __slots__ = ["field", "value", "certainty", "origin"]
-
-    field: str
-    value: T
-    certainty: Optional[str]
-    origin: Optional[str]
-
-    def __init__(
-        self,
-        field: str,
-        value: T,
-        *,
-        certainty: Optional[str] = None,
-        origin: Optional[str] = None,
-    ) -> None:
-        self.field = field
-        if value is None:
-            raise ValueError(field)
-        self.value = value
-        if certainty not in SUPPORTED_CERTAINTIES:
-            raise ValueError(certainty)
-        self.certainty = certainty
-        self.origin = origin
-
-    def __eq__(self, other):
-        return (
-            isinstance(other, type(self))
-            and self.field == other.field
-            and self.value == other.value
-            and self.certainty == other.certainty
-            and self.origin == other.origin
-        )
-
-    def __str__(self):
-        return f"{self.field}: {self.value}"
-
-    def __repr__(self):
-        return "{}({!r}, {!r}, {!r}, {!r})".format(
-            type(self).__name__,
-            self.field,
-            self.value,
-            self.certainty,
-            self.origin,
-        )
-
-
+UpstreamDatum = _upstream_ontologist.UpstreamDatum
 UpstreamMetadata = _upstream_ontologist.UpstreamMetadata
 
 
