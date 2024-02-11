@@ -181,21 +181,7 @@ class UpstreamDatum(Generic[T]):
         )
 
 
-UpstreamMetadata = TypedDict(
-    "UpstreamMetadata",
-    {
-        "Name": UpstreamDatum[str],
-        "Contact": UpstreamDatum[str],
-        "Repository": UpstreamDatum[str],
-        "Repository-Browse": UpstreamDatum[str],
-        "Summary": UpstreamDatum[str],
-        "Bug-Database": UpstreamDatum[str],
-        "Bug-Submit": UpstreamDatum[str],
-        "Homepage": UpstreamDatum[str],
-        "Screenshots": UpstreamDatum[List[str]],
-    },
-    total=False,
-)
+UpstreamMetadata = _upstream_ontologist.UpstreamMetadata
 
 
 class UpstreamPackage:

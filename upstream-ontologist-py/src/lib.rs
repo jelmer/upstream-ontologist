@@ -1,6 +1,5 @@
 use pyo3::create_exception;
-use pyo3::exceptions::PyException;
-use pyo3::exceptions::{PyKeyError, PyRuntimeError, PyValueError};
+use pyo3::exceptions::{PyException, PyKeyError, PyRuntimeError, PyValueError, PyStopIteration};
 use pyo3::import_exception;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -711,8 +710,18 @@ impl UpstreamMetadata {
     }
 
     #[new]
-    fn new() -> Self {
-        UpstreamMetadata(upstream_ontologist::UpstreamMetadata::new())
+    #[pyo3(signature = (**kwargs))]
+    fn new(kwargs: Option<&PyDict>) -> Self {
+        let mut ret = UpstreamMetadata(upstream_ontologist::UpstreamMetadata::new());
+
+        if let Some(kwargs) = kwargs {
+            for item in kwargs.items() {
+                let datum = item.extract::<UpstreamDatum>().unwrap();
+                ret.0.insert(datum.0);
+            }
+        }
+
+        ret
     }
 
     pub fn __iter__(slf: PyRef<Self>) -> PyResult<PyObject> {
@@ -879,13 +888,28 @@ fn fix_upstream_metadata(metadata: &mut UpstreamMetadata) -> PyResult<()> {
 
 #[pyfunction]
 fn update_from_guesses(
+    py: Python,
     metadata: &mut UpstreamMetadata,
-    items: Vec<UpstreamDatum>
-) -> Vec<UpstreamDatum> {
-    upstream_ontologist::update_from_guesses(
+    items_iter: PyObject
+) -> PyResult<Vec<UpstreamDatum>> {
+    let mut items = vec![];
+    loop {
+        let item = match items_iter.call_method0(py, "__next__") {
+            Ok(item) => item,
+            Err(e) => {
+                if e.is_instance_of::<PyStopIteration>(py) {
+                    break;
+                } else {
+                    return Err(e);
+                }
+            }
+        };
+        items.push(item.extract::<UpstreamDatum>(py)?);
+    }
+    Ok(upstream_ontologist::update_from_guesses(
         metadata.0.mut_items(),
         items.into_iter().map(|datum| datum.0),
-    ).into_iter().map(UpstreamDatum).collect()
+    ).into_iter().map(UpstreamDatum).collect())
 }
 
 #[pymodule]

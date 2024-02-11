@@ -1,6 +1,6 @@
 from typing import Iterator
 
-from upstream_ontologist import UpstreamDatum, UpstreamMetadata, UpstreamPackage
+from upstream_ontologist import UpstreamDatum, UpstreamPackage
 
 def drop_vcs_in_scheme(url: str) -> str: ...
 def unsplit_vcs_url(repo_url: str, branch: str | None, subpath: str | None) -> str: ...
@@ -112,3 +112,9 @@ def update_from_guesses(
     upstream_metadata: UpstreamMetadata,
     items: list[UpstreamDatum],
 ) -> list[UpstreamDatum]: ...
+
+class UpstreamMetadata:
+
+    def __init__(self, **kwargs):
+        ...
+    ...
