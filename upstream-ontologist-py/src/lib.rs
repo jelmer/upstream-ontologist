@@ -683,6 +683,10 @@ impl UpstreamMetadata {
         Ok(())
     }
 
+    fn __contains__(&self, field: &str) -> bool {
+        self.0.contains_key(&field)
+    }
+
     pub fn items(&self) -> Vec<(String, UpstreamDatum)> {
         self.0
             .iter()
