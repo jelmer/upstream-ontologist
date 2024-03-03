@@ -228,18 +228,6 @@ pub fn description_from_readme_md(
     description_from_readme_html(&html_output)
 }
 
-pub fn description_from_readme_plain(
-    long_description: &str,
-) -> PyResult<(Option<String>, Vec<UpstreamDatumWithMetadata>)> {
-    Python::with_gil(|py| {
-        let readme_mod = Python::import(py, "upstream_ontologist.readme").unwrap();
-        let (description, extra_md): (Option<String>, Vec<UpstreamDatumWithMetadata>) = readme_mod
-            .call_method1("description_from_readme_plain", (long_description,))?
-            .extract()?;
-        Ok((description, extra_md))
-    })
-}
-
 pub fn guess_from_readme(
     path: &std::path::Path,
     _trust_package: bool,
@@ -390,7 +378,7 @@ pub fn guess_from_readme(
         }
         None => {
             let contents = std::fs::read_to_string(path)?;
-            description_from_readme_plain(&contents)
+            Ok(description_from_readme_plain(&contents)?)
         }
         Some("pod") => {
             let contents = std::fs::read_to_string(path)?;
@@ -433,39 +421,124 @@ pub fn guess_from_readme(
 }
 
 pub fn parse_first_header_text(text: &str) -> (Option<&str>, Option<&str>, Option<&str>) {
-    if let Some(captures) = lazy_regex::regex!(r"^([A-Za-z]+) ([0-9.]+)$").captures(text) {
-        return (
-            captures.get(1).map(|m| m.as_str()),
-            None,
-            captures.get(2).map(|m| m.as_str()),
-        );
+    if let Some((_, name, version)) = lazy_regex::regex_captures!(r"^([A-Za-z]+) ([0-9.]+)$", text)
+    {
+        return (Some(name), None, Some(version));
     }
-    if let Some(captures) = lazy_regex::regex!(r"^([A-Za-z]+): (.+)$").captures(text) {
-        return (
-            captures.get(1).map(|m| m.as_str()),
-            captures.get(2).map(|m| m.as_str()),
-            None,
-        );
+    if let Some((_, name, summary)) = lazy_regex::regex_captures!(r"^([A-Za-z]+): (.+)$", text) {
+        return (Some(name), Some(summary), None);
     }
-    if let Some(captures) = lazy_regex::regex!(r"^([A-Za-z]+) - (.+)$").captures(text) {
-        return (
-            captures.get(1).map(|m| m.as_str()),
-            captures.get(2).map(|m| m.as_str()),
-            None,
-        );
+    if let Some((_, name, summary)) = lazy_regex::regex_captures!(r"^([A-Za-z]+) - (.+)$", text) {
+        return (Some(name), Some(summary), None);
     }
-    if let Some(captures) = lazy_regex::regex!(r"^([A-Za-z]+) -- (.+)$").captures(text) {
-        return (
-            captures.get(1).map(|m| m.as_str()),
-            captures.get(2).map(|m| m.as_str()),
-            None,
-        );
+    if let Some((_, name, summary)) = lazy_regex::regex_captures!(r"^([A-Za-z]+) -- (.+)$", text) {
+        return (Some(name), Some(summary), None);
     }
-    if let Some(captures) = lazy_regex::regex!(r"^([A-Za-z]+) version ([^ ]+)").captures(text) {
-        if let Some(version) = captures.get(2).map(|m| m.as_str()) {
-            let name = &text[..version.len() + " version ".len()];
-            return (Some(name), None, Some(version));
-        }
+    if let Some((_, name, version)) =
+        lazy_regex::regex_captures!(r"^([A-Za-z]+) version ([^ ]+)", text)
+    {
+        return (Some(name), None, Some(version));
     }
     (None, None, None)
+}
+
+#[test]
+fn test_parse_first_header_text() {
+    assert_eq!(
+        parse_first_header_text("libwand 1.0"),
+        (Some("libwand"), None, Some("1.0"))
+    );
+    assert_eq!(
+        parse_first_header_text("libwand -- A wand"),
+        (Some("libwand"), Some("A wand"), None)
+    );
+    assert_eq!(
+        parse_first_header_text("libwand version 1.0"),
+        (Some("libwand"), None, Some("1.0"))
+    );
+}
+
+pub fn description_from_readme_plain(
+    text: &str,
+) -> Result<(Option<String>, Vec<UpstreamDatumWithMetadata>), ProviderError> {
+    let mut lines: Vec<&str> = text.split_terminator('\n').collect();
+    let mut metadata: Vec<UpstreamDatumWithMetadata> = Vec::new();
+
+    if lines.is_empty() {
+        return Ok((None, Vec::new()));
+    }
+
+    if !lines[0].trim().is_empty()
+        && lines.len() > 1
+        && (lines[1].is_empty() || !lines[1].chars().next().unwrap().is_alphanumeric())
+    {
+        let (name, summary, version) = parse_first_header_text(lines[0]);
+        if let Some(name) = name {
+            metadata.push(UpstreamDatumWithMetadata {
+                origin: None,
+                datum: UpstreamDatum::Name(name.to_string()),
+                certainty: Some(Certainty::Likely),
+            });
+        }
+        if let Some(version) = version {
+            metadata.push(UpstreamDatumWithMetadata {
+                origin: None,
+                datum: UpstreamDatum::Version(version.to_string()),
+                certainty: Some(Certainty::Likely),
+            });
+        }
+        if let Some(summary) = summary {
+            metadata.push(UpstreamDatumWithMetadata {
+                origin: None,
+                datum: UpstreamDatum::Summary(summary.to_string()),
+                certainty: Some(Certainty::Likely),
+            });
+        }
+        if name.is_some() || version.is_some() || summary.is_some() {
+            lines.remove(0);
+        }
+    }
+
+    while !lines.is_empty() && lines[0].trim().trim_matches('-').is_empty() {
+        lines.remove(0);
+    }
+
+    let mut paras: Vec<Vec<&str>> = Vec::new();
+    let mut current_para: Vec<&str> = Vec::new();
+    for line in lines {
+        if line.trim().is_empty() {
+            if !current_para.is_empty() {
+                paras.push(current_para.clone());
+                current_para.clear();
+            }
+        } else {
+            current_para.push(line);
+        }
+    }
+    if !current_para.is_empty() {
+        paras.push(current_para.clone());
+    }
+
+    let mut output: Vec<String> = Vec::new();
+    for para in paras {
+        if para.is_empty() {
+            continue;
+        }
+        let line = para.join("\n");
+        let (skip, extra_metadata) = skip_paragraph(&line);
+        metadata.extend(extra_metadata);
+        if skip {
+            continue;
+        }
+        output.push(format!("{}\n", line));
+    }
+    let description = if output.len() > 30 {
+        None
+    } else {
+        while !output.is_empty() && output.last().unwrap().trim().is_empty() {
+            output.pop();
+        }
+        Some(output.join("\n"))
+    };
+    Ok((description, metadata))
 }

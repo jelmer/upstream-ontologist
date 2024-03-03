@@ -927,9 +927,8 @@ fn update_from_guesses(
             Err(e) => {
                 if e.is_instance_of::<PyStopIteration>(py) {
                     break;
-                } else {
-                    return Err(e);
                 }
+                return Err(e);
             }
         };
         items.push(item.extract::<UpstreamDatum>(py)?);
@@ -946,6 +945,13 @@ fn update_from_guesses(
 #[pyfunction]
 fn parse_first_header_text(text: &str) -> (Option<&str>, Option<&str>, Option<&str>) {
     upstream_ontologist::readme::parse_first_header_text(text)
+}
+
+#[pyfunction]
+fn description_from_readme_plain(text: &str) -> PyResult<(Option<String>, Vec<UpstreamDatum>)> {
+    let (description, data) = upstream_ontologist::readme::description_from_readme_plain(text)?;
+
+    Ok((description, data.into_iter().map(UpstreamDatum).collect()))
 }
 
 #[pymodule]
@@ -985,6 +991,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(fix_upstream_metadata))?;
     m.add_wrapped(wrap_pyfunction!(guess_upstream_metadata_items))?;
     m.add_wrapped(wrap_pyfunction!(update_from_guesses))?;
+    m.add_wrapped(wrap_pyfunction!(description_from_readme_plain))?;
     let debianm = PyModule::new(py, "debian")?;
     debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_source_name))?;
     debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_binary_name))?;
