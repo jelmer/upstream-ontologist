@@ -1,7 +1,5 @@
 use crate::{Certainty, Origin, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 
-use std::error::Error;
-
 use reqwest::blocking::Client;
 use reqwest::header::USER_AGENT;
 use scraper::{Html, Selector};

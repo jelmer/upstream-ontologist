@@ -908,7 +908,7 @@ pub fn load_json_url(
         .build()
         .map_err(HTTPJSONError::HTTPError)?;
 
-    let http_url: reqwest::Url = http_url.clone().into_string().parse().unwrap();
+    let http_url: reqwest::Url = Into::<String>::into(http_url.clone()).parse().unwrap();
 
     let request = client
         .get(http_url)

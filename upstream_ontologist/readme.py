@@ -30,6 +30,8 @@ logger = logging.getLogger(__name__)
 
 _skip_paragraph = _upstream_ontologist.readme.skip_paragraph  # type: ignore
 description_from_readme_md = _upstream_ontologist.description_from_readme_md  # type: ignore
+_parse_first_header_text = _upstream_ontologist.parse_first_header_text  # type: ignore
+description_from_readme_plain = _upstream_ontologist.description_from_readme_plain  # type: ignore
 
 
 def _skip_paragraph_block(para):  # noqa: C901
@@ -108,27 +110,6 @@ def _skip_paragraph_block(para):  # noqa: C901
 
 def render(el):
     return el.get_text()
-
-
-def _parse_first_header_text(text):
-    m = re.fullmatch("([A-Za-z]+) ([0-9.]+)", text)
-    if m:
-        return m.group(1), None, m.group(2)
-    m = re.fullmatch("([A-Za-z]+): (.+)", text)
-    if m:
-        return m.group(1), m.group(2), None
-    m = re.fullmatch("([A-Za-z]+) - (.+)", text)
-    if m:
-        return m.group(1), m.group(2), None
-    m = re.fullmatch("([A-Za-z]+) -- (.+)", text)
-    if m:
-        return m.group(1), m.group(2), None
-    m = re.fullmatch("([A-Za-z]+) version ([^ ]+)", text)
-    if m:
-        name, version = text.split(" version ", 1)
-        summary = None
-        return name, summary, version
-    return None, None, None
 
 
 def _parse_first_header(el):
@@ -318,53 +299,3 @@ def description_from_readme_rst(
         rst_text, writer=Writer(), settings_overrides=settings
     ).get("html_body")
     return description_from_readme_html(html_text)
-
-
-def description_from_readme_plain(
-    text: str
-) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
-    lines = list(text.splitlines(False))
-    metadata = []
-    if not lines:
-        return None, {}
-    if (
-        lines[0].strip()
-        and len(lines) > 1
-        and (not lines[1] or not lines[1][0].isalnum())
-    ):
-        name, summary, version = _parse_first_header_text(lines[0])
-        if name:
-            metadata.append(UpstreamDatum("Name", name, certainty="likely"))
-        if version:
-            metadata.append(UpstreamDatum("Version", version, certainty="likely"))
-        if summary:
-            metadata.append(UpstreamDatum("Summary", summary, certainty="likely"))
-        if name or version or summary:
-            lines.pop(0)
-    else:
-        name = version = summary = None
-    while lines and not lines[0].strip("-").strip():
-        lines.pop(0)
-
-    paras: List[List[str]] = [[]]
-    for line in lines:
-        if not line.strip():
-            paras.append([])
-        else:
-            paras[-1].append(line)
-
-    output: List[str] = []
-    for para in paras:
-        if not para:
-            continue
-        line = "\n".join(para)
-        (skip, extra_metadata) = _skip_paragraph(line)
-        metadata.extend(extra_metadata)
-        if skip:
-            continue
-        output.append(line + "\n")
-    if len(output) > 30:
-        return None, {}
-    while output and not output[-1].strip():
-        output.pop(-1)
-    return "\n".join(output), metadata
