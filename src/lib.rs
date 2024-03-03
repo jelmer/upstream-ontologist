@@ -2224,6 +2224,12 @@ impl From<std::io::Error> for ProviderError {
     }
 }
 
+impl From<reqwest::Error> for ProviderError {
+    fn from(e: reqwest::Error) -> Self {
+        ProviderError::Other(e.to_string())
+    }
+}
+
 #[cfg(feature = "pyo3")]
 pyo3::create_exception!(
     upstream_ontologist,

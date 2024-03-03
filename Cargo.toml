@@ -39,24 +39,25 @@ select = "0.6.0"
 pulldown-cmark = "0.9.3"
 # See https://salsa.debian.org/rust-team/debcargo/-/merge_requests/59
 debcargo = { optional = true, git = "https://github.com/jelmer/debcargo.git", branch = "windows-build" }
+scraper = "0.19.0"
 
 [workspace]
 members = [ "upstream-ontologist-py",]
 
 [features]
-default = [ "git-config", "launchpad", "opam", "dist-ini", "cargo", "r-description", "pyproject-toml", "python-pkginfo", "default-tls", "debian", "pyo3"]
-default-tls = [ "reqwest/default-tls",]
-git-config = [ "dep:gix-config",]
-launchpad = [ "dep:distro-info" ]
-opam = [ "dep:opam-file-rs",]
-dist-ini = [ "dep:rust-ini",]
-cargo = [ "dep:toml",]
-r-description = [ "dep:mailparse",]
-pyproject-toml = [ "dep:pyproject-toml",]
-python-pkginfo = [ "dep:python-pkginfo",]
-rustls-tls = [ "reqwest/rustls-tls",]
-debcargo = [ "dep:debcargo",]
-debian = ["debcargo", "dep:debian-watch", "dep:makefile-lossless", "dep:debian-changelog", "dep:debian-control", "dep:debian-copyright",]
+default = ["git-config", "launchpad", "opam", "dist-ini", "cargo", "r-description", "pyproject-toml", "python-pkginfo", "default-tls", "debian", "pyo3"]
+default-tls = ["reqwest/default-tls"]
+git-config = ["dep:gix-config"]
+launchpad = ["dep:distro-info"]
+opam = ["dep:opam-file-rs"]
+dist-ini = ["dep:rust-ini"]
+cargo = ["dep:toml"]
+r-description = ["dep:mailparse"]
+pyproject-toml = ["dep:pyproject-toml"]
+python-pkginfo = ["dep:python-pkginfo"]
+rustls-tls = ["reqwest/rustls-tls"]
+debcargo = ["dep:debcargo"]
+debian = ["debcargo", "dep:debian-watch", "dep:makefile-lossless", "dep:debian-changelog", "dep:debian-control", "dep:debian-copyright"]
 pyo3 = []
 
 [lib]
