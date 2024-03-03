@@ -1,7 +1,12 @@
 use crate::{Certainty, Origin, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use lazy_regex::regex;
+use log::warn;
 use pyo3::prelude::*;
+use scraper::node::Element;
+use scraper::{ElementRef, Html, Selector};
 use std::io::BufRead;
+use std::iter::Iterator;
+use url::Url;
 
 pub fn skip_paragraph(para: &str) -> (bool, Vec<UpstreamDatumWithMetadata>) {
     let mut ret = Vec::<UpstreamDatumWithMetadata>::new();
@@ -198,19 +203,6 @@ pub fn description_from_readme_rst(
         let readme_mod = Python::import(py, "upstream_ontologist.readme").unwrap();
         let (description, extra_md): (Option<String>, Vec<UpstreamDatumWithMetadata>) = readme_mod
             .call_method1("description_from_readme_rst", (long_description,))?
-            .extract()?;
-
-        Ok((description, extra_md))
-    })
-}
-
-pub fn description_from_readme_html(
-    long_description: &str,
-) -> PyResult<(Option<String>, Vec<UpstreamDatumWithMetadata>)> {
-    Python::with_gil(|py| {
-        let readme_mod = Python::import(py, "upstream_ontologist.readme").unwrap();
-        let (description, extra_md): (Option<String>, Vec<UpstreamDatumWithMetadata>) = readme_mod
-            .call_method1("description_from_readme_html", (long_description,))?
             .extract()?;
 
         Ok((description, extra_md))
@@ -541,4 +533,68 @@ pub fn description_from_readme_plain(
         Some(output.join("\n"))
     };
     Ok((description, metadata))
+}
+
+fn ul_is_field_list(el: ElementRef) -> bool {
+    let names = ["Issues", "Home", "Documentation", "License"];
+    for li in el.select(&Selector::parse("li").unwrap()) {
+        let text = li.text().collect::<String>();
+        if let Some((_, name)) = lazy_regex::regex_captures!(r"([A-Za-z]+)\s*:.*", text.trim()) {
+            if !names.contains(&name) {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+    true
+}
+
+#[test]
+fn test_ul_is_field_list() {
+    let el = Html::parse_fragment(
+        r#"<ul>
+            <li>Issues: <a href="https://github.com/serde-rs/serde/issues">blah</a></li>
+            <li>Home: <a href="https://serde.rs/">blah</a></li>
+            </ul>"#,
+    );
+
+    assert_eq!(
+        ul_is_field_list(
+            el.root_element()
+                .select(&Selector::parse("ul").unwrap())
+                .next()
+                .unwrap()
+        ),
+        true
+    );
+
+    let el = Html::parse_fragment(
+        r#"<ul>
+            <li>Some other thing</li>
+            </ul>"#,
+    );
+
+    assert_eq!(
+        ul_is_field_list(
+            el.root_element()
+                .select(&Selector::parse("ul").unwrap())
+                .next()
+                .unwrap()
+        ),
+        false
+    );
+}
+
+pub fn description_from_readme_html(
+    long_description: &str,
+) -> PyResult<(Option<String>, Vec<UpstreamDatumWithMetadata>)> {
+    Python::with_gil(|py| {
+        let readme_mod = Python::import(py, "upstream_ontologist.readme").unwrap();
+        let (description, extra_md): (Option<String>, Vec<UpstreamDatumWithMetadata>) = readme_mod
+            .call_method1("description_from_readme_html", (long_description,))?
+            .extract()?;
+
+        Ok((description, extra_md))
+    })
 }
