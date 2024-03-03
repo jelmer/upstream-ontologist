@@ -431,3 +431,41 @@ pub fn guess_from_readme(
     }
     Ok(ret)
 }
+
+pub fn parse_first_header_text(text: &str) -> (Option<&str>, Option<&str>, Option<&str>) {
+    if let Some(captures) = lazy_regex::regex!(r"^([A-Za-z]+) ([0-9.]+)$").captures(text) {
+        return (
+            captures.get(1).map(|m| m.as_str()),
+            None,
+            captures.get(2).map(|m| m.as_str()),
+        );
+    }
+    if let Some(captures) = lazy_regex::regex!(r"^([A-Za-z]+): (.+)$").captures(text) {
+        return (
+            captures.get(1).map(|m| m.as_str()),
+            captures.get(2).map(|m| m.as_str()),
+            None,
+        );
+    }
+    if let Some(captures) = lazy_regex::regex!(r"^([A-Za-z]+) - (.+)$").captures(text) {
+        return (
+            captures.get(1).map(|m| m.as_str()),
+            captures.get(2).map(|m| m.as_str()),
+            None,
+        );
+    }
+    if let Some(captures) = lazy_regex::regex!(r"^([A-Za-z]+) -- (.+)$").captures(text) {
+        return (
+            captures.get(1).map(|m| m.as_str()),
+            captures.get(2).map(|m| m.as_str()),
+            None,
+        );
+    }
+    if let Some(captures) = lazy_regex::regex!(r"^([A-Za-z]+) version ([^ ]+)").captures(text) {
+        if let Some(version) = captures.get(2).map(|m| m.as_str()) {
+            let name = &text[..version.len() + " version ".len()];
+            return (Some(name), None, Some(version));
+        }
+    }
+    (None, None, None)
+}

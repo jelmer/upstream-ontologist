@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 _skip_paragraph = _upstream_ontologist.readme.skip_paragraph  # type: ignore
 description_from_readme_md = _upstream_ontologist.description_from_readme_md  # type: ignore
+_parse_first_header_text = _upstream_ontologist.parse_first_header_text  # type: ignore
 
 
 def _skip_paragraph_block(para):  # noqa: C901
@@ -108,27 +109,6 @@ def _skip_paragraph_block(para):  # noqa: C901
 
 def render(el):
     return el.get_text()
-
-
-def _parse_first_header_text(text):
-    m = re.fullmatch("([A-Za-z]+) ([0-9.]+)", text)
-    if m:
-        return m.group(1), None, m.group(2)
-    m = re.fullmatch("([A-Za-z]+): (.+)", text)
-    if m:
-        return m.group(1), m.group(2), None
-    m = re.fullmatch("([A-Za-z]+) - (.+)", text)
-    if m:
-        return m.group(1), m.group(2), None
-    m = re.fullmatch("([A-Za-z]+) -- (.+)", text)
-    if m:
-        return m.group(1), m.group(2), None
-    m = re.fullmatch("([A-Za-z]+) version ([^ ]+)", text)
-    if m:
-        name, version = text.split(" version ", 1)
-        summary = None
-        return name, summary, version
-    return None, None, None
 
 
 def _parse_first_header(el):

@@ -1,5 +1,5 @@
 use pyo3::create_exception;
-use pyo3::exceptions::{PyException, PyKeyError, PyRuntimeError, PyValueError, PyStopIteration};
+use pyo3::exceptions::{PyException, PyKeyError, PyRuntimeError, PyStopIteration, PyValueError};
 use pyo3::import_exception;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -504,98 +504,106 @@ impl UpstreamDatum {
         certainty: Option<String>,
         origin: Option<Origin>,
     ) -> PyResult<Self> {
-        Ok(UpstreamDatum(upstream_ontologist::UpstreamDatumWithMetadata {
-            datum: match field.as_str() {
-                "Name" => upstream_ontologist::UpstreamDatum::Name(value.extract(py).unwrap()),
-                "Version" => {
-                    upstream_ontologist::UpstreamDatum::Version(value.extract(py).unwrap())
-                }
-                "Summary" => {
-                    upstream_ontologist::UpstreamDatum::Summary(value.extract(py).unwrap())
-                }
-                "Description" => {
-                    upstream_ontologist::UpstreamDatum::Description(value.extract(py).unwrap())
-                }
-                "Homepage" => {
-                    upstream_ontologist::UpstreamDatum::Homepage(value.extract(py).unwrap())
-                }
-                "Repository" => {
-                    upstream_ontologist::UpstreamDatum::Repository(value.extract(py).unwrap())
-                }
-                "Repository-Browse" => {
-                    upstream_ontologist::UpstreamDatum::RepositoryBrowse(value.extract(py).unwrap())
-                }
-                "License" => {
-                    upstream_ontologist::UpstreamDatum::License(value.extract(py).unwrap())
-                }
-                "Author" => upstream_ontologist::UpstreamDatum::Author(value.extract(py).unwrap()),
-                "Bug-Database" => {
-                    upstream_ontologist::UpstreamDatum::BugDatabase(value.extract(py).unwrap())
-                }
-                "Bug-Submit" => {
-                    upstream_ontologist::UpstreamDatum::BugSubmit(value.extract(py).unwrap())
-                }
-                "Contact" => {
-                    upstream_ontologist::UpstreamDatum::Contact(value.extract(py).unwrap())
-                }
-                "Cargo-Crate" => {
-                    upstream_ontologist::UpstreamDatum::CargoCrate(value.extract(py).unwrap())
-                }
-                "Security-MD" => {
-                    upstream_ontologist::UpstreamDatum::SecurityMD(value.extract(py).unwrap())
-                }
-                "Keywords" => {
-                    upstream_ontologist::UpstreamDatum::Keywords(value.extract(py).unwrap())
-                }
-                "Maintainer" => {
-                    upstream_ontologist::UpstreamDatum::Maintainer(value.extract(py).unwrap())
-                }
-                "Copyright" => {
-                    upstream_ontologist::UpstreamDatum::Copyright(value.extract(py).unwrap())
-                }
-                "Documentation" => {
-                    upstream_ontologist::UpstreamDatum::Documentation(value.extract(py).unwrap())
-                }
-                "Go-Import-Path" => {
-                    upstream_ontologist::UpstreamDatum::GoImportPath(value.extract(py).unwrap())
-                }
-                "Download" => {
-                    upstream_ontologist::UpstreamDatum::Download(value.extract(py).unwrap())
-                }
-                "Wiki" => upstream_ontologist::UpstreamDatum::Wiki(value.extract(py).unwrap()),
-                "MailingList" => {
-                    upstream_ontologist::UpstreamDatum::MailingList(value.extract(py).unwrap())
-                }
-                "SourceForge-Project" => upstream_ontologist::UpstreamDatum::SourceForgeProject(
-                    value.extract(py).unwrap(),
-                ),
-                "Archive" => {
-                    upstream_ontologist::UpstreamDatum::Archive(value.extract(py).unwrap())
-                }
-                "Demo" => upstream_ontologist::UpstreamDatum::Demo(value.extract(py).unwrap()),
-                "Pecl-Package" => {
-                    upstream_ontologist::UpstreamDatum::PeclPackage(value.extract(py).unwrap())
-                }
-                "Haskell-Package" => {
-                    upstream_ontologist::UpstreamDatum::HaskellPackage(value.extract(py).unwrap())
-                }
-                "Funding" => {
-                    upstream_ontologist::UpstreamDatum::Funding(value.extract(py).unwrap())
-                }
-                "Changelog" => {
-                    upstream_ontologist::UpstreamDatum::Changelog(value.extract(py).unwrap())
-                }
-                "Debian-ITP" => {
-                    upstream_ontologist::UpstreamDatum::DebianITP(value.extract(py).unwrap())
-                }
-                "Screenshots" => {
-                    upstream_ontologist::UpstreamDatum::Screenshots(value.extract(py).unwrap())
-                }
-                _ => { return Err(PyValueError::new_err(format!("Unknown field: {}", field))); }
+        Ok(UpstreamDatum(
+            upstream_ontologist::UpstreamDatumWithMetadata {
+                datum: match field.as_str() {
+                    "Name" => upstream_ontologist::UpstreamDatum::Name(value.extract(py).unwrap()),
+                    "Version" => {
+                        upstream_ontologist::UpstreamDatum::Version(value.extract(py).unwrap())
+                    }
+                    "Summary" => {
+                        upstream_ontologist::UpstreamDatum::Summary(value.extract(py).unwrap())
+                    }
+                    "Description" => {
+                        upstream_ontologist::UpstreamDatum::Description(value.extract(py).unwrap())
+                    }
+                    "Homepage" => {
+                        upstream_ontologist::UpstreamDatum::Homepage(value.extract(py).unwrap())
+                    }
+                    "Repository" => {
+                        upstream_ontologist::UpstreamDatum::Repository(value.extract(py).unwrap())
+                    }
+                    "Repository-Browse" => upstream_ontologist::UpstreamDatum::RepositoryBrowse(
+                        value.extract(py).unwrap(),
+                    ),
+                    "License" => {
+                        upstream_ontologist::UpstreamDatum::License(value.extract(py).unwrap())
+                    }
+                    "Author" => {
+                        upstream_ontologist::UpstreamDatum::Author(value.extract(py).unwrap())
+                    }
+                    "Bug-Database" => {
+                        upstream_ontologist::UpstreamDatum::BugDatabase(value.extract(py).unwrap())
+                    }
+                    "Bug-Submit" => {
+                        upstream_ontologist::UpstreamDatum::BugSubmit(value.extract(py).unwrap())
+                    }
+                    "Contact" => {
+                        upstream_ontologist::UpstreamDatum::Contact(value.extract(py).unwrap())
+                    }
+                    "Cargo-Crate" => {
+                        upstream_ontologist::UpstreamDatum::CargoCrate(value.extract(py).unwrap())
+                    }
+                    "Security-MD" => {
+                        upstream_ontologist::UpstreamDatum::SecurityMD(value.extract(py).unwrap())
+                    }
+                    "Keywords" => {
+                        upstream_ontologist::UpstreamDatum::Keywords(value.extract(py).unwrap())
+                    }
+                    "Maintainer" => {
+                        upstream_ontologist::UpstreamDatum::Maintainer(value.extract(py).unwrap())
+                    }
+                    "Copyright" => {
+                        upstream_ontologist::UpstreamDatum::Copyright(value.extract(py).unwrap())
+                    }
+                    "Documentation" => upstream_ontologist::UpstreamDatum::Documentation(
+                        value.extract(py).unwrap(),
+                    ),
+                    "Go-Import-Path" => {
+                        upstream_ontologist::UpstreamDatum::GoImportPath(value.extract(py).unwrap())
+                    }
+                    "Download" => {
+                        upstream_ontologist::UpstreamDatum::Download(value.extract(py).unwrap())
+                    }
+                    "Wiki" => upstream_ontologist::UpstreamDatum::Wiki(value.extract(py).unwrap()),
+                    "MailingList" => {
+                        upstream_ontologist::UpstreamDatum::MailingList(value.extract(py).unwrap())
+                    }
+                    "SourceForge-Project" => {
+                        upstream_ontologist::UpstreamDatum::SourceForgeProject(
+                            value.extract(py).unwrap(),
+                        )
+                    }
+                    "Archive" => {
+                        upstream_ontologist::UpstreamDatum::Archive(value.extract(py).unwrap())
+                    }
+                    "Demo" => upstream_ontologist::UpstreamDatum::Demo(value.extract(py).unwrap()),
+                    "Pecl-Package" => {
+                        upstream_ontologist::UpstreamDatum::PeclPackage(value.extract(py).unwrap())
+                    }
+                    "Haskell-Package" => upstream_ontologist::UpstreamDatum::HaskellPackage(
+                        value.extract(py).unwrap(),
+                    ),
+                    "Funding" => {
+                        upstream_ontologist::UpstreamDatum::Funding(value.extract(py).unwrap())
+                    }
+                    "Changelog" => {
+                        upstream_ontologist::UpstreamDatum::Changelog(value.extract(py).unwrap())
+                    }
+                    "Debian-ITP" => {
+                        upstream_ontologist::UpstreamDatum::DebianITP(value.extract(py).unwrap())
+                    }
+                    "Screenshots" => {
+                        upstream_ontologist::UpstreamDatum::Screenshots(value.extract(py).unwrap())
+                    }
+                    _ => {
+                        return Err(PyValueError::new_err(format!("Unknown field: {}", field)));
+                    }
+                },
+                origin,
+                certainty: certainty.map(|s| upstream_ontologist::Certainty::from_str(&s).unwrap()),
             },
-            origin,
-            certainty: certainty.map(|s| upstream_ontologist::Certainty::from_str(&s).unwrap()),
-        }))
+        ))
     }
 
     #[getter]
@@ -605,7 +613,13 @@ impl UpstreamDatum {
 
     #[getter]
     fn value(&self, py: Python) -> PyResult<PyObject> {
-        let value = self.0.datum.to_object(py).extract::<(String, PyObject)>(py).unwrap().1;
+        let value = self
+            .0
+            .datum
+            .to_object(py)
+            .extract::<(String, PyObject)>(py)
+            .unwrap()
+            .1;
         assert!(!value.as_ref(py).is_instance_of::<PyTuple>());
         Ok(value)
     }
@@ -700,7 +714,10 @@ impl UpstreamMetadata {
     }
 
     pub fn values(&self) -> Vec<UpstreamDatum> {
-        self.0.iter().map(|datum| UpstreamDatum(datum.clone())).collect()
+        self.0
+            .iter()
+            .map(|datum| UpstreamDatum(datum.clone()))
+            .collect()
     }
 
     pub fn get(&self, py: Python, field: &str, default: Option<PyObject>) -> PyObject {
@@ -832,12 +849,13 @@ fn extend_upstream_metadata(
     net_access: Option<bool>,
     consult_external_directory: Option<bool>,
 ) -> PyResult<()> {
-    let minimum_certainty = minimum_certainty.map(|s| s.parse()).transpose().map_err(|e: String| {
-        PyValueError::new_err(format!(
-            "Invalid minimum_certainty: {}",
-            e.to_string()
-        ))
-    })?;
+    let minimum_certainty =
+        minimum_certainty
+            .map(|s| s.parse())
+            .transpose()
+            .map_err(|e: String| {
+                PyValueError::new_err(format!("Invalid minimum_certainty: {}", e.to_string()))
+            })?;
     upstream_ontologist::extend_upstream_metadata(
         &mut metadata.0,
         path.as_path(),
@@ -877,12 +895,12 @@ fn guess_upstream_metadata_items(
     let metadata = upstream_ontologist::guess_upstream_metadata_items(
         path.as_path(),
         trust_package,
-        minimum_certainty.map(|s| s.parse()).transpose().map_err(|e: String| {
-            PyValueError::new_err(format!(
-                "Invalid minimum_certainty: {}",
-                e.to_string()
-            ))
-        })?,
+        minimum_certainty
+            .map(|s| s.parse())
+            .transpose()
+            .map_err(|e: String| {
+                PyValueError::new_err(format!("Invalid minimum_certainty: {}", e.to_string()))
+            })?,
     );
     Ok(metadata
         .into_iter()
@@ -900,7 +918,7 @@ fn fix_upstream_metadata(metadata: &mut UpstreamMetadata) -> PyResult<()> {
 fn update_from_guesses(
     py: Python,
     metadata: &mut UpstreamMetadata,
-    items_iter: PyObject
+    items_iter: PyObject,
 ) -> PyResult<Vec<UpstreamDatum>> {
     let mut items = vec![];
     loop {
@@ -919,7 +937,15 @@ fn update_from_guesses(
     Ok(upstream_ontologist::update_from_guesses(
         metadata.0.mut_items(),
         items.into_iter().map(|datum| datum.0),
-    ).into_iter().map(UpstreamDatum).collect())
+    )
+    .into_iter()
+    .map(UpstreamDatum)
+    .collect())
+}
+
+#[pyfunction]
+fn parse_first_header_text(text: &str) -> (Option<&str>, Option<&str>, Option<&str>) {
+    upstream_ontologist::readme::parse_first_header_text(text)
 }
 
 #[pymodule]
@@ -973,6 +999,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_upstream_info))?;
     m.add_wrapped(wrap_pyfunction!(get_upstream_info))?;
     m.add_wrapped(wrap_pyfunction!(description_from_readme_md))?;
+    m.add_wrapped(wrap_pyfunction!(parse_first_header_text))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;
