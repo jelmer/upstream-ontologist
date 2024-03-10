@@ -28,7 +28,7 @@ breezyshim = "0.1.24"
 debian-watch = { version = "0.2.1", optional = true }
 debian-changelog = { version = "0.1.8", optional = true }
 debbugs = "0.1.0"
-clap = { version = "4.4.6", features = ["derive", "env"] }
+clap = { version = "4,<4.5", features = ["derive", "env"] }
 maplit = "1.0.2"
 env_logger = "0.10.0"
 xml = "0.8.10"
