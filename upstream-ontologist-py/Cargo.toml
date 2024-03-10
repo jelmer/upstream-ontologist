@@ -12,7 +12,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 upstream-ontologist = { path = ".." }
-pyo3 = { workspace = true, features = ["extension-module"] }
+pyo3 = { workspace = true }
 pyo3-log = { workspace = true }
 reqwest = { version = "^0.11", features=["blocking", "json"], default-features = false }
 url = "2.2"
@@ -23,3 +23,4 @@ log = "0.4"
 default = []
 default-tls = ["upstream-ontologist/default-tls", "reqwest/default-tls"]
 rustls-tls = ["upstream-ontologist/rustls-tls", "reqwest/rustls-tls"]
+extension-module = ["pyo3/extension-module"]
