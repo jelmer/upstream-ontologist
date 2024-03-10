@@ -36,6 +36,11 @@ struct SoftwareSourceCode {
     related_link: HashSet<String>,
 }
 
+fn valid_spdx_identifier(name: &str) -> bool {
+    name.chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '+')
+}
+
 fn codemeta_file_from_upstream_info(data: Vec<UpstreamDatum>) -> SoftwareSourceCode {
     let mut result = SoftwareSourceCode {
         ..Default::default()
@@ -75,7 +80,9 @@ fn codemeta_file_from_upstream_info(data: Vec<UpstreamDatum>) -> SoftwareSourceC
                 result.related_link.insert(r);
             }
             UpstreamDatum::License(l) => {
-                result.license = Some(format!("https://spdx.org/licenses/{}", l));
+                if valid_spdx_identifier(&l) {
+                    result.license = Some(format!("https://spdx.org/licenses/{}", l));
+                }
             }
             UpstreamDatum::Version(v) => {
                 result.version = Some(v);
