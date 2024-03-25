@@ -1,6 +1,10 @@
 [build-system]
-requires = ["setuptools>=61.2", "setuptools-rust"]
-build-backend = "setuptools.build_meta"
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+module-name = "upstream_ontologist._upstream_ontologist_py"
+python-source = "python"
 
 [tool.mypy]
 warn_redundant_casts = true
@@ -54,9 +58,6 @@ readme = [
 ]
 "setup.cfg" = ["setuptools"]
 testing = ["breezy>=3.3.0"]
-
-[project.scripts]
-guess-upstream-metadata = "upstream_ontologist.__main__:main"
 
 [tool.setuptools]
 packages = [
