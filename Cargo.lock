@@ -759,7 +759,7 @@ dependencies = [
 [[package]]
 name = "debcargo"
 version = "2.6.1"
-source = "git+https://salsa.debian.org/rust-team/debcargo.git/#d56f5241940e0def972d33713bbaf9ae9b78a6ad"
+source = "git+https://salsa.debian.org/rust-team/debcargo#d56f5241940e0def972d33713bbaf9ae9b78a6ad"
 dependencies = [
  "ansi_term",
  "anyhow",
