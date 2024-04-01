@@ -1,4 +1,4 @@
-from typing import Iterator, Any
+from typing import Any, Iterator
 
 from upstream_ontologist import UpstreamPackage
 
@@ -52,9 +52,7 @@ def upstream_name_to_debian_source_name(upstream_name: str) -> str: ...
 def upstream_version_to_debian_upstream_version(
     version: str, family: str | None = None
 ) -> str: ...
-
 def check_upstream_metadata(data: UpstreamMetadata) -> None: ...
-
 def upstream_package_to_debian_source_name(package: UpstreamPackage) -> str: ...
 def upstream_package_to_debian_binary_name(package: UpstreamPackage) -> str: ...
 
@@ -77,18 +75,24 @@ class Launchpad(Forge): ...
 SECURE_SCHEMES: list[str]
 KNOWN_GITLAB_SITES: list[str]
 
-def find_secure_repo_url(url: str, branch: str | None = None, net_access: bool | None = None) -> str | None: ...
+def find_secure_repo_url(
+    url: str, branch: str | None = None, net_access: bool | None = None
+) -> str | None: ...
 def sanitize_url(url: str) -> str: ...
 def convert_cvs_list_to_str(cvs_list: list[str]) -> str: ...
-def fixup_broken_git_details(url: str, branch: str | None = None, subpath: str | None = None) -> tuple[str, str | None, str | None]: ...
+def fixup_broken_git_details(
+    url: str, branch: str | None = None, subpath: str | None = None
+) -> tuple[str, str | None, str | None]: ...
 def guess_upstream_info(
     path: str, trust_package: bool = False
 ) -> list[UpstreamDatum]: ...
-
 def get_upstream_info(
-        path: str, trust_package: bool = False, net_access: bool | None = None, consult_external_directory: bool = True, check: bool = True
+    path: str,
+    trust_package: bool = False,
+    net_access: bool | None = None,
+    consult_external_directory: bool = True,
+    check: bool = True,
 ) -> UpstreamMetadata: ...
-
 def extend_upstream_metadata(
     upstream_metadata: UpstreamMetadata,
     path: str,
@@ -96,30 +100,25 @@ def extend_upstream_metadata(
     net_access: bool | None = None,
     consult_external_directory: bool = True,
 ) -> None: ...
-
 def guess_upstream_metadata(
     path: str,
     trust_package: bool | None = None,
     net_access: bool | None = None,
     consult_external_directory: bool | None = None,
-    check: bool | None = None) -> UpstreamMetadata: ...
-
+    check: bool | None = None,
+) -> UpstreamMetadata: ...
 def fix_upstream_metadata(upstream_metadata: UpstreamMetadata) -> None: ...
-
-def guess_upstream_metadata_items(path: str, trust_package: bool | None = None, minimum_certainty: str | None = None) -> Iterator[UpstreamDatum]: ...
-
+def guess_upstream_metadata_items(
+    path: str, trust_package: bool | None = None, minimum_certainty: str | None = None
+) -> Iterator[UpstreamDatum]: ...
 def update_from_guesses(
     upstream_metadata: UpstreamMetadata,
     items: list[UpstreamDatum],
 ) -> list[UpstreamDatum]: ...
 
 class UpstreamMetadata:
-
-    def __init__(self, **kwargs):
-        ...
+    def __init__(self, **kwargs): ...
     ...
 
-
 class UpstreamDatum:
-
-    def __init__(self, name, value: Any, certainty: str | None = None): ...
+    def __init__(self, name, value: Any, certainty: str | None = None): ...  # noqa: ANN401
