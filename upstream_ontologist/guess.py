@@ -16,29 +16,11 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
 import logging
-import os
-import urllib.error
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple, cast
-from urllib.parse import urlparse
-from urllib.request import Request, urlopen
+from typing import Iterable, Iterator
 
 from . import (
-    DEFAULT_URLLIB_TIMEOUT,
-    USER_AGENT,
-    InvalidUrl,
-    Person,
     UpstreamDatum,
-    UpstreamMetadata,
-    UrlUnverifiable,
     _upstream_ontologist,
-)
-from .vcs import (
-    browse_url_from_repo_url,
-    check_repository_url_canonical,
-    guess_repo_from_url,
-)
-from .vcs import (
-    sanitize_url as sanitize_vcs_url,
 )
 
 logger = logging.getLogger(__name__)
@@ -96,6 +78,7 @@ def filter_bad_guesses(
     guesses: Iterable[UpstreamDatum],
 ) -> Iterator[UpstreamDatum]:
     return (guess for guess in guesses if not known_bad_guess(guess))
+
 
 fix_upstream_metadata = _upstream_ontologist.fix_upstream_metadata
 

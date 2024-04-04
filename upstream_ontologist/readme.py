@@ -51,7 +51,9 @@ def _skip_paragraph_block(para):  # noqa: C901
             else:
                 name = None
             if name in ("CRAN", "CRAN_Status_Badge", "CRAN_Logs_Badge"):
-                extra_metadata.append(UpstreamDatum("Archive", "CRAN", certainty="confident"))
+                extra_metadata.append(
+                    UpstreamDatum("Archive", "CRAN", certainty="confident")
+                )
             elif name == "Gitter":
                 parsed_url = urlparse(c.get("href"))
                 extra_metadata.append(
@@ -79,7 +81,9 @@ def _skip_paragraph_block(para):  # noqa: C901
                 )
             elif name and name.lower() == "api docs":
                 extra_metadata.append(
-                    UpstreamDatum("API-Documentation", c.get("href"), certainty="confident")
+                    UpstreamDatum(
+                        "API-Documentation", c.get("href"), certainty="confident"
+                    )
                 )
             elif name and name.lower() == "downloads":
                 extra_metadata.append(
@@ -89,7 +93,9 @@ def _skip_paragraph_block(para):  # noqa: C901
                 href = c.get("href")
                 if href.startswith("https://crates.io/crates/"):
                     extra_metadata.append(
-                        UpstreamDatum("Cargo-Crate", href.rsplit("/")[-1], certainty="confident")
+                        UpstreamDatum(
+                            "Cargo-Crate", href.rsplit("/")[-1], certainty="confident"
+                        )
                     )
             elif name:
                 m = re.match("(.*) License", name)
@@ -197,13 +203,21 @@ def _extract_paragraphs(children, metadata):
 
 def _parse_field(name, body):
     if name == "Homepage" and body.find("a"):
-        yield UpstreamDatum("Homepage", body.find("a").get("href"), certainty="confident")
+        yield UpstreamDatum(
+            "Homepage", body.find("a").get("href"), certainty="confident"
+        )
     if name == "Home" and body.find("a"):
-        yield UpstreamDatum("Homepage", body.find("a").get("href"), certainty="confident")
+        yield UpstreamDatum(
+            "Homepage", body.find("a").get("href"), certainty="confident"
+        )
     if name == "Issues" and body.find("a"):
-        yield UpstreamDatum("Bug-Database", body.find("a").get("href"), certainty="confident")
+        yield UpstreamDatum(
+            "Bug-Database", body.find("a").get("href"), certainty="confident"
+        )
     if name == "Documentation" and body.find("a"):
-        yield UpstreamDatum("Documentation", body.find("a").get("href"), certainty="confident")
+        yield UpstreamDatum(
+            "Documentation", body.find("a").get("href"), certainty="confident"
+        )
     if name == "License":
         yield UpstreamDatum("License", body.get_text(), certainty="confident")
 
@@ -264,7 +278,9 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[Upstream
     return None, metadata
 
 
-def description_from_readme_html(html_text: str) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
+def description_from_readme_html(
+    html_text: str,
+) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
     """Description from HTML."""
     try:
         from bs4 import BeautifulSoup, FeatureNotFound
@@ -280,7 +296,7 @@ def description_from_readme_html(html_text: str) -> Tuple[Optional[str], Iterabl
 
 
 def description_from_readme_rst(
-    rst_text: str
+    rst_text: str,
 ) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
     """Description from README.rst."""
     if platform.python_implementation() == "PyPy":

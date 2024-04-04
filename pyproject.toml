@@ -71,14 +71,9 @@ upstream_ontologist = ["py.typed"]
 version = {attr = "upstream_ontologist.version_string"}
 
 [tool.ruff]
-select = [
-    "ANN",
-    "D",
-    "E",
-    "F",
-    "I",
-    "UP",
-]
+target-version = "py37"
+
+[tool.ruff.lint]
 ignore = [
     "ANN001",
     "ANN002",
@@ -103,7 +98,14 @@ ignore = [
     "E501",  # line too long
     "E741",  # ambiguous variable name
 ]
-target-version = "py37"
+select = [
+    "ANN",
+    "D",
+    "E",
+    "F",
+    "I",
+    "UP",
+]
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "google"

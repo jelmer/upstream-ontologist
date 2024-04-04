@@ -55,7 +55,7 @@ Supported, but currently not set.
 
 from dataclasses import dataclass
 from email.utils import parseaddr
-from typing import Generic, List, Optional, Sequence, TypedDict, TypeVar
+from typing import Optional
 
 import ruamel.yaml
 
