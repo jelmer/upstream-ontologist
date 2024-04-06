@@ -248,7 +248,7 @@ mod person_tests {
 
 impl ToPyObject for Person {
     fn to_object(&self, py: Python) -> PyObject {
-        let m = PyModule::import(py, "upstream_ontologist.guess").unwrap();
+        let m = PyModule::import(py, "upstream_ontologist").unwrap();
         let person_cls = m.getattr("Person").unwrap();
         person_cls
             .call1((self.name.as_ref(), self.email.as_ref(), self.url.as_ref()))
