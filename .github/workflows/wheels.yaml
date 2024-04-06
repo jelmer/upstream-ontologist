@@ -26,7 +26,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly
+          toolchain: stable
           override: true
       - name: Install native dependencies (MacOS)
         run: brew install swig gpgme
@@ -52,26 +52,26 @@ jobs:
           CIBW_ENVIRONMENT: 'PATH="$HOME/.cargo/bin:$PATH"'
           CIBW_BEFORE_BUILD: >
             pip install -U setuptools-rust &&
-            rustup default nightly &&
+            rustup default stable &&
             rustup target add all &&
             rustup show
           CIBW_BEFORE_BUILD_LINUX: >
             if command -v yum; then yum -y install openssl-devel; fi &&
             if command -v apk; then apk add openssl-dev pkgconfig; fi &&
             pip install -U setuptools-rust &&
-            curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=nightly --profile=minimal -y &&
+            curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=stable --profile=minimal -y &&
             rustup target add all &&
             rustup show
           CIBW_BEFORE_BUILD_MACOS: >
             brew install openssl &&
             pip install -U setuptools-rust &&
-            curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=nightly --profile=minimal -y &&
+            curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=stable --profile=minimal -y &&
             rustup target add all &&
             rustup show
           CIBW_BEFORE_BUILD_WINDOWS: >
             vcpkg install openssl &&
             pip install -U setuptools-rust &&
-            curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=nightly --profile=minimal -y &&
+            curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=stable --profile=minimal -y &&
             rustup target add all &&
             rustup show
           CIBW_ENVIRONMENT_WINDOWS: 'CMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake"'
