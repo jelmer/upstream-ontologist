@@ -113,6 +113,8 @@ convention = "google"
 [tool.cibuildwheel]
 before-build = "pip install -U setuptools-rust && rustup default stable && rustup show"
 environment = {PATH="$HOME/.cargo/bin:$PATH"}
+# breezyshim needs to embed python, which pypy doesn't support
+skip = "pp*-* *musllinux*"
 
 [tool.cibuildwheel.linux]
 before-build = "if command -v yum; then yum -y install openssl-devel; fi && if command -v apk; then apk add openssl-dev pkgconfig; fi && pip install -U setuptools-rust && curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=stable --profile=minimal -y && rustup show"
