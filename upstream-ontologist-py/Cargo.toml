@@ -12,7 +12,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 upstream-ontologist = { path = ".." }
-pyo3 = { workspace = true, features = ["abi3"] }
+pyo3 = { workspace = true }
 pyo3-log = { workspace = true }
 reqwest = { version = "^0.12", features=["blocking", "json"], default-features = false }
 url = "2.2"

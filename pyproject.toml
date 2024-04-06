@@ -109,3 +109,21 @@ select = [
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.cibuildwheel]
+skip = "*-win32 *-win_amd64"
+before-build = "pip install -U setuptools-rust && rustup default stable && rustup show"
+environment = {PATH="$HOME/.cargo/bin:$PATH"}
+
+[tool.cibuildwheel.linux]
+# Arm builds fail at the moment
+archs = "x86_64"
+before-build = "if command -v yum; then yum -y install openssl-devel; fi && if command -v apk; then apk add openssl-dev pkgconfig; fi && pip install -U setuptools-rust && curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=stable --profile=minimal -y && rustup show"
+
+[tool.cibuildwheel.macos]
+macos = "x86_64 arm64 universal2"
+before-build = "brew install openssl && pip install -U setuptools-rust && curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=stable --profile=minimal -y && rustup show"
+
+[tool.cibuildwheel.windows]
+before-build = "vcpkg install openssl && pip install -U setuptools-rust && curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=stable --profile=minimal -y && rustup show"
+environment = {CMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake"}
