@@ -24,7 +24,7 @@ name = "upstream-ontologist"
 authors = [{name = "Jelmer Vernooij", email = "jelmer@jelmer.uk"}]
 maintainers = [{name = "Jelmer Vernooij", email = "jelmer@jelmer.uk"}]
 description = "tracking of upstream project metadata"
-requires-python = ">= 3.8"
+requires-python = ">= 3.7"
 dependencies = [
     "python_debian",
     "ruamel.yaml",
@@ -109,3 +109,20 @@ select = [
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.cibuildwheel]
+before-build = "pip install -U setuptools-rust && rustup default stable && rustup show"
+environment = {PATH="$HOME/.cargo/bin:$PATH"}
+# breezyshim needs to embed python, which pypy doesn't support
+skip = "pp*-* *musllinux*"
+
+[tool.cibuildwheel.linux]
+before-build = "if command -v yum; then yum -y install openssl-devel; fi && if command -v apk; then apk add openssl-dev pkgconfig; fi && pip install -U setuptools-rust && curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=stable --profile=minimal -y && rustup show"
+
+[tool.cibuildwheel.macos]
+macos = "x86_64 arm64 universal2"
+before-build = "brew install openssl && pip install -U setuptools-rust && curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=stable --profile=minimal -y && rustup show"
+
+[tool.cibuildwheel.windows]
+before-build = "vcpkg install openssl && pip install -U setuptools-rust && curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=stable --profile=minimal -y && rustup show"
+environment = {CMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake"}

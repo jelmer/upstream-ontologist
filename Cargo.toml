@@ -111,3 +111,9 @@ optional = true
 [workspace.dependencies]
 pyo3 = "0.20"
 pyo3-log = "0.8"
+
+[[bin]]
+name = "autodoap"
+
+[[bin]]
+name = "autocodemeta"
