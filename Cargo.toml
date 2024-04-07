@@ -30,7 +30,7 @@ debian-changelog = { version = "0.1.8", optional = true }
 debbugs = "0.1.0"
 clap = { version = "4,<4.5", features = ["derive", "env"] }
 maplit = "1.0.2"
-env_logger = "0.10"
+env_logger = "0.11"
 xml = "0.8.10"
 makefile-lossless = { version = "0.1.2", optional = true }
 debian-copyright = { version = "0.1.2", optional = true }
