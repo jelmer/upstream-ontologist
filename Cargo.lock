@@ -249,7 +249,7 @@ dependencies = [
  "chrono",
  "ctor",
  "debversion 0.3.0",
- "lazy-regex 3.1.0",
+ "lazy-regex",
  "lazy_static",
  "pyo3",
  "pyo3-filelike",
@@ -762,7 +762,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c97610f1921c853f2461e39c9d6aaa4639d060994348bd45d12204049432fca"
 dependencies = [
  "debversion 0.2.2",
- "lazy-regex 3.1.0",
+ "lazy-regex",
  "log",
  "mailparse",
  "maplit",
@@ -808,7 +808,7 @@ checksum = "71be2258e81c0c1f83f5e87340a11bf5c2336b3424fb2a7c7aa1be5a00c32577"
 dependencies = [
  "chrono",
  "debversion 0.3.0",
- "lazy-regex 3.1.0",
+ "lazy-regex",
  "log",
  "rowan",
  "textwrap",
@@ -857,7 +857,7 @@ version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e65a0a572fa10f34b89addac251b7c8f40266606ee5847d769ab8db4d56ca11b"
 dependencies = [
- "lazy-regex 3.1.0",
+ "lazy-regex",
 ]
 
 [[package]]
@@ -866,7 +866,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6912a4e23e6853e2b09afbbe7ff88d42758cc878bc26ab17de584d9e77b381a7"
 dependencies = [
- "lazy-regex 3.1.0",
+ "lazy-regex",
  "pyo3",
 ]
 
@@ -2090,36 +2090,13 @@ dependencies = [
 
 [[package]]
 name = "lazy-regex"
-version = "2.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff63c423c68ea6814b7da9e88ce585f793c87ddd9e78f646970891769c8235d4"
-dependencies = [
- "lazy-regex-proc_macros 2.4.1",
- "once_cell",
- "regex",
-]
-
-[[package]]
-name = "lazy-regex"
 version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d12be4595afdf58bd19e4a9f4e24187da2a66700786ff660a418e9059937a4c"
 dependencies = [
- "lazy-regex-proc_macros 3.1.0",
+ "lazy-regex-proc_macros",
  "once_cell",
  "regex",
-]
-
-[[package]]
-name = "lazy-regex-proc_macros"
-version = "2.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8edfc11b8f56ce85e207e62ea21557cfa09bb24a8f6b04ae181b086ff8611c22"
-dependencies = [
- "proc-macro2",
- "quote",
- "regex",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -4277,7 +4254,7 @@ dependencies = [
  "env_logger 0.11.3",
  "gix-config",
  "html5ever 0.27.0",
- "lazy-regex 2.5.0",
+ "lazy-regex",
  "lazy_static",
  "log",
  "mailparse",
