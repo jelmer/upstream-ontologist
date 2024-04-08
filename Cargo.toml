@@ -73,7 +73,7 @@ features = [ "blocking", "json",]
 default-features = false
 
 [dependencies.rust-ini]
-version = "0.18"
+version = "0.21"
 optional = true
 
 [dependencies.serde]
