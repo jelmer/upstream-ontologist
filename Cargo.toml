@@ -97,7 +97,7 @@ version = ">=0.5"
 optional = true
 
 [dependencies.mailparse]
-version = "0.14"
+version = "0.15"
 optional = true
 
 [dependencies.pyproject-toml]
