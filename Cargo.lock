@@ -740,9 +740,9 @@ dependencies = [
 
 [[package]]
 name = "data-encoding"
-version = "2.5.0"
+version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e962a19be5cfc3f3bf6dd8f61eb50107f356ad6270fbb3ed41476571db78be5"
+checksum = "e8566979429cf69b49a5c740c60791108e86440e8be149bbea4fe54d2c32d6e2"
 
 [[package]]
 name = "deb822-lossless"
@@ -764,7 +764,7 @@ dependencies = [
  "debversion 0.2.2",
  "lazy-regex",
  "log",
- "mailparse",
+ "mailparse 0.14.1",
  "maplit",
  "reqwest 0.11.27",
  "tokio",
@@ -2249,6 +2249,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "mailparse"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3da03d5980411a724e8aaf7b61a7b5e386ec55a7fb49ee3d0ff79efc7e5e7c7e"
+dependencies = [
+ "charset",
+ "data-encoding",
+ "quoted_printable 0.5.0",
+]
+
+[[package]]
 name = "makefile-lossless"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2977,7 +2988,7 @@ checksum = "037469c164f08c891bf6d69ca02f1d56210011451e229618669777df82124cfa"
 dependencies = [
  "flate2",
  "fs-err",
- "mailparse",
+ "mailparse 0.14.1",
  "rfc2047-decoder",
  "tar",
  "thiserror",
@@ -4275,7 +4286,7 @@ dependencies = [
  "lazy-regex",
  "lazy_static",
  "log",
- "mailparse",
+ "mailparse 0.15.0",
  "makefile-lossless",
  "maplit",
  "opam-file-rs",
