@@ -59,8 +59,7 @@ def _skip_paragraph_block(para):  # noqa: C901
                 extra_metadata.append(
                     UpstreamDatum(
                         "Repository",
-                        "https://github.com/%s"
-                        % "/".join(parsed_url.path.strip("/").split("/")[:2]),
+                        "https://github.com/{}".format("/".join(parsed_url.path.strip("/").split("/")[:2])),
                         certainty="confident",
                     )
                 )
@@ -70,8 +69,7 @@ def _skip_paragraph_block(para):  # noqa: C901
                     extra_metadata.append(
                         UpstreamDatum(
                             "Repository",
-                            "https://github.com/%s"
-                            % "/".join(parsed_url.path.strip("/").split("/")[:2]),
+                            "https://github.com/{}".format("/".join(parsed_url.path.strip("/").split("/")[:2])),
                             certainty="confident",
                         )
                     )
@@ -190,7 +188,7 @@ def _extract_paragraphs(children, metadata):
                 metadata.extend(_parse_ul_field_list(el))
             else:
                 paragraphs.append(
-                    "".join("* %s\n" % li.get_text() for li in el.findAll("li"))
+                    "".join(f"* {li.get_text()}\n" for li in el.findAll("li"))
                 )
         elif re.match("h[0-9]", el.name):
             if len(paragraphs) == 0:
