@@ -28,15 +28,15 @@ breezyshim = "0.1.92"
 debian-watch = { version = "0.2.1", optional = true }
 debian-changelog = { version = "0.1.8", optional = true }
 debbugs = "0.1.0"
-clap = { version = "4,<4.5", features = ["derive", "env"] }
+clap = { version = "4,<4.5", features = ["derive", "env"], optional = true }
 maplit = "1.0.2"
-env_logger = "0.11"
+env_logger = { version = "0.10", optional = true }
 xml = "0.8.10"
 makefile-lossless = { version = "0.1.2", optional = true }
 debian-copyright = { version = "0.1.2", optional = true }
 debian-control = { version = "0.1.6", optional = true }
 select = "0.6.0"
-pulldown-cmark = "0.10.3"
+pulldown-cmark = "0.9"
 debcargo = { optional = true, git = "https://salsa.debian.org/rust-team/debcargo" }
 scraper = "0.19.0"
 
@@ -58,6 +58,7 @@ rustls-tls = ["reqwest/rustls-tls"]
 debcargo = ["dep:debcargo"]
 debian = ["debcargo", "dep:debian-watch", "dep:makefile-lossless", "dep:debian-changelog", "dep:debian-control", "dep:debian-copyright"]
 pyo3 = []
+cli = ["dep:clap", "dep:env_logger"]
 
 [lib]
 
@@ -114,6 +115,12 @@ pyo3-log = "0.8"
 
 [[bin]]
 name = "autodoap"
+required-features = ["cli"]
 
 [[bin]]
 name = "autocodemeta"
+required-features = ["cli"]
+
+[[bin]]
+name = "guess-upstream-metadata"
+required-features = ["cli"]
