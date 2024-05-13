@@ -2,10 +2,9 @@ use pyo3::create_exception;
 use pyo3::exceptions::{PyException, PyKeyError, PyRuntimeError, PyStopIteration, PyValueError};
 use pyo3::import_exception;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
-use pyo3::types::PyTuple;
+use pyo3::types::{PyDict, PyTuple, PyType};
 use std::str::FromStr;
-use upstream_ontologist::{CanonicalizeError, Origin, UpstreamPackage};
+use upstream_ontologist::{CanonicalizeError, Certainty, Origin, UpstreamPackage};
 use url::Url;
 
 import_exception!(urllib.error, HTTPError);
@@ -596,12 +595,24 @@ impl UpstreamDatum {
                     "Screenshots" => {
                         upstream_ontologist::UpstreamDatum::Screenshots(value.extract(py).unwrap())
                     }
+                    "Cite-As" => {
+                        upstream_ontologist::UpstreamDatum::CiteAs(value.extract(py).unwrap())
+                    }
+                    "Registry" => {
+                        upstream_ontologist::UpstreamDatum::Registry(value.extract(py).unwrap())
+                    }
+                    "Donation" => {
+                        upstream_ontologist::UpstreamDatum::Donation(value.extract(py).unwrap())
+                    }
+                    "Webservice" => {
+                        upstream_ontologist::UpstreamDatum::Webservice(value.extract(py).unwrap())
+                    }
                     _ => {
                         return Err(PyValueError::new_err(format!("Unknown field: {}", field)));
                     }
                 },
                 origin,
-                certainty: certainty.map(|s| upstream_ontologist::Certainty::from_str(&s).unwrap()),
+                certainty: certainty.map(|s| Certainty::from_str(&s).unwrap()),
             },
         ))
     }
@@ -641,7 +652,7 @@ impl UpstreamDatum {
 
     #[setter]
     pub fn set_certainty(&mut self, certainty: Option<String>) {
-        self.0.certainty = certainty.map(|s| upstream_ontologist::Certainty::from_str(&s).unwrap());
+        self.0.certainty = certainty.map(|s| Certainty::from_str(&s).unwrap());
     }
 
     fn __eq__(lhs: &PyCell<Self>, rhs: &PyCell<Self>) -> PyResult<bool> {
@@ -749,6 +760,38 @@ impl UpstreamMetadata {
         }
 
         ret
+    }
+
+    #[classmethod]
+    pub fn from_dict(
+        cls: &PyType,
+        py: Python,
+        d: &PyDict,
+        default_certainty: Option<Certainty>,
+    ) -> PyResult<Self> {
+        let mut data = Vec::new();
+        let mut di = d.iter();
+        while let Some(t) = di.next() {
+            let t = t.to_object(py);
+            let mut datum: upstream_ontologist::UpstreamDatumWithMetadata =
+                if let Ok(wm) = t.extract(py) {
+                    wm
+                } else {
+                    let wm: upstream_ontologist::UpstreamDatum = t.extract(py)?;
+
+                    upstream_ontologist::UpstreamDatumWithMetadata {
+                        datum: wm,
+                        certainty: default_certainty,
+                        origin: None,
+                    }
+                };
+
+            if datum.certainty.is_none() {
+                datum.certainty = default_certainty;
+            }
+            data.push(datum);
+        }
+        Ok(Self(upstream_ontologist::UpstreamMetadata::from_data(data)))
     }
 
     pub fn __iter__(slf: PyRef<Self>) -> PyResult<PyObject> {

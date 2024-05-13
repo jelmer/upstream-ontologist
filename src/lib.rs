@@ -1,7 +1,7 @@
 use lazy_regex::regex;
 use log::{debug, error, warn};
 use percent_encoding::utf8_percent_encode;
-use pyo3::exceptions::{PyRuntimeError, PyTypeError};
+use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use reqwest::header::HeaderMap;
 use serde::ser::{Serialize, SerializeSeq};
@@ -121,6 +121,14 @@ impl ToString for Certainty {
             Certainty::Likely => "likely".to_string(),
             Certainty::Possible => "possible".to_string(),
         }
+    }
+}
+
+#[cfg(feature = "pyo3")]
+impl FromPyObject<'_> for Certainty {
+    fn extract(ob: &PyAny) -> PyResult<Self> {
+        let o = ob.extract::<&str>()?;
+        o.parse().map_err(PyValueError::new_err)
     }
 }
 
@@ -343,6 +351,14 @@ pub enum UpstreamDatum {
     DebianITP(i32),
     /// List of URLs to screenshots
     Screenshots(Vec<String>),
+    /// Name of registry
+    Registry(String),
+    /// Recommended way to cite the software
+    CiteAs(String),
+    /// Link for donations (e.g. Paypal, Libera, etc)
+    Donation(String),
+    /// Link to a life instance of the webservice
+    Webservice(String),
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -394,6 +410,10 @@ impl UpstreamDatum {
             UpstreamDatum::Changelog(..) => "Changelog",
             UpstreamDatum::DebianITP(..) => "Debian-ITP",
             UpstreamDatum::Screenshots(..) => "Screenshots",
+            UpstreamDatum::Registry(..) => "Registry",
+            UpstreamDatum::CiteAs(..) => "Cite-As",
+            UpstreamDatum::Donation(..) => "Donation",
+            UpstreamDatum::Webservice(..) => "Webservice",
         }
     }
 
@@ -431,6 +451,10 @@ impl UpstreamDatum {
             UpstreamDatum::Changelog(c) => Some(c),
             UpstreamDatum::Screenshots(..) => None,
             UpstreamDatum::DebianITP(_c) => None,
+            UpstreamDatum::CiteAs(c) => Some(c),
+            UpstreamDatum::Registry(r) => Some(r),
+            UpstreamDatum::Donation(d) => Some(d),
+            UpstreamDatum::Webservice(w) => Some(w),
         }
     }
 
@@ -468,6 +492,10 @@ impl UpstreamDatum {
             UpstreamDatum::Changelog(s) => Some(s.parse().ok()?),
             UpstreamDatum::Screenshots(..) => None,
             UpstreamDatum::DebianITP(_c) => None,
+            UpstreamDatum::Registry(_r) => None,
+            UpstreamDatum::CiteAs(_c) => None,
+            UpstreamDatum::Donation(_d) => None,
+            UpstreamDatum::Webservice(w) => Some(w.parse().ok()?),
         }
     }
 
@@ -650,6 +678,18 @@ impl std::fmt::Display for UpstreamDatum {
             UpstreamDatum::Screenshots(s) => {
                 write!(f, "Screenshots: {}", s.join(", "))
             }
+            UpstreamDatum::Registry(r) => {
+                write!(f, "Registry: {}", r)
+            }
+            UpstreamDatum::CiteAs(c) => {
+                write!(f, "Cite-As: {}", c)
+            }
+            UpstreamDatum::Donation(d) => {
+                write!(f, "Donation: {}", d)
+            }
+            UpstreamDatum::Webservice(w) => {
+                write!(f, "Webservice: {}", w)
+            }
         }
     }
 }
@@ -707,6 +747,10 @@ impl serde::ser::Serialize for UpstreamDatum {
                 }
                 seq.end()
             }
+            UpstreamDatum::CiteAs(c) => serializer.serialize_str(c),
+            UpstreamDatum::Registry(r) => serializer.serialize_str(r),
+            UpstreamDatum::Donation(d) => serializer.serialize_str(d),
+            UpstreamDatum::Webservice(w) => serializer.serialize_str(w),
         }
     }
 }
@@ -716,6 +760,10 @@ pub struct UpstreamMetadata(Vec<UpstreamDatumWithMetadata>);
 impl UpstreamMetadata {
     pub fn new() -> Self {
         UpstreamMetadata(Vec::new())
+    }
+
+    pub fn from_data(data: Vec<UpstreamDatumWithMetadata>) -> Self {
+        Self(data)
     }
 
     pub fn mut_items(&mut self) -> &mut Vec<UpstreamDatumWithMetadata> {
@@ -760,6 +808,12 @@ impl UpstreamMetadata {
     pub fn remove(&mut self, field: &str) -> Option<UpstreamDatumWithMetadata> {
         let index = self.0.iter().position(|d| d.datum.field() == field)?;
         Some(self.0.remove(index))
+    }
+}
+
+impl Default for UpstreamMetadata {
+    fn default() -> Self {
+        UpstreamMetadata::new()
     }
 }
 
@@ -2119,6 +2173,10 @@ impl FromPyObject<'_> for UpstreamDatum {
             "Maintainer" => Ok(UpstreamDatum::Maintainer(val.extract::<Person>()?)),
             "Changelog" => Ok(UpstreamDatum::Changelog(val.extract::<String>()?)),
             "Screenshots" => Ok(UpstreamDatum::Screenshots(val.extract::<Vec<String>>()?)),
+            "Cite-As" => Ok(UpstreamDatum::CiteAs(val.extract::<String>()?)),
+            "Registry" => Ok(UpstreamDatum::Registry(val.extract::<String>()?)),
+            "Donation" => Ok(UpstreamDatum::Donation(val.extract::<String>()?)),
+            "Webservice" => Ok(UpstreamDatum::Webservice(val.extract::<String>()?)),
             _ => Err(PyRuntimeError::new_err(format!("Unknown field: {}", field))),
         }
     }
@@ -2161,6 +2219,10 @@ impl ToPyObject for UpstreamDatum {
                 UpstreamDatum::HaskellPackage(p) => p.into_py(py),
                 UpstreamDatum::DebianITP(i) => i.into_py(py),
                 UpstreamDatum::Screenshots(s) => s.to_object(py),
+                UpstreamDatum::CiteAs(s) => s.to_object(py),
+                UpstreamDatum::Registry(r) => r.to_object(py),
+                UpstreamDatum::Donation(d) => d.to_object(py),
+                UpstreamDatum::Webservice(w) => w.to_object(py),
             },
         )
             .to_object(py)
