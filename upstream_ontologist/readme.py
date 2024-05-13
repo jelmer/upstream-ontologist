@@ -59,7 +59,9 @@ def _skip_paragraph_block(para):  # noqa: C901
                 extra_metadata.append(
                     UpstreamDatum(
                         "Repository",
-                        "https://github.com/{}".format("/".join(parsed_url.path.strip("/").split("/")[:2])),
+                        "https://github.com/{}".format(
+                            "/".join(parsed_url.path.strip("/").split("/")[:2])
+                        ),
                         certainty="confident",
                     )
                 )
@@ -69,7 +71,9 @@ def _skip_paragraph_block(para):  # noqa: C901
                     extra_metadata.append(
                         UpstreamDatum(
                             "Repository",
-                            "https://github.com/{}".format("/".join(parsed_url.path.strip("/").split("/")[:2])),
+                            "https://github.com/{}".format(
+                                "/".join(parsed_url.path.strip("/").split("/")[:2])
+                            ),
                             certainty="confident",
                         )
                     )
