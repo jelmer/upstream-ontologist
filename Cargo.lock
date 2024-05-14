@@ -339,7 +339,7 @@ dependencies = [
  "crates-io",
  "curl",
  "curl-sys",
- "env_logger",
+ "env_logger 0.10.2",
  "filetime",
  "flate2",
  "fwdansi",
@@ -793,7 +793,7 @@ dependencies = [
  "cargo-util",
  "chrono",
  "clap",
- "env_logger",
+ "env_logger 0.10.2",
  "filetime",
  "flate2",
  "git2",
@@ -1094,6 +1094,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "env_filter"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a009aa4810eb158359dda09d0c87378e4bbb89b5a801f016885a4707ba24f7ea"
+dependencies = [
+ "log",
+ "regex",
+]
+
+[[package]]
 name = "env_logger"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1104,6 +1114,19 @@ dependencies = [
  "log",
  "regex",
  "termcolor",
+]
+
+[[package]]
+name = "env_logger"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38b35839ba51819680ba087cd351788c9a3c476841207e0b8cee0b04722343b9"
+dependencies = [
+ "anstream",
+ "anstyle",
+ "env_filter",
+ "humantime",
+ "log",
 ]
 
 [[package]]
@@ -4348,7 +4371,7 @@ dependencies = [
  "debian-copyright",
  "debian-watch",
  "distro-info",
- "env_logger",
+ "env_logger 0.11.3",
  "gix-config",
  "html5ever 0.27.0",
  "lazy-regex",
