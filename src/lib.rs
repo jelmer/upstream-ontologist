@@ -4,7 +4,7 @@ use percent_encoding::utf8_percent_encode;
 use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use reqwest::header::HeaderMap;
-use serde::ser::{Serialize, SerializeSeq};
+use serde::ser::SerializeSeq;
 use std::str::FromStr;
 
 use std::fs::File;
@@ -2827,6 +2827,8 @@ impl Iterator for UpstreamMetadataScanner {
 
             let guesser = self.guessers.remove(0);
 
+            let abspath = std::env::current_dir().unwrap().join(self.path.as_path());
+
             let guess = (guesser.guess)(&self.config);
             match guess {
                 Ok(entries) => {
@@ -2836,7 +2838,7 @@ impl Iterator for UpstreamMetadataScanner {
                             .origin
                             .or(Some(Origin::Other(guesser.name.display().to_string())));
                         if let Some(Origin::Path(p)) = e.origin.as_ref() {
-                            if let Ok(suffix) = p.strip_prefix(self.path.as_path()) {
+                            if let Ok(suffix) = p.strip_prefix(abspath.as_path()) {
                                 if suffix.to_str().unwrap().is_empty() {
                                     e.origin = Some(Origin::Path(PathBuf::from_str(".").unwrap()));
                                 } else {
