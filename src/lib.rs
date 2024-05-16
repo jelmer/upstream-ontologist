@@ -2835,6 +2835,13 @@ impl Iterator for UpstreamMetadataScanner {
                         e.origin = e
                             .origin
                             .or(Some(Origin::Other(guesser.name.display().to_string())));
+                        if let Some(Origin::Path(p)) = e.origin.as_ref() {
+                            if let Ok(suffix) = p.strip_prefix(self.path.as_path()) {
+                                e.origin = Some(Origin::Path(
+                                    PathBuf::from_str(".").unwrap().join(suffix),
+                                ));
+                            }
+                        }
                         e
                     }));
                 }
