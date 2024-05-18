@@ -1,12 +1,9 @@
 use crate::{Certainty, Origin, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use lazy_regex::regex;
-use log::warn;
 use pyo3::prelude::*;
-use scraper::node::Element;
-use scraper::{ElementRef, Html, Selector};
+use scraper::{ElementRef, Selector};
 use std::io::BufRead;
 use std::iter::Iterator;
-use url::Url;
 
 pub fn skip_paragraph(para: &str) -> (bool, Vec<UpstreamDatumWithMetadata>) {
     let mut ret = Vec::<UpstreamDatumWithMetadata>::new();
@@ -552,7 +549,7 @@ fn ul_is_field_list(el: ElementRef) -> bool {
 
 #[test]
 fn test_ul_is_field_list() {
-    let el = Html::parse_fragment(
+    let el = scraper::Html::parse_fragment(
         r#"<ul>
             <li>Issues: <a href="https://github.com/serde-rs/serde/issues">blah</a></li>
             <li>Home: <a href="https://serde.rs/">blah</a></li>
@@ -569,7 +566,7 @@ fn test_ul_is_field_list() {
         true
     );
 
-    let el = Html::parse_fragment(
+    let el = scraper::Html::parse_fragment(
         r#"<ul>
             <li>Some other thing</li>
             </ul>"#,

@@ -764,7 +764,7 @@ impl UpstreamMetadata {
 
     #[classmethod]
     pub fn from_dict(
-        cls: &PyType,
+        _cls: &PyType,
         py: Python,
         d: &PyDict,
         default_certainty: Option<Certainty>,
