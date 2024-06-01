@@ -123,6 +123,7 @@ before-build = "if command -v yum; then yum -y install openssl-devel; fi && if c
 [tool.cibuildwheel.macos]
 macos = "x86_64 arm64 universal2"
 before-build = "brew install openssl && pip install -U setuptools-rust && curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=stable --profile=minimal -y && rustup show"
+environment = {MACOSX_DEPLOYMENT_TARGET=14.0}
 
 [[tool.cibuildwheel.overrides]]
 select = "*-macosx_arm64"
