@@ -72,3 +72,12 @@ Homepage: https://example.com
         self.assertEqual(metadata['Name'].value, 'foo')
         self.assertEqual(metadata['Version'].value, '1.2.3')
         self.assertEqual(metadata['Homepage'].value, 'https://example.com')
+
+    def test_from_dict_registry(self):
+        d = {
+            'Name': 'foo',
+            'Version': '1.2.3',
+            'Registry': [{'Name': 'conda:conda-forge', 'Entry': 'r-tsne'}]
+        }
+        metadata = UpstreamMetadata.from_dict(d)
+        self.assertEqual(metadata['Registry'].value, [{'Name': 'conda:conda-forge', 'Entry': 'r-tsne'}])

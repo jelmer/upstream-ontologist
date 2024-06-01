@@ -2,7 +2,7 @@ use pyo3::create_exception;
 use pyo3::exceptions::{PyException, PyKeyError, PyRuntimeError, PyStopIteration, PyValueError};
 use pyo3::import_exception;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyTuple, PyType};
+use pyo3::types::{PyDict, PyList, PyTuple, PyType};
 use std::str::FromStr;
 use upstream_ontologist::{CanonicalizeError, Certainty, Origin, UpstreamPackage};
 use url::Url;
@@ -489,6 +489,12 @@ fn fixup_broken_git_details(
     )
 }
 
+fn extract_str_value(py: Python, value: PyObject) -> PyResult<String> {
+    let value = value.extract::<PyObject>(py)?;
+
+    value.extract::<String>(py)
+}
+
 #[derive(Clone)]
 #[pyclass]
 struct UpstreamDatum(pub(crate) upstream_ontologist::UpstreamDatumWithMetadata);
@@ -506,46 +512,55 @@ impl UpstreamDatum {
         Ok(UpstreamDatum(
             upstream_ontologist::UpstreamDatumWithMetadata {
                 datum: match field.as_str() {
-                    "Name" => upstream_ontologist::UpstreamDatum::Name(value.extract(py).unwrap()),
+                    "Name" => {
+                        upstream_ontologist::UpstreamDatum::Name(extract_str_value(py, value)?)
+                    }
                     "Version" => {
-                        upstream_ontologist::UpstreamDatum::Version(value.extract(py).unwrap())
+                        upstream_ontologist::UpstreamDatum::Version(extract_str_value(py, value)?)
                     }
                     "Summary" => {
-                        upstream_ontologist::UpstreamDatum::Summary(value.extract(py).unwrap())
+                        upstream_ontologist::UpstreamDatum::Summary(extract_str_value(py, value)?)
                     }
-                    "Description" => {
-                        upstream_ontologist::UpstreamDatum::Description(value.extract(py).unwrap())
-                    }
+                    "Description" => upstream_ontologist::UpstreamDatum::Description(
+                        extract_str_value(py, value)?,
+                    ),
                     "Homepage" => {
-                        upstream_ontologist::UpstreamDatum::Homepage(value.extract(py).unwrap())
+                        upstream_ontologist::UpstreamDatum::Homepage(extract_str_value(py, value)?)
                     }
                     "Repository" => {
-                        upstream_ontologist::UpstreamDatum::Repository(value.extract(py).unwrap())
+                        // Check if the value is a list rather than a string
+                        if let Ok(value) = value.extract::<Vec<String>>(py) {
+                            upstream_ontologist::UpstreamDatum::Repository(value.join(" "))
+                        } else {
+                            upstream_ontologist::UpstreamDatum::Repository(extract_str_value(
+                                py, value,
+                            )?)
+                        }
                     }
                     "Repository-Browse" => upstream_ontologist::UpstreamDatum::RepositoryBrowse(
-                        value.extract(py).unwrap(),
+                        extract_str_value(py, value)?,
                     ),
                     "License" => {
-                        upstream_ontologist::UpstreamDatum::License(value.extract(py).unwrap())
+                        upstream_ontologist::UpstreamDatum::License(extract_str_value(py, value)?)
                     }
                     "Author" => {
                         upstream_ontologist::UpstreamDatum::Author(value.extract(py).unwrap())
                     }
-                    "Bug-Database" => {
-                        upstream_ontologist::UpstreamDatum::BugDatabase(value.extract(py).unwrap())
-                    }
+                    "Bug-Database" => upstream_ontologist::UpstreamDatum::BugDatabase(
+                        extract_str_value(py, value)?,
+                    ),
                     "Bug-Submit" => {
-                        upstream_ontologist::UpstreamDatum::BugSubmit(value.extract(py).unwrap())
+                        upstream_ontologist::UpstreamDatum::BugSubmit(extract_str_value(py, value)?)
                     }
                     "Contact" => {
-                        upstream_ontologist::UpstreamDatum::Contact(value.extract(py).unwrap())
+                        upstream_ontologist::UpstreamDatum::Contact(extract_str_value(py, value)?)
                     }
-                    "Cargo-Crate" => {
-                        upstream_ontologist::UpstreamDatum::CargoCrate(value.extract(py).unwrap())
-                    }
-                    "Security-MD" => {
-                        upstream_ontologist::UpstreamDatum::SecurityMD(value.extract(py).unwrap())
-                    }
+                    "Cargo-Crate" => upstream_ontologist::UpstreamDatum::CargoCrate(
+                        extract_str_value(py, value)?,
+                    ),
+                    "Security-MD" => upstream_ontologist::UpstreamDatum::SecurityMD(
+                        extract_str_value(py, value)?,
+                    ),
                     "Keywords" => {
                         upstream_ontologist::UpstreamDatum::Keywords(value.extract(py).unwrap())
                     }
