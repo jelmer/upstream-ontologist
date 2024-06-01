@@ -16,8 +16,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
 
-from unittest import TestCase
 from typing import Any
+from unittest import TestCase
 
 from upstream_ontologist import UpstreamMetadata
 
@@ -59,7 +59,7 @@ class UpstreamMetadataFromDictTests(TestCase):
             'Homepage': 42,
         }
         with self.assertRaises(TypeError):
-            metadata = UpstreamMetadata.from_dict(d)
+            UpstreamMetadata.from_dict(d)
 
     def test_from_dict_yaml(self):
         from ruamel.yaml import YAML
