@@ -20,6 +20,7 @@ import unittest
 
 def test_suite():
     names = [
+        "data",
         "vcs",
     ]
     module_names = [__name__ + ".test_" + name for name in names]
