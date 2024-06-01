@@ -124,6 +124,10 @@ before-build = "if command -v yum; then yum -y install openssl-devel; fi && if c
 macos = "x86_64 arm64 universal2"
 before-build = "brew install openssl && pip install -U setuptools-rust && curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=stable --profile=minimal -y && rustup show"
 
+[[tool.cibuildwheel.overrides]]
+select = "*-macosx_arm64"
+before-build = "pip install -U setuptools-rust && curl https://sh.rustup.rs -sSf | sh -s -- --profile=minimal -y && rustup target add aarch64-apple-darwin"
+
 [tool.cibuildwheel.windows]
 before-build = "vcpkg install openssl && pip install -U setuptools-rust && curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=stable --profile=minimal -y && rustup show"
 environment = {CMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake"}
