@@ -3061,9 +3061,9 @@ dependencies = [
 
 [[package]]
 name = "python-pkginfo"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85f2c5f010e6a63cabc4abcd60d8a61f8f8c450ac60ff0f4ae32a23b2c17d626"
+checksum = "4320ca452fe003f8a07afb8e30c315bbd813ae8105f454ddefebf15a24021e1f"
 dependencies = [
  "flate2",
  "fs-err",
