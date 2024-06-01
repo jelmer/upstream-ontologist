@@ -3,6 +3,7 @@ use log::{debug, error, warn};
 use percent_encoding::utf8_percent_encode;
 use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 use reqwest::header::HeaderMap;
 use serde::ser::SerializeSeq;
 use std::str::FromStr;
@@ -352,7 +353,7 @@ pub enum UpstreamDatum {
     /// List of URLs to screenshots
     Screenshots(Vec<String>),
     /// Name of registry
-    Registry(String),
+    Registry(Vec<(String, String)>),
     /// Recommended way to cite the software
     CiteAs(String),
     /// Link for donations (e.g. Paypal, Libera, etc)
@@ -452,7 +453,7 @@ impl UpstreamDatum {
             UpstreamDatum::Screenshots(..) => None,
             UpstreamDatum::DebianITP(_c) => None,
             UpstreamDatum::CiteAs(c) => Some(c),
-            UpstreamDatum::Registry(r) => Some(r),
+            UpstreamDatum::Registry(r) => None,
             UpstreamDatum::Donation(d) => Some(d),
             UpstreamDatum::Webservice(w) => Some(w),
         }
@@ -679,7 +680,12 @@ impl std::fmt::Display for UpstreamDatum {
                 write!(f, "Screenshots: {}", s.join(", "))
             }
             UpstreamDatum::Registry(r) => {
-                write!(f, "Registry: {}", r)
+                write!(f, "Registry:")?;
+                for (k, v) in r {
+                    write!(f, "  - Name: {}", k)?;
+                    write!(f, "    Entry: {}", v)?;
+                }
+                Ok(())
             }
             UpstreamDatum::CiteAs(c) => {
                 write!(f, "Cite-As: {}", c)
@@ -748,7 +754,22 @@ impl serde::ser::Serialize for UpstreamDatum {
                 seq.end()
             }
             UpstreamDatum::CiteAs(c) => serializer.serialize_str(c),
-            UpstreamDatum::Registry(r) => serializer.serialize_str(r),
+            UpstreamDatum::Registry(r) => {
+                let mut l = serializer.serialize_seq(Some(r.len()))?;
+                for (k, v) in r {
+                    let mut m = serde_yaml::Mapping::new();
+                    m.insert(
+                        serde_yaml::Value::String("Name".to_string()),
+                        serde_yaml::to_value(k).unwrap(),
+                    );
+                    m.insert(
+                        serde_yaml::Value::String("Entry".to_string()),
+                        serde_yaml::to_value(v).unwrap(),
+                    );
+                    l.serialize_element(&m)?;
+                }
+                l.end()
+            }
             UpstreamDatum::Donation(d) => serializer.serialize_str(d),
             UpstreamDatum::Webservice(w) => serializer.serialize_str(w),
         }
@@ -2174,7 +2195,17 @@ impl FromPyObject<'_> for UpstreamDatum {
             "Changelog" => Ok(UpstreamDatum::Changelog(val.extract::<String>()?)),
             "Screenshots" => Ok(UpstreamDatum::Screenshots(val.extract::<Vec<String>>()?)),
             "Cite-As" => Ok(UpstreamDatum::CiteAs(val.extract::<String>()?)),
-            "Registry" => Ok(UpstreamDatum::Registry(val.extract::<String>()?)),
+            "Registry" => {
+                let v = val.extract::<Vec<&PyAny>>()?;
+                let mut registry = Vec::new();
+                for item in v {
+                    let d = item.extract::<&PyDict>()?;
+                    let name = d.get_item("Name")?.unwrap().extract::<String>()?;
+                    let entry = d.get_item("Entry")?.unwrap().extract::<String>()?;
+                    registry.push((name, entry));
+                }
+                Ok(UpstreamDatum::Registry(registry))
+            }
             "Donation" => Ok(UpstreamDatum::Donation(val.extract::<String>()?)),
             "Webservice" => Ok(UpstreamDatum::Webservice(val.extract::<String>()?)),
             _ => Err(PyRuntimeError::new_err(format!("Unknown field: {}", field))),
@@ -2220,7 +2251,16 @@ impl ToPyObject for UpstreamDatum {
                 UpstreamDatum::DebianITP(i) => i.into_py(py),
                 UpstreamDatum::Screenshots(s) => s.to_object(py),
                 UpstreamDatum::CiteAs(s) => s.to_object(py),
-                UpstreamDatum::Registry(r) => r.to_object(py),
+                UpstreamDatum::Registry(r) => r
+                    .iter()
+                    .map(|(name, entry)| {
+                        let dict = PyDict::new(py);
+                        dict.set_item("Name", name).unwrap();
+                        dict.set_item("Entry", entry).unwrap();
+                        dict.into()
+                    })
+                    .collect::<Vec<PyObject>>()
+                    .to_object(py),
                 UpstreamDatum::Donation(d) => d.to_object(py),
                 UpstreamDatum::Webservice(w) => w.to_object(py),
             },
