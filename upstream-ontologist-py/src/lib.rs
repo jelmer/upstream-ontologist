@@ -963,7 +963,8 @@ fn guess_upstream_metadata_items(
     Ok(metadata
         .into_iter()
         .map(|datum| datum.map(|o| o.to_object(py)))
-        .collect::<Result<Vec<PyObject>, upstream_ontologist::ProviderError>>()?)
+        .filter_map(Result::ok)
+        .collect::<Vec<PyObject>>())
 }
 
 #[pyfunction]
