@@ -2,7 +2,7 @@ use pyo3::create_exception;
 use pyo3::exceptions::{PyException, PyKeyError, PyRuntimeError, PyStopIteration, PyValueError};
 use pyo3::import_exception;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyTuple, PyType};
+use pyo3::types::{PyDict, PyTuple, PyType};
 use std::str::FromStr;
 use upstream_ontologist::{CanonicalizeError, Certainty, Origin, UpstreamPackage};
 use url::Url;

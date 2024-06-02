@@ -453,7 +453,7 @@ impl UpstreamDatum {
             UpstreamDatum::Screenshots(..) => None,
             UpstreamDatum::DebianITP(_c) => None,
             UpstreamDatum::CiteAs(c) => Some(c),
-            UpstreamDatum::Registry(r) => None,
+            UpstreamDatum::Registry(_) => None,
             UpstreamDatum::Donation(d) => Some(d),
             UpstreamDatum::Webservice(w) => Some(w),
         }
