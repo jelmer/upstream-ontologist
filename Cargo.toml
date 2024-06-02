@@ -40,7 +40,7 @@ debian-copyright = { version = "0.1.2", optional = true }
 debian-control = { version = "0.1.6", optional = true }
 select = "0.6.0"
 pulldown-cmark = "0.11"
-debcargo = { optional = true, git = "https://salsa.debian.org/rust-team/debcargo" }
+debcargo = { version = "2.6.1", optional = true }
 scraper = "0.19.0"
 
 [workspace]
