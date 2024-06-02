@@ -1,6 +1,6 @@
 [package]
 name = "upstream-ontologist"
-version = "0.1.36"
+version = { workspace = true }
 authors = [ "Jelmer Vernooĳ <jelmer@jelmer.uk>",]
 edition = "2021"
 license = "GPL-2.0+"
@@ -8,6 +8,9 @@ description = "tracking of upstream project metadata"
 repository = "https://github.com/jelmer/upstream-ontologist.git"
 homepage = "https://github.com/jelmer/upstream-ontologist"
 default-run = "guess-upstream-metadata"
+
+[workspace.package]
+version = "0.1.37"
 
 [dependencies]
 log = "0.4"

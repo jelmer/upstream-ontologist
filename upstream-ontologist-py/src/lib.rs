@@ -1092,5 +1092,6 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
         "SECURE_SCHEMES",
         upstream_ontologist::vcs::SECURE_SCHEMES.to_vec(),
     )?;
+    m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }
