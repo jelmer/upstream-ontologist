@@ -125,3 +125,6 @@ class UpstreamMetadata:
 
 class UpstreamDatum:
     def __init__(self, name, value: Any, certainty: str | None = None): ...  # noqa: ANN401
+
+
+__version__: str

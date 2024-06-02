@@ -1,6 +1,6 @@
 [package]
 name = "upstream-ontologist-py"
-version = "0.0.0"
+version = { workspace = true }
 authors = ["Jelmer Vernooĳ <jelmer@jelmer.uk>"]
 edition = "2018"
 license = "Apache-2.0"
