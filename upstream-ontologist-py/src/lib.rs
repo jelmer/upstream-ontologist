@@ -1,322 +1,62 @@
-use log::debug;
 use pyo3::create_exception;
-use pyo3::exceptions::PyException;
-use pyo3::exceptions::PyRuntimeError;
+use pyo3::exceptions::{PyException, PyKeyError, PyRuntimeError, PyStopIteration, PyValueError};
 use pyo3::import_exception;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
-use std::collections::HashMap;
-use std::path::PathBuf;
-use upstream_ontologist::{
-    py_to_upstream_datum, CanonicalizeError, Person, UpstreamDatum, UpstreamDatumWithMetadata,
-};
+use pyo3::types::{PyDict, PyTuple, PyType};
+use std::str::FromStr;
+use upstream_ontologist::{CanonicalizeError, Certainty, Origin, UpstreamPackage};
 use url::Url;
 
 import_exception!(urllib.error, HTTPError);
 create_exception!(upstream_ontologist, UnverifiableUrl, PyException);
 create_exception!(upstream_ontologist, InvalidUrl, PyException);
-create_exception!(upstream_ontologist, NoSuchRepologyProject, PyException);
 create_exception!(upstream_ontologist, NoSuchForgeProject, PyException);
-create_exception!(upstream_ontologist, ParseError, PyException);
 
 #[pyfunction]
 fn url_from_git_clone_command(command: &[u8]) -> Option<String> {
-    upstream_ontologist::url_from_git_clone_command(command)
+    upstream_ontologist::vcs_command::url_from_git_clone_command(command)
 }
 
 #[pyfunction]
 fn url_from_fossil_clone_command(command: &[u8]) -> Option<String> {
-    upstream_ontologist::url_from_fossil_clone_command(command)
+    upstream_ontologist::vcs_command::url_from_fossil_clone_command(command)
 }
 
 #[pyfunction]
 fn url_from_svn_co_command(command: &[u8]) -> Option<String> {
-    upstream_ontologist::url_from_svn_co_command(command)
+    upstream_ontologist::vcs_command::url_from_svn_co_command(command)
 }
 
 #[pyfunction]
-fn drop_vcs_in_scheme(url: &str) -> &str {
-    upstream_ontologist::vcs::drop_vcs_in_scheme(url)
-}
-
-fn upstream_datum_to_py(py: Python, datum: UpstreamDatum) -> PyResult<(String, PyObject)> {
-    let m = PyModule::import(py, "upstream_ontologist.guess")?;
-    let PersonCls = m.getattr("Person")?;
-    Ok((
-        datum.field().to_string(),
-        match datum {
-            UpstreamDatum::Name(n) => n.into_py(py),
-            UpstreamDatum::Version(v) => v.into_py(py),
-            UpstreamDatum::Contact(c) => c.into_py(py),
-            UpstreamDatum::Summary(s) => s.into_py(py),
-            UpstreamDatum::License(l) => l.into_py(py),
-            UpstreamDatum::Homepage(h) => h.into_py(py),
-            UpstreamDatum::Description(d) => d.into_py(py),
-            UpstreamDatum::BugDatabase(b) => b.into_py(py),
-            UpstreamDatum::BugSubmit(b) => b.into_py(py),
-            UpstreamDatum::Repository(r) => r.into_py(py),
-            UpstreamDatum::RepositoryBrowse(r) => r.into_py(py),
-            UpstreamDatum::SecurityMD(s) => s.into_py(py),
-            UpstreamDatum::SecurityContact(s) => s.into_py(py),
-            UpstreamDatum::CargoCrate(c) => c.into_py(py),
-            UpstreamDatum::Keywords(ks) => ks.into_py(py),
-            UpstreamDatum::Copyright(c) => c.into_py(py),
-            UpstreamDatum::Documentation(a) => a.into_py(py),
-            UpstreamDatum::GoImportPath(ip) => ip.into_py(py),
-            UpstreamDatum::Archive(a) => a.into_py(py),
-            UpstreamDatum::Demo(d) => d.into_py(py),
-            UpstreamDatum::Maintainer(m) => PersonCls.call1((m.name, m.email, m.url))?.into_py(py),
-            UpstreamDatum::Author(a) => a
-                .into_iter()
-                .map(|x| PersonCls.call1((x.name, x.email, x.url)))
-                .collect::<PyResult<Vec<&PyAny>>>()?
-                .into_py(py),
-            UpstreamDatum::Wiki(w) => w.into_py(py),
-            UpstreamDatum::Download(d) => d.into_py(py),
-            UpstreamDatum::MailingList(m) => m.into_py(py),
-            UpstreamDatum::SourceForgeProject(m) => m.into_py(py),
-            UpstreamDatum::PeclPackage(p) => p.into_py(py),
-            UpstreamDatum::Funding(p) => p.into_py(py),
-            UpstreamDatum::Changelog(c) => c.into_py(py),
-        },
-    ))
-}
-
-fn upstream_datum_with_metadata_to_py(
-    py: Python,
-    datum: UpstreamDatumWithMetadata,
-) -> PyResult<PyObject> {
-    let m = PyModule::import(py, "upstream_ontologist.guess")?;
-
-    let UpstreamDatumCls = m.getattr("UpstreamDatum")?;
-
-    {
-        let (field, py_datum) = upstream_datum_to_py(py, datum.datum)?;
-        let datum = UpstreamDatumCls.call1((
-            field,
-            py_datum,
-            datum.certainty.map(|x| x.to_string()),
-            datum.origin,
-        ))?;
-        Ok(datum.to_object(py))
-    }
+fn url_from_cvs_co_command(command: &[u8]) -> Option<String> {
+    upstream_ontologist::vcs_command::url_from_cvs_co_command(command)
 }
 
 #[pyfunction]
-fn guess_from_meson(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    let ret =
-        upstream_ontologist::providers::meson::guess_from_meson(path.as_path(), trust_package)
-            .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+fn url_from_vcs_command(command: &[u8]) -> Option<String> {
+    upstream_ontologist::vcs_command::url_from_vcs_command(command)
 }
 
 #[pyfunction]
-fn guess_from_package_json(
-    py: Python,
-    path: PathBuf,
-    trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::providers::package_json::guess_from_package_json(
-        path.as_path(),
-        trust_package,
-    )
-    .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+fn drop_vcs_in_scheme(url: &str) -> String {
+    upstream_ontologist::vcs::drop_vcs_in_scheme(&url.parse().unwrap())
+        .map_or_else(|| url.to_string(), |u| u.to_string())
 }
 
 #[pyfunction]
-fn debian_is_native(path: PathBuf) -> PyResult<Option<bool>> {
-    Ok(upstream_ontologist::debian_is_native(path.as_path())?)
-}
-
-#[pyfunction]
-fn unsplit_vcs_url(repo_url: &str, branch: Option<&str>, subpath: Option<&str>) -> String {
-    upstream_ontologist::vcs::unsplit_vcs_url(repo_url, branch, subpath)
-}
-
-fn json_to_py(py: Python, data: serde_json::Value) -> PyResult<PyObject> {
-    match data {
-        serde_json::Value::Null => Ok(py.None()),
-        serde_json::Value::Bool(b) => Ok(b.into_py(py)),
-        serde_json::Value::Number(i) => Ok(i.as_i64().unwrap().into_py(py)),
-        serde_json::Value::String(s) => Ok(s.into_py(py)),
-        serde_json::Value::Array(a) => Ok(a
-            .into_iter()
-            .map(|x| json_to_py(py, x))
-            .collect::<PyResult<Vec<PyObject>>>()?
-            .into_py(py)),
-        serde_json::Value::Object(o) => Ok({
-            let d = PyDict::new(py);
-
-            for (k, v) in o {
-                d.set_item(k.into_py(py), json_to_py(py, v)?)?;
-            }
-            d.into_py(py)
-        }),
-    }
-}
-
-#[pyfunction]
-fn load_json_url(py: Python, http_url: &str, timeout: Option<u64>) -> PyResult<PyObject> {
-    debug!("Loading JSON from {}", http_url);
-    let http_url = http_url
-        .parse::<reqwest::Url>()
-        .map_err(|e| PyRuntimeError::new_err(format!("{}: {}", e, http_url)))?;
-    Ok(json_to_py(
-        py,
-        upstream_ontologist::load_json_url(&http_url, timeout.map(std::time::Duration::from_secs))
-            .map_err(|e| match e {
-                upstream_ontologist::HTTPJSONError::Error {
-                    url,
-                    status,
-                    response,
-                } => {
-                    HTTPError::new_err((url.as_str().to_string(), status, response.text().unwrap()))
-                }
-                upstream_ontologist::HTTPJSONError::HTTPError(e) => {
-                    PyRuntimeError::new_err(e.to_string())
-                }
-            })?,
-    )?)
-}
-
-#[pyfunction]
-fn guess_from_composer_json(
-    py: Python,
-    path: PathBuf,
-    trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::providers::composer_json::guess_from_composer_json(
-        path.as_path(),
-        trust_package,
-    )
-    .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn guess_from_package_xml(
-    py: Python,
-    path: PathBuf,
-    trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::providers::package_xml::guess_from_package_xml(
-        path.as_path(),
-        trust_package,
-    )
-    .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn guess_from_dist_ini(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    let ret =
-        upstream_ontologist::providers::perl::guess_from_dist_ini(path.as_path(), trust_package)
-            .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn guess_from_perl_dist_name(
-    py: Python,
-    path: PathBuf,
-    dist_name: &str,
-) -> PyResult<Vec<PyObject>> {
-    let ret =
-        upstream_ontologist::providers::perl::guess_from_perl_dist_name(path.as_path(), dist_name)
-            .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn guess_from_perl_module(py: Python, path: PathBuf) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::providers::perl::guess_from_perl_module(path.as_path())
-        .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn guess_from_pod(py: Python, contents: &str) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::providers::perl::guess_from_pod(contents)
-        .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn guess_from_pubspec_yaml(
-    py: Python,
-    path: PathBuf,
-    trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::providers::pubspec::guess_from_pubspec_yaml(
-        path.as_path(),
-        trust_package,
-    )
-    .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn guess_from_authors(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    let ret =
-        upstream_ontologist::providers::authors::guess_from_authors(path.as_path(), trust_package)
-            .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn guess_from_metadata_json(
-    py: Python,
-    path: PathBuf,
-    trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::guess_from_metadata_json(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn guess_from_meta_json(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    let ret =
-        upstream_ontologist::providers::perl::guess_from_meta_json(path.as_path(), trust_package)
-            .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
+fn unsplit_vcs_url(
+    repo_url: &str,
+    branch: Option<&str>,
+    subpath: Option<&str>,
+) -> PyResult<String> {
+    let location = upstream_ontologist::vcs::VcsLocation {
+        url: repo_url
+            .parse()
+            .map_err(|e: url::ParseError| PyValueError::new_err(e.to_string()))?,
+        branch: branch.map(|b| b.to_string()),
+        subpath: subpath.map(|b| b.to_string()),
+    };
+    Ok(upstream_ontologist::vcs::unsplit_vcs_url(&location))
 }
 
 #[pyclass(subclass)]
@@ -462,84 +202,6 @@ impl SourceForge {
 }
 
 #[pyfunction]
-fn guess_from_travis_yml(
-    py: Python,
-    path: PathBuf,
-    trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::guess_from_travis_yml(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?;
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn guess_from_meta_yml(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    let ret =
-        upstream_ontologist::providers::perl::guess_from_meta_yml(path.as_path(), trust_package)
-            .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn metadata_from_itp_bug_body(py: Python, body: &str) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::providers::debian::metadata_from_itp_bug_body(body)
-        .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn guess_from_metainfo(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::providers::metainfo::guess_from_metainfo(
-        path.as_path(),
-        trust_package,
-    )
-    .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn guess_from_doap(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::providers::doap::guess_from_doap(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn guess_from_opam(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::providers::ocaml::guess_from_opam(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn guess_from_pom_xml(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    let ret =
-        upstream_ontologist::providers::maven::guess_from_pom_xml(path.as_path(), trust_package)
-            .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
 fn plausible_vcs_url(url: &str) -> PyResult<bool> {
     Ok(upstream_ontologist::vcs::plausible_url(url))
 }
@@ -547,87 +209,6 @@ fn plausible_vcs_url(url: &str) -> PyResult<bool> {
 #[pyfunction]
 fn plausible_vcs_browse_url(url: &str) -> PyResult<bool> {
     Ok(upstream_ontologist::vcs::plausible_browse_url(url))
-}
-
-#[pyfunction]
-fn guess_from_wscript(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    let ret =
-        upstream_ontologist::providers::waf::guess_from_wscript(path.as_path(), trust_package)
-            .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn guess_from_makefile_pl(
-    py: Python,
-    path: PathBuf,
-    trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
-    let ret =
-        upstream_ontologist::providers::perl::guess_from_makefile_pl(path.as_path(), trust_package)
-            .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn guess_from_go_mod(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::providers::go::guess_from_go_mod(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn guess_from_cabal(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    let ret =
-        upstream_ontologist::providers::haskell::guess_from_cabal(path.as_path(), trust_package)
-            .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn guess_from_cabal_lines(py: Python, lines: Vec<String>) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::providers::haskell::guess_from_cabal_lines(lines.into_iter())
-        .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn guess_from_git_config(
-    py: Python,
-    path: PathBuf,
-    trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
-    let ret =
-        upstream_ontologist::providers::git::guess_from_git_config(path.as_path(), trust_package)
-            .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn guess_from_aur(py: Python, package: &str) -> PyResult<Vec<(String, PyObject)>> {
-    let ret = upstream_ontologist::providers::arch::guess_from_aur(package);
-
-    ret.into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
-        .collect::<PyResult<Vec<_>>>()
 }
 
 #[pyfunction]
@@ -646,43 +227,14 @@ fn check_url_canonical(url: &str) -> PyResult<String> {
 }
 
 #[pyfunction]
-fn guess_from_environment(py: Python) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::guess_from_environment().map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-fn map_provider_err_to_py_err(e: upstream_ontologist::ProviderError) -> PyErr {
-    match e {
-        upstream_ontologist::ProviderError::IoError(e) => e.into(),
-        upstream_ontologist::ProviderError::ParseError(e) => ParseError::new_err((e,)),
-        upstream_ontologist::ProviderError::Other(e) => PyRuntimeError::new_err((e,)),
-    }
-}
-
-#[pyfunction]
-fn guess_from_nuspec(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::guess_from_nuspec(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
 fn guess_repo_from_url(url: &str, net_access: Option<bool>) -> PyResult<Option<String>> {
-    let url = Url::parse(url);
-    if let Err(e) = url {
-        return Ok(None);
+    if let Ok(url) = Url::parse(url) {
+        Ok(upstream_ontologist::vcs::guess_repo_from_url(
+            &url, net_access,
+        ))
+    } else {
+        Ok(None)
     }
-
-    Ok(upstream_ontologist::vcs::guess_repo_from_url(
-        &url.unwrap(),
-        net_access,
-    ))
 }
 
 #[pyfunction]
@@ -720,23 +272,12 @@ fn probe_upstream_branch_url(url: &str, version: Option<&str>) -> Option<bool> {
 }
 
 #[pyfunction]
-fn guess_from_gemspec(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    let ret =
-        upstream_ontologist::providers::ruby::guess_from_gemspec(path.as_path(), trust_package)
-            .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
 fn guess_from_launchpad(
     py: Python,
     package: &str,
     distribution: Option<&str>,
     suite: Option<&str>,
-) -> PyResult<Vec<(String, PyObject)>> {
+) -> PyResult<PyObject> {
     let ret = upstream_ontologist::providers::launchpad::guess_from_launchpad(
         package,
         distribution,
@@ -744,13 +285,10 @@ fn guess_from_launchpad(
     );
 
     if ret.is_none() {
-        return Ok(vec![]);
+        Ok(Vec::<String>::new().to_object(py))
+    } else {
+        Ok(ret.to_object(py))
     }
-
-    ret.unwrap()
-        .into_iter()
-        .map(|x| upstream_datum_to_py(py, x))
-        .collect::<PyResult<Vec<_>>>()
 }
 
 #[pyfunction]
@@ -759,15 +297,26 @@ fn browse_url_from_repo_url(
     branch: Option<&str>,
     subpath: Option<&str>,
     net_access: Option<bool>,
-) -> Option<String> {
-    upstream_ontologist::vcs::browse_url_from_repo_url(url, branch, subpath, net_access)
+) -> PyResult<Option<String>> {
+    let location = upstream_ontologist::vcs::VcsLocation {
+        url: Url::parse(url).map_err(|e| PyValueError::new_err(format!("Invalid URL: {}", e)))?,
+        branch: branch.map(|s| s.to_string()),
+        subpath: subpath.map(|s| s.to_string()),
+    };
+    Ok(
+        upstream_ontologist::vcs::browse_url_from_repo_url(&location, net_access)
+            .map(|u| u.to_string()),
+    )
 }
 
 #[pyfunction]
 fn canonical_git_repo_url(url: &str, net_access: Option<bool>) -> PyResult<String> {
     let url =
         Url::parse(url).map_err(|e| PyRuntimeError::new_err(format!("Invalid URL: {}", e)))?;
-    Ok(upstream_ontologist::vcs::canonical_git_repo_url(&url, net_access).to_string())
+    Ok(
+        upstream_ontologist::vcs::canonical_git_repo_url(&url, net_access)
+            .map_or_else(|| url.to_string(), |u| u.to_string()),
+    )
 }
 
 #[pyfunction]
@@ -775,44 +324,6 @@ fn find_public_repo_url(url: &str, net_access: Option<bool>) -> PyResult<Option<
     Ok(upstream_ontologist::vcs::find_public_repo_url(
         url, net_access,
     ))
-}
-
-#[pyfunction]
-fn guess_from_configure(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::providers::autoconf::guess_from_configure(
-        path.as_path(),
-        trust_package,
-    )
-    .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn guess_from_r_description(
-    py: Python,
-    path: PathBuf,
-    trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
-    let ret =
-        upstream_ontologist::providers::r::guess_from_r_description(path.as_path(), trust_package)
-            .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn guess_from_cargo(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    let ret = upstream_ontologist::providers::rust::guess_from_cargo(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?;
-
-    ret.into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
 }
 
 #[pyfunction]
@@ -896,207 +407,634 @@ fn check_bug_submit_url_canonical(url: &str, net_access: Option<bool>) -> PyResu
 }
 
 #[pyfunction]
-fn extract_sf_project_name(url: &str) -> Option<String> {
-    upstream_ontologist::extract_sf_project_name(url)
-}
-
-#[pyfunction]
-fn extract_pecl_package_name(url: &str) -> Option<String> {
-    upstream_ontologist::extract_pecl_package_name(url)
-}
-
-#[pyfunction]
-fn metadata_from_url(py: Python, url: &str, origin: Option<&str>) -> PyResult<Vec<PyObject>> {
-    upstream_ontologist::metadata_from_url(url, origin)
-        .into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()
-}
-
-#[pyfunction]
-fn get_repology_metadata(py: Python, name: &str, distro: Option<&str>) -> PyResult<PyObject> {
-    let ret = upstream_ontologist::get_repology_metadata(name, distro);
-
-    if ret.is_none() {
-        return Ok(py.None());
-    }
-
-    Ok(json_to_py(py, ret.unwrap())?)
-}
-
-#[pyfunction]
-fn guess_from_security_md(
-    py: Python,
-    name: &str,
-    path: PathBuf,
-    trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
-    upstream_ontologist::providers::security_md::guess_from_security_md(
-        name,
-        path.as_path(),
-        trust_package,
-    )
-    .into_iter()
-    .map(|x| upstream_datum_with_metadata_to_py(py, x))
-    .collect()
-}
-
-#[pyfunction]
-fn get_sf_metadata(project: &str) -> PyResult<PyObject> {
-    if let Some(ret) = upstream_ontologist::get_sf_metadata(project) {
-        Python::with_gil(|py| Ok(json_to_py(py, ret)?))
-    } else {
-        return Err(NoSuchForgeProject::new_err((project.to_string(),)));
-    }
-}
-
-#[pyfunction]
 fn known_bad_guess(py: Python, datum: PyObject) -> PyResult<bool> {
-    let datum = py_to_upstream_datum(py, &datum)?;
+    let datum: upstream_ontologist::UpstreamDatum = datum.extract(py)?;
     Ok(datum.known_bad_guess())
 }
 
-#[pyfunction]
-fn guess_from_debian_patch(
-    py: Python,
-    path: PathBuf,
-    trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
-    upstream_ontologist::providers::debian::guess_from_debian_patch(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?
-        .into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect()
-}
-
-#[pyfunction]
-fn guess_from_path(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    upstream_ontologist::guess_from_path(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?
-        .into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect()
-}
-
 #[pyfunction(name = "skip_paragraph")]
-fn readme_skip_paragraph(py: Python, para: &str) -> PyResult<(bool, Vec<PyObject>)> {
+fn readme_skip_paragraph(py: Python, para: &str) -> PyResult<(bool, PyObject)> {
     let (skip, para) = upstream_ontologist::readme::skip_paragraph(para);
-    let para = para
-        .into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect::<PyResult<Vec<PyObject>>>()?;
-    Ok((skip, para))
+    Ok((skip, para.to_object(py)))
 }
 
 #[pyfunction]
-fn guess_from_pyproject_toml(
+fn fixup_rcp_style_git_repo_url(url: &str) -> PyResult<String> {
+    Ok(upstream_ontologist::vcs::fixup_rcp_style_git_repo_url(url)
+        .map_or(url.to_string(), |u| u.to_string()))
+}
+
+#[pyfunction]
+fn valid_debian_package_name(name: &str) -> PyResult<bool> {
+    Ok(upstream_ontologist::debian::valid_debian_package_name(name))
+}
+
+#[pyfunction]
+fn debian_to_upstream_version(version: &str) -> PyResult<String> {
+    Ok(upstream_ontologist::debian::debian_to_upstream_version(version).to_string())
+}
+
+#[pyfunction]
+fn upstream_name_to_debian_source_name(name: &str) -> PyResult<String> {
+    Ok(upstream_ontologist::debian::upstream_name_to_debian_source_name(name))
+}
+
+#[pyfunction]
+fn upstream_package_to_debian_binary_name(package: UpstreamPackage) -> PyResult<String> {
+    Ok(upstream_ontologist::debian::upstream_package_to_debian_binary_name(&package))
+}
+
+#[pyfunction]
+fn upstream_package_to_debian_source_name(package: UpstreamPackage) -> PyResult<String> {
+    Ok(upstream_ontologist::debian::upstream_package_to_debian_source_name(&package))
+}
+
+#[pyfunction]
+pub fn find_secure_repo_url(
+    url: String,
+    branch: Option<&str>,
+    net_access: Option<bool>,
+) -> Option<String> {
+    upstream_ontologist::vcs::find_secure_repo_url(url.parse().unwrap(), branch, net_access)
+        .map(|u| u.to_string())
+}
+
+#[pyfunction]
+fn sanitize_url(url: &str) -> PyResult<String> {
+    Ok(upstream_ontologist::vcs::sanitize_url(url))
+}
+
+#[pyfunction]
+fn convert_cvs_list_to_str(urls: Vec<&str>) -> Option<String> {
+    upstream_ontologist::vcs::convert_cvs_list_to_str(urls.as_slice())
+}
+
+#[pyfunction]
+fn fixup_broken_git_details(
+    location: &str,
+    branch: Option<&str>,
+    subpath: Option<&str>,
+) -> (String, Option<String>, Option<String>) {
+    let url = upstream_ontologist::vcs::fixup_git_url(location);
+    let location = upstream_ontologist::vcs::VcsLocation {
+        url: url.parse().unwrap(),
+        branch: branch.map(|s| s.to_string()),
+        subpath: subpath.map(|s| s.to_string()),
+    };
+    let ret = upstream_ontologist::vcs::fixup_git_location(&location);
+    (
+        ret.url.to_string(),
+        ret.branch.as_ref().map(|s| s.to_string()),
+        ret.subpath.as_ref().map(|s| s.to_string()),
+    )
+}
+
+fn extract_str_value(py: Python, value: PyObject) -> PyResult<String> {
+    let value = value.extract::<PyObject>(py)?;
+
+    value.extract::<String>(py)
+}
+
+#[derive(Clone)]
+#[pyclass]
+struct UpstreamDatum(pub(crate) upstream_ontologist::UpstreamDatumWithMetadata);
+
+#[pymethods]
+impl UpstreamDatum {
+    #[new]
+    fn new(
+        py: Python,
+        field: String,
+        value: PyObject,
+        certainty: Option<String>,
+        origin: Option<Origin>,
+    ) -> PyResult<Self> {
+        Ok(UpstreamDatum(
+            upstream_ontologist::UpstreamDatumWithMetadata {
+                datum: match field.as_str() {
+                    "Name" => {
+                        upstream_ontologist::UpstreamDatum::Name(extract_str_value(py, value)?)
+                    }
+                    "Version" => {
+                        upstream_ontologist::UpstreamDatum::Version(extract_str_value(py, value)?)
+                    }
+                    "Summary" => {
+                        upstream_ontologist::UpstreamDatum::Summary(extract_str_value(py, value)?)
+                    }
+                    "Description" => upstream_ontologist::UpstreamDatum::Description(
+                        extract_str_value(py, value)?,
+                    ),
+                    "Homepage" => {
+                        upstream_ontologist::UpstreamDatum::Homepage(extract_str_value(py, value)?)
+                    }
+                    "Repository" => {
+                        // Check if the value is a list rather than a string
+                        if let Ok(value) = value.extract::<Vec<String>>(py) {
+                            upstream_ontologist::UpstreamDatum::Repository(value.join(" "))
+                        } else {
+                            upstream_ontologist::UpstreamDatum::Repository(extract_str_value(
+                                py, value,
+                            )?)
+                        }
+                    }
+                    "Repository-Browse" => upstream_ontologist::UpstreamDatum::RepositoryBrowse(
+                        extract_str_value(py, value)?,
+                    ),
+                    "License" => {
+                        upstream_ontologist::UpstreamDatum::License(extract_str_value(py, value)?)
+                    }
+                    "Author" => {
+                        upstream_ontologist::UpstreamDatum::Author(value.extract(py).unwrap())
+                    }
+                    "Bug-Database" => upstream_ontologist::UpstreamDatum::BugDatabase(
+                        extract_str_value(py, value)?,
+                    ),
+                    "Bug-Submit" => {
+                        upstream_ontologist::UpstreamDatum::BugSubmit(extract_str_value(py, value)?)
+                    }
+                    "Contact" => {
+                        upstream_ontologist::UpstreamDatum::Contact(extract_str_value(py, value)?)
+                    }
+                    "Cargo-Crate" => upstream_ontologist::UpstreamDatum::CargoCrate(
+                        extract_str_value(py, value)?,
+                    ),
+                    "Security-MD" => upstream_ontologist::UpstreamDatum::SecurityMD(
+                        extract_str_value(py, value)?,
+                    ),
+                    "Keywords" => {
+                        upstream_ontologist::UpstreamDatum::Keywords(value.extract(py).unwrap())
+                    }
+                    "Maintainer" => {
+                        upstream_ontologist::UpstreamDatum::Maintainer(value.extract(py).unwrap())
+                    }
+                    "Copyright" => {
+                        upstream_ontologist::UpstreamDatum::Copyright(value.extract(py).unwrap())
+                    }
+                    "Documentation" => upstream_ontologist::UpstreamDatum::Documentation(
+                        value.extract(py).unwrap(),
+                    ),
+                    "Go-Import-Path" => {
+                        upstream_ontologist::UpstreamDatum::GoImportPath(value.extract(py).unwrap())
+                    }
+                    "Download" => {
+                        upstream_ontologist::UpstreamDatum::Download(value.extract(py).unwrap())
+                    }
+                    "Wiki" => upstream_ontologist::UpstreamDatum::Wiki(value.extract(py).unwrap()),
+                    "MailingList" => {
+                        upstream_ontologist::UpstreamDatum::MailingList(value.extract(py).unwrap())
+                    }
+                    "SourceForge-Project" => {
+                        upstream_ontologist::UpstreamDatum::SourceForgeProject(
+                            value.extract(py).unwrap(),
+                        )
+                    }
+                    "Archive" => {
+                        upstream_ontologist::UpstreamDatum::Archive(value.extract(py).unwrap())
+                    }
+                    "Demo" => upstream_ontologist::UpstreamDatum::Demo(value.extract(py).unwrap()),
+                    "Pecl-Package" => {
+                        upstream_ontologist::UpstreamDatum::PeclPackage(value.extract(py).unwrap())
+                    }
+                    "Haskell-Package" => upstream_ontologist::UpstreamDatum::HaskellPackage(
+                        value.extract(py).unwrap(),
+                    ),
+                    "Funding" => {
+                        upstream_ontologist::UpstreamDatum::Funding(value.extract(py).unwrap())
+                    }
+                    "Changelog" => {
+                        upstream_ontologist::UpstreamDatum::Changelog(value.extract(py).unwrap())
+                    }
+                    "Debian-ITP" => {
+                        upstream_ontologist::UpstreamDatum::DebianITP(value.extract(py).unwrap())
+                    }
+                    "Screenshots" => {
+                        upstream_ontologist::UpstreamDatum::Screenshots(value.extract(py).unwrap())
+                    }
+                    "Cite-As" => {
+                        upstream_ontologist::UpstreamDatum::CiteAs(value.extract(py).unwrap())
+                    }
+                    "Registry" => {
+                        upstream_ontologist::UpstreamDatum::Registry(value.extract(py).unwrap())
+                    }
+                    "Donation" => {
+                        upstream_ontologist::UpstreamDatum::Donation(value.extract(py).unwrap())
+                    }
+                    "Webservice" => {
+                        upstream_ontologist::UpstreamDatum::Webservice(value.extract(py).unwrap())
+                    }
+                    _ => {
+                        return Err(PyValueError::new_err(format!("Unknown field: {}", field)));
+                    }
+                },
+                origin,
+                certainty: certainty.map(|s| Certainty::from_str(&s).unwrap()),
+            },
+        ))
+    }
+
+    #[getter]
+    fn field(&self) -> PyResult<String> {
+        Ok(self.0.datum.field().to_string())
+    }
+
+    #[getter]
+    fn value(&self, py: Python) -> PyResult<PyObject> {
+        let value = self
+            .0
+            .datum
+            .to_object(py)
+            .extract::<(String, PyObject)>(py)
+            .unwrap()
+            .1;
+        assert!(!value.as_ref(py).is_instance_of::<PyTuple>());
+        Ok(value)
+    }
+
+    #[getter]
+    fn origin(&self) -> Option<Origin> {
+        self.0.origin.clone()
+    }
+
+    #[setter]
+    fn set_origin(&mut self, origin: Option<Origin>) {
+        self.0.origin = origin;
+    }
+
+    #[getter]
+    fn certainty(&self) -> Option<String> {
+        self.0.certainty.map(|c| c.to_string())
+    }
+
+    #[setter]
+    pub fn set_certainty(&mut self, certainty: Option<String>) {
+        self.0.certainty = certainty.map(|s| Certainty::from_str(&s).unwrap());
+    }
+
+    fn __eq__(lhs: &PyCell<Self>, rhs: &PyCell<Self>) -> PyResult<bool> {
+        Ok(lhs.borrow().0 == rhs.borrow().0)
+    }
+
+    fn __ne__(lhs: &PyCell<Self>, rhs: &PyCell<Self>) -> PyResult<bool> {
+        Ok(lhs.borrow().0 != rhs.borrow().0)
+    }
+
+    fn __str__(&self) -> PyResult<String> {
+        Ok(format!(
+            "{}: {}",
+            self.0.datum.field(),
+            self.0.datum.to_string()
+        ))
+    }
+
+    fn __repr__(slf: PyRef<Self>) -> PyResult<String> {
+        Ok(format!(
+            "UpstreamDatum({}, {}, {}, certainty={})",
+            slf.0.datum.field(),
+            slf.0.datum.to_string(),
+            slf.0
+                .origin
+                .as_ref()
+                .map(|s| format!("Some({})", s))
+                .unwrap_or_else(|| "None".to_string()),
+            slf.0
+                .certainty
+                .as_ref()
+                .map(|c| format!("Some({})", c.to_string()))
+                .unwrap_or_else(|| "None".to_string()),
+        ))
+    }
+}
+
+#[pyclass]
+struct UpstreamMetadata(pub(crate) upstream_ontologist::UpstreamMetadata);
+
+#[allow(non_snake_case)]
+#[pymethods]
+impl UpstreamMetadata {
+    fn __getitem__(&self, field: &str) -> PyResult<UpstreamDatum> {
+        self.0
+            .get(&field)
+            .map(|datum| UpstreamDatum(datum.clone()))
+            .ok_or_else(|| PyKeyError::new_err(format!("No such field: {}", field)))
+    }
+
+    fn __delitem__(&mut self, field: &str) -> PyResult<()> {
+        self.0.remove(&field);
+        Ok(())
+    }
+
+    fn __contains__(&self, field: &str) -> bool {
+        self.0.contains_key(&field)
+    }
+
+    pub fn items(&self) -> Vec<(String, UpstreamDatum)> {
+        self.0
+            .iter()
+            .map(|datum| {
+                (
+                    datum.datum.field().to_string(),
+                    UpstreamDatum(datum.clone()),
+                )
+            })
+            .collect()
+    }
+
+    pub fn values(&self) -> Vec<UpstreamDatum> {
+        self.0
+            .iter()
+            .map(|datum| UpstreamDatum(datum.clone()))
+            .collect()
+    }
+
+    pub fn get(&self, py: Python, field: &str, default: Option<PyObject>) -> PyObject {
+        let default = default.unwrap_or_else(|| py.None());
+        let value = self
+            .0
+            .get(&field)
+            .map(|datum| UpstreamDatum(datum.clone()).into_py(py));
+
+        value.unwrap_or(default)
+    }
+
+    fn __setitem__(&mut self, field: &str, datum: UpstreamDatum) -> PyResult<()> {
+        assert_eq!(field, datum.0.datum.field());
+        self.0.insert(datum.0);
+        Ok(())
+    }
+
+    #[new]
+    #[pyo3(signature = (**kwargs))]
+    fn new(kwargs: Option<&PyDict>) -> Self {
+        let mut ret = UpstreamMetadata(upstream_ontologist::UpstreamMetadata::new());
+
+        if let Some(kwargs) = kwargs {
+            for item in kwargs.items() {
+                let datum = item.extract::<UpstreamDatum>().unwrap();
+                ret.0.insert(datum.0);
+            }
+        }
+
+        ret
+    }
+
+    #[classmethod]
+    pub fn from_dict(
+        _cls: &PyType,
+        py: Python,
+        d: &PyDict,
+        default_certainty: Option<Certainty>,
+    ) -> PyResult<Self> {
+        let mut data = Vec::new();
+        let mut di = d.iter();
+        while let Some(t) = di.next() {
+            let t = t.to_object(py);
+            let mut datum: upstream_ontologist::UpstreamDatumWithMetadata =
+                if let Ok(wm) = t.extract(py) {
+                    wm
+                } else {
+                    let wm: upstream_ontologist::UpstreamDatum = t.extract(py)?;
+
+                    upstream_ontologist::UpstreamDatumWithMetadata {
+                        datum: wm,
+                        certainty: default_certainty,
+                        origin: None,
+                    }
+                };
+
+            if datum.certainty.is_none() {
+                datum.certainty = default_certainty;
+            }
+            data.push(datum);
+        }
+        Ok(Self(upstream_ontologist::UpstreamMetadata::from_data(data)))
+    }
+
+    pub fn __iter__(slf: PyRef<Self>) -> PyResult<PyObject> {
+        #[pyclass]
+        struct UpstreamDatumIter {
+            inner: Vec<upstream_ontologist::UpstreamDatumWithMetadata>,
+        }
+        #[pymethods]
+        impl UpstreamDatumIter {
+            fn __next__(&mut self) -> Option<UpstreamDatum> {
+                self.inner.pop().map(UpstreamDatum)
+            }
+        }
+        Ok(UpstreamDatumIter {
+            inner: slf.0.iter().cloned().collect::<Vec<_>>(),
+        }
+        .into_py(slf.py()))
+    }
+}
+
+#[pyfunction]
+fn guess_upstream_info(
     py: Python,
-    path: PathBuf,
-    trust_package: bool,
+    path: std::path::PathBuf,
+    trust_package: Option<bool>,
 ) -> PyResult<Vec<PyObject>> {
-    upstream_ontologist::providers::python::guess_from_pyproject_toml(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?
-        .into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect()
+    let mut result = Vec::new();
+
+    for datum in upstream_ontologist::guess_upstream_info(&path, trust_package) {
+        let datum = match datum {
+            Ok(datum) => datum,
+            Err(e) => {
+                log::warn!("Warning: {}", e);
+                continue;
+            }
+        };
+        result.push(datum.to_object(py));
+    }
+
+    Ok(result)
 }
 
 #[pyfunction]
-fn guess_from_setup_cfg(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    upstream_ontologist::providers::python::guess_from_setup_cfg(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?
-        .into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect()
-}
-
-#[pyfunction]
-fn guess_from_setup_py(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    upstream_ontologist::providers::python::guess_from_setup_py(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?
-        .into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect()
-}
-
-#[pyfunction]
-fn guess_from_package_yaml(
+fn description_from_readme_md(
     py: Python,
-    path: PathBuf,
-    trust_package: bool,
-) -> PyResult<Vec<PyObject>> {
-    upstream_ontologist::providers::package_yaml::guess_from_package_yaml(
+    contents: &str,
+) -> PyResult<(Option<String>, Vec<PyObject>)> {
+    let (description, metadata) =
+        upstream_ontologist::readme::description_from_readme_md(contents)?;
+    let metadata = metadata
+        .into_iter()
+        .map(|datum| datum.to_object(py))
+        .collect();
+    Ok((description, metadata))
+}
+
+#[pyfunction]
+fn get_upstream_info(
+    py: Python,
+    path: std::path::PathBuf,
+    trust_package: Option<bool>,
+    net_access: Option<bool>,
+    consult_external_directory: Option<bool>,
+    check: Option<bool>,
+) -> PyResult<&PyDict> {
+    let metadata = upstream_ontologist::get_upstream_info(
         path.as_path(),
         trust_package,
-    )
-    .map_err(map_provider_err_to_py_err)?
-    .into_iter()
-    .map(|x| upstream_datum_with_metadata_to_py(py, x))
-    .collect()
+        net_access,
+        consult_external_directory,
+        check,
+    )?;
+    let ret = PyDict::new(py);
+    for datum in metadata.iter() {
+        ret.set_item(
+            datum.datum.field(),
+            datum
+                .datum
+                .to_object(py)
+                .extract::<(String, PyObject)>(py)?
+                .1,
+        )?;
+    }
+    Ok(ret)
 }
 
 #[pyfunction]
-fn guess_from_pkg_info(py: Python, path: PathBuf, trust_package: bool) -> PyResult<Vec<PyObject>> {
-    upstream_ontologist::providers::python::guess_from_pkg_info(path.as_path(), trust_package)
-        .map_err(map_provider_err_to_py_err)?
+fn check_upstream_metadata(metadata: &mut UpstreamMetadata) -> PyResult<()> {
+    upstream_ontologist::check_upstream_metadata(&mut metadata.0, None);
+    Ok(())
+}
+
+#[pyfunction]
+fn extend_upstream_metadata(
+    metadata: &mut UpstreamMetadata,
+    path: std::path::PathBuf,
+    minimum_certainty: Option<String>,
+    net_access: Option<bool>,
+    consult_external_directory: Option<bool>,
+) -> PyResult<()> {
+    let minimum_certainty =
+        minimum_certainty
+            .map(|s| s.parse())
+            .transpose()
+            .map_err(|e: String| {
+                PyValueError::new_err(format!("Invalid minimum_certainty: {}", e.to_string()))
+            })?;
+    upstream_ontologist::extend_upstream_metadata(
+        &mut metadata.0,
+        path.as_path(),
+        minimum_certainty,
+        net_access,
+        consult_external_directory,
+    )?;
+    Ok(())
+}
+
+#[pyfunction]
+fn guess_upstream_metadata(
+    path: std::path::PathBuf,
+    trust_package: Option<bool>,
+    net_access: Option<bool>,
+    consult_external_directory: Option<bool>,
+    check: Option<bool>,
+) -> PyResult<UpstreamMetadata> {
+    Ok(UpstreamMetadata(
+        upstream_ontologist::guess_upstream_metadata(
+            path.as_path(),
+            trust_package,
+            net_access,
+            consult_external_directory,
+            check,
+        )?,
+    ))
+}
+
+#[pyfunction]
+fn guess_upstream_metadata_items(
+    py: Python,
+    path: std::path::PathBuf,
+    trust_package: Option<bool>,
+    minimum_certainty: Option<String>,
+) -> PyResult<Vec<PyObject>> {
+    let metadata = upstream_ontologist::guess_upstream_metadata_items(
+        path.as_path(),
+        trust_package,
+        minimum_certainty
+            .map(|s| s.parse())
+            .transpose()
+            .map_err(|e: String| {
+                PyValueError::new_err(format!("Invalid minimum_certainty: {}", e.to_string()))
+            })?,
+    );
+    Ok(metadata
         .into_iter()
-        .map(|x| upstream_datum_with_metadata_to_py(py, x))
-        .collect()
+        .map(|datum| datum.map(|o| o.to_object(py)))
+        .filter_map(Result::ok)
+        .collect::<Vec<PyObject>>())
+}
+
+#[pyfunction]
+fn fix_upstream_metadata(metadata: &mut UpstreamMetadata) -> PyResult<()> {
+    upstream_ontologist::fix_upstream_metadata(&mut metadata.0);
+    Ok(())
+}
+
+#[pyfunction]
+fn update_from_guesses(
+    py: Python,
+    metadata: &mut UpstreamMetadata,
+    items_iter: PyObject,
+) -> PyResult<Vec<UpstreamDatum>> {
+    let mut items = vec![];
+    loop {
+        let item = match items_iter.call_method0(py, "__next__") {
+            Ok(item) => item,
+            Err(e) => {
+                if e.is_instance_of::<PyStopIteration>(py) {
+                    break;
+                }
+                return Err(e);
+            }
+        };
+        items.push(item.extract::<UpstreamDatum>(py)?);
+    }
+    Ok(upstream_ontologist::update_from_guesses(
+        metadata.0.mut_items(),
+        items.into_iter().map(|datum| datum.0),
+    )
+    .into_iter()
+    .map(UpstreamDatum)
+    .collect())
+}
+
+#[pyfunction]
+fn parse_first_header_text(text: &str) -> (Option<&str>, Option<&str>, Option<&str>) {
+    upstream_ontologist::readme::parse_first_header_text(text)
+}
+
+#[pyfunction]
+fn description_from_readme_plain(text: &str) -> PyResult<(Option<String>, Vec<UpstreamDatum>)> {
+    let (description, data) = upstream_ontologist::readme::description_from_readme_plain(text)?;
+
+    Ok((description, data.into_iter().map(UpstreamDatum).collect()))
 }
 
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
     m.add_wrapped(wrap_pyfunction!(url_from_git_clone_command))?;
+    m.add_wrapped(wrap_pyfunction!(url_from_vcs_command))?;
     m.add_wrapped(wrap_pyfunction!(url_from_fossil_clone_command))?;
     m.add_wrapped(wrap_pyfunction!(url_from_svn_co_command))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_meson))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_package_json))?;
-    m.add_wrapped(wrap_pyfunction!(debian_is_native))?;
+    m.add_wrapped(wrap_pyfunction!(url_from_cvs_co_command))?;
     m.add_wrapped(wrap_pyfunction!(drop_vcs_in_scheme))?;
     m.add_wrapped(wrap_pyfunction!(unsplit_vcs_url))?;
-    m.add_wrapped(wrap_pyfunction!(load_json_url))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_composer_json))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_package_xml))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_dist_ini))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_perl_dist_name))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_perl_module))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_pod))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_pubspec_yaml))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_authors))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_metadata_json))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_meta_json))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_travis_yml))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_meta_yml))?;
-    m.add_wrapped(wrap_pyfunction!(metadata_from_itp_bug_body))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_metainfo))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_doap))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_opam))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_pom_xml))?;
     m.add_wrapped(wrap_pyfunction!(plausible_vcs_url))?;
     m.add_wrapped(wrap_pyfunction!(plausible_vcs_browse_url))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_wscript))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_makefile_pl))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_go_mod))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_cabal))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_cabal_lines))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_git_config))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_aur))?;
     m.add_wrapped(wrap_pyfunction!(check_url_canonical))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_environment))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_nuspec))?;
     m.add_wrapped(wrap_pyfunction!(guess_repo_from_url))?;
     m.add_wrapped(wrap_pyfunction!(probe_gitlab_host))?;
     m.add_wrapped(wrap_pyfunction!(is_gitlab_site))?;
     m.add_wrapped(wrap_pyfunction!(check_repository_url_canonical))?;
     m.add_wrapped(wrap_pyfunction!(probe_upstream_branch_url))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_gemspec))?;
     m.add_wrapped(wrap_pyfunction!(guess_from_launchpad))?;
     m.add_wrapped(wrap_pyfunction!(canonical_git_repo_url))?;
     m.add_wrapped(wrap_pyfunction!(browse_url_from_repo_url))?;
     m.add_wrapped(wrap_pyfunction!(find_public_repo_url))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_configure))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_r_description))?;
     m.add_wrapped(wrap_pyfunction!(find_forge))?;
     m.add_wrapped(wrap_pyfunction!(repo_url_from_merge_request_url))?;
     m.add_wrapped(wrap_pyfunction!(bug_database_from_issue_url))?;
@@ -1105,36 +1043,55 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(bug_submit_url_from_bug_database_url))?;
     m.add_wrapped(wrap_pyfunction!(check_bug_database_canonical))?;
     m.add_wrapped(wrap_pyfunction!(check_bug_submit_url_canonical))?;
-    m.add_wrapped(wrap_pyfunction!(extract_sf_project_name))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_cargo))?;
-    m.add_wrapped(wrap_pyfunction!(extract_pecl_package_name))?;
-    m.add_wrapped(wrap_pyfunction!(metadata_from_url))?;
-    m.add_wrapped(wrap_pyfunction!(get_repology_metadata))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_security_md))?;
-    m.add_wrapped(wrap_pyfunction!(get_sf_metadata))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_debian_patch))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_path))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_pyproject_toml))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_setup_cfg))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_setup_py))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_package_yaml))?;
-    m.add_wrapped(wrap_pyfunction!(guess_from_pkg_info))?;
+    m.add_wrapped(wrap_pyfunction!(fixup_rcp_style_git_repo_url))?;
+    m.add_wrapped(wrap_pyfunction!(check_upstream_metadata))?;
+    m.add_wrapped(wrap_pyfunction!(extend_upstream_metadata))?;
+    m.add_wrapped(wrap_pyfunction!(guess_upstream_metadata))?;
+    m.add_wrapped(wrap_pyfunction!(fix_upstream_metadata))?;
+    m.add_wrapped(wrap_pyfunction!(guess_upstream_metadata_items))?;
+    m.add_wrapped(wrap_pyfunction!(update_from_guesses))?;
+    m.add_wrapped(wrap_pyfunction!(description_from_readme_plain))?;
+    let debianm = PyModule::new(py, "debian")?;
+    debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_source_name))?;
+    debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_binary_name))?;
+    debianm.add_wrapped(wrap_pyfunction!(valid_debian_package_name))?;
+    debianm.add_wrapped(wrap_pyfunction!(debian_to_upstream_version))?;
+    debianm.add_wrapped(wrap_pyfunction!(upstream_name_to_debian_source_name))?;
+    m.add("debian", debianm)?;
+    m.add_wrapped(wrap_pyfunction!(find_secure_repo_url))?;
+    m.add_wrapped(wrap_pyfunction!(sanitize_url))?;
+    m.add_wrapped(wrap_pyfunction!(convert_cvs_list_to_str))?;
+    m.add_wrapped(wrap_pyfunction!(fixup_broken_git_details))?;
+    m.add_wrapped(wrap_pyfunction!(guess_upstream_info))?;
+    m.add_wrapped(wrap_pyfunction!(get_upstream_info))?;
+    m.add_wrapped(wrap_pyfunction!(description_from_readme_md))?;
+    m.add_wrapped(wrap_pyfunction!(parse_first_header_text))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;
     m.add_class::<Launchpad>()?;
     m.add_class::<SourceForge>()?;
+    m.add_class::<UpstreamMetadata>()?;
+    m.add_class::<UpstreamDatum>()?;
     m.add("InvalidUrl", py.get_type::<InvalidUrl>())?;
     m.add("UnverifiableUrl", py.get_type::<UnverifiableUrl>())?;
-    m.add(
-        "NoSuchRepologyProject",
-        py.get_type::<NoSuchRepologyProject>(),
-    )?;
     m.add("NoSuchForgeProject", py.get_type::<NoSuchForgeProject>())?;
     m.add_wrapped(wrap_pyfunction!(known_bad_guess))?;
     let readmem = PyModule::new(py, "readme")?;
     readmem.add_wrapped(wrap_pyfunction!(readme_skip_paragraph))?;
     m.add_submodule(readmem)?;
-    m.add("ParseError", py.get_type::<ParseError>())?;
+    m.add(
+        "ParseError",
+        py.get_type::<upstream_ontologist::ParseError>(),
+    )?;
+    m.add(
+        "KNOWN_GITLAB_SITES",
+        upstream_ontologist::vcs::KNOWN_GITLAB_SITES.to_vec(),
+    )?;
+    m.add(
+        "SECURE_SCHEMES",
+        upstream_ontologist::vcs::SECURE_SCHEMES.to_vec(),
+    )?;
+    m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }

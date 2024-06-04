@@ -1,9 +1,11 @@
-use crate::{Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{
+    Certainty, GuesserSettings, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata,
+};
 use std::path::Path;
 
 pub fn guess_from_package_yaml(
     path: &Path,
-    trust_package: bool,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let reader = std::fs::File::open(path)?;
     let data: serde_yaml::Value =
@@ -16,7 +18,7 @@ pub fn guess_from_package_yaml(
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Name(name.to_string()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.display().to_string()),
+                origin: Some(path.into()),
             });
         }
     }
@@ -26,7 +28,7 @@ pub fn guess_from_package_yaml(
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Version(version.to_string()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.display().to_string()),
+                origin: Some(path.into()),
             });
         }
     }
@@ -37,7 +39,7 @@ pub fn guess_from_package_yaml(
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Author(authors.into_iter().map(Person::from).collect()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.display().to_string()),
+                origin: Some(path.into()),
             });
         }
     }
@@ -53,7 +55,7 @@ pub fn guess_from_package_yaml(
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Maintainer(maintainer),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.display().to_string()),
+                    origin: Some(path.into()),
                 });
             }
         }
@@ -64,7 +66,7 @@ pub fn guess_from_package_yaml(
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Homepage(homepage.to_string()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.display().to_string()),
+                origin: Some(path.into()),
             });
         }
     }
@@ -75,7 +77,7 @@ pub fn guess_from_package_yaml(
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Description(description.to_string()),
                     certainty: Some(Certainty::Confident),
-                    origin: Some(path.display().to_string()),
+                    origin: Some(path.into()),
                 });
             }
         }
@@ -86,7 +88,7 @@ pub fn guess_from_package_yaml(
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Summary(synopsis.to_string()),
                 certainty: Some(Certainty::Confident),
-                origin: Some(path.display().to_string()),
+                origin: Some(path.into()),
             });
         }
     }
@@ -96,7 +98,7 @@ pub fn guess_from_package_yaml(
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::License(license.to_string()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.display().to_string()),
+                origin: Some(path.into()),
             });
         }
     }
@@ -106,7 +108,7 @@ pub fn guess_from_package_yaml(
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Repository(format!("https://github.com/{}", github)),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.display().to_string()),
+                origin: Some(path.into()),
             });
         }
     }
@@ -116,7 +118,7 @@ pub fn guess_from_package_yaml(
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Repository(repository.to_string()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.display().to_string()),
+                origin: Some(path.into()),
             });
         }
     }

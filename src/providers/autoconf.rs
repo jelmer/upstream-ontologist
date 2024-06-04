@@ -1,4 +1,4 @@
-use crate::{Certainty, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{Certainty, GuesserSettings, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use log::debug;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -18,7 +18,7 @@ fn is_email_address(email: &str) -> bool {
 
 pub fn guess_from_configure(
     path: &std::path::Path,
-    trust_package: bool,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     if std::path::Path::new(path).is_dir() {
         return Ok(Vec::new());
@@ -62,21 +62,21 @@ pub fn guess_from_configure(
                     results.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Name(value.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some("./configure".to_string()),
+                        origin: Some(path.into()),
                     });
                 }
                 "PACKAGE_TARNAME" => {
                     results.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Name(value.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some("./configure".to_string()),
+                        origin: Some(path.into()),
                     });
                 }
                 "PACKAGE_VERSION" => {
                     results.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Version(value.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some("./configure".to_string()),
+                        origin: Some(path.into()),
                     });
                 }
                 "PACKAGE_BUGREPORT" => {
@@ -107,7 +107,7 @@ pub fn guess_from_configure(
                         results.push(UpstreamDatumWithMetadata {
                             datum: UpstreamDatum::BugSubmit(value.to_string()),
                             certainty,
-                            origin: Some("./configure".to_string()),
+                            origin: Some(path.into()),
                         });
                     }
                 }
@@ -115,7 +115,7 @@ pub fn guess_from_configure(
                     results.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Homepage(value.to_string()),
                         certainty: Some(Certainty::Certain),
-                        origin: Some("./configure".to_string()),
+                        origin: Some(path.into()),
                     });
                 }
                 _ => {

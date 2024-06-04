@@ -20,9 +20,7 @@ import unittest
 
 def test_suite():
     names = [
-        "debian",
-        "guess",
-        "upstream_ontologist",
+        "data",
         "vcs",
     ]
     module_names = [__name__ + ".test_" + name for name in names]

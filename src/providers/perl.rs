@@ -1,6 +1,8 @@
-use crate::{Certainty, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{
+    Certainty, GuesserSettings, Origin, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata,
+};
 use lazy_regex::regex;
-use log::error;
+
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
@@ -9,6 +11,7 @@ use std::process::Command;
 
 pub fn guess_from_pod(
     contents: &str,
+    origin: &Origin,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut by_header: HashMap<String, String> = HashMap::new();
     let mut inheader: Option<String> = None;
@@ -41,7 +44,7 @@ pub fn guess_from_pod(
         upstream_data.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Description(description),
             certainty: Some(Certainty::Certain),
-            origin: Some("pod".to_string()),
+            origin: Some(origin.clone()),
         });
     }
 
@@ -52,18 +55,18 @@ pub fn guess_from_pod(
                 upstream_data.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Name(name.trim().to_string()),
                     certainty: Some(Certainty::Confident),
-                    origin: Some("pod".to_string()),
+                    origin: Some(origin.clone()),
                 });
                 upstream_data.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Summary(summary.trim().to_string()),
                     certainty: Some(Certainty::Confident),
-                    origin: Some("pod".to_string()),
+                    origin: Some(origin.clone()),
                 });
             } else if !line.contains(' ') {
                 upstream_data.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Name(line.trim().to_string()),
                     certainty: Some(Certainty::Confident),
-                    origin: Some("pod".to_string()),
+                    origin: Some(origin.clone()),
                 });
             }
         }
@@ -76,10 +79,13 @@ pub fn guess_from_perl_module(
     path: &Path,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     match Command::new("perldoc").arg("-u").arg(path).output() {
-        Ok(output) => guess_from_pod(&String::from_utf8_lossy(&output.stdout)),
+        Ok(output) => guess_from_pod(
+            &String::from_utf8_lossy(&output.stdout),
+            &Origin::Path(path.into()),
+        ),
         Err(e) => Err(ProviderError::Other(format!(
             "Error running perldoc: {}",
-            e.to_string()
+            e
         ))),
     }
 }
@@ -107,7 +113,7 @@ pub fn guess_from_perl_dist_name(
 #[cfg(feature = "dist-ini")]
 pub fn guess_from_dist_ini(
     path: &Path,
-    _trust_package: bool,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let parser = ini::Ini::load_from_file(path)
         .map_err(|e| ProviderError::ParseError(format!("Error parsing dist.ini: {}", e)))?;
@@ -117,7 +123,7 @@ pub fn guess_from_dist_ini(
         .map(|name| UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Name(name.to_string()),
             certainty: Some(Certainty::Certain),
-            origin: Some("dist.ini".to_string()),
+            origin: Some(path.into()),
         });
 
     let version =
@@ -126,7 +132,7 @@ pub fn guess_from_dist_ini(
             .map(|version| UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Version(version.to_string()),
                 certainty: Some(Certainty::Certain),
-                origin: Some("dist.ini".to_string()),
+                origin: Some(path.into()),
             });
 
     let summary =
@@ -135,7 +141,7 @@ pub fn guess_from_dist_ini(
             .map(|summary| UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Summary(summary.to_string()),
                 certainty: Some(Certainty::Certain),
-                origin: Some("dist.ini".to_string()),
+                origin: Some(path.into()),
             });
 
     let bug_database = parser
@@ -143,7 +149,7 @@ pub fn guess_from_dist_ini(
         .map(|bugtracker| UpstreamDatumWithMetadata {
             datum: UpstreamDatum::BugDatabase(bugtracker.to_string()),
             certainty: Some(Certainty::Certain),
-            origin: Some("dist.ini".to_string()),
+            origin: Some(path.into()),
         });
 
     let repository = parser
@@ -151,7 +157,7 @@ pub fn guess_from_dist_ini(
         .map(|repository| UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Repository(repository.to_string()),
             certainty: Some(Certainty::Certain),
-            origin: Some("dist.ini".to_string()),
+            origin: Some(path.into()),
         });
 
     let license =
@@ -160,7 +166,7 @@ pub fn guess_from_dist_ini(
             .map(|license| UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::License(license.to_string()),
                 certainty: Some(Certainty::Certain),
-                origin: Some("dist.ini".to_string()),
+                origin: Some(path.into()),
             });
 
     let copyright = match (
@@ -170,7 +176,7 @@ pub fn guess_from_dist_ini(
         (Some(year), Some(holder)) => Some(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Copyright(format!("{} {}", year, holder)),
             certainty: Some(Certainty::Certain),
-            origin: Some("dist.ini".to_string()),
+            origin: Some(path.into()),
         }),
         _ => None,
     };
@@ -208,7 +214,7 @@ pub fn guess_from_dist_ini(
 
 pub fn guess_from_meta_json(
     path: &Path,
-    _trust_package: bool,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut file = File::open(path)?;
     let mut contents = String::new();
@@ -223,7 +229,7 @@ pub fn guess_from_meta_json(
         upstream_data.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Name(name.to_string()),
             certainty: Some(Certainty::Certain),
-            origin: Some(path.to_string_lossy().to_string()),
+            origin: Some(path.into()),
         });
     }
 
@@ -232,7 +238,7 @@ pub fn guess_from_meta_json(
         upstream_data.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Version(version.to_string()),
             certainty: Some(Certainty::Certain),
-            origin: Some(path.to_string_lossy().to_string()),
+            origin: Some(path.into()),
         });
     }
 
@@ -240,7 +246,7 @@ pub fn guess_from_meta_json(
         upstream_data.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Summary(summary.to_string()),
             certainty: Some(Certainty::Certain),
-            origin: Some(path.to_string_lossy().to_string()),
+            origin: Some(path.into()),
         });
     }
 
@@ -253,7 +259,7 @@ pub fn guess_from_meta_json(
                 upstream_data.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::BugDatabase(web.to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
                 // TODO: Support resources["bugtracker"]["mailto"]
             }
@@ -266,7 +272,7 @@ pub fn guess_from_meta_json(
             upstream_data.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Homepage(homepage.to_string()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
 
@@ -278,7 +284,7 @@ pub fn guess_from_meta_json(
                 upstream_data.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Repository(url.to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
 
@@ -286,7 +292,7 @@ pub fn guess_from_meta_json(
                 upstream_data.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::RepositoryBrowse(web.to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
         }
@@ -306,7 +312,7 @@ pub fn guess_from_meta_json(
 /// specification of the format.
 pub fn guess_from_meta_yml(
     path: &Path,
-    _trust_package: bool,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut file = File::open(path)?;
 
@@ -323,7 +329,7 @@ pub fn guess_from_meta_yml(
             upstream_data.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Name(name.to_string()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
     }
@@ -333,7 +339,7 @@ pub fn guess_from_meta_yml(
             upstream_data.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::License(license.to_string()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
     }
@@ -343,7 +349,7 @@ pub fn guess_from_meta_yml(
             upstream_data.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Version(version.to_string()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
     }
@@ -353,7 +359,7 @@ pub fn guess_from_meta_yml(
             upstream_data.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::BugDatabase(bugtracker.as_str().unwrap().to_string()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
 
@@ -361,7 +367,7 @@ pub fn guess_from_meta_yml(
             upstream_data.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Homepage(homepage.as_str().unwrap().to_string()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
 
@@ -370,13 +376,13 @@ pub fn guess_from_meta_yml(
                 upstream_data.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Repository(url.as_str().unwrap().to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             } else {
                 upstream_data.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Repository(repository.as_str().unwrap().to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.to_string_lossy().to_string()),
+                    origin: Some(path.into()),
                 });
             }
         }
@@ -394,7 +400,7 @@ pub fn guess_from_meta_yml(
 
 pub fn guess_from_makefile_pl(
     path: &Path,
-    _trust_package: bool,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut dist_name = None;
     let file = File::open(path)?;
@@ -410,7 +416,7 @@ pub fn guess_from_makefile_pl(
             results.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Name(name),
                 certainty: Some(Certainty::Confident),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
         if let Some(captures) = repository_regex.captures(&line) {
@@ -418,7 +424,7 @@ pub fn guess_from_makefile_pl(
             results.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Repository(repository),
                 certainty: Some(Certainty::Confident),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
     }

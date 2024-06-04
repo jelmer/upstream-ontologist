@@ -1,10 +1,10 @@
-use crate::{Certainty, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
-use log::warn;
+use crate::{Certainty, GuesserSettings, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
+
 use std::process::Command;
 
 pub fn guess_from_meson(
     path: &std::path::Path,
-    _trust_package: bool,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     // TODO(jelmer): consider looking for a meson build directory to call "meson
     // introspect" on
@@ -30,7 +30,7 @@ pub fn guess_from_meson(
             results.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Name(name.to_owned()),
                 certainty: Some(Certainty::Certain),
-                origin: Some("meson.build".to_owned()),
+                origin: Some(path.into()),
             });
         }
     }
@@ -39,7 +39,7 @@ pub fn guess_from_meson(
             results.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Version(version_str.to_owned()),
                 certainty: Some(Certainty::Certain),
-                origin: Some("meson.build".to_owned()),
+                origin: Some(path.into()),
             });
         }
     }

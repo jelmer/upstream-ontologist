@@ -1,10 +1,10 @@
-use crate::{Certainty, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{Certainty, GuesserSettings, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use log::error;
 use std::path::Path;
 
 pub fn guess_from_composer_json(
     path: &Path,
-    _trust_package: bool,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     // https://getcomposer.org/doc/04-schema.md
     let file = std::fs::File::open(path)?;
@@ -28,35 +28,35 @@ pub fn guess_from_composer_json(
                 upstream_data.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Name(value.as_str().unwrap().to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some("composer.json".to_string()),
+                    origin: Some(path.into()),
                 });
             }
             "homepage" => {
                 upstream_data.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Homepage(value.as_str().unwrap().to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some("composer.json".to_string()),
+                    origin: Some(path.into()),
                 });
             }
             "description" => {
                 upstream_data.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Summary(value.as_str().unwrap().to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some("composer.json".to_string()),
+                    origin: Some(path.into()),
                 });
             }
             "license" => {
                 upstream_data.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::License(value.as_str().unwrap().to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some("composer.json".to_string()),
+                    origin: Some(path.into()),
                 });
             }
             "version" => {
                 upstream_data.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Version(value.as_str().unwrap().to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some("composer.json".to_string()),
+                    origin: Some(path.into()),
                 });
             }
             "type" => {
@@ -75,7 +75,7 @@ pub fn guess_from_composer_json(
                             .collect(),
                     ),
                     certainty: Some(Certainty::Certain),
-                    origin: Some("composer.json".to_string()),
+                    origin: Some(path.into()),
                 });
             }
             "require" | "require-dev" | "autoload" | "autoload-dev" | "scripts" | "extra"
