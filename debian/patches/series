@@ -8,5 +8,5 @@ pulldown-cmark
 pyproject-toml
 rust-ini
 scraper
-select
 xml
+select
