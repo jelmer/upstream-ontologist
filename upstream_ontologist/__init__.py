@@ -53,37 +53,32 @@ Supported, but currently not set.
 - Webservice
 """
 
-from typing import Optional, Sequence, TypeVar, Generic, List
 from dataclasses import dataclass
 from email.utils import parseaddr
+from typing import Optional
+
 import ruamel.yaml
-
-
-try:
-    from typing import TypedDict  # type: ignore
-except ImportError:
-    from typing_extensions import TypedDict  # type: ignore
-
 
 from . import _upstream_ontologist
 
+get_upstream_info = _upstream_ontologist.get_upstream_info
 
 SUPPORTED_CERTAINTIES = ["certain", "confident", "likely", "possible", None]
 
-version_string = "0.1.36"
+version_string = "0.1.37"
 
 USER_AGENT = "upstream-ontologist/" + version_string
 # Too aggressive?
 DEFAULT_URLLIB_TIMEOUT = 3
 
 
-yaml = ruamel.yaml.YAML(typ='safe')
+yaml = ruamel.yaml.YAML(typ="safe")
 
 
 @dataclass
 @yaml.register_class
 class Person:
-    yaml_tag = '!Person'
+    yaml_tag = "!Person"
 
     name: str
     email: Optional[str] = None
@@ -92,8 +87,8 @@ class Person:
     def __init__(self, name, email=None, url=None):
         self.name = name
         self.email = email
-        if url and url.startswith('mailto:'):
-            self.email = url[len('mailto:'):]
+        if url and url.startswith("mailto:"):
+            self.email = url[len("mailto:") :]
             self.url = None
         else:
             self.url = url
@@ -103,29 +98,26 @@ class Person:
         d = {}
         for k, v in node.value:
             d[k.value] = v.value
-        return cls(
-            name=d.get('name'),
-            email=d.get('email'),
-            url=d.get('url'))
+        return cls(name=d.get("name"), email=d.get("email"), url=d.get("url"))
 
     @classmethod
     def from_string(cls, text):
-        text = text.replace(' at ', '@')
-        text = text.replace(' -at- ', '@')
-        text = text.replace(' -dot- ', '.')
-        text = text.replace('[AT]', '@')
-        if '(' in text and text.endswith(')'):
-            (p1, p2) = text[:-1].split('(', 1)
-            if p2.startswith('https://') or p2.startswith('http://'):
+        text = text.replace(" at ", "@")
+        text = text.replace(" -at- ", "@")
+        text = text.replace(" -dot- ", ".")
+        text = text.replace("[AT]", "@")
+        if "(" in text and text.endswith(")"):
+            (p1, p2) = text[:-1].split("(", 1)
+            if p2.startswith("https://") or p2.startswith("http://"):
                 url = p2
-                if '<' in p1:
+                if "<" in p1:
                     (name, email) = parseaddr(p1)
                     return cls(name=name, email=email, url=url)
                 return cls(name=p1, url=url)
-            elif '@' in p2:
+            elif "@" in p2:
                 return cls(name=p1, email=p2)
             return cls(text)
-        elif '<' in text:
+        elif "<" in text:
             (name, email) = parseaddr(text)
             return cls(name=name, email=email)
         else:
@@ -133,67 +125,12 @@ class Person:
 
     def __str__(self):
         if self.email:
-            return f'{self.name} <{self.email}>'
+            return f"{self.name} <{self.email}>"
         return self.name
 
 
-T = TypeVar('T')
-
-
-class UpstreamDatum(Generic[T]):
-    """A single piece of upstream metadata."""
-
-    __slots__ = ["field", "value", "certainty", "origin"]
-
-    field: str
-    value: T
-    certainty: Optional[str]
-    origin: Optional[str]
-
-    def __init__(self, field: str, value: T, certainty: Optional[str] = None,
-                 origin: Optional[str] = None) -> None:
-        self.field = field
-        if value is None:
-            raise ValueError(field)
-        self.value = value
-        if certainty not in SUPPORTED_CERTAINTIES:
-            raise ValueError(certainty)
-        self.certainty = certainty
-        self.origin = origin
-
-    def __eq__(self, other):
-        return (
-            isinstance(other, type(self))
-            and self.field == other.field
-            and self.value == other.value
-            and self.certainty == other.certainty
-            and self.origin == other.origin
-        )
-
-    def __str__(self):
-        return "{}: {}".format(self.field, self.value)
-
-    def __repr__(self):
-        return "{}({!r}, {!r}, {!r}, {!r})".format(
-            type(self).__name__,
-            self.field,
-            self.value,
-            self.certainty,
-            self.origin,
-        )
-
-
-UpstreamMetadata = TypedDict('UpstreamMetadata', {
-    'Name': UpstreamDatum[str],
-    'Contact': UpstreamDatum[str],
-    'Repository': UpstreamDatum[str],
-    'Repository-Browse': UpstreamDatum[str],
-    'Summary': UpstreamDatum[str],
-    'Bug-Database': UpstreamDatum[str],
-    'Bug-Submit': UpstreamDatum[str],
-    'Homepage': UpstreamDatum[str],
-    'Screenshots': UpstreamDatum[List[str]],
-}, total=False)
+UpstreamDatum = _upstream_ontologist.UpstreamDatum
+UpstreamMetadata = _upstream_ontologist.UpstreamMetadata
 
 
 class UpstreamPackage:
@@ -209,51 +146,6 @@ def upstream_metadata_sort_key(x):
         "Name": "00-Name",
         "Contact": "01-Contact",
     }.get(k, k)
-
-
-def min_certainty(certainties: Sequence[str]) -> str:
-    confidences = [certainty_to_confidence(c) for c in certainties]
-    return confidence_to_certainty(max([c for c in confidences if c is not None] + [0]))
-
-
-def certainty_to_confidence(certainty: Optional[str]) -> Optional[int]:
-    if certainty in ("unknown", None):
-        return None
-    return SUPPORTED_CERTAINTIES.index(certainty)
-
-
-def confidence_to_certainty(confidence: Optional[int]) -> str:
-    if confidence is None:
-        return "unknown"
-    try:
-        return SUPPORTED_CERTAINTIES[confidence] or "unknown"
-    except IndexError as e:
-        raise ValueError(confidence) from e
-
-
-def certainty_sufficient(
-    actual_certainty: Optional[str], minimum_certainty: Optional[str]
-) -> bool:
-    """Check if the actual certainty is sufficient.
-
-    Args:
-      actual_certainty: Actual certainty with which changes were made
-      minimum_certainty: Minimum certainty to keep changes
-    Returns:
-      boolean
-    """
-    actual_confidence = certainty_to_confidence(actual_certainty)
-    if actual_confidence is None:
-        # Actual confidence is unknown.
-        # TODO(jelmer): Should we really be ignoring this?
-        return True
-    minimum_confidence = certainty_to_confidence(minimum_certainty)
-    if minimum_confidence is None:
-        return True
-    return actual_confidence <= minimum_confidence
-
-
-_load_json_url = _upstream_ontologist.load_json_url  # noqa: F401
 
 
 class UrlUnverifiable(Exception):

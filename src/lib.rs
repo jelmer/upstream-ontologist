@@ -1,14 +1,15 @@
 use lazy_regex::regex;
 use log::{debug, error, warn};
 use percent_encoding::utf8_percent_encode;
-use pyo3::exceptions::PyRuntimeError;
+use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 use reqwest::header::HeaderMap;
+use serde::ser::SerializeSeq;
 use std::str::FromStr;
 
-use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Read};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use url::Url;
 
@@ -17,16 +18,87 @@ static USER_AGENT: &str = concat!("upstream-ontologist/", env!("CARGO_PKG_VERSIO
 // Too aggressive?
 const DEFAULT_URLLIB_TIMEOUT: u64 = 3;
 
+pub mod debian;
+pub mod extrapolate;
+pub mod homepage;
 pub mod providers;
 pub mod readme;
 pub mod vcs;
+pub mod vcs_command;
 
-#[derive(Clone, Copy, Debug, Ord, Eq, PartialOrd, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum Certainty {
-    Certain,
-    Confident,
-    Likely,
     Possible,
+    Likely,
+    Confident,
+    Certain,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Origin {
+    Path(PathBuf),
+    Url(url::Url),
+    Other(String),
+}
+
+impl std::fmt::Display for Origin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Origin::Path(path) => write!(f, "{}", path.display()),
+            Origin::Url(url) => write!(f, "{}", url),
+            Origin::Other(s) => write!(f, "{}", s),
+        }
+    }
+}
+
+impl From<&std::path::Path> for Origin {
+    fn from(path: &std::path::Path) -> Self {
+        Origin::Path(path.to_path_buf())
+    }
+}
+
+impl From<std::path::PathBuf> for Origin {
+    fn from(path: std::path::PathBuf) -> Self {
+        Origin::Path(path)
+    }
+}
+
+impl From<url::Url> for Origin {
+    fn from(url: url::Url) -> Self {
+        Origin::Url(url)
+    }
+}
+
+impl ToPyObject for Origin {
+    fn to_object(&self, py: Python) -> PyObject {
+        match self {
+            Origin::Path(path) => path.to_str().unwrap().to_object(py),
+            Origin::Url(url) => url.to_string().to_object(py),
+            Origin::Other(s) => s.to_object(py),
+        }
+    }
+}
+
+impl IntoPy<PyObject> for Origin {
+    fn into_py(self, py: Python) -> PyObject {
+        match self {
+            Origin::Path(path) => path.to_str().unwrap().to_object(py),
+            Origin::Url(url) => url.to_string().to_object(py),
+            Origin::Other(s) => s.to_object(py),
+        }
+    }
+}
+
+impl FromPyObject<'_> for Origin {
+    fn extract(ob: &PyAny) -> PyResult<Self> {
+        if let Ok(path) = ob.extract::<PathBuf>() {
+            Ok(Origin::Path(path))
+        } else if let Ok(s) = ob.extract::<String>() {
+            Ok(Origin::Other(s))
+        } else {
+            Err(PyTypeError::new_err("expected str or Path"))
+        }
+    }
 }
 
 impl FromStr for Certainty {
@@ -53,11 +125,32 @@ impl ToString for Certainty {
     }
 }
 
-#[derive(Default, Clone, Debug)]
+#[cfg(feature = "pyo3")]
+impl FromPyObject<'_> for Certainty {
+    fn extract(ob: &PyAny) -> PyResult<Self> {
+        let o = ob.extract::<&str>()?;
+        o.parse().map_err(PyValueError::new_err)
+    }
+}
+
+#[derive(Default, Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct Person {
     pub name: Option<String>,
     pub email: Option<String>,
     pub url: Option<String>,
+}
+
+impl std::fmt::Display for Person {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name.as_ref().unwrap_or(&"".to_string()))?;
+        if let Some(email) = &self.email {
+            write!(f, " <{}>", email)?;
+        }
+        if let Some(url) = &self.url {
+            write!(f, " ({})", url)?;
+        }
+        Ok(())
+    }
 }
 
 impl From<&str> for Person {
@@ -72,29 +165,35 @@ impl From<&str> for Person {
                 if p2.starts_with("https://") || p2.starts_with("http://") {
                     let url = p2.to_string();
                     if let Some((name, email)) = parseaddr(p1) {
-                        return Person {
+                        Person {
                             name: Some(name),
                             email: Some(email),
                             url: Some(url),
-                        };
+                        }
                     } else {
-                        return Person {
+                        Person {
                             name: Some(p1.to_string()),
                             url: Some(url),
                             ..Default::default()
-                        };
+                        }
                     }
                 } else if p2.contains('@') {
-                    return Person {
+                    Person {
                         name: Some(p1.to_string()),
                         email: Some(p2.to_string()),
                         ..Default::default()
-                    };
+                    }
+                } else {
+                    Person {
+                        name: Some(text.to_string()),
+                        ..Default::default()
+                    }
                 }
-                return Person {
+            } else {
+                Person {
                     name: Some(text.to_string()),
                     ..Default::default()
-                };
+                }
             }
         } else if text.contains('<') {
             if let Some((name, email)) = parseaddr(text.as_str()) {
@@ -103,13 +202,67 @@ impl From<&str> for Person {
                     email: Some(email),
                     ..Default::default()
                 };
+            } else {
+                Person {
+                    name: Some(text.to_string()),
+                    ..Default::default()
+                }
+            }
+        } else if text.contains('@') && !text.contains(' ') {
+            return Person {
+                email: Some(text),
+                ..Default::default()
+            };
+        } else {
+            Person {
+                name: Some(text),
+                ..Default::default()
             }
         }
+    }
+}
 
-        Person {
-            name: Some(text),
-            ..Default::default()
-        }
+#[cfg(test)]
+mod person_tests {
+    use super::*;
+
+    #[test]
+    fn test_from_str() {
+        assert_eq!(
+            Person::from("Foo Bar <foo@example.com>"),
+            Person {
+                name: Some("Foo Bar".to_string()),
+                email: Some("foo@example.com".to_string()),
+                url: None
+            }
+        );
+        assert_eq!(
+            Person::from("Foo Bar"),
+            Person {
+                name: Some("Foo Bar".to_string()),
+                email: None,
+                url: None
+            }
+        );
+        assert_eq!(
+            Person::from("foo@example.com"),
+            Person {
+                name: None,
+                email: Some("foo@example.com".to_string()),
+                url: None
+            }
+        );
+    }
+}
+
+impl ToPyObject for Person {
+    fn to_object(&self, py: Python) -> PyObject {
+        let m = PyModule::import(py, "upstream_ontologist").unwrap();
+        let person_cls = m.getattr("Person").unwrap();
+        person_cls
+            .call1((self.name.as_ref(), self.email.as_ref(), self.url.as_ref()))
+            .unwrap()
+            .into_py(py)
     }
 }
 
@@ -134,43 +287,85 @@ impl FromPyObject<'_> for Person {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum UpstreamDatum {
+    /// Name of the project
     Name(String),
+    /// URL to project homepage
     Homepage(String),
+    /// URL to the project's source code repository
     Repository(String),
+    /// URL to browse the project's source code repository
     RepositoryBrowse(String),
+    /// Long description of the project
     Description(String),
+    /// Short summary of the project (one line)
     Summary(String),
+    /// License name or SPDX identifier
     License(String),
+    /// List of authors
     Author(Vec<Person>),
+    /// List of maintainers
     Maintainer(Person),
+    /// URL of the project's issue tracker
     BugDatabase(String),
+    /// URL to submit a new bug
     BugSubmit(String),
+    /// URL to the project's contact page or email address
     Contact(String),
+    /// Cargo crate name
     CargoCrate(String),
+    /// Name of the security page name
     SecurityMD(String),
+    /// URL to the security page or email address
     SecurityContact(String),
+    /// Last version of the project
     Version(String),
+    /// List of keywords
     Keywords(Vec<String>),
+    /// Copyright notice
     Copyright(String),
+    /// URL to the project's documentation
     Documentation(String),
+    /// Go import path
     GoImportPath(String),
+    /// URL to the project's download page
     Download(String),
+    /// URL to the project's wiki
     Wiki(String),
+    /// URL to the project's mailing list
     MailingList(String),
+    /// SourceForge project name
     SourceForgeProject(String),
     Archive(String),
+    /// URL to a demo instance
     Demo(String),
+    /// PHP PECL package name
     PeclPackage(String),
+    /// URL to the funding page
     Funding(String),
+    /// URL to the changelog
     Changelog(String),
+    /// Haskell package name
+    HaskellPackage(String),
+    /// Debian ITP (Intent To Package) bug number
+    DebianITP(i32),
+    /// List of URLs to screenshots
+    Screenshots(Vec<String>),
+    /// Name of registry
+    Registry(Vec<(String, String)>),
+    /// Recommended way to cite the software
+    CiteAs(String),
+    /// Link for donations (e.g. Paypal, Libera, etc)
+    Donation(String),
+    /// Link to a life instance of the webservice
+    Webservice(String),
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct UpstreamDatumWithMetadata {
     pub datum: UpstreamDatum,
-    pub origin: Option<String>,
+    pub origin: Option<Origin>,
     pub certainty: Option<Certainty>,
 }
 
@@ -211,8 +406,15 @@ impl UpstreamDatum {
             UpstreamDatum::Archive(..) => "Archive",
             UpstreamDatum::Demo(..) => "Demo",
             UpstreamDatum::PeclPackage(..) => "Pecl-Package",
+            UpstreamDatum::HaskellPackage(..) => "Haskell-Package",
             UpstreamDatum::Funding(..) => "Funding",
             UpstreamDatum::Changelog(..) => "Changelog",
+            UpstreamDatum::DebianITP(..) => "Debian-ITP",
+            UpstreamDatum::Screenshots(..) => "Screenshots",
+            UpstreamDatum::Registry(..) => "Registry",
+            UpstreamDatum::CiteAs(..) => "Cite-As",
+            UpstreamDatum::Donation(..) => "Donation",
+            UpstreamDatum::Webservice(..) => "Webservice",
         }
     }
 
@@ -241,12 +443,67 @@ impl UpstreamDatum {
             UpstreamDatum::Archive(s) => Some(s),
             UpstreamDatum::Demo(s) => Some(s),
             UpstreamDatum::PeclPackage(s) => Some(s),
+            UpstreamDatum::HaskellPackage(s) => Some(s),
             UpstreamDatum::Author(..) => None,
             UpstreamDatum::Maintainer(..) => None,
             UpstreamDatum::Keywords(..) => None,
             UpstreamDatum::Copyright(c) => Some(c),
             UpstreamDatum::Funding(f) => Some(f),
             UpstreamDatum::Changelog(c) => Some(c),
+            UpstreamDatum::Screenshots(..) => None,
+            UpstreamDatum::DebianITP(_c) => None,
+            UpstreamDatum::CiteAs(c) => Some(c),
+            UpstreamDatum::Registry(_) => None,
+            UpstreamDatum::Donation(d) => Some(d),
+            UpstreamDatum::Webservice(w) => Some(w),
+        }
+    }
+
+    pub fn to_url(&self) -> Option<url::Url> {
+        match self {
+            UpstreamDatum::Name(..) => None,
+            UpstreamDatum::Homepage(s) => Some(s.parse().ok()?),
+            UpstreamDatum::Repository(s) => Some(s.parse().ok()?),
+            UpstreamDatum::RepositoryBrowse(s) => Some(s.parse().ok()?),
+            UpstreamDatum::Description(..) => None,
+            UpstreamDatum::Summary(..) => None,
+            UpstreamDatum::License(..) => None,
+            UpstreamDatum::BugDatabase(s) => Some(s.parse().ok()?),
+            UpstreamDatum::BugSubmit(s) => Some(s.parse().ok()?),
+            UpstreamDatum::Contact(..) => None,
+            UpstreamDatum::CargoCrate(s) => Some(s.parse().ok()?),
+            UpstreamDatum::SecurityMD(..) => None,
+            UpstreamDatum::SecurityContact(..) => None,
+            UpstreamDatum::Version(..) => None,
+            UpstreamDatum::Documentation(s) => Some(s.parse().ok()?),
+            UpstreamDatum::GoImportPath(_s) => None,
+            UpstreamDatum::Download(s) => Some(s.parse().ok()?),
+            UpstreamDatum::Wiki(s) => Some(s.parse().ok()?),
+            UpstreamDatum::MailingList(s) => Some(s.parse().ok()?),
+            UpstreamDatum::SourceForgeProject(s) => Some(s.parse().ok()?),
+            UpstreamDatum::Archive(s) => Some(s.parse().ok()?),
+            UpstreamDatum::Demo(s) => Some(s.parse().ok()?),
+            UpstreamDatum::PeclPackage(_s) => None,
+            UpstreamDatum::HaskellPackage(_s) => None,
+            UpstreamDatum::Author(..) => None,
+            UpstreamDatum::Maintainer(..) => None,
+            UpstreamDatum::Keywords(..) => None,
+            UpstreamDatum::Copyright(..) => None,
+            UpstreamDatum::Funding(s) => Some(s.parse().ok()?),
+            UpstreamDatum::Changelog(s) => Some(s.parse().ok()?),
+            UpstreamDatum::Screenshots(..) => None,
+            UpstreamDatum::DebianITP(_c) => None,
+            UpstreamDatum::Registry(_r) => None,
+            UpstreamDatum::CiteAs(_c) => None,
+            UpstreamDatum::Donation(_d) => None,
+            UpstreamDatum::Webservice(w) => Some(w.parse().ok()?),
+        }
+    }
+
+    pub fn as_person(&self) -> Option<&Person> {
+        match self {
+            UpstreamDatum::Maintainer(p) => Some(p),
+            _ => None,
         }
     }
 
@@ -353,6 +610,172 @@ impl UpstreamDatum {
     }
 }
 
+impl std::fmt::Display for UpstreamDatum {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UpstreamDatum::Name(s) => write!(f, "Name: {}", s),
+            UpstreamDatum::Homepage(s) => write!(f, "Homepage: {}", s),
+            UpstreamDatum::Repository(s) => write!(f, "Repository: {}", s),
+            UpstreamDatum::RepositoryBrowse(s) => write!(f, "RepositoryBrowse: {}", s),
+            UpstreamDatum::Description(s) => write!(f, "Description: {}", s),
+            UpstreamDatum::Summary(s) => write!(f, "Summary: {}", s),
+            UpstreamDatum::License(s) => write!(f, "License: {}", s),
+            UpstreamDatum::BugDatabase(s) => write!(f, "BugDatabase: {}", s),
+            UpstreamDatum::BugSubmit(s) => write!(f, "BugSubmit: {}", s),
+            UpstreamDatum::Contact(s) => write!(f, "Contact: {}", s),
+            UpstreamDatum::CargoCrate(s) => write!(f, "CargoCrate: {}", s),
+            UpstreamDatum::SecurityMD(s) => write!(f, "SecurityMD: {}", s),
+            UpstreamDatum::SecurityContact(s) => write!(f, "SecurityContact: {}", s),
+            UpstreamDatum::Version(s) => write!(f, "Version: {}", s),
+            UpstreamDatum::Documentation(s) => write!(f, "Documentation: {}", s),
+            UpstreamDatum::GoImportPath(s) => write!(f, "GoImportPath: {}", s),
+            UpstreamDatum::Download(s) => write!(f, "Download: {}", s),
+            UpstreamDatum::Wiki(s) => write!(f, "Wiki: {}", s),
+            UpstreamDatum::MailingList(s) => write!(f, "MailingList: {}", s),
+            UpstreamDatum::SourceForgeProject(s) => write!(f, "SourceForgeProject: {}", s),
+            UpstreamDatum::Archive(s) => write!(f, "Archive: {}", s),
+            UpstreamDatum::Demo(s) => write!(f, "Demo: {}", s),
+            UpstreamDatum::PeclPackage(s) => write!(f, "PeclPackage: {}", s),
+            UpstreamDatum::Author(authors) => {
+                write!(
+                    f,
+                    "Author: {}",
+                    authors
+                        .iter()
+                        .map(|a| a.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+            UpstreamDatum::Maintainer(maintainer) => {
+                write!(f, "Maintainer: {}", maintainer)
+            }
+            UpstreamDatum::Keywords(keywords) => {
+                write!(
+                    f,
+                    "Keywords: {}",
+                    keywords
+                        .iter()
+                        .map(|a| a.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+            UpstreamDatum::Copyright(s) => {
+                write!(f, "Copyright: {}", s)
+            }
+            UpstreamDatum::Funding(s) => {
+                write!(f, "Funding: {}", s)
+            }
+            UpstreamDatum::Changelog(s) => {
+                write!(f, "Changelog: {}", s)
+            }
+            UpstreamDatum::DebianITP(s) => {
+                write!(f, "DebianITP: {}", s)
+            }
+            UpstreamDatum::HaskellPackage(p) => {
+                write!(f, "HaskellPackage: {}", p)
+            }
+            UpstreamDatum::Screenshots(s) => {
+                write!(f, "Screenshots: {}", s.join(", "))
+            }
+            UpstreamDatum::Registry(r) => {
+                write!(f, "Registry:")?;
+                for (k, v) in r {
+                    write!(f, "  - Name: {}", k)?;
+                    write!(f, "    Entry: {}", v)?;
+                }
+                Ok(())
+            }
+            UpstreamDatum::CiteAs(c) => {
+                write!(f, "Cite-As: {}", c)
+            }
+            UpstreamDatum::Donation(d) => {
+                write!(f, "Donation: {}", d)
+            }
+            UpstreamDatum::Webservice(w) => {
+                write!(f, "Webservice: {}", w)
+            }
+        }
+    }
+}
+
+impl serde::ser::Serialize for UpstreamDatum {
+    fn serialize<S: serde::ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            UpstreamDatum::Name(s) => serializer.serialize_str(s),
+            UpstreamDatum::Homepage(s) => serializer.serialize_str(s),
+            UpstreamDatum::Repository(s) => serializer.serialize_str(s),
+            UpstreamDatum::RepositoryBrowse(s) => serializer.serialize_str(s),
+            UpstreamDatum::Description(s) => serializer.serialize_str(s),
+            UpstreamDatum::Summary(s) => serializer.serialize_str(s),
+            UpstreamDatum::License(s) => serializer.serialize_str(s),
+            UpstreamDatum::BugDatabase(s) => serializer.serialize_str(s),
+            UpstreamDatum::BugSubmit(s) => serializer.serialize_str(s),
+            UpstreamDatum::Contact(s) => serializer.serialize_str(s),
+            UpstreamDatum::CargoCrate(s) => serializer.serialize_str(s),
+            UpstreamDatum::SecurityMD(s) => serializer.serialize_str(s),
+            UpstreamDatum::SecurityContact(s) => serializer.serialize_str(s),
+            UpstreamDatum::Version(s) => serializer.serialize_str(s),
+            UpstreamDatum::Documentation(s) => serializer.serialize_str(s),
+            UpstreamDatum::GoImportPath(s) => serializer.serialize_str(s),
+            UpstreamDatum::Download(s) => serializer.serialize_str(s),
+            UpstreamDatum::Wiki(s) => serializer.serialize_str(s),
+            UpstreamDatum::MailingList(s) => serializer.serialize_str(s),
+            UpstreamDatum::SourceForgeProject(s) => serializer.serialize_str(s),
+            UpstreamDatum::Archive(s) => serializer.serialize_str(s),
+            UpstreamDatum::Demo(s) => serializer.serialize_str(s),
+            UpstreamDatum::PeclPackage(s) => serializer.serialize_str(s),
+            UpstreamDatum::Author(authors) => {
+                let mut seq = serializer.serialize_seq(Some(authors.len()))?;
+                for a in authors {
+                    seq.serialize_element(a)?;
+                }
+                seq.end()
+            }
+            UpstreamDatum::Maintainer(maintainer) => maintainer.serialize(serializer),
+            UpstreamDatum::Keywords(keywords) => {
+                let mut seq = serializer.serialize_seq(Some(keywords.len()))?;
+                for a in keywords {
+                    seq.serialize_element(a)?;
+                }
+                seq.end()
+            }
+            UpstreamDatum::Copyright(s) => serializer.serialize_str(s),
+            UpstreamDatum::Funding(s) => serializer.serialize_str(s),
+            UpstreamDatum::Changelog(s) => serializer.serialize_str(s),
+            UpstreamDatum::DebianITP(s) => serializer.serialize_i32(*s),
+            UpstreamDatum::HaskellPackage(p) => serializer.serialize_str(p),
+            UpstreamDatum::Screenshots(s) => {
+                let mut seq = serializer.serialize_seq(Some(s.len()))?;
+                for s in s {
+                    seq.serialize_element(s)?;
+                }
+                seq.end()
+            }
+            UpstreamDatum::CiteAs(c) => serializer.serialize_str(c),
+            UpstreamDatum::Registry(r) => {
+                let mut l = serializer.serialize_seq(Some(r.len()))?;
+                for (k, v) in r {
+                    let mut m = serde_yaml::Mapping::new();
+                    m.insert(
+                        serde_yaml::Value::String("Name".to_string()),
+                        serde_yaml::to_value(k).unwrap(),
+                    );
+                    m.insert(
+                        serde_yaml::Value::String("Entry".to_string()),
+                        serde_yaml::to_value(v).unwrap(),
+                    );
+                    l.serialize_element(&m)?;
+                }
+                l.end()
+            }
+            UpstreamDatum::Donation(d) => serializer.serialize_str(d),
+            UpstreamDatum::Webservice(w) => serializer.serialize_str(w),
+        }
+    }
+}
+
 pub struct UpstreamMetadata(Vec<UpstreamDatumWithMetadata>);
 
 impl UpstreamMetadata {
@@ -360,20 +783,66 @@ impl UpstreamMetadata {
         UpstreamMetadata(Vec::new())
     }
 
+    pub fn from_data(data: Vec<UpstreamDatumWithMetadata>) -> Self {
+        Self(data)
+    }
+
+    pub fn mut_items(&mut self) -> &mut Vec<UpstreamDatumWithMetadata> {
+        &mut self.0
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = &UpstreamDatumWithMetadata> {
         self.0.iter()
     }
 
-    pub fn get_field(&self, field: &str) -> Option<&UpstreamDatumWithMetadata> {
+    pub fn mut_iter(&mut self) -> impl Iterator<Item = &mut UpstreamDatumWithMetadata> {
+        self.0.iter_mut()
+    }
+
+    pub fn get(&self, field: &str) -> Option<&UpstreamDatumWithMetadata> {
         self.0.iter().find(|d| d.datum.field() == field)
     }
 
-    pub fn has_field(&self, field: &str) -> bool {
-        self.get_field(field).is_some()
+    pub fn get_mut(&mut self, field: &str) -> Option<&mut UpstreamDatumWithMetadata> {
+        self.0.iter_mut().find(|d| d.datum.field() == field)
+    }
+
+    pub fn insert(&mut self, datum: UpstreamDatumWithMetadata) {
+        self.0.push(datum);
+    }
+
+    pub fn contains_key(&self, field: &str) -> bool {
+        self.get(field).is_some()
     }
 
     pub fn discard_known_bad(&mut self) {
         self.0.retain(|d| !d.datum.known_bad_guess());
+    }
+
+    pub fn update(
+        &mut self,
+        new_items: impl Iterator<Item = UpstreamDatumWithMetadata>,
+    ) -> Vec<UpstreamDatumWithMetadata> {
+        update_from_guesses(&mut self.0, new_items)
+    }
+
+    pub fn remove(&mut self, field: &str) -> Option<UpstreamDatumWithMetadata> {
+        let index = self.0.iter().position(|d| d.datum.field() == field)?;
+        Some(self.0.remove(index))
+    }
+}
+
+impl Default for UpstreamMetadata {
+    fn default() -> Self {
+        UpstreamMetadata::new()
+    }
+}
+
+impl Iterator for UpstreamMetadata {
+    type Item = UpstreamDatumWithMetadata;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.pop()
     }
 }
 
@@ -383,76 +852,79 @@ impl From<Vec<UpstreamDatumWithMetadata>> for UpstreamMetadata {
     }
 }
 
-pub fn guess_upstream_metadata(
-    path: PathBuf,
-    trust_package: Option<bool>,
-    net_access: Option<bool>,
-    consult_external_directory: Option<bool>,
-    check: Option<bool>,
-) -> Result<Vec<UpstreamDatum>, ()> {
-    Python::with_gil(|py| {
-        let guess = py.import("upstream_ontologist.guess").unwrap();
-        let guess_upstream_metadata = guess.getattr("guess_upstream_metadata").unwrap();
+impl From<Vec<UpstreamDatum>> for UpstreamMetadata {
+    fn from(v: Vec<UpstreamDatum>) -> Self {
+        UpstreamMetadata(
+            v.into_iter()
+                .map(|d| UpstreamDatumWithMetadata {
+                    datum: d,
+                    certainty: None,
+                    origin: None,
+                })
+                .collect(),
+        )
+    }
+}
 
-        let items = guess_upstream_metadata
-            .call1((
-                path,
-                trust_package,
-                net_access,
-                consult_external_directory,
-                check,
-            ))
-            .unwrap()
-            .extract::<HashMap<String, PyObject>>()
+impl From<UpstreamMetadata> for Vec<UpstreamDatumWithMetadata> {
+    fn from(v: UpstreamMetadata) -> Self {
+        v.0
+    }
+}
+
+impl From<UpstreamMetadata> for Vec<UpstreamDatum> {
+    fn from(v: UpstreamMetadata) -> Self {
+        v.0.into_iter().map(|d| d.datum).collect()
+    }
+}
+
+impl serde::ser::Serialize for UpstreamMetadata {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        let mut map = serde_yaml::Mapping::new();
+        for datum in &self.0 {
+            map.insert(
+                serde_yaml::Value::String(datum.datum.field().to_string()),
+                serde_yaml::to_value(datum).unwrap(),
+            );
+        }
+        map.serialize(serializer)
+    }
+}
+
+impl ToPyObject for UpstreamDatumWithMetadata {
+    fn to_object(&self, py: Python) -> PyObject {
+        let m = PyModule::import(py, "upstream_ontologist.guess").unwrap();
+
+        let cls = m.getattr("UpstreamDatum").unwrap();
+
+        let (field, py_datum) = self
+            .datum
+            .to_object(py)
+            .extract::<(String, PyObject)>(py)
             .unwrap();
 
-        let mut ret = Vec::new();
-        for (name, value) in items.into_iter() {
-            if value.is_none(py) {
-                continue;
-            }
-            let entry = match name.as_str() {
-                "Homepage" => UpstreamDatum::Homepage(value.extract::<String>(py).unwrap()),
-                "Name" => UpstreamDatum::Name(value.extract::<String>(py).unwrap()),
-                "Repository" => UpstreamDatum::Repository(value.extract::<String>(py).unwrap()),
-                "Repository-Browse" => {
-                    UpstreamDatum::RepositoryBrowse(value.extract::<String>(py).unwrap())
-                }
-                "Bug-Database" => UpstreamDatum::BugDatabase(value.extract::<String>(py).unwrap()),
-                "Bug-Submit" => UpstreamDatum::BugSubmit(value.extract::<String>(py).unwrap()),
-                "Documentation" => {
-                    UpstreamDatum::Documentation(value.extract::<String>(py).unwrap())
-                }
-                "Copyright" => UpstreamDatum::Copyright(value.extract::<String>(py).unwrap()),
-                "Keywords" => UpstreamDatum::Keywords(value.extract::<Vec<String>>(py).unwrap()),
-                "Contact" => UpstreamDatum::Contact(value.extract::<String>(py).unwrap()),
-                "Security-MD" => UpstreamDatum::SecurityMD(value.extract::<String>(py).unwrap()),
-                "Security-Contact" => {
-                    UpstreamDatum::SecurityContact(value.extract::<String>(py).unwrap())
-                }
-                "Cargo-Crate" => UpstreamDatum::CargoCrate(value.extract::<String>(py).unwrap()),
-                "Description" => UpstreamDatum::Description(value.extract::<String>(py).unwrap()),
-                "Summary" => UpstreamDatum::Summary(value.extract::<String>(py).unwrap()),
-                "License" => UpstreamDatum::License(value.extract::<String>(py).unwrap()),
-                "Version" => UpstreamDatum::Version(value.extract::<String>(py).unwrap()),
-                "Demo" => UpstreamDatum::Demo(value.extract::<String>(py).unwrap()),
-                "Archive" => UpstreamDatum::Archive(value.extract::<String>(py).unwrap()),
-                "Pecl-Package" => UpstreamDatum::PeclPackage(value.extract::<String>(py).unwrap()),
-                "Author" => UpstreamDatum::Author(
-                    value
-                        .extract::<Vec<Person>>(py)
-                        .unwrap()
-                        .into_iter()
-                        .collect(),
-                ),
-                _ => {
-                    panic!("{}: {:?}", name, value);
-                }
-            };
-            ret.push(entry);
-        }
-        Ok(ret)
-    })
+        let kwargs = pyo3::types::PyDict::new(py);
+        kwargs
+            .set_item("certainty", self.certainty.map(|x| x.to_string()))
+            .unwrap();
+        kwargs.set_item("origin", self.origin.as_ref()).unwrap();
+
+        let datum = cls.call((field, py_datum), Some(kwargs)).unwrap();
+
+        datum.to_object(py)
+    }
+}
+
+impl serde::ser::Serialize for UpstreamDatumWithMetadata {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        UpstreamDatum::serialize(&self.datum, serializer)
+    }
 }
 
 pub trait UpstreamDataProvider {
@@ -460,167 +932,6 @@ pub trait UpstreamDataProvider {
         path: &std::path::Path,
         trust_package: bool,
     ) -> dyn Iterator<Item = (UpstreamDatum, Certainty)>;
-}
-
-pub fn url_from_git_clone_command(command: &[u8]) -> Option<String> {
-    if command.ends_with(&[b'\\']) {
-        warn!("Ignoring command with line break: {:?}", command);
-        return None;
-    }
-    let command_str = match String::from_utf8(command.to_vec()) {
-        Ok(s) => s,
-        Err(_) => {
-            warn!("Ignoring command with non-UTF-8: {:?}", command);
-            return None;
-        }
-    };
-    let argv: Vec<String> = shlex::split(command_str.as_str())?
-        .into_iter()
-        .filter(|arg| !arg.trim().is_empty())
-        .collect();
-    let mut args = argv;
-    let mut i = 0;
-    while i < args.len() {
-        if !args[i].starts_with('-') {
-            i += 1;
-            continue;
-        }
-        if args[i].contains('=') {
-            args.remove(i);
-            continue;
-        }
-        // arguments that take a parameter
-        if args[i] == "-b" || args[i] == "--depth" || args[i] == "--branch" {
-            args.remove(i);
-            args.remove(i);
-            continue;
-        }
-        args.remove(i);
-    }
-    let url = args
-        .get(2)
-        .cloned()
-        .unwrap_or_else(|| args.get(0).cloned().unwrap_or_default());
-    if vcs::plausible_url(&url) {
-        Some(url)
-    } else {
-        None
-    }
-}
-
-pub fn url_from_fossil_clone_command(command: &[u8]) -> Option<String> {
-    let command_str = match String::from_utf8(command.to_vec()) {
-        Ok(s) => s,
-        Err(_) => return None,
-    };
-    let argv: Vec<String> = shlex::split(command_str.as_str())?
-        .into_iter()
-        .filter(|arg| !arg.trim().is_empty())
-        .collect();
-    let mut args = argv;
-    let mut i = 0;
-    while i < args.len() {
-        if !args[i].starts_with('-') {
-            i += 1;
-            continue;
-        }
-        if args[i].contains('=') {
-            args.remove(i);
-            continue;
-        }
-        args.remove(i);
-    }
-    let url = args
-        .get(2)
-        .cloned()
-        .unwrap_or_else(|| args.get(0).cloned().unwrap_or_default());
-    if vcs::plausible_url(&url) {
-        Some(url)
-    } else {
-        None
-    }
-}
-
-/*
-pub fn url_from_cvs_co_command(command: &[u8]) -> Option<String> {
-    let command_str = match String::from_utf8(command.to_vec()) {
-        Ok(s) => s,
-        Err(_) => return None,
-    };
-    let argv: Vec<String> = shlex::split(command_str.as_str())?
-        .into_iter()
-        .filter(|arg| !arg.trim().is_empty())
-        .collect();
-    let mut args = argv;
-    let mut i = 0;
-    let mut cvsroot = None;
-    let mut module = None;
-    let mut command_seen = false;
-    args.remove(0);
-    while i < args.len() {
-        if args[i] == "-d" {
-            args.remove(i);
-            cvsroot = Some(&args[i][..]);
-            args.remove(i);
-            continue;
-        }
-        if args[i].starts_with("-d") {
-            cvsroot = Some(&args[i][2..]);
-            args.remove(i);
-            continue;
-        }
-        if command_seen && !args[i].starts_with('-') {
-            module = Some(args[i]);
-        } else if args[i] == "co" || args[i] == "checkout" {
-            command_seen = true;
-        }
-        args.remove(i);
-    }
-    if let Some(cvsroot) = cvsroot {
-        let url = cvs_to_url(&cvsroot);
-        if let Some(module) = module {
-            return Some(url.join(module));
-        }
-        return Some(url);
-    }
-    None
-}
-
-*/
-
-pub fn url_from_svn_co_command(command: &[u8]) -> Option<String> {
-    if command.ends_with(&[b'\\']) {
-        warn!("Ignoring command with line break: {:?}", command);
-        return None;
-    }
-    let command_str = match std::str::from_utf8(command) {
-        Ok(s) => s,
-        Err(_) => return None,
-    };
-    let argv: Vec<String> = shlex::split(command_str)?
-        .into_iter()
-        .filter(|arg| !arg.trim().is_empty())
-        .collect();
-    let args = argv;
-    let url_schemes = vec!["svn+ssh", "http", "https", "svn"];
-    args.into_iter().find(|arg| {
-        url_schemes
-            .iter()
-            .any(|scheme| arg.starts_with(&format!("{}://", scheme)))
-    })
-}
-
-pub fn debian_is_native(path: &Path) -> std::io::Result<Option<bool>> {
-    let format_file_path = path.join("source/format");
-    match File::open(format_file_path) {
-        Ok(mut file) => {
-            let mut content = String::new();
-            file.read_to_string(&mut content)?;
-            Ok(Some(content.trim() == "3.0 (native)"))
-        }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(e),
-    }
 }
 
 #[derive(Debug)]
@@ -631,6 +942,19 @@ pub enum HTTPJSONError {
         status: u16,
         response: reqwest::blocking::Response,
     },
+}
+
+impl std::fmt::Display for HTTPJSONError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            HTTPJSONError::HTTPError(e) => write!(f, "{}", e),
+            HTTPJSONError::Error {
+                url,
+                status,
+                response: _,
+            } => write!(f, "HTTP error {} for {}:", status, url,),
+        }
+    }
 }
 
 pub fn load_json_url(
@@ -659,7 +983,7 @@ pub fn load_json_url(
         .build()
         .map_err(HTTPJSONError::HTTPError)?;
 
-    let http_url: reqwest::Url = http_url.clone().into_string().parse().unwrap();
+    let http_url: reqwest::Url = Into::<String>::into(http_url.clone()).parse().unwrap();
 
     let request = client
         .get(http_url)
@@ -705,149 +1029,6 @@ fn simplify_namespaces(element: &mut xmltree::Element, namespaces: &[String]) {
             simplify_namespaces(child_element, namespaces);
         }
     }
-}
-
-pub fn guess_from_metadata_json(
-    path: &Path,
-    _trust_package: bool,
-) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
-    let mut file = File::open(path)?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)?;
-
-    let data: serde_json::Map<String, serde_json::Value> = match serde_json::from_str(&contents) {
-        Ok(data) => data,
-        Err(e) => {
-            return Err(ProviderError::ParseError(e.to_string()));
-        }
-    };
-
-    let mut upstream_data: Vec<UpstreamDatumWithMetadata> = Vec::new();
-
-    for (field, value) in data.iter() {
-        match field.as_str() {
-            "description" => {
-                if let Some(description) = value.as_str() {
-                    upstream_data.push(UpstreamDatumWithMetadata {
-                        datum: UpstreamDatum::Description(description.to_string()),
-                        certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
-                    });
-                }
-            }
-            "name" => {
-                if let Some(name) = value.as_str() {
-                    upstream_data.push(UpstreamDatumWithMetadata {
-                        datum: UpstreamDatum::Name(name.to_string()),
-                        certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
-                    });
-                }
-            }
-            "version" => {
-                if let Some(version) = value.as_str() {
-                    upstream_data.push(UpstreamDatumWithMetadata {
-                        datum: UpstreamDatum::Version(version.to_string()),
-                        certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
-                    });
-                }
-            }
-            "url" => {
-                if let Some(url) = value.as_str() {
-                    upstream_data.push(UpstreamDatumWithMetadata {
-                        datum: UpstreamDatum::Homepage(url.to_string()),
-                        certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
-                    });
-                }
-            }
-            "license" => {
-                if let Some(license) = value.as_str() {
-                    upstream_data.push(UpstreamDatumWithMetadata {
-                        datum: UpstreamDatum::License(license.to_string()),
-                        certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
-                    });
-                }
-            }
-            "source" => {
-                if let Some(repository) = value.as_str() {
-                    upstream_data.push(UpstreamDatumWithMetadata {
-                        datum: UpstreamDatum::Repository(repository.to_string()),
-                        certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
-                    });
-                }
-            }
-            "summary" => {
-                if let Some(summary) = value.as_str() {
-                    upstream_data.push(UpstreamDatumWithMetadata {
-                        datum: UpstreamDatum::Summary(summary.to_string()),
-                        certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
-                    });
-                }
-            }
-            "issues_url" => {
-                if let Some(issues_url) = value.as_str() {
-                    upstream_data.push(UpstreamDatumWithMetadata {
-                        datum: UpstreamDatum::BugDatabase(issues_url.to_string()),
-                        certainty: Some(Certainty::Certain),
-                        origin: Some(path.to_string_lossy().to_string()),
-                    });
-                }
-            }
-            "project_page" => {
-                if let Some(project_page) = value.as_str() {
-                    upstream_data.push(UpstreamDatumWithMetadata {
-                        datum: UpstreamDatum::Homepage(project_page.to_string()),
-                        certainty: Some(Certainty::Likely),
-                        origin: Some(path.to_string_lossy().to_string()),
-                    });
-                }
-            }
-            "author" => {
-                if let Some(author_value) = value.as_str() {
-                    let author = Person::from(author_value);
-                    upstream_data.push(UpstreamDatumWithMetadata {
-                        datum: UpstreamDatum::Author(vec![author]),
-                        certainty: Some(Certainty::Likely),
-                        origin: Some(path.to_string_lossy().to_string()),
-                    });
-                } else if let Some(author_values) = value.as_array() {
-                    let authors: Vec<Person> = match author_values
-                        .iter()
-                        .map(|v| {
-                            Ok::<Person, &str>(Person::from(
-                                v.as_str().ok_or("Author value is not a string")?,
-                            ))
-                        })
-                        .collect::<std::result::Result<Vec<_>, _>>()
-                    {
-                        Ok(authors) => authors,
-                        Err(e) => {
-                            warn!("Error parsing author array: {}", e);
-                            continue;
-                        }
-                    };
-                    upstream_data.push(UpstreamDatumWithMetadata {
-                        datum: UpstreamDatum::Author(authors),
-                        certainty: Some(Certainty::Likely),
-                        origin: Some(path.to_string_lossy().to_string()),
-                    });
-                }
-            }
-            "operatingsystem_support" | "requirements" | "dependencies" => {
-                // Skip these fields
-            }
-            _ => {
-                warn!("Unknown field {} ({:?}) in metadata.json", field, value);
-            }
-        }
-    }
-
-    Ok(upstream_data)
 }
 
 pub enum CanonicalizeError {
@@ -914,11 +1095,11 @@ pub trait Forge: Send + Sync {
 
     fn name(&self) -> &'static str;
 
-    fn bug_database_url_from_bug_submit_url(&self, url: &Url) -> Option<Url> {
+    fn bug_database_url_from_bug_submit_url(&self, _url: &Url) -> Option<Url> {
         None
     }
 
-    fn bug_submit_url_from_bug_database_url(&self, url: &Url) -> Option<Url> {
+    fn bug_submit_url_from_bug_database_url(&self, _url: &Url) -> Option<Url> {
         None
     }
 
@@ -936,23 +1117,23 @@ pub trait Forge: Send + Sync {
         ))
     }
 
-    fn bug_database_from_issue_url(&self, url: &Url) -> Option<Url> {
+    fn bug_database_from_issue_url(&self, _url: &Url) -> Option<Url> {
         None
     }
 
-    fn bug_database_url_from_repo_url(&self, url: &Url) -> Option<Url> {
+    fn bug_database_url_from_repo_url(&self, _url: &Url) -> Option<Url> {
         None
     }
 
-    fn repo_url_from_merge_request_url(&self, url: &Url) -> Option<Url> {
+    fn repo_url_from_merge_request_url(&self, _url: &Url) -> Option<Url> {
         None
     }
 
     fn extend_metadata(
         &self,
-        metadata: &mut Vec<UpstreamDatumWithMetadata>,
-        project: &str,
-        max_certainty: Certainty,
+        _metadata: &mut Vec<UpstreamDatumWithMetadata>,
+        _project: &str,
+        _max_certainty: Option<Certainty>,
     ) {
     }
 }
@@ -1360,7 +1541,7 @@ impl Forge for GitLab {
 
 pub fn guess_from_travis_yml(
     path: &Path,
-    _trust_package: bool,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut file = File::open(path)?;
 
@@ -1377,7 +1558,7 @@ pub fn guess_from_travis_yml(
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::GoImportPath(go_import_path.to_string()),
                 certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
+                origin: Some(path.into()),
             });
         }
     }
@@ -1392,144 +1573,10 @@ pub fn guess_from_environment() -> std::result::Result<Vec<UpstreamDatumWithMeta
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Repository(url),
             certainty: Some(Certainty::Certain),
-            origin: Some("environment".to_string()),
+            origin: Some(Origin::Other("environment".to_string())),
         });
     }
     Ok(results)
-}
-
-// Documentation: https://docs.microsoft.com/en-us/nuget/reference/nuspec
-pub fn guess_from_nuspec(
-    path: &Path,
-    trust_package: bool,
-) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
-    const NAMESPACES: &[&str] = &["http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd"];
-    // XML parsing and other logic
-    let root = match xmlparse_simplify_namespaces(path, NAMESPACES) {
-        Some(root) => root,
-        None => {
-            return Err(ProviderError::ParseError(
-                "Unable to parse nuspec".to_string(),
-            ));
-        }
-    };
-
-    assert_eq!(root.name, "package", "root tag is {}", root.name);
-    let metadata = root.get_child("metadata");
-    if metadata.is_none() {
-        return Err(ProviderError::ParseError(
-            "Unable to find metadata tag".to_string(),
-        ));
-    }
-    let metadata = metadata.unwrap();
-
-    let mut result = Vec::new();
-
-    if let Some(version_tag) = metadata.get_child("version") {
-        if let Some(version) = version_tag.get_text() {
-            result.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Version(version.into_owned()),
-                certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
-            });
-        }
-    }
-
-    if let Some(description_tag) = metadata.get_child("description") {
-        if let Some(description) = description_tag.get_text() {
-            result.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Description(description.into_owned()),
-                certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
-            });
-        }
-    }
-
-    if let Some(authors_tag) = metadata.get_child("authors") {
-        if let Some(authors) = authors_tag.get_text() {
-            let authors = authors.split(',').map(Person::from).collect();
-            result.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Author(authors),
-                certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
-            });
-        }
-    }
-
-    if let Some(project_url_tag) = metadata.get_child("projectUrl") {
-        if let Some(project_url) = project_url_tag.get_text() {
-            let repo_url = vcs::guess_repo_from_url(&url::Url::parse(&project_url).unwrap(), None);
-            if let Some(repo_url) = repo_url {
-                result.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Repository(repo_url),
-                    certainty: Some(Certainty::Confident),
-                    origin: Some(path.to_string_lossy().to_string()),
-                });
-            }
-            result.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Homepage(project_url.into_owned()),
-                certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
-            });
-        }
-    }
-
-    if let Some(license_tag) = metadata.get_child("license") {
-        if let Some(license) = license_tag.get_text() {
-            result.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::License(license.into_owned()),
-                certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
-            });
-        }
-    }
-
-    if let Some(copyright_tag) = metadata.get_child("copyright") {
-        if let Some(copyright) = copyright_tag.get_text() {
-            result.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Copyright(copyright.into_owned()),
-                certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
-            });
-        }
-    }
-
-    if let Some(title_tag) = metadata.get_child("title") {
-        if let Some(title) = title_tag.get_text() {
-            result.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Name(title.into_owned()),
-                certainty: Some(Certainty::Likely),
-                origin: Some(path.to_string_lossy().to_string()),
-            });
-        }
-    }
-
-    if let Some(summary_tag) = metadata.get_child("summary") {
-        if let Some(summary) = summary_tag.get_text() {
-            result.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Summary(summary.into_owned()),
-                certainty: Some(Certainty::Likely),
-                origin: Some(path.to_string_lossy().to_string()),
-            });
-        }
-    }
-
-    if let Some(repository_tag) = metadata.get_child("repository") {
-        if let Some(repo_url) = repository_tag.attributes.get("url") {
-            let branch = repository_tag.attributes.get("branch");
-            result.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Repository(vcs::unsplit_vcs_url(
-                    repo_url,
-                    branch.map(|s| s.as_str()),
-                    None,
-                )),
-                certainty: Some(Certainty::Certain),
-                origin: Some(path.to_string_lossy().to_string()),
-            });
-        }
-    }
-
-    Ok(result)
 }
 
 fn find_datum<'a>(
@@ -1550,14 +1597,14 @@ fn set_datum(metadata: &mut Vec<UpstreamDatumWithMetadata>, datum: UpstreamDatum
     }
 }
 
-fn update_from_guesses(
+pub fn update_from_guesses(
     metadata: &mut Vec<UpstreamDatumWithMetadata>,
-    new_items: Vec<UpstreamDatumWithMetadata>,
+    new_items: impl Iterator<Item = UpstreamDatumWithMetadata>,
 ) -> Vec<UpstreamDatumWithMetadata> {
     let mut changed = vec![];
     for datum in new_items {
         let current_datum = find_datum(metadata, datum.datum.field());
-        if current_datum.is_none() || datum.certainty < current_datum.unwrap().certainty {
+        if current_datum.is_none() || datum.certainty > current_datum.unwrap().certainty {
             changed.push(datum.clone());
             set_datum(metadata, datum);
         }
@@ -1568,7 +1615,7 @@ fn update_from_guesses(
 fn possible_fields_missing(
     upstream_metadata: &[UpstreamDatumWithMetadata],
     fields: &[&str],
-    field_certainty: Certainty,
+    _field_certainty: Certainty,
 ) -> bool {
     for field in fields {
         match find_datum(upstream_metadata, field) {
@@ -1582,11 +1629,13 @@ fn possible_fields_missing(
 
 fn extend_from_external_guesser(
     metadata: &mut Vec<UpstreamDatumWithMetadata>,
-    max_certainty: Certainty,
+    max_certainty: Option<Certainty>,
     supported_fields: &[&str],
     new_items: impl Fn() -> Vec<UpstreamDatum>,
 ) {
-    if !possible_fields_missing(metadata, supported_fields, max_certainty) {
+    if max_certainty.is_some()
+        && !possible_fields_missing(metadata, supported_fields, max_certainty.unwrap())
+    {
         return;
     }
 
@@ -1594,10 +1643,9 @@ fn extend_from_external_guesser(
         .into_iter()
         .map(|item| UpstreamDatumWithMetadata {
             datum: item,
-            certainty: Some(max_certainty),
+            certainty: max_certainty,
             origin: None,
-        })
-        .collect();
+        });
 
     update_from_guesses(metadata, new_items);
 }
@@ -1634,9 +1682,9 @@ impl Forge for SourceForge {
         &self,
         metadata: &mut Vec<UpstreamDatumWithMetadata>,
         project: &str,
-        max_certainty: Certainty,
+        max_certainty: Option<Certainty>,
     ) {
-        let subproject = find_datum(metadata, "Name").map_or(None, |f| match f.datum {
+        let subproject = find_datum(metadata, "Name").and_then(|f| match f.datum {
             UpstreamDatum::Name(ref name) => Some(name.to_string()),
             _ => None,
         });
@@ -1742,6 +1790,29 @@ pub fn bug_database_url_from_bug_submit_url(url: &Url, net_access: Option<bool>)
     } else {
         None
     }
+}
+
+#[test]
+fn test_bug_database_url_from_bug_submit_url() {
+    let url = Url::parse("https://bugs.launchpad.net/bugs/+filebug").unwrap();
+    assert_eq!(
+        bug_database_url_from_bug_submit_url(&url, None).unwrap(),
+        Url::parse("https://bugs.launchpad.net/bugs").unwrap()
+    );
+
+    let url = Url::parse("https://github.com/dulwich/dulwich/issues/new").unwrap();
+
+    assert_eq!(
+        bug_database_url_from_bug_submit_url(&url, None).unwrap(),
+        Url::parse("https://github.com/dulwich/dulwich/issues").unwrap()
+    );
+
+    let url = Url::parse("https://sourceforge.net/p/dulwich/bugs/new").unwrap();
+
+    assert_eq!(
+        bug_database_url_from_bug_submit_url(&url, None).unwrap(),
+        Url::parse("https://sourceforge.net/p/dulwich/bugs").unwrap()
+    );
 }
 
 pub fn guess_bug_database_url_from_repo_url(url: &Url, net_access: Option<bool>) -> Option<Url> {
@@ -1965,19 +2036,27 @@ pub fn extract_pecl_package_name(url: &str) -> Option<String> {
     None
 }
 
+pub fn extract_hackage_package(url: &str) -> Option<String> {
+    let hackage_regex = regex!(r"https?://hackage\.haskell\.org/package/([^/]+)/.*");
+    if let Some(captures) = hackage_regex.captures(url) {
+        return captures.get(1).map(|m| m.as_str().to_string());
+    }
+    None
+}
+
 /// Obtain metadata from a URL related to the project
-pub fn metadata_from_url(url: &str, origin: Option<&str>) -> Vec<UpstreamDatumWithMetadata> {
+pub fn metadata_from_url(url: &str, origin: &Origin) -> Vec<UpstreamDatumWithMetadata> {
     let mut results = Vec::new();
     if let Some(sf_project) = extract_sf_project_name(url) {
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::SourceForgeProject(sf_project),
             certainty: Some(Certainty::Certain),
-            origin: origin.map(|s| s.to_string()),
+            origin: Some(origin.clone()),
         });
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Archive("SourceForge".to_string()),
             certainty: Some(Certainty::Certain),
-            origin: origin.map(|s| s.to_string()),
+            origin: Some(origin.clone()),
         });
     }
 
@@ -1985,15 +2064,27 @@ pub fn metadata_from_url(url: &str, origin: Option<&str>) -> Vec<UpstreamDatumWi
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::PeclPackage(pecl_package),
             certainty: Some(Certainty::Certain),
-            origin: origin.map(|s| s.to_string()),
+            origin: Some(origin.clone()),
         });
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Archive("Pecl".to_string()),
             certainty: Some(Certainty::Certain),
-            origin: origin.map(|s| s.to_string()),
+            origin: Some(origin.clone()),
         });
     }
 
+    if let Some(haskell_package) = extract_hackage_package(url) {
+        results.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::HaskellPackage(haskell_package),
+            certainty: Some(Certainty::Certain),
+            origin: Some(origin.clone()),
+        });
+        results.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Archive("Hackage".to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: Some(origin.clone()),
+        });
+    }
     results
 }
 
@@ -2017,7 +2108,7 @@ pub fn get_repology_metadata(srcname: &str, repo: Option<&str>) -> Option<serde_
 
 pub fn guess_from_path(
     path: &Path,
-    trust_package: bool,
+    _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let basename = path.file_name().and_then(|s| s.to_str());
     let mut ret = Vec::new();
@@ -2028,133 +2119,1349 @@ pub fn guess_from_path(
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Name(name.as_str().to_string()),
                     certainty: Some(Certainty::Possible),
-                    origin: Some(path.display().to_string()),
+                    origin: Some(path.into()),
                 });
             }
             if let Some(version) = captures.get(2) {
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Version(version.as_str().to_string()),
                     certainty: Some(Certainty::Possible),
-                    origin: Some(path.display().to_string()),
+                    origin: Some(path.into()),
                 });
             }
         } else {
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::Name(basename_str.to_string()),
                 certainty: Some(Certainty::Possible),
-                origin: Some(path.display().to_string()),
+                origin: Some(path.into()),
             });
         }
     }
     Ok(ret)
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
+impl FromPyObject<'_> for UpstreamDatum {
+    fn extract(obj: &PyAny) -> PyResult<Self> {
+        let (field, val): (String, &PyAny) = if let Ok((field, val)) =
+            obj.extract::<(String, &PyAny)>()
+        {
+            (field, val)
+        } else if let Ok(datum) = obj.getattr("datum") {
+            let field = datum.getattr("field")?.extract::<String>()?;
+            let val = datum.getattr("value")?;
+            (field, val)
+        } else if obj.hasattr("field")? && obj.hasattr("value")? {
+            let field = obj.getattr("field")?.extract::<String>()?;
+            let val = obj.getattr("value")?;
+            (field, val)
+        } else {
+            return Err(PyTypeError::new_err((
+                format!("Expected a tuple of (field, value) or an object with field and value attributesm, found {:?}", obj),
+            )));
+        };
 
-    #[test]
-    fn test_guess_upstream_metadata() {
-        guess_upstream_metadata(
-            PathBuf::from("."),
-            Some(true),
-            Some(true),
-            Some(true),
-            Some(true),
+        match field.as_str() {
+            "Name" => Ok(UpstreamDatum::Name(val.extract::<String>()?)),
+            "Version" => Ok(UpstreamDatum::Version(val.extract::<String>()?)),
+            "Homepage" => Ok(UpstreamDatum::Homepage(val.extract::<String>()?)),
+            "Bug-Database" => Ok(UpstreamDatum::BugDatabase(val.extract::<String>()?)),
+            "Bug-Submit" => Ok(UpstreamDatum::BugSubmit(val.extract::<String>()?)),
+            "Contact" => Ok(UpstreamDatum::Contact(val.extract::<String>()?)),
+            "Repository" => Ok(UpstreamDatum::Repository(val.extract::<String>()?)),
+            "Repository-Browse" => Ok(UpstreamDatum::RepositoryBrowse(val.extract::<String>()?)),
+            "License" => Ok(UpstreamDatum::License(val.extract::<String>()?)),
+            "Description" => Ok(UpstreamDatum::Description(val.extract::<String>()?)),
+            "Summary" => Ok(UpstreamDatum::Summary(val.extract::<String>()?)),
+            "Cargo-Crate" => Ok(UpstreamDatum::CargoCrate(val.extract::<String>()?)),
+            "Security-MD" => Ok(UpstreamDatum::SecurityMD(val.extract::<String>()?)),
+            "Security-Contact" => Ok(UpstreamDatum::SecurityContact(val.extract::<String>()?)),
+            "Keywords" => Ok(UpstreamDatum::Keywords(val.extract::<Vec<String>>()?)),
+            "Copyright" => Ok(UpstreamDatum::Copyright(val.extract::<String>()?)),
+            "Documentation" => Ok(UpstreamDatum::Documentation(val.extract::<String>()?)),
+            "Go-Import-Path" => Ok(UpstreamDatum::GoImportPath(val.extract::<String>()?)),
+            "Download" => Ok(UpstreamDatum::Download(val.extract::<String>()?)),
+            "Wiki" => Ok(UpstreamDatum::Wiki(val.extract::<String>()?)),
+            "MailingList" => Ok(UpstreamDatum::MailingList(val.extract::<String>()?)),
+            "Funding" => Ok(UpstreamDatum::Funding(val.extract::<String>()?)),
+            "SourceForge-Project" => {
+                Ok(UpstreamDatum::SourceForgeProject(val.extract::<String>()?))
+            }
+            "Archive" => Ok(UpstreamDatum::Archive(val.extract::<String>()?)),
+            "Demo" => Ok(UpstreamDatum::Demo(val.extract::<String>()?)),
+            "Pecl-Package" => Ok(UpstreamDatum::PeclPackage(val.extract::<String>()?)),
+            "Haskell-Package" => Ok(UpstreamDatum::HaskellPackage(val.extract::<String>()?)),
+            "Author" => Ok(UpstreamDatum::Author(val.extract::<Vec<Person>>()?)),
+            "Maintainer" => Ok(UpstreamDatum::Maintainer(val.extract::<Person>()?)),
+            "Changelog" => Ok(UpstreamDatum::Changelog(val.extract::<String>()?)),
+            "Screenshots" => Ok(UpstreamDatum::Screenshots(val.extract::<Vec<String>>()?)),
+            "Cite-As" => Ok(UpstreamDatum::CiteAs(val.extract::<String>()?)),
+            "Registry" => {
+                let v = val.extract::<Vec<&PyAny>>()?;
+                let mut registry = Vec::new();
+                for item in v {
+                    let d = item.extract::<&PyDict>()?;
+                    let name = d.get_item("Name")?.unwrap().extract::<String>()?;
+                    let entry = d.get_item("Entry")?.unwrap().extract::<String>()?;
+                    registry.push((name, entry));
+                }
+                Ok(UpstreamDatum::Registry(registry))
+            }
+            "Donation" => Ok(UpstreamDatum::Donation(val.extract::<String>()?)),
+            "Webservice" => Ok(UpstreamDatum::Webservice(val.extract::<String>()?)),
+            _ => Err(PyRuntimeError::new_err(format!("Unknown field: {}", field))),
+        }
+    }
+}
+
+impl ToPyObject for UpstreamDatum {
+    fn to_object(&self, py: Python) -> PyObject {
+        (
+            self.field().to_string(),
+            match self {
+                UpstreamDatum::Name(n) => n.into_py(py),
+                UpstreamDatum::Version(v) => v.into_py(py),
+                UpstreamDatum::Contact(c) => c.into_py(py),
+                UpstreamDatum::Summary(s) => s.into_py(py),
+                UpstreamDatum::License(l) => l.into_py(py),
+                UpstreamDatum::Homepage(h) => h.into_py(py),
+                UpstreamDatum::Description(d) => d.into_py(py),
+                UpstreamDatum::BugDatabase(b) => b.into_py(py),
+                UpstreamDatum::BugSubmit(b) => b.into_py(py),
+                UpstreamDatum::Repository(r) => r.into_py(py),
+                UpstreamDatum::RepositoryBrowse(r) => r.into_py(py),
+                UpstreamDatum::SecurityMD(s) => s.into_py(py),
+                UpstreamDatum::SecurityContact(s) => s.into_py(py),
+                UpstreamDatum::CargoCrate(c) => c.into_py(py),
+                UpstreamDatum::Keywords(ks) => ks.to_object(py),
+                UpstreamDatum::Copyright(c) => c.into_py(py),
+                UpstreamDatum::Documentation(a) => a.into_py(py),
+                UpstreamDatum::GoImportPath(ip) => ip.into_py(py),
+                UpstreamDatum::Archive(a) => a.into_py(py),
+                UpstreamDatum::Demo(d) => d.into_py(py),
+                UpstreamDatum::Maintainer(m) => m.to_object(py),
+                UpstreamDatum::Author(a) => a.to_object(py),
+                UpstreamDatum::Wiki(w) => w.into_py(py),
+                UpstreamDatum::Download(d) => d.into_py(py),
+                UpstreamDatum::MailingList(m) => m.into_py(py),
+                UpstreamDatum::SourceForgeProject(m) => m.into_py(py),
+                UpstreamDatum::PeclPackage(p) => p.into_py(py),
+                UpstreamDatum::Funding(p) => p.into_py(py),
+                UpstreamDatum::Changelog(c) => c.into_py(py),
+                UpstreamDatum::HaskellPackage(p) => p.into_py(py),
+                UpstreamDatum::DebianITP(i) => i.into_py(py),
+                UpstreamDatum::Screenshots(s) => s.to_object(py),
+                UpstreamDatum::CiteAs(s) => s.to_object(py),
+                UpstreamDatum::Registry(r) => r
+                    .iter()
+                    .map(|(name, entry)| {
+                        let dict = PyDict::new(py);
+                        dict.set_item("Name", name).unwrap();
+                        dict.set_item("Entry", entry).unwrap();
+                        dict.into()
+                    })
+                    .collect::<Vec<PyObject>>()
+                    .to_object(py),
+                UpstreamDatum::Donation(d) => d.to_object(py),
+                UpstreamDatum::Webservice(w) => w.to_object(py),
+            },
         )
-        .unwrap();
-    }
-
-    #[test]
-    fn test_url_from_git_clone_command() {
-        assert_eq!(
-            url_from_git_clone_command(b"git clone https://github.com/foo/bar foo"),
-            Some("https://github.com/foo/bar".to_string())
-        );
+            .to_object(py)
     }
 }
 
-pub fn py_to_person(py: Python, obj: PyObject) -> PyResult<Person> {
-    let name = obj.getattr(py, "name")?.extract::<Option<String>>(py)?;
-    let email = obj.getattr(py, "email")?.extract::<Option<String>>(py)?;
-    let url = obj.getattr(py, "url")?.extract::<Option<String>>(py)?;
+impl FromPyObject<'_> for UpstreamDatumWithMetadata {
+    fn extract(obj: &PyAny) -> PyResult<Self> {
+        let certainty = obj.getattr("certainty")?.extract::<Option<String>>()?;
+        let origin = obj.getattr("origin")?.extract::<Option<Origin>>()?;
+        let datum = if obj.hasattr("datum")? {
+            obj.getattr("datum")?.extract::<UpstreamDatum>()
+        } else {
+            obj.extract::<UpstreamDatum>()
+        }?;
 
-    Ok(Person { name, email, url })
-}
-
-pub fn py_to_upstream_datum(py: Python, obj: &PyObject) -> PyResult<UpstreamDatum> {
-    let field = obj.getattr(py, "field")?.extract::<String>(py)?;
-
-    let val = obj.getattr(py, "value")?;
-
-    match field.as_str() {
-        "Name" => Ok(UpstreamDatum::Name(val.extract::<String>(py)?)),
-        "Version" => Ok(UpstreamDatum::Version(val.extract::<String>(py)?)),
-        "Homepage" => Ok(UpstreamDatum::Homepage(val.extract::<String>(py)?)),
-        "Bug-Database" => Ok(UpstreamDatum::BugDatabase(val.extract::<String>(py)?)),
-        "Bug-Submit" => Ok(UpstreamDatum::BugSubmit(val.extract::<String>(py)?)),
-        "Contact" => Ok(UpstreamDatum::Contact(val.extract::<String>(py)?)),
-        "Repository" => Ok(UpstreamDatum::Repository(val.extract::<String>(py)?)),
-        "Repository-Browse" => Ok(UpstreamDatum::RepositoryBrowse(val.extract::<String>(py)?)),
-        "License" => Ok(UpstreamDatum::License(val.extract::<String>(py)?)),
-        "Description" => Ok(UpstreamDatum::Description(val.extract::<String>(py)?)),
-        "Summary" => Ok(UpstreamDatum::Summary(val.extract::<String>(py)?)),
-        "Cargo-Crate" => Ok(UpstreamDatum::CargoCrate(val.extract::<String>(py)?)),
-        "Security-MD" => Ok(UpstreamDatum::SecurityMD(val.extract::<String>(py)?)),
-        "Security-Contact" => Ok(UpstreamDatum::SecurityContact(val.extract::<String>(py)?)),
-        "Keywords" => Ok(UpstreamDatum::Keywords(val.extract::<Vec<String>>(py)?)),
-        "Copyright" => Ok(UpstreamDatum::Copyright(val.extract::<String>(py)?)),
-        "Documentation" => Ok(UpstreamDatum::Documentation(val.extract::<String>(py)?)),
-        "Go-Import-Path" => Ok(UpstreamDatum::GoImportPath(val.extract::<String>(py)?)),
-        "Download" => Ok(UpstreamDatum::Download(val.extract::<String>(py)?)),
-        "Wiki" => Ok(UpstreamDatum::Wiki(val.extract::<String>(py)?)),
-        "MailingList" => Ok(UpstreamDatum::MailingList(val.extract::<String>(py)?)),
-        "Funding" => Ok(UpstreamDatum::Funding(val.extract::<String>(py)?)),
-        "SourceForge-Project" => Ok(UpstreamDatum::SourceForgeProject(
-            val.extract::<String>(py)?,
-        )),
-        "Archive" => Ok(UpstreamDatum::Archive(val.extract::<String>(py)?)),
-        "Demo" => Ok(UpstreamDatum::Demo(val.extract::<String>(py)?)),
-        "Pecl-Package" => Ok(UpstreamDatum::PeclPackage(val.extract::<String>(py)?)),
-        "Author" => Ok(UpstreamDatum::Author(
-            val.extract::<Vec<PyObject>>(py)?
-                .into_iter()
-                .map(|x| py_to_person(py, x))
-                .collect::<PyResult<Vec<Person>>>()?,
-        )),
-        "Maintainer" => Ok(UpstreamDatum::Maintainer(py_to_person(py, val)?)),
-        "Changelog" => Ok(UpstreamDatum::Changelog(val.extract::<String>(py)?)),
-        _ => Err(PyRuntimeError::new_err(format!("Unknown field: {}", field))),
+        Ok(UpstreamDatumWithMetadata {
+            datum,
+            certainty: certainty.map(|s| s.parse().unwrap()),
+            origin,
+        })
     }
 }
 
-pub fn py_to_upstream_datum_with_metadata(
-    py: Python,
-    obj: PyObject,
-) -> PyResult<UpstreamDatumWithMetadata> {
-    let datum = py_to_upstream_datum(py, &obj)?;
-
-    let origin = obj.getattr(py, "origin")?.extract::<Option<String>>(py)?;
-
-    let certainty = obj
-        .getattr(py, "certainty")?
-        .extract::<Option<String>>(py)?;
-
-    Ok(UpstreamDatumWithMetadata {
-        datum,
-        certainty: certainty.map(|s| s.parse().unwrap()),
-        origin,
-    })
-}
-
+#[derive(Debug)]
 pub enum ProviderError {
     ParseError(String),
     IoError(std::io::Error),
     Other(String),
+    HttpJsonError(HTTPJSONError),
+    Python(PyErr),
+    ExtrapolationLimitExceeded(usize),
+}
+
+impl std::fmt::Display for ProviderError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ProviderError::ParseError(e) => write!(f, "Parse error: {}", e),
+            ProviderError::IoError(e) => write!(f, "IO error: {}", e),
+            ProviderError::Other(e) => write!(f, "Other error: {}", e),
+            ProviderError::HttpJsonError(e) => write!(f, "HTTP JSON error: {}", e),
+            ProviderError::Python(e) => write!(f, "Python error: {}", e),
+            ProviderError::ExtrapolationLimitExceeded(e) => {
+                write!(f, "Extrapolation limit exceeded: {}", e)
+            }
+        }
+    }
+}
+
+impl std::error::Error for ProviderError {}
+
+impl From<HTTPJSONError> for ProviderError {
+    fn from(e: HTTPJSONError) -> Self {
+        ProviderError::HttpJsonError(e)
+    }
 }
 
 impl From<std::io::Error> for ProviderError {
     fn from(e: std::io::Error) -> Self {
         ProviderError::IoError(e)
     }
+}
+
+impl From<reqwest::Error> for ProviderError {
+    fn from(e: reqwest::Error) -> Self {
+        ProviderError::Other(e.to_string())
+    }
+}
+
+#[cfg(feature = "pyo3")]
+pyo3::create_exception!(
+    upstream_ontologist,
+    ParseError,
+    pyo3::exceptions::PyException
+);
+
+#[cfg(feature = "pyo3")]
+impl From<ProviderError> for PyErr {
+    fn from(e: ProviderError) -> PyErr {
+        match e {
+            ProviderError::IoError(e) => e.into(),
+            ProviderError::ParseError(e) => ParseError::new_err((e,)),
+            ProviderError::Other(e) => PyRuntimeError::new_err((e,)),
+            ProviderError::HttpJsonError(e) => PyRuntimeError::new_err((e.to_string(),)),
+            ProviderError::Python(e) => e,
+            ProviderError::ExtrapolationLimitExceeded(e) => {
+                PyRuntimeError::new_err((e.to_string(),))
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct UpstreamPackage {
+    pub family: String,
+    pub name: String,
+}
+
+impl FromPyObject<'_> for UpstreamPackage {
+    fn extract(obj: &PyAny) -> PyResult<Self> {
+        let family = obj.getattr("family")?.extract::<String>()?;
+        let name = obj.getattr("name")?.extract::<String>()?;
+        Ok(UpstreamPackage { family, name })
+    }
+}
+
+impl ToPyObject for UpstreamPackage {
+    fn to_object(&self, py: Python) -> PyObject {
+        let dict = pyo3::types::PyDict::new(py);
+        dict.set_item("family", self.family.clone()).unwrap();
+        dict.set_item("name", self.name.clone()).unwrap();
+        dict.into()
+    }
+}
+
+#[derive(Debug)]
+pub struct UpstreamVersion(String);
+
+impl FromPyObject<'_> for UpstreamVersion {
+    fn extract(obj: &PyAny) -> PyResult<Self> {
+        let version = obj.extract::<String>()?;
+        Ok(UpstreamVersion(version))
+    }
+}
+
+impl ToPyObject for UpstreamVersion {
+    fn to_object(&self, py: Python) -> PyObject {
+        self.0.to_object(py)
+    }
+}
+
+#[derive(Debug)]
+pub struct GuesserSettings {
+    pub trust_package: bool,
+}
+
+impl Default for GuesserSettings {
+    fn default() -> Self {
+        GuesserSettings {
+            trust_package: false,
+        }
+    }
+}
+
+pub struct UpstreamMetadataGuesser {
+    pub name: std::path::PathBuf,
+    pub guess:
+        Box<dyn FnOnce(&GuesserSettings) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>>,
+}
+
+impl std::fmt::Debug for UpstreamMetadataGuesser {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("UpstreamMetadataGuesser")
+            .field("name", &self.name)
+            .finish()
+    }
+}
+
+const STATIC_GUESSERS: &[(
+    &str,
+    fn(&std::path::Path, &GuesserSettings) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>,
+)] = &[
+    (
+        "debian/watch",
+        crate::providers::debian::guess_from_debian_watch,
+    ),
+    (
+        "debian/control",
+        crate::providers::debian::guess_from_debian_control,
+    ),
+    (
+        "debian/changelog",
+        crate::providers::debian::guess_from_debian_changelog,
+    ),
+    (
+        "debian/rules",
+        crate::providers::debian::guess_from_debian_rules,
+    ),
+    ("PKG-INFO", crate::providers::python::guess_from_pkg_info),
+    (
+        "package.json",
+        crate::providers::package_json::guess_from_package_json,
+    ),
+    (
+        "composer.json",
+        crate::providers::composer_json::guess_from_composer_json,
+    ),
+    (
+        "package.xml",
+        crate::providers::package_xml::guess_from_package_xml,
+    ),
+    (
+        "package.yaml",
+        crate::providers::package_yaml::guess_from_package_yaml,
+    ),
+    ("dist.ini", crate::providers::perl::guess_from_dist_ini),
+    (
+        "debian/copyright",
+        crate::providers::debian::guess_from_debian_copyright,
+    ),
+    ("META.json", crate::providers::perl::guess_from_meta_json),
+    ("MYMETA.json", crate::providers::perl::guess_from_meta_json),
+    ("META.yml", crate::providers::perl::guess_from_meta_yml),
+    ("MYMETA.yml", crate::providers::perl::guess_from_meta_yml),
+    (
+        "configure",
+        crate::providers::autoconf::guess_from_configure,
+    ),
+    ("DESCRIPTION", crate::providers::r::guess_from_r_description),
+    ("Cargo.toml", crate::providers::rust::guess_from_cargo),
+    ("pom.xml", crate::providers::maven::guess_from_pom_xml),
+    (".git/config", crate::providers::git::guess_from_git_config),
+    (
+        "debian/get-orig-source.sh",
+        crate::vcs_command::guess_from_get_orig_source,
+    ),
+    (
+        "pyproject.toml",
+        crate::providers::python::guess_from_pyproject_toml,
+    ),
+    ("setup.cfg", crate::providers::python::guess_from_setup_cfg),
+    ("go.mod", crate::providers::go::guess_from_go_mod),
+    (
+        "Makefile.PL",
+        crate::providers::perl::guess_from_makefile_pl,
+    ),
+    ("wscript", crate::providers::waf::guess_from_wscript),
+    ("AUTHORS", crate::providers::authors::guess_from_authors),
+    ("INSTALL", crate::providers::guess_from_install),
+    (
+        "pubspec.yaml",
+        crate::providers::pubspec::guess_from_pubspec_yaml,
+    ),
+    (
+        "pubspec.yml",
+        crate::providers::pubspec::guess_from_pubspec_yaml,
+    ),
+    ("meson.build", crate::providers::meson::guess_from_meson),
+    (
+        "metadata.json",
+        crate::providers::metadata_json::guess_from_metadata_json,
+    ),
+    (".travis.yml", crate::guess_from_travis_yml),
+];
+
+fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
+    let mut candidates: Vec<(
+        String,
+        Box<
+            dyn FnOnce(
+                &std::path::Path,
+                &GuesserSettings,
+            ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>,
+        >,
+    )> = Vec::new();
+
+    let path = path.canonicalize().unwrap();
+
+    for (name, cb) in STATIC_GUESSERS {
+        let subpath = path.join(name);
+        if subpath.exists() {
+            candidates.push((
+                name.to_string(),
+                Box::new(move |_path, s: &GuesserSettings| cb(&subpath, s)),
+            ));
+        }
+    }
+
+    for name in ["SECURITY.md", ".github/SECURITY.md", "docs/SECURITY.md"].iter() {
+        if path.join(name).exists() {
+            candidates.push((
+                name.to_string(),
+                Box::new(move |path, s: &GuesserSettings| {
+                    crate::providers::security_md::guess_from_security_md(name, path, s)
+                }),
+            ));
+        }
+    }
+
+    let mut found_pkg_info = path.join("PKG-INFO").exists();
+    for entry in std::fs::read_dir(&path).unwrap() {
+        let entry = entry.unwrap();
+        let filename = entry.file_name().to_string_lossy().to_string();
+        if filename.ends_with(".egg-info") {
+            candidates.push((
+                format!("{}/PKG-INFO", filename),
+                Box::new(move |_path, s| {
+                    crate::providers::python::guess_from_pkg_info(
+                        entry.path().join("PKG-INFO").as_path(),
+                        s,
+                    )
+                }),
+            ));
+            found_pkg_info = true;
+        } else if filename.ends_with(".dist-info") {
+            candidates.push((
+                format!("{}/METADATA", filename),
+                Box::new(move |_path, s| {
+                    crate::providers::python::guess_from_pkg_info(
+                        entry.path().join("PKG-INFO").as_path(),
+                        s,
+                    )
+                }),
+            ));
+            found_pkg_info = true;
+        }
+    }
+
+    if !found_pkg_info && path.join("setup.py").exists() {
+        candidates.push((
+            "setup.py".to_string(),
+            Box::new(|path, s| {
+                crate::providers::python::guess_from_setup_py(path, s.trust_package)
+            }),
+        ));
+    }
+
+    for entry in std::fs::read_dir(&path).unwrap() {
+        let entry = entry.unwrap();
+
+        if entry.file_name().to_string_lossy().ends_with(".gemspec") {
+            candidates.push((
+                entry.file_name().to_string_lossy().to_string(),
+                Box::new(move |_path, s| {
+                    crate::providers::ruby::guess_from_gemspec(entry.path().as_path(), s)
+                }),
+            ));
+        }
+    }
+
+    // TODO(jelmer): Perhaps scan all directories if no other primary project information file has been found?
+    for entry in std::fs::read_dir(&path).unwrap() {
+        let entry = entry.unwrap();
+        let path = entry.path();
+
+        if entry.file_type().unwrap().is_dir() {
+            let description_name = format!("{}/DESCRIPTION", entry.file_name().to_string_lossy());
+            if path.join(&description_name).exists() {
+                candidates.push((
+                    description_name,
+                    Box::new(move |_path, s| {
+                        crate::providers::r::guess_from_r_description(entry.path().as_path(), s)
+                    }),
+                ));
+            }
+        }
+    }
+
+    let mut doap_filenames = std::fs::read_dir(&path)
+        .unwrap()
+        .filter_map(|entry| {
+            let entry = entry.unwrap();
+            let filename = entry.file_name().to_string_lossy().to_string();
+            if filename.ends_with(".doap")
+                || (filename.ends_with(".xml") && filename.starts_with("doap_XML_"))
+            {
+                Some(entry.file_name())
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    if doap_filenames.len() == 1 {
+        let doap_filename = doap_filenames.remove(0);
+        candidates.push((
+            doap_filename.to_string_lossy().to_string(),
+            Box::new(|path, s| crate::providers::doap::guess_from_doap(path, s.trust_package)),
+        ));
+    } else if doap_filenames.len() > 1 {
+        log::warn!(
+            "Multiple DOAP files found: {:?}, ignoring all.",
+            doap_filenames
+        );
+    }
+
+    let mut metainfo_filenames = std::fs::read_dir(&path)
+        .unwrap()
+        .filter_map(|entry| {
+            let entry = entry.unwrap();
+            if entry
+                .file_name()
+                .to_string_lossy()
+                .ends_with(".metainfo.xml")
+            {
+                Some(entry.file_name())
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    if metainfo_filenames.len() == 1 {
+        let metainfo_filename = metainfo_filenames.remove(0);
+        candidates.push((
+            metainfo_filename.to_string_lossy().to_string(),
+            Box::new(|path, s| {
+                crate::providers::metainfo::guess_from_metainfo(path, s.trust_package)
+            }),
+        ));
+    } else if metainfo_filenames.len() > 1 {
+        log::warn!(
+            "Multiple metainfo files found: {:?}, ignoring all.",
+            metainfo_filenames
+        );
+    }
+
+    let mut cabal_filenames = std::fs::read_dir(&path)
+        .unwrap()
+        .filter_map(|entry| {
+            let entry = entry.unwrap();
+            if entry.file_name().to_string_lossy().ends_with(".cabal") {
+                Some(entry.file_name())
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    if cabal_filenames.len() == 1 {
+        let cabal_filename = cabal_filenames.remove(0);
+        candidates.push((
+            cabal_filename.to_string_lossy().to_string(),
+            Box::new(|path, s| crate::providers::haskell::guess_from_cabal(path, s.trust_package)),
+        ));
+    } else if cabal_filenames.len() > 1 {
+        log::warn!(
+            "Multiple cabal files found: {:?}, ignoring all.",
+            cabal_filenames
+        );
+    }
+
+    let readme_filenames = std::fs::read_dir(&path)
+        .unwrap()
+        .filter_map(|entry| {
+            let entry = entry.unwrap();
+            let filename = entry.file_name().to_string_lossy().to_string();
+            if !(filename.to_lowercase().starts_with("readme")
+                || filename.to_lowercase().starts_with("hacking")
+                || filename.to_lowercase().starts_with("contributing"))
+            {
+                return None;
+            }
+
+            if filename.ends_with('~') {
+                return None;
+            }
+
+            let extension = entry
+                .path()
+                .extension()
+                .map(|s| s.to_string_lossy().to_string());
+
+            if extension.as_deref() == Some("html")
+                || extension.as_deref() == Some("pdf")
+                || extension.as_deref() == Some("xml")
+            {
+                return None;
+            }
+            Some(entry.file_name())
+        })
+        .collect::<Vec<_>>();
+
+    for filename in readme_filenames {
+        candidates.push((
+            filename.to_string_lossy().to_string(),
+            Box::new(|path, s| crate::readme::guess_from_readme(path, s.trust_package)),
+        ));
+    }
+
+    let mut nuspec_filenames = std::fs::read_dir(&path)
+        .unwrap()
+        .filter_map(|entry| {
+            let entry = entry.unwrap();
+            if entry.file_name().to_string_lossy().ends_with(".nuspec") {
+                Some(entry.file_name())
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    if nuspec_filenames.len() == 1 {
+        let nuspec_filename = nuspec_filenames.remove(0);
+        candidates.push((
+            nuspec_filename.to_string_lossy().to_string(),
+            Box::new(|path, s| crate::providers::nuspec::guess_from_nuspec(path, s.trust_package)),
+        ));
+    } else if nuspec_filenames.len() > 1 {
+        log::warn!(
+            "Multiple nuspec files found: {:?}, ignoring all.",
+            nuspec_filenames
+        );
+    }
+
+    let mut opam_filenames = std::fs::read_dir(&path)
+        .unwrap()
+        .filter_map(|entry| {
+            let entry = entry.unwrap();
+            if entry.file_name().to_string_lossy().ends_with(".opam") {
+                Some(entry.file_name())
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    if opam_filenames.len() == 1 {
+        let opam_filename = opam_filenames.remove(0);
+        candidates.push((
+            opam_filename.to_string_lossy().to_string(),
+            Box::new(|path, s| crate::providers::ocaml::guess_from_opam(path, s.trust_package)),
+        ));
+    } else if opam_filenames.len() > 1 {
+        log::warn!(
+            "Multiple opam files found: {:?}, ignoring all.",
+            opam_filenames
+        );
+    }
+
+    let debian_patches = match std::fs::read_dir(path.join("debian").join("patches")) {
+        Ok(patches) => patches
+            .filter_map(|entry| {
+                let entry = entry.unwrap();
+                if entry.file_name().to_string_lossy().ends_with(".patch") {
+                    Some(format!(
+                        "debian/patches/{}",
+                        entry.file_name().to_string_lossy()
+                    ))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>(),
+        Err(_) => Vec::new(),
+    };
+
+    for filename in debian_patches {
+        candidates.push((
+            filename.clone(),
+            Box::new(crate::providers::debian::guess_from_debian_patch),
+        ));
+    }
+
+    candidates.push((
+        "environment".to_string(),
+        Box::new(|_path, _| crate::guess_from_environment()),
+    ));
+    candidates.push((".".to_string(), Box::new(crate::guess_from_path)));
+
+    candidates
+        .into_iter()
+        .map(|(name, cb)| {
+            assert!(
+                !name.is_empty() && !name.starts_with('/'),
+                "invalid name: {}",
+                name
+            );
+            let path = path.join(name);
+            UpstreamMetadataGuesser {
+                name: path.clone(),
+                guess: Box::new(move |s| cb(&path, s)),
+            }
+        })
+        .collect()
+}
+
+pub struct UpstreamMetadataScanner {
+    path: std::path::PathBuf,
+    config: GuesserSettings,
+    pending: Vec<UpstreamDatumWithMetadata>,
+    guessers: Vec<UpstreamMetadataGuesser>,
+}
+
+impl UpstreamMetadataScanner {
+    pub fn from_path(path: &std::path::Path, trust_package: Option<bool>) -> Self {
+        let trust_package = trust_package.unwrap_or(false);
+
+        let guessers = find_guessers(path);
+
+        Self {
+            path: path.to_path_buf(),
+            pending: Vec::new(),
+            config: GuesserSettings { trust_package },
+            guessers,
+        }
+    }
+}
+
+impl Iterator for UpstreamMetadataScanner {
+    type Item = Result<UpstreamDatumWithMetadata, ProviderError>;
+
+    fn next(&mut self) -> Option<Result<UpstreamDatumWithMetadata, ProviderError>> {
+        loop {
+            if !self.pending.is_empty() {
+                return Some(Ok(self.pending.remove(0)));
+            }
+
+            if self.guessers.is_empty() {
+                return None;
+            }
+
+            let guesser = self.guessers.remove(0);
+
+            let abspath = std::env::current_dir().unwrap().join(self.path.as_path());
+
+            let guess = (guesser.guess)(&self.config);
+            match guess {
+                Ok(entries) => {
+                    self.pending.extend(entries.into_iter().map(|mut e| {
+                        log::trace!("{}: {:?}", guesser.name.display(), e);
+                        e.origin = e
+                            .origin
+                            .or(Some(Origin::Other(guesser.name.display().to_string())));
+                        if let Some(Origin::Path(p)) = e.origin.as_ref() {
+                            if let Ok(suffix) = p.strip_prefix(abspath.as_path()) {
+                                if suffix.to_str().unwrap().is_empty() {
+                                    e.origin = Some(Origin::Path(PathBuf::from_str(".").unwrap()));
+                                } else {
+                                    e.origin = Some(Origin::Path(
+                                        PathBuf::from_str(".").unwrap().join(suffix),
+                                    ));
+                                }
+                            }
+                        }
+                        e
+                    }));
+                }
+                Err(e) => {
+                    return Some(Err(e));
+                }
+            }
+        }
+    }
+}
+
+pub fn guess_upstream_info(
+    path: &std::path::Path,
+    trust_package: Option<bool>,
+) -> impl Iterator<Item = Result<UpstreamDatumWithMetadata, ProviderError>> {
+    UpstreamMetadataScanner::from_path(path, trust_package)
+}
+
+pub fn extend_upstream_metadata(
+    upstream_metadata: &mut UpstreamMetadata,
+    path: &std::path::Path,
+    minimum_certainty: Option<Certainty>,
+    net_access: Option<bool>,
+    consult_external_directory: Option<bool>,
+) -> Result<(), ProviderError> {
+    let net_access = net_access.unwrap_or(false);
+    let consult_external_directory = consult_external_directory.unwrap_or(false);
+    let minimum_certainty = minimum_certainty.unwrap_or(Certainty::Confident);
+
+    // TODO(jelmer): Use EXTRAPOLATE_FNS mechanism for this?
+    for field in [
+        "Homepage",
+        "Bug-Database",
+        "Bug-Submit",
+        "Repository",
+        "Repository-Browse",
+        "Download",
+    ] {
+        let value = match upstream_metadata.get(field) {
+            Some(value) => value,
+            None => continue,
+        };
+
+        if let Some(project) = extract_sf_project_name(value.datum.as_str().unwrap()) {
+            let certainty = Some(
+                std::cmp::min(Some(Certainty::Likely), value.certainty)
+                    .unwrap_or(Certainty::Likely),
+            );
+            upstream_metadata.insert(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Archive("SourceForge".to_string()),
+                certainty,
+                origin: Some(Origin::Other(format!("derived from {}", field))),
+            });
+            upstream_metadata.insert(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::SourceForgeProject(project),
+                certainty,
+                origin: Some(Origin::Other(format!("derived from {}", field))),
+            });
+            break;
+        }
+    }
+
+    let archive = upstream_metadata.get("Archive");
+    if archive.is_some()
+        && archive.unwrap().datum.as_str().unwrap() == "SourceForge"
+        && upstream_metadata.contains_key("SourceForge-Project")
+        && net_access
+    {
+        let sf_project = upstream_metadata
+            .get("SourceForge-Project")
+            .unwrap()
+            .datum
+            .as_str()
+            .unwrap()
+            .to_string();
+        let sf_certainty = archive.unwrap().certainty;
+        SourceForge::new().extend_metadata(
+            upstream_metadata.mut_items(),
+            sf_project.as_str(),
+            sf_certainty,
+        );
+    }
+
+    let archive = upstream_metadata.get("Archive");
+    if archive.is_some()
+        && archive.unwrap().datum.as_str().unwrap() == "Hackage"
+        && upstream_metadata.contains_key("Hackage-Package")
+        && net_access
+    {
+        let hackage_package = upstream_metadata
+            .get("Hackage-Package")
+            .unwrap()
+            .datum
+            .as_str()
+            .unwrap()
+            .to_string();
+        let hackage_certainty = archive.unwrap().certainty;
+
+        crate::providers::haskell::Hackage::new()
+            .extend_metadata(
+                upstream_metadata.mut_items(),
+                hackage_package.as_str(),
+                hackage_certainty,
+            )
+            .unwrap();
+    }
+
+    let archive = upstream_metadata.get("Archive");
+    if archive.is_some()
+        && archive.unwrap().datum.as_str().unwrap() == "crates.io"
+        && upstream_metadata.contains_key("Cargo-Crate")
+        && net_access
+    {
+        let cargo_crate = upstream_metadata
+            .get("Cargo-Crate")
+            .unwrap()
+            .datum
+            .as_str()
+            .unwrap()
+            .to_string();
+        let crates_io_certainty = upstream_metadata.get("Archive").unwrap().certainty;
+        crate::providers::rust::CratesIo::new()
+            .extend_metadata(
+                upstream_metadata.mut_items(),
+                cargo_crate.as_str(),
+                crates_io_certainty,
+            )
+            .unwrap();
+    }
+
+    let archive = upstream_metadata.get("Archive");
+    if archive.is_some()
+        && archive.unwrap().datum.as_str().unwrap() == "Pecl"
+        && upstream_metadata.contains_key("Pecl-Package")
+        && net_access
+    {
+        let pecl_package = upstream_metadata
+            .get("Pecl-Package")
+            .unwrap()
+            .datum
+            .as_str()
+            .unwrap()
+            .to_string();
+        let pecl_certainty = upstream_metadata.get("Archive").unwrap().certainty;
+        crate::providers::php::Pecl::new()
+            .extend_metadata(
+                upstream_metadata.mut_items(),
+                pecl_package.as_str(),
+                pecl_certainty,
+            )
+            .unwrap();
+    }
+
+    if net_access && consult_external_directory {
+        // TODO(jelmer): Don't assume debian/control exists
+        let package = match debian_control::Control::from_file_relaxed(path.join("debian/control"))
+        {
+            Ok((control, _)) => control.source().and_then(|s| s.get("Package")),
+            Err(_) => None,
+        };
+
+        if let Some(package) = package {
+            extend_from_lp(
+                upstream_metadata.mut_items(),
+                minimum_certainty,
+                package.as_str(),
+                None,
+                None,
+            );
+            crate::providers::arch::Aur::new()
+                .extend_metadata(
+                    upstream_metadata.mut_items(),
+                    package.as_str(),
+                    Some(minimum_certainty),
+                )
+                .unwrap();
+            crate::providers::gobo::Gobo::new()
+                .extend_metadata(
+                    upstream_metadata.mut_items(),
+                    package.as_str(),
+                    Some(minimum_certainty),
+                )
+                .unwrap();
+            extend_from_repology(
+                upstream_metadata.mut_items(),
+                minimum_certainty,
+                package.as_str(),
+            );
+        }
+    }
+    crate::extrapolate::extrapolate_fields(upstream_metadata, net_access, None)?;
+    Ok(())
+}
+
+pub trait ThirdPartyRepository {
+    fn name(&self) -> &'static str;
+    fn supported_fields(&self) -> &'static [&'static str];
+    fn max_supported_certainty(&self) -> Certainty;
+
+    fn extend_metadata(
+        &self,
+        metadata: &mut Vec<UpstreamDatumWithMetadata>,
+        name: &str,
+        min_certainty: Option<Certainty>,
+    ) -> Result<(), ProviderError> {
+        if min_certainty.is_some() && min_certainty.unwrap() > self.max_supported_certainty() {
+            // Don't bother if we can't meet minimum certainty
+            return Ok(());
+        }
+
+        extend_from_external_guesser(
+            metadata,
+            Some(self.max_supported_certainty()),
+            self.supported_fields(),
+            || self.guess_metadata(name).unwrap(),
+        );
+
+        Ok(())
+    }
+
+    fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, ProviderError>;
+}
+
+fn extend_from_lp(
+    upstream_metadata: &mut Vec<UpstreamDatumWithMetadata>,
+    minimum_certainty: Certainty,
+    package: &str,
+    distribution: Option<&str>,
+    suite: Option<&str>,
+) {
+    // The set of fields that Launchpad can possibly provide:
+    let lp_fields = &["Homepage", "Repository", "Name", "Download"][..];
+    let lp_certainty = Certainty::Possible;
+
+    if lp_certainty < minimum_certainty {
+        // Don't bother talking to launchpad if we're not
+        // speculating.
+        return;
+    }
+
+    extend_from_external_guesser(upstream_metadata, Some(lp_certainty), lp_fields, || {
+        crate::providers::launchpad::guess_from_launchpad(package, distribution, suite).unwrap()
+    })
+}
+
+fn extend_from_repology(
+    upstream_metadata: &mut Vec<UpstreamDatumWithMetadata>,
+    minimum_certainty: Certainty,
+    source_package: &str,
+) {
+    // The set of fields that repology can possibly provide:
+    let repology_fields = &["Homepage", "License", "Summary", "Download"][..];
+    let certainty = Certainty::Confident;
+
+    if certainty < minimum_certainty {
+        // Don't bother talking to repology if we're not speculating.
+        return;
+    }
+
+    extend_from_external_guesser(upstream_metadata, Some(certainty), repology_fields, || {
+        crate::providers::repology::guess_from_repology(source_package).unwrap()
+    })
+}
+
+/// Fix existing upstream metadata.
+pub fn fix_upstream_metadata(upstream_metadata: &mut UpstreamMetadata) {
+    if let Some(repository) = upstream_metadata.get_mut("Repository") {
+        let url = crate::vcs::sanitize_url(repository.datum.as_str().unwrap());
+        repository.datum = UpstreamDatum::Repository(url.to_string());
+    }
+
+    if let Some(summary) = upstream_metadata.get_mut("Summary") {
+        let s = summary.datum.as_str().unwrap();
+        let s = s.split_once(". ").map_or(s, |(a, _)| a);
+        let s = s.trim_end().trim_end_matches('.');
+        summary.datum = UpstreamDatum::Summary(s.to_string());
+    }
+}
+
+/// Summarize the upstream metadata into a dictionary.
+///
+/// # Arguments
+/// * `metadata_items`: Iterator over metadata items
+/// * `path`: Path to the package
+/// * `trust_package`: Whether to trust the package contents and i.e. run executables in it
+/// * `net_access`: Whether to allow net access
+/// * `consult_external_directory`: Whether to pull in data from external (user-maintained) directories.
+pub fn summarize_upstream_metadata(
+    metadata_items: impl Iterator<Item = UpstreamDatumWithMetadata>,
+    path: &std::path::Path,
+    net_access: Option<bool>,
+    consult_external_directory: Option<bool>,
+    check: Option<bool>,
+) -> Result<UpstreamMetadata, ProviderError> {
+    let check = check.unwrap_or(false);
+    let mut upstream_metadata = UpstreamMetadata::new();
+    upstream_metadata.update(filter_bad_guesses(metadata_items));
+
+    extend_upstream_metadata(
+        &mut upstream_metadata,
+        path,
+        None,
+        net_access,
+        consult_external_directory,
+    )?;
+
+    if check {
+        check_upstream_metadata(&mut upstream_metadata, None);
+    }
+
+    fix_upstream_metadata(&mut upstream_metadata);
+
+    Ok(upstream_metadata)
+}
+
+/// Guess upstream metadata items, in no particular order.
+///
+/// # Arguments
+/// * `path`: Path to the package
+/// * `trust_package`: Whether to trust the package contents and i.e. run executables in it
+/// * `minimum_certainty`: Minimum certainty of guesses to return
+pub fn guess_upstream_metadata_items(
+    path: &std::path::Path,
+    trust_package: Option<bool>,
+    minimum_certainty: Option<Certainty>,
+) -> impl Iterator<Item = Result<UpstreamDatumWithMetadata, ProviderError>> {
+    guess_upstream_info(path, trust_package).filter_map(move |e| match e {
+        Err(e) => Some(Err(e)),
+        Ok(UpstreamDatumWithMetadata {
+            datum,
+            certainty,
+            origin,
+        }) => {
+            if minimum_certainty.is_some() && certainty < minimum_certainty {
+                None
+            } else {
+                Some(Ok(UpstreamDatumWithMetadata {
+                    datum,
+                    certainty,
+                    origin,
+                }))
+            }
+        }
+    })
+}
+
+pub fn get_upstream_info(
+    path: &std::path::Path,
+    trust_package: Option<bool>,
+    net_access: Option<bool>,
+    consult_external_directory: Option<bool>,
+    check: Option<bool>,
+) -> Result<UpstreamMetadata, ProviderError> {
+    let metadata_items = guess_upstream_info(path, trust_package);
+    summarize_upstream_metadata(
+        metadata_items.filter_map(|x| match x {
+            Ok(x) => Some(x),
+            Err(e) => {
+                log::error!("{}", e);
+                None
+            }
+        }),
+        path,
+        net_access,
+        consult_external_directory,
+        check,
+    )
+}
+
+/// Guess the upstream metadata dictionary.
+///
+/// # Arguments
+/// * `path`: Path to the package
+/// * `trust_package`: Whether to trust the package contents and i.e. run executables in it
+/// * `net_access`: Whether to allow net access
+/// * `consult_external_directory`: Whether to pull in data from external (user-maintained) directories.
+pub fn guess_upstream_metadata(
+    path: &std::path::Path,
+    trust_package: Option<bool>,
+    net_access: Option<bool>,
+    consult_external_directory: Option<bool>,
+    check: Option<bool>,
+) -> Result<UpstreamMetadata, ProviderError> {
+    let metadata_items =
+        guess_upstream_metadata_items(path, trust_package, None).filter_map(|x| match x {
+            Ok(x) => Some(x),
+            Err(e) => {
+                log::error!("{}", e);
+                None
+            }
+        });
+    summarize_upstream_metadata(
+        metadata_items,
+        path,
+        net_access,
+        consult_external_directory,
+        check,
+    )
+}
+
+pub fn verify_screenshots(urls: &[&str]) -> Vec<(String, Option<bool>)> {
+    let mut ret = Vec::new();
+    for url in urls {
+        let mut request =
+            reqwest::blocking::Request::new(reqwest::Method::GET, url.parse().unwrap());
+        request.headers_mut().insert(
+            reqwest::header::USER_AGENT,
+            reqwest::header::HeaderValue::from_static(USER_AGENT),
+        );
+
+        match reqwest::blocking::Client::new().execute(request) {
+            Ok(response) => {
+                let status = response.status();
+                if status.is_success() {
+                    ret.push((url.to_string(), Some(true)));
+                } else if status.is_client_error() {
+                    ret.push((url.to_string(), Some(false)));
+                } else {
+                    ret.push((url.to_string(), None));
+                }
+            }
+            Err(e) => {
+                log::debug!("Error fetching {}: {}", url, e);
+                ret.push((url.to_string(), None));
+            }
+        }
+    }
+
+    ret
+}
+
+/// Check upstream metadata.
+///
+/// This will make network connections, etc.
+pub fn check_upstream_metadata(upstream_metadata: &mut UpstreamMetadata, version: Option<&str>) {
+    let repository = upstream_metadata.get_mut("Repository");
+    if let Some(repository) = repository {
+        match vcs::check_repository_url_canonical(repository.datum.to_url().unwrap(), version) {
+            Ok(canonical_url) => {
+                repository.datum = UpstreamDatum::Repository(canonical_url.to_string());
+                if repository.certainty == Some(Certainty::Confident) {
+                    repository.certainty = Some(Certainty::Certain);
+                }
+                let derived_browse_url = vcs::browse_url_from_repo_url(
+                    &vcs::VcsLocation {
+                        url: repository.datum.to_url().unwrap(),
+                        branch: None,
+                        subpath: None,
+                    },
+                    Some(true),
+                );
+                let certainty = repository.certainty;
+                let browse_repo = upstream_metadata.get_mut("Repository-Browse");
+                if browse_repo.is_some()
+                    && derived_browse_url == browse_repo.as_ref().and_then(|u| u.datum.to_url())
+                {
+                    browse_repo.unwrap().certainty = certainty;
+                }
+            }
+            Err(CanonicalizeError::Unverifiable(u, _)) | Err(CanonicalizeError::RateLimited(u)) => {
+                log::debug!("Unverifiable URL: {}", u);
+            }
+            Err(CanonicalizeError::InvalidUrl(u, e)) => {
+                log::debug!("Deleting invalid Repository URL {}: {}", u, e);
+                upstream_metadata.remove("Repository");
+            }
+        }
+    }
+    let homepage = upstream_metadata.get_mut("Homepage");
+    if let Some(homepage) = homepage {
+        match check_url_canonical(&homepage.datum.to_url().unwrap()) {
+            Ok(canonical_url) => {
+                homepage.datum = UpstreamDatum::Homepage(canonical_url.to_string());
+                if homepage.certainty >= Some(Certainty::Likely) {
+                    homepage.certainty = Some(Certainty::Certain);
+                }
+            }
+            Err(CanonicalizeError::Unverifiable(u, _)) | Err(CanonicalizeError::RateLimited(u)) => {
+                log::debug!("Unverifiable URL: {}", u);
+            }
+            Err(CanonicalizeError::InvalidUrl(u, e)) => {
+                log::debug!("Deleting invalid Homepage URL {}: {}", u, e);
+                upstream_metadata.remove("Homepage");
+            }
+        }
+    }
+    if let Some(repository_browse) = upstream_metadata.get_mut("Repository-Browse") {
+        match check_url_canonical(&repository_browse.datum.to_url().unwrap()) {
+            Ok(u) => {
+                repository_browse.datum = UpstreamDatum::RepositoryBrowse(u.to_string());
+                if repository_browse.certainty >= Some(Certainty::Likely) {
+                    repository_browse.certainty = Some(Certainty::Certain);
+                }
+            }
+            Err(CanonicalizeError::InvalidUrl(u, e)) => {
+                log::debug!("Deleting invalid Repository-Browse URL {}: {}", u, e);
+                upstream_metadata.remove("Repository-Browse");
+            }
+            Err(CanonicalizeError::Unverifiable(u, _)) | Err(CanonicalizeError::RateLimited(u)) => {
+                log::debug!("Unable to verify Repository-Browse URL {}", u);
+            }
+        }
+    }
+    if let Some(bug_database) = upstream_metadata.get_mut("Bug-Database") {
+        match check_bug_database_canonical(&bug_database.datum.to_url().unwrap(), Some(true)) {
+            Ok(u) => {
+                bug_database.datum = UpstreamDatum::BugDatabase(u.to_string());
+                if bug_database.certainty >= Some(Certainty::Likely) {
+                    bug_database.certainty = Some(Certainty::Certain);
+                }
+            }
+            Err(CanonicalizeError::InvalidUrl(u, e)) => {
+                log::debug!("Deleting invalid Bug-Database URL {}: {}", u, e);
+                upstream_metadata.remove("Bug-Database");
+            }
+            Err(CanonicalizeError::Unverifiable(u, _)) | Err(CanonicalizeError::RateLimited(u)) => {
+                log::debug!("Unable to verify Bug-Database URL {}", u);
+            }
+        }
+    }
+    let bug_submit = upstream_metadata.get_mut("Bug-Submit");
+    if let Some(bug_submit) = bug_submit {
+        match check_bug_submit_url_canonical(&bug_submit.datum.to_url().unwrap(), Some(true)) {
+            Ok(u) => {
+                bug_submit.datum = UpstreamDatum::BugSubmit(u.to_string());
+                if bug_submit.certainty >= Some(Certainty::Likely) {
+                    bug_submit.certainty = Some(Certainty::Certain);
+                }
+            }
+            Err(CanonicalizeError::InvalidUrl(u, e)) => {
+                log::debug!("Deleting invalid Bug-Submit URL {}: {}", u, e);
+                upstream_metadata.remove("Bug-Submit");
+            }
+            Err(CanonicalizeError::Unverifiable(u, _)) | Err(CanonicalizeError::RateLimited(u)) => {
+                log::debug!("Unable to verify Bug-Submit URL {}", u);
+            }
+        }
+    }
+    let mut screenshots = upstream_metadata.get_mut("Screenshots");
+    if screenshots.is_some() && screenshots.as_ref().unwrap().certainty == Some(Certainty::Likely) {
+        let mut newvalue = vec![];
+        screenshots.as_mut().unwrap().certainty = Some(Certainty::Certain);
+        let urls = match &screenshots.as_ref().unwrap().datum {
+            UpstreamDatum::Screenshots(urls) => urls,
+            _ => unreachable!(),
+        };
+        for (url, status) in verify_screenshots(
+            urls.iter()
+                .map(|x| x.as_str())
+                .collect::<Vec<&str>>()
+                .as_slice(),
+        ) {
+            match status {
+                Some(true) => {
+                    newvalue.push(url);
+                }
+                Some(false) => {}
+                None => {
+                    screenshots.as_mut().unwrap().certainty = Some(Certainty::Likely);
+                }
+            }
+        }
+        screenshots.as_mut().unwrap().datum = UpstreamDatum::Screenshots(newvalue);
+    }
+}
+
+pub fn filter_bad_guesses(
+    guessed_items: impl Iterator<Item = UpstreamDatumWithMetadata>,
+) -> impl Iterator<Item = UpstreamDatumWithMetadata> {
+    guessed_items.filter(|item| {
+        let bad = item.datum.known_bad_guess();
+        if bad {
+            log::debug!("Excluding known bad item {:?}", item);
+        }
+        !bad
+    })
 }

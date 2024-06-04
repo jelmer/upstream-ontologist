@@ -7,6 +7,6 @@ Homepage: https://github.com/example/blah
 Name: TestPackage
 Repository: https://github.com/example/blah.git
 Repository-Browse: https://github.com/example/blah
+Summary: Small package with two programs
 Description: blah blah
 License: BSD3
-Summary: blah blah

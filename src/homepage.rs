@@ -1,64 +1,53 @@
-use crate::{Certainty, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{Certainty, Origin, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
+
 use reqwest::blocking::Client;
-use reqwest::header;
-use std::io::Read;
+use reqwest::header::USER_AGENT;
+use scraper::{Html, Selector};
 
-fn guess_from_homepage(url: &str) -> Vec<UpstreamDatumWithMetadata> {
+pub fn guess_from_homepage(
+    url: &url::Url,
+) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let client = Client::new();
-    let mut headers = header::HeaderMap::new();
-    headers.insert(
-        header::USER_AGENT,
-        header::HeaderValue::from_static(USER_AGENT),
-    );
-    let response = client.get(url).headers(headers).send().unwrap();
-    let mut buffer = Vec::new();
-    response.read_to_end(&mut buffer).unwrap();
+    let response = client
+        .get(url.clone())
+        .header(USER_AGENT, crate::USER_AGENT)
+        .send()?;
 
-    let entries = guess_from_page(&buffer, url);
-    let mut results = Vec::new();
-    for (upstream_datum, certainty) in entries {
-        results.push(UpstreamDatumWithMetadata {
-            datum: upstream_datum,
-            certainty: Some(certainty),
-            origin: Some(url.to_owned()),
-        });
-    }
-    results
+    let body = response.text()?;
+    Ok(guess_from_page(&body, url))
 }
 
-fn guess_from_page(text: &[u8], basehref: &url::Url) -> Vec<(UpstreamDatum, Certainty)> {
-    html5ever::Parser::from_utf8(text)
-        .from_utf8()
-        .read_from(&mut text.as_ref())
-        .unwrap();
-    let soup = match BeautifulSoup::new(str::from_utf8(text)?, "lxml") {
-        Ok(soup) => soup,
-        Err(_) => {
-            return Err(GuessError {
-                message: "lxml not available, not parsing README.md".to_owned(),
-            })
-        }
-    };
+fn guess_from_page(text: &str, basehref: &url::Url) -> Vec<UpstreamDatumWithMetadata> {
+    let fragment = Html::parse_document(text);
+    let selector = Selector::parse("a").unwrap();
 
-    let mut results = Vec::new();
-    for a in soup.find_all(Name("a")) {
-        if let Some(href) = a.get("href") {
-            let labels: Vec<Option<&str>> = vec![a.get("aria-label"), a.text()];
-            for label in labels.into_iter().flatten() {
+    let mut result = Vec::new();
+
+    for element in fragment.select(&selector) {
+        if let Some(href) = element.value().attr("href") {
+            let labels: Vec<String> = vec![
+                element.value().attr("aria-label").unwrap_or("").to_string(),
+                element.text().collect::<String>(),
+            ];
+            for label in labels.iter().filter(|&label| !label.is_empty()) {
                 match label.to_lowercase().as_str() {
                     "github" | "git" | "repository" | "github repository" => {
-                        let repository_url = basehref.join(href).unwrap();
-                        results.push((
-                            UpstreamDatum::Repository(repository_url.to_string()),
-                            Certainty::Possible,
-                        ));
+                        result.push(UpstreamDatumWithMetadata {
+                            origin: Some(Origin::Url(basehref.clone())),
+                            datum: UpstreamDatum::Repository(
+                                basehref.join(href).unwrap().to_string(),
+                            ),
+                            certainty: Some(Certainty::Possible),
+                        });
                     }
                     "github bug tracking" | "bug tracker" => {
-                        let bug_tracker_url = basehref.join(href).unwrap();
-                        results.push((
-                            UpstreamDatum::BugDatabase(bug_tracker_url.to_string()),
-                            Certainty::Possible,
-                        ));
+                        result.push(UpstreamDatumWithMetadata {
+                            origin: Some(Origin::Url(basehref.clone())),
+                            datum: UpstreamDatum::Repository(
+                                basehref.join(href).unwrap().to_string(),
+                            ),
+                            certainty: Some(Certainty::Possible),
+                        });
                     }
                     _ => {}
                 }
@@ -66,5 +55,5 @@ fn guess_from_page(text: &[u8], basehref: &url::Url) -> Vec<(UpstreamDatum, Cert
         }
     }
 
-    Ok(results)
+    result
 }

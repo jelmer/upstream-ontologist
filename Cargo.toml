@@ -1,12 +1,16 @@
 [package]
 name = "upstream-ontologist"
-version = "0.1.36"
-authors = [ "Jelmer Vernooij <jelmer@jelmer.uk>",]
+version = { workspace = true }
+authors = [ "Jelmer Vernooĳ <jelmer@jelmer.uk>",]
 edition = "2021"
 license = "GPL-2.0+"
 description = "tracking of upstream project metadata"
 repository = "https://github.com/jelmer/upstream-ontologist.git"
 homepage = "https://github.com/jelmer/upstream-ontologist"
+default-run = "guess-upstream-metadata"
+
+[workspace.package]
+version = "0.1.37"
 
 [dependencies]
 log = "0.4"
@@ -17,43 +21,63 @@ regex = "1"
 url = "2"
 xmltree = "0.10"
 configparser = "3"
-serde_yaml = "0.8"
+serde_yaml = "0.9"
 percent-encoding = "2"
 html5ever = ">=0.26"
-select = "0.6"
 chrono = "0.4"
 textwrap = ">=0.16"
-lazy-regex = "2"
-breezyshim = "0.1.24"
+lazy-regex = "3"
+breezyshim = "0.1.92"
+debian-watch = { version = "0.2.1", optional = true }
+debian-changelog = { version = "0.1.8", optional = true }
+debbugs = "0.1.0"
+clap = { version = "4,<4.5", features = ["derive", "env"], optional = true }
+maplit = "1.0.2"
+env_logger = { version = "0.11", optional = true }
+xml = "0.8.10"
+makefile-lossless = { version = "0.1.2", optional = true }
+debian-copyright = { version = "0.1.2", optional = true }
+debian-control = { version = "0.1.6", optional = true }
+select = "0.6.0"
+pulldown-cmark = "0.11"
+debcargo = { version = "2.6.1", optional = true }
+scraper = "0.19.0"
 
 [workspace]
 members = [ "upstream-ontologist-py",]
 
 [features]
-default = [ "git-config", "launchpad", "opam", "dist-ini", "cargo", "r-description", "pyproject-toml", "python-pkginfo", "default-tls",]
-default-tls = [ "reqwest/default-tls",]
-git-config = [ "dep:gix-config",]
-launchpad = [ "dep:distro-info",]
-opam = [ "dep:opam-file-rs",]
-dist-ini = [ "dep:rust-ini",]
-cargo = [ "dep:toml",]
-r-description = [ "dep:mailparse",]
-pyproject-toml = [ "dep:pyproject-toml",]
-python-pkginfo = [ "dep:python-pkginfo",]
-rustls-tls = [ "reqwest/rustls-tls",]
+default = ["git-config", "launchpad", "opam", "dist-ini", "cargo", "r-description", "pyproject-toml", "python-pkginfo", "default-tls", "debian", "pyo3"]
+default-tls = ["reqwest/default-tls"]
+git-config = ["dep:gix-config"]
+launchpad = ["dep:distro-info"]
+opam = ["dep:opam-file-rs"]
+dist-ini = ["dep:rust-ini"]
+cargo = ["dep:toml"]
+r-description = ["dep:mailparse"]
+pyproject-toml = ["dep:pyproject-toml"]
+python-pkginfo = ["dep:python-pkginfo"]
+rustls-tls = ["reqwest/rustls-tls"]
+debcargo = ["dep:debcargo"]
+debian = ["debcargo", "dep:debian-watch", "dep:makefile-lossless", "dep:debian-changelog", "dep:debian-control", "dep:debian-copyright"]
+pyo3 = []
+cli = ["dep:clap", "dep:env_logger"]
 
 [lib]
+
+[dev-dependencies]
+tempfile = "3.8.1"
 
 [dependencies.pyo3]
 workspace = true
 
 [dependencies.reqwest]
-version = "^0.11"
+version = "^0.12"
 features = [ "blocking", "json",]
 default-features = false
 
 [dependencies.rust-ini]
-version = "0.19"
+version = "0.21"
 optional = true
 
 [dependencies.serde]
@@ -69,7 +93,7 @@ version = ">=0.20"
 optional = true
 
 [dependencies.distro-info]
-version = "0.3"
+version = "0.4"
 optional = true
 
 [dependencies.toml]
@@ -77,11 +101,11 @@ version = ">=0.5"
 optional = true
 
 [dependencies.mailparse]
-version = "0.14"
+version = "0.15"
 optional = true
 
 [dependencies.pyproject-toml]
-version = "0.6"
+version = "0.11"
 optional = true
 
 [dependencies.python-pkginfo]
@@ -89,5 +113,17 @@ version = ">=0.5"
 optional = true
 
 [workspace.dependencies]
-pyo3 = "0.19"
+pyo3 = "0.20"
 pyo3-log = "0.8"
+
+[[bin]]
+name = "autodoap"
+required-features = ["cli"]
+
+[[bin]]
+name = "autocodemeta"
+required-features = ["cli"]
+
+[[bin]]
+name = "guess-upstream-metadata"
+required-features = ["cli"]
