@@ -1,0 +1,13 @@
+Index: upstream-ontologist/Cargo.toml
+===================================================================
+--- upstream-ontologist.orig/Cargo.toml
++++ upstream-ontologist/Cargo.toml
+@@ -114,7 +114,7 @@ optional = true
+ 
+ [workspace.dependencies]
+ pyo3 = "0.20"
+-pyo3-log = "0.8"
++pyo3-log = "0.9"
+ 
+ [[bin]]
+ name = "autodoap"

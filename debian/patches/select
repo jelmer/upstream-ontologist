@@ -1,0 +1,12 @@
+Index: upstream-ontologist/Cargo.toml
+===================================================================
+--- upstream-ontologist.orig/Cargo.toml
++++ upstream-ontologist/Cargo.toml
+@@ -38,7 +38,6 @@ xml = "0.8.10"
+ makefile-lossless = { version = "0.1.2", optional = true }
+ debian-copyright = { version = "0.1.2", optional = true }
+ debian-control = { version = "0.1.6", optional = true }
+-select = "0.6.0"
+ pulldown-cmark = "0.9"
+ debcargo = { version = "2.6.1", optional = true }
+ scraper = "0.18.0"

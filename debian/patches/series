@@ -1,5 +1,12 @@
-pyo3-0.20
-distro-info-0.4
-pyproject-toml-0.7
-rust-ini-0.18
-drop-gix-config
+pyo3-log
+reqwest
+env-logger
+gix-config
+lazy-regex
+mailparse
+pulldown-cmark
+pyproject-toml
+rust-ini
+scraper
+select
+xml

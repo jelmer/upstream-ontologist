@@ -1,0 +1,26 @@
+Index: upstream-ontologist/Cargo.toml
+===================================================================
+--- upstream-ontologist.orig/Cargo.toml
++++ upstream-ontologist/Cargo.toml
+@@ -47,9 +47,8 @@ scraper = "0.19.0"
+ members = [ "upstream-ontologist-py",]
+ 
+ [features]
+-default = ["git-config", "launchpad", "opam", "dist-ini", "cargo", "r-description", "pyproject-toml", "python-pkginfo", "default-tls", "debian", "pyo3"]
++default = ["launchpad", "opam", "dist-ini", "cargo", "r-description", "pyproject-toml", "python-pkginfo", "default-tls", "debian", "pyo3"]
+ default-tls = ["reqwest/default-tls"]
+-git-config = ["dep:gix-config"]
+ launchpad = ["dep:distro-info"]
+ opam = ["dep:opam-file-rs"]
+ dist-ini = ["dep:rust-ini"]
+@@ -88,10 +87,6 @@ features = [ "derive",]
+ version = "0.1"
+ optional = true
+ 
+-[dependencies.gix-config]
+-version = ">=0.20"
+-optional = true
+-
+ [dependencies.distro-info]
+ version = "0.4"
+ optional = true
