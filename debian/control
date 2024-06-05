@@ -47,7 +47,8 @@ Depends: python3-breezy,
          python3-debmutate,
          python3-ruamel.yaml,
          ${misc:Depends},
-         ${python3:Depends}
+         ${python3:Depends},
+         ${shlibs:Depends}
 Recommends: perl-doc,
             python3-bs4,
             python3-distro-info,
