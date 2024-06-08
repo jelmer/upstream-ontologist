@@ -60,10 +60,11 @@ dev = ["ruff==0.4.7"]
 guess-upstream-metadata = "upstream_ontologist.__main__:main"
 
 [tool.setuptools]
-packages = [
-    "upstream_ontologist",
-]
 include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["py"]
+include = ["upstream_ontologist"]
 
 [tool.setuptools.package-data]
 upstream_ontologist = ["py.typed"]
