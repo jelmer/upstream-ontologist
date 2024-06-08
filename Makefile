@@ -6,7 +6,7 @@ build:
 check:: unittest-py
 
 unittest-py: build
-	python3 -m unittest tests.test_suite
+	PYTHONPATH=$(shell pwd)/py python3 -m unittest tests.test_suite
 
 cargo-test:
 	cargo test
@@ -14,7 +14,7 @@ cargo-test:
 check:: cargo-test
 
 coverage: build
-	python3 -m coverage run -m unittest tests.test_suite
+	PYTHONPATH=$(shell pwd)/py python3 -m coverage run -m unittest tests.test_suite
 
 coverage-html: coverage
 	python3 -m coverage html
@@ -22,4 +22,4 @@ coverage-html: coverage
 check:: typing
 
 typing:
-	mypy upstream_ontologist/ tests/
+	mypy py/ tests/
