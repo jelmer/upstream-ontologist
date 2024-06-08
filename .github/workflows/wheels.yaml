@@ -46,7 +46,7 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: artifact-{{ matrix.os }}
+          name: artifact-${{ matrix.os }}
           path: ./wheelhouse/*.whl
 
   build-sdist:
@@ -82,7 +82,7 @@ jobs:
       - uses: actions/setup-python@v5
 
       - name: Download wheels
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           merge-multiple: true
           patterns: artifact-*
