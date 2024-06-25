@@ -151,11 +151,12 @@ fn version_in_tags(version: &str, tag_names: &[&str]) -> bool {
 }
 
 fn probe_upstream_breezy_branch_url(url: &url::Url, version: Option<&str>) -> Option<bool> {
+    use pyo3::prelude::*;
     let tags: HashMap<String, Vec<u8>> = pyo3::Python::with_gil(|py| {
-        let breezy_ui = py.import("breezy.ui")?;
-        let branch_mod = py.import("breezy.branch")?;
-        py.import("breezy.bzr")?;
-        py.import("breezy.git")?;
+        let breezy_ui = py.import_bound("breezy.ui")?;
+        let branch_mod = py.import_bound("breezy.branch")?;
+        py.import_bound("breezy.bzr")?;
+        py.import_bound("breezy.git")?;
         let old_ui = breezy_ui.getattr("ui_factory")?;
         breezy_ui.setattr("ui_factory", breezy_ui.call_method0("SilentUIFactory")?)?;
         let branch_cls = branch_mod.getattr("Branch")?;
@@ -862,8 +863,8 @@ pub fn try_open_branch(
 ) -> Option<Box<dyn breezyshim::branch::Branch>> {
     use pyo3::prelude::*;
     match Python::with_gil(|py| {
-        let uim = py.import("breezy.ui")?;
-        let controldirm = py.import("breezy.controldir")?;
+        let uim = py.import_bound("breezy.ui")?;
+        let controldirm = py.import_bound("breezy.controldir")?;
         let controldir_cls = controldirm.getattr("ControlDir")?;
 
         let old_ui_factory = uim.getattr("ui_factory")?;

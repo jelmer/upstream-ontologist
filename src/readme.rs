@@ -197,7 +197,7 @@ pub fn description_from_readme_rst(
     long_description: &str,
 ) -> PyResult<(Option<String>, Vec<UpstreamDatumWithMetadata>)> {
     Python::with_gil(|py| {
-        let readme_mod = Python::import(py, "upstream_ontologist.readme").unwrap();
+        let readme_mod = Python::import_bound(py, "upstream_ontologist.readme").unwrap();
         let (description, extra_md): (Option<String>, Vec<UpstreamDatumWithMetadata>) = readme_mod
             .call_method1("description_from_readme_rst", (long_description,))?
             .extract()?;
@@ -587,7 +587,7 @@ pub fn description_from_readme_html(
     long_description: &str,
 ) -> PyResult<(Option<String>, Vec<UpstreamDatumWithMetadata>)> {
     Python::with_gil(|py| {
-        let readme_mod = Python::import(py, "upstream_ontologist.readme").unwrap();
+        let readme_mod = Python::import_bound(py, "upstream_ontologist.readme").unwrap();
         let (description, extra_md): (Option<String>, Vec<UpstreamDatumWithMetadata>) = readme_mod
             .call_method1("description_from_readme_html", (long_description,))?
             .extract()?;
