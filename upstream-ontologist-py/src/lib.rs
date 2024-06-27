@@ -465,7 +465,8 @@ fn sanitize_url(url: &str) -> PyResult<String> {
 }
 
 #[pyfunction]
-fn convert_cvs_list_to_str(urls: Vec<&str>) -> Option<String> {
+fn convert_cvs_list_to_str(urls: Vec<String>) -> Option<String> {
+    let urls = urls.iter().map(|x| x.as_str()).collect::<Vec<&str>>();
     upstream_ontologist::vcs::convert_cvs_list_to_str(urls.as_slice())
 }
 
@@ -646,7 +647,7 @@ impl UpstreamDatum {
             .extract::<(String, PyObject)>(py)
             .unwrap()
             .1;
-        assert!(!value.as_ref(py).is_instance_of::<PyTuple>());
+        assert!(!value.bind(py).is_instance_of::<PyTuple>());
         Ok(value)
     }
 
@@ -670,11 +671,11 @@ impl UpstreamDatum {
         self.0.certainty = certainty.map(|s| Certainty::from_str(&s).unwrap());
     }
 
-    fn __eq__(lhs: &PyCell<Self>, rhs: &PyCell<Self>) -> PyResult<bool> {
+    fn __eq__(lhs: &Bound<Self>, rhs: &Bound<Self>) -> PyResult<bool> {
         Ok(lhs.borrow().0 == rhs.borrow().0)
     }
 
-    fn __ne__(lhs: &PyCell<Self>, rhs: &PyCell<Self>) -> PyResult<bool> {
+    fn __ne__(lhs: &Bound<Self>, rhs: &Bound<Self>) -> PyResult<bool> {
         Ok(lhs.borrow().0 != rhs.borrow().0)
     }
 
@@ -764,7 +765,7 @@ impl UpstreamMetadata {
 
     #[new]
     #[pyo3(signature = (**kwargs))]
-    fn new(kwargs: Option<&PyDict>) -> Self {
+    fn new(kwargs: Option<Bound<PyDict>>) -> Self {
         let mut ret = UpstreamMetadata(upstream_ontologist::UpstreamMetadata::new());
 
         if let Some(kwargs) = kwargs {
@@ -779,9 +780,9 @@ impl UpstreamMetadata {
 
     #[classmethod]
     pub fn from_dict(
-        _cls: &PyType,
+        _cls: &Bound<PyType>,
         py: Python,
-        d: &PyDict,
+        d: &Bound<PyDict>,
         default_certainty: Option<Certainty>,
     ) -> PyResult<Self> {
         let mut data = Vec::new();
@@ -871,7 +872,7 @@ fn get_upstream_info(
     net_access: Option<bool>,
     consult_external_directory: Option<bool>,
     check: Option<bool>,
-) -> PyResult<&PyDict> {
+) -> PyResult<Bound<PyDict>> {
     let metadata = upstream_ontologist::get_upstream_info(
         path.as_path(),
         trust_package,
@@ -879,7 +880,7 @@ fn get_upstream_info(
         consult_external_directory,
         check,
     )?;
-    let ret = PyDict::new(py);
+    let ret = PyDict::new_bound(py);
     for datum in metadata.iter() {
         ret.set_item(
             datum.datum.field(),
@@ -1014,7 +1015,7 @@ fn description_from_readme_plain(text: &str) -> PyResult<(Option<String>, Vec<Up
 }
 
 #[pymodule]
-fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
+fn _upstream_ontologist(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     pyo3_log::init();
     m.add_wrapped(wrap_pyfunction!(url_from_git_clone_command))?;
     m.add_wrapped(wrap_pyfunction!(url_from_vcs_command))?;
@@ -1051,7 +1052,7 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_upstream_metadata_items))?;
     m.add_wrapped(wrap_pyfunction!(update_from_guesses))?;
     m.add_wrapped(wrap_pyfunction!(description_from_readme_plain))?;
-    let debianm = PyModule::new(py, "debian")?;
+    let debianm = PyModule::new_bound(py, "debian")?;
     debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_source_name))?;
     debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_binary_name))?;
     debianm.add_wrapped(wrap_pyfunction!(valid_debian_package_name))?;
@@ -1073,16 +1074,16 @@ fn _upstream_ontologist(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<SourceForge>()?;
     m.add_class::<UpstreamMetadata>()?;
     m.add_class::<UpstreamDatum>()?;
-    m.add("InvalidUrl", py.get_type::<InvalidUrl>())?;
-    m.add("UnverifiableUrl", py.get_type::<UnverifiableUrl>())?;
-    m.add("NoSuchForgeProject", py.get_type::<NoSuchForgeProject>())?;
+    m.add("InvalidUrl", py.get_type_bound::<InvalidUrl>())?;
+    m.add("UnverifiableUrl", py.get_type_bound::<UnverifiableUrl>())?;
+    m.add("NoSuchForgeProject", py.get_type_bound::<NoSuchForgeProject>())?;
     m.add_wrapped(wrap_pyfunction!(known_bad_guess))?;
-    let readmem = PyModule::new(py, "readme")?;
+    let readmem = PyModule::new_bound(py, "readme")?;
     readmem.add_wrapped(wrap_pyfunction!(readme_skip_paragraph))?;
-    m.add_submodule(readmem)?;
+    m.add_submodule(&readmem)?;
     m.add(
         "ParseError",
-        py.get_type::<upstream_ontologist::ParseError>(),
+        py.get_type_bound::<upstream_ontologist::ParseError>(),
     )?;
     m.add(
         "KNOWN_GITLAB_SITES",

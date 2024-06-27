@@ -90,7 +90,7 @@ impl IntoPy<PyObject> for Origin {
 }
 
 impl FromPyObject<'_> for Origin {
-    fn extract(ob: &PyAny) -> PyResult<Self> {
+    fn extract_bound(ob: &Bound<PyAny>) -> PyResult<Self> {
         if let Ok(path) = ob.extract::<PathBuf>() {
             Ok(Origin::Path(path))
         } else if let Ok(s) = ob.extract::<String>() {
@@ -127,7 +127,7 @@ impl ToString for Certainty {
 
 #[cfg(feature = "pyo3")]
 impl FromPyObject<'_> for Certainty {
-    fn extract(ob: &PyAny) -> PyResult<Self> {
+    fn extract_bound(ob: &Bound<PyAny>) -> PyResult<Self> {
         let o = ob.extract::<&str>()?;
         o.parse().map_err(PyValueError::new_err)
     }
@@ -257,7 +257,7 @@ mod person_tests {
 
 impl ToPyObject for Person {
     fn to_object(&self, py: Python) -> PyObject {
-        let m = PyModule::import(py, "upstream_ontologist").unwrap();
+        let m = PyModule::import_bound(py, "upstream_ontologist").unwrap();
         let person_cls = m.getattr("Person").unwrap();
         person_cls
             .call1((self.name.as_ref(), self.email.as_ref(), self.url.as_ref()))
@@ -279,7 +279,7 @@ fn parseaddr(text: &str) -> Option<(String, String)> {
 }
 
 impl FromPyObject<'_> for Person {
-    fn extract(ob: &'_ PyAny) -> PyResult<Self> {
+    fn extract_bound(ob: &Bound<PyAny>) -> PyResult<Self> {
         let name = ob.getattr("name")?.extract::<Option<String>>()?;
         let email = ob.getattr("email")?.extract::<Option<String>>()?;
         let url = ob.getattr("url")?.extract::<Option<String>>()?;
@@ -896,7 +896,7 @@ impl serde::ser::Serialize for UpstreamMetadata {
 
 impl ToPyObject for UpstreamDatumWithMetadata {
     fn to_object(&self, py: Python) -> PyObject {
-        let m = PyModule::import(py, "upstream_ontologist.guess").unwrap();
+        let m = PyModule::import_bound(py, "upstream_ontologist.guess").unwrap();
 
         let cls = m.getattr("UpstreamDatum").unwrap();
 
@@ -906,13 +906,13 @@ impl ToPyObject for UpstreamDatumWithMetadata {
             .extract::<(String, PyObject)>(py)
             .unwrap();
 
-        let kwargs = pyo3::types::PyDict::new(py);
+        let kwargs = pyo3::types::PyDict::new_bound(py);
         kwargs
             .set_item("certainty", self.certainty.map(|x| x.to_string()))
             .unwrap();
         kwargs.set_item("origin", self.origin.as_ref()).unwrap();
 
-        let datum = cls.call((field, py_datum), Some(kwargs)).unwrap();
+        let datum = cls.call((field, py_datum), Some(&kwargs)).unwrap();
 
         datum.to_object(py)
     }
@@ -2141,9 +2141,9 @@ pub fn guess_from_path(
 }
 
 impl FromPyObject<'_> for UpstreamDatum {
-    fn extract(obj: &PyAny) -> PyResult<Self> {
-        let (field, val): (String, &PyAny) = if let Ok((field, val)) =
-            obj.extract::<(String, &PyAny)>()
+    fn extract_bound(obj: &Bound<PyAny>) -> PyResult<Self> {
+        let (field, val): (String, Bound<PyAny>) = if let Ok((field, val)) =
+            obj.extract::<(String, Bound<PyAny>)>()
         {
             (field, val)
         } else if let Ok(datum) = obj.getattr("datum") {
@@ -2196,12 +2196,11 @@ impl FromPyObject<'_> for UpstreamDatum {
             "Screenshots" => Ok(UpstreamDatum::Screenshots(val.extract::<Vec<String>>()?)),
             "Cite-As" => Ok(UpstreamDatum::CiteAs(val.extract::<String>()?)),
             "Registry" => {
-                let v = val.extract::<Vec<&PyAny>>()?;
+                let v = val.extract::<Vec<Bound<PyAny>>>()?;
                 let mut registry = Vec::new();
                 for item in v {
-                    let d = item.extract::<&PyDict>()?;
-                    let name = d.get_item("Name")?.unwrap().extract::<String>()?;
-                    let entry = d.get_item("Entry")?.unwrap().extract::<String>()?;
+                    let name = item.get_item("Name")?.extract::<String>()?;
+                    let entry = item.get_item("Entry")?.extract::<String>()?;
                     registry.push((name, entry));
                 }
                 Ok(UpstreamDatum::Registry(registry))
@@ -2254,7 +2253,7 @@ impl ToPyObject for UpstreamDatum {
                 UpstreamDatum::Registry(r) => r
                     .iter()
                     .map(|(name, entry)| {
-                        let dict = PyDict::new(py);
+                        let dict = PyDict::new_bound(py);
                         dict.set_item("Name", name).unwrap();
                         dict.set_item("Entry", entry).unwrap();
                         dict.into()
@@ -2270,7 +2269,7 @@ impl ToPyObject for UpstreamDatum {
 }
 
 impl FromPyObject<'_> for UpstreamDatumWithMetadata {
-    fn extract(obj: &PyAny) -> PyResult<Self> {
+    fn extract_bound(obj: &Bound<PyAny>) -> PyResult<Self> {
         let certainty = obj.getattr("certainty")?.extract::<Option<String>>()?;
         let origin = obj.getattr("origin")?.extract::<Option<Origin>>()?;
         let datum = if obj.hasattr("datum")? {
@@ -2362,7 +2361,7 @@ pub struct UpstreamPackage {
 }
 
 impl FromPyObject<'_> for UpstreamPackage {
-    fn extract(obj: &PyAny) -> PyResult<Self> {
+    fn extract_bound(obj: &Bound<PyAny>) -> PyResult<Self> {
         let family = obj.getattr("family")?.extract::<String>()?;
         let name = obj.getattr("name")?.extract::<String>()?;
         Ok(UpstreamPackage { family, name })
@@ -2371,7 +2370,7 @@ impl FromPyObject<'_> for UpstreamPackage {
 
 impl ToPyObject for UpstreamPackage {
     fn to_object(&self, py: Python) -> PyObject {
-        let dict = pyo3::types::PyDict::new(py);
+        let dict = pyo3::types::PyDict::new_bound(py);
         dict.set_item("family", self.family.clone()).unwrap();
         dict.set_item("name", self.name.clone()).unwrap();
         dict.into()
@@ -2382,7 +2381,7 @@ impl ToPyObject for UpstreamPackage {
 pub struct UpstreamVersion(String);
 
 impl FromPyObject<'_> for UpstreamVersion {
-    fn extract(obj: &PyAny) -> PyResult<Self> {
+    fn extract_bound(obj: &Bound<PyAny>) -> PyResult<Self> {
         let version = obj.extract::<String>()?;
         Ok(UpstreamVersion(version))
     }
