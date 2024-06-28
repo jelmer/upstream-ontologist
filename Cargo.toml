@@ -31,7 +31,7 @@ breezyshim = ">=0.1.101"
 debian-watch = { version = "0.2", optional = true }
 debian-changelog = { version = "0.1", optional = true }
 debbugs = "0.1.0"
-clap = { version = "4,<4.5", features = ["derive", "env"], optional = true }
+clap = { version = "4, <4.6", features = ["derive", "env"], optional = true }
 maplit = "1"
 env_logger = { version = "0.11", optional = true }
 xml = "0.8.10"
