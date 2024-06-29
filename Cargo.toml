@@ -10,7 +10,7 @@ homepage = "https://github.com/jelmer/upstream-ontologist"
 default-run = "guess-upstream-metadata"
 
 [workspace.package]
-version = "0.1.37"
+version = "0.1.38"
 
 [dependencies]
 log = "0.4"
@@ -30,11 +30,11 @@ lazy-regex = ">=2"
 breezyshim = ">=0.1.101"
 debian-watch = { version = "0.2", optional = true }
 debian-changelog = { version = "0.1", optional = true }
-debbugs = "0.1.0"
+debbugs = "0.1"
 clap = { version = "4,<4.5", features = ["derive", "env"], optional = true }
 maplit = "1"
 env_logger = { version = "0.11", optional = true }
-xml = "0.8.10"
+xml = "0.8"
 makefile-lossless = { version = "0.1", optional = true }
 debian-copyright = { version = "0.1", optional = true }
 debian-control = { version = "0.1", optional = true }
@@ -105,7 +105,7 @@ version = "0.15"
 optional = true
 
 [dependencies.pyproject-toml]
-version = "0.11"
+version = ">=0.11"
 optional = true
 
 [dependencies.python-pkginfo]
