@@ -6,6 +6,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use reqwest::header::HeaderMap;
 use serde::ser::SerializeSeq;
+use std::cmp::Ordering;
 use std::str::FromStr;
 
 use std::fs::File;
@@ -2769,17 +2770,21 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
         })
         .collect::<Vec<_>>();
 
-    if opam_filenames.len() == 1 {
-        let opam_filename = opam_filenames.remove(0);
-        candidates.push((
-            opam_filename.to_string_lossy().to_string(),
-            Box::new(|path, s| crate::providers::ocaml::guess_from_opam(path, s.trust_package)),
-        ));
-    } else if opam_filenames.len() > 1 {
-        log::warn!(
-            "Multiple opam files found: {:?}, ignoring all.",
-            opam_filenames
-        );
+    match opam_filenames.len().cmp(&1) {
+        Ordering::Equal => {
+            let opam_filename = opam_filenames.remove(0);
+            candidates.push((
+                opam_filename.to_string_lossy().to_string(),
+                Box::new(|path, s| crate::providers::ocaml::guess_from_opam(path, s.trust_package)),
+            ));
+        }
+        Ordering::Greater => {
+            log::warn!(
+                "Multiple opam files found: {:?}, ignoring all.",
+                opam_filenames
+            );
+        }
+        Ordering::Less => {}
     }
 
     let debian_patches = match std::fs::read_dir(path.join("debian").join("patches")) {
