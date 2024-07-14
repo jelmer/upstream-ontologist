@@ -19,7 +19,6 @@ static USER_AGENT: &str = concat!("upstream-ontologist/", env!("CARGO_PKG_VERSIO
 pub mod debian;
 pub mod extrapolate;
 pub mod homepage;
-pub mod http;
 pub mod providers;
 pub mod readme;
 pub mod vcs;
@@ -2512,7 +2511,7 @@ const STATIC_GUESSERS: &[(
     (".travis.yml", crate::guess_from_travis_yml),
 ];
 
-fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
+fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
     let mut candidates: Vec<Box<dyn Guesser>> = Vec::new();
 
     let path = path.canonicalize().unwrap();
@@ -2822,27 +2821,13 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
     }));
 
     candidates
-        .into_iter()
-        .map(|mut guesser| {
-            let name = guesser.name();
-            assert!(
-                !name.is_empty() && !name.starts_with('/'),
-                "invalid name: {}",
-                name
-            );
-            UpstreamMetadataGuesser {
-                name: path.clone(),
-                guess: Box::new(move |s| guesser.guess(s)),
-            }
-        })
-        .collect()
 }
 
 pub struct UpstreamMetadataScanner {
     path: std::path::PathBuf,
     config: GuesserSettings,
     pending: Vec<UpstreamDatumWithMetadata>,
-    guessers: Vec<UpstreamMetadataGuesser>,
+    guessers: Vec<Box<dyn Guesser>>,
 }
 
 impl UpstreamMetadataScanner {
@@ -2873,18 +2858,16 @@ impl Iterator for UpstreamMetadataScanner {
                 return None;
             }
 
-            let guesser = self.guessers.remove(0);
+            let mut guesser = self.guessers.remove(0);
 
             let abspath = std::env::current_dir().unwrap().join(self.path.as_path());
 
-            let guess = (guesser.guess)(&self.config);
+            let guess = guesser.guess(&self.config);
             match guess {
                 Ok(entries) => {
                     self.pending.extend(entries.into_iter().map(|mut e| {
-                        log::trace!("{}: {:?}", guesser.name.display(), e);
-                        e.origin = e
-                            .origin
-                            .or(Some(Origin::Other(guesser.name.display().to_string())));
+                        log::trace!("{}: {:?}", guesser.name(), e);
+                        e.origin = e.origin.or(Some(Origin::Other(guesser.name().to_string())));
                         if let Some(Origin::Path(p)) = e.origin.as_ref() {
                             if let Ok(suffix) = p.strip_prefix(abspath.as_path()) {
                                 if suffix.to_str().unwrap().is_empty() {
@@ -3512,6 +3495,12 @@ pub struct EnvironmentGuesser;
 impl EnvironmentGuesser {
     pub fn new() -> Self {
         Self
+    }
+}
+
+impl Default for EnvironmentGuesser {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
