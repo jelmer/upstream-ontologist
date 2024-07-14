@@ -13,22 +13,20 @@ pub fn guess_from_go_mod(
     let reader = BufReader::new(file);
     let mut results = Vec::new();
 
-    for line in reader.lines() {
-        if let Ok(line) = line {
-            if line.starts_with("module ") {
-                let modname = match line.trim().split_once(' ') {
-                    Some((_, modname)) => modname,
-                    None => {
-                        debug!("Failed to parse module name from line: {}", line);
-                        continue;
-                    }
-                };
-                results.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Name(modname.to_owned()),
-                    certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
-                });
-            }
+    for line in reader.lines().map_while(Result::ok) {
+        if line.starts_with("module ") {
+            let modname = match line.trim().split_once(' ') {
+                Some((_, modname)) => modname,
+                None => {
+                    debug!("Failed to parse module name from line: {}", line);
+                    continue;
+                }
+            };
+            results.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Name(modname.to_owned()),
+                certainty: Some(Certainty::Certain),
+                origin: Some(path.into()),
+            });
         }
     }
 

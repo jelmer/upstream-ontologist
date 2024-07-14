@@ -111,8 +111,8 @@ fn probe_upstream_github_branch_url(url: &url::Url, version: Option<&str>) -> Op
             }
             Some(true)
         }
-        Err(crate::HTTPJSONError::Error { status, .. }) if status == 404 => Some(false),
-        Err(crate::HTTPJSONError::Error { status, .. }) if status == 403 => {
+        Err(crate::HTTPJSONError::Error { status: 404, .. }) => Some(false),
+        Err(crate::HTTPJSONError::Error { status: 403, .. }) => {
             debug!("github api rate limit exceeded");
             None
         }
@@ -278,13 +278,13 @@ pub fn check_repository_url_canonical(
 
                 Ok(url::Url::parse(data["clone_url"].as_str().unwrap()).unwrap())
             }
-            Err(crate::HTTPJSONError::Error { status, .. }) if status == 404 => {
+            Err(crate::HTTPJSONError::Error { status: 404, .. }) => {
                 return Err(crate::CanonicalizeError::InvalidUrl(
                     url,
                     "GitHub URL does not exist".to_string(),
                 ))
             }
-            Err(crate::HTTPJSONError::Error { status, .. }) if status == 403 => {
+            Err(crate::HTTPJSONError::Error { status: 403, .. }) => {
                 return Err(crate::CanonicalizeError::Unverifiable(
                     url,
                     "GitHub URL rate-limited".to_string(),
@@ -338,8 +338,10 @@ pub fn probe_gitlab_host(hostname: &str) -> bool {
     match crate::load_json_url(&url::Url::parse(url.as_str()).unwrap(), None) {
         Ok(_data) => true,
         Err(crate::HTTPJSONError::Error {
-            status, response, ..
-        }) if status == 401 => {
+            status: 401,
+            response,
+            ..
+        }) => {
             if let Ok(data) = response.json::<serde_json::Value>() {
                 if let Some(message) = data["message"].as_str() {
                     if message == "401 Unauthorized" {

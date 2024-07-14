@@ -79,29 +79,6 @@ fn guess_from_pecl_page(body: &str) -> Result<Vec<UpstreamDatum>, ProviderError>
     Ok(ret)
 }
 
-#[cfg(test)]
-mod pecl_tests {
-    use super::*;
-
-    #[test]
-    fn test_guess_from_pecl_page() {
-        let text = include_str!("pecl.html");
-        let ret = guess_from_pecl_page(text).unwrap();
-        assert_eq!(
-            ret,
-            vec![
-                UpstreamDatum::RepositoryBrowse(
-                    "https://github.com/eduardok/libsmbclient-php".to_string()
-                ),
-                UpstreamDatum::BugDatabase(
-                    "https://github.com/eduardok/libsmbclient-php/issues".to_string()
-                ),
-                UpstreamDatum::Homepage("https://github.com/eduardok/libsmbclient-php".to_string())
-            ]
-        );
-    }
-}
-
 pub struct Pecl;
 
 impl Default for Pecl {
@@ -131,5 +108,28 @@ impl crate::ThirdPartyRepository for Pecl {
 
     fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, ProviderError> {
         guess_from_pecl_package(name)
+    }
+}
+
+#[cfg(test)]
+mod pecl_tests {
+    use super::*;
+
+    #[test]
+    fn test_guess_from_pecl_page() {
+        let text = include_str!("pecl.html");
+        let ret = guess_from_pecl_page(text).unwrap();
+        assert_eq!(
+            ret,
+            vec![
+                UpstreamDatum::RepositoryBrowse(
+                    "https://github.com/eduardok/libsmbclient-php".to_string()
+                ),
+                UpstreamDatum::BugDatabase(
+                    "https://github.com/eduardok/libsmbclient-php/issues".to_string()
+                ),
+                UpstreamDatum::Homepage("https://github.com/eduardok/libsmbclient-php".to_string())
+            ]
+        );
     }
 }

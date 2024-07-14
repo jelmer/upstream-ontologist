@@ -409,7 +409,7 @@ pub fn guess_from_makefile_pl(
     let name_regex = regex!("name '([^'\"]+)';$");
     let repository_regex = regex!("repository '([^'\"]+)';$");
 
-    for line in reader.lines().flatten() {
+    for line in reader.lines().map_while(Result::ok) {
         if let Some(captures) = name_regex.captures(&line) {
             dist_name = Some(captures.get(1).unwrap().as_str().to_owned());
             let name = dist_name.as_ref().unwrap().to_owned();
