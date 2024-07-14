@@ -19,6 +19,7 @@ static USER_AGENT: &str = concat!("upstream-ontologist/", env!("CARGO_PKG_VERSIO
 pub mod debian;
 pub mod extrapolate;
 pub mod homepage;
+pub mod http;
 pub mod providers;
 pub mod readme;
 pub mod vcs;
