@@ -74,7 +74,7 @@ pub fn url_from_git_clone_command(command: &[u8]) -> Option<String> {
     let url = args
         .get(2)
         .cloned()
-        .unwrap_or_else(|| args.get(0).cloned().unwrap_or_default());
+        .unwrap_or_else(|| args.first().cloned().unwrap_or_default());
     if vcs::plausible_url(&url) {
         Some(url)
     } else {
@@ -127,7 +127,7 @@ pub fn url_from_fossil_clone_command(command: &[u8]) -> Option<String> {
     let url = args
         .get(2)
         .cloned()
-        .unwrap_or_else(|| args.get(0).cloned().unwrap_or_default());
+        .unwrap_or_else(|| args.first().cloned().unwrap_or_default());
     if vcs::plausible_url(&url) {
         Some(url)
     } else {

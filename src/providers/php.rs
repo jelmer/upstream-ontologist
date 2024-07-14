@@ -104,6 +104,12 @@ mod pecl_tests {
 
 pub struct Pecl;
 
+impl Default for Pecl {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Pecl {
     pub fn new() -> Self {
         Self

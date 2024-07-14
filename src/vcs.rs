@@ -769,7 +769,7 @@ pub fn browse_url_from_repo_url(
             .url
             .path_segments()
             .map(|segments| segments.into_iter().collect::<Vec<&str>>())
-            .unwrap_or_else(Vec::new);
+            .unwrap_or_default();
         if path_elements.len() >= 2 && path_elements[0] == "repos" && path_elements[1] == "asf" {
             let mut path_elements = path_elements.into_iter().skip(1).collect::<Vec<&str>>();
             path_elements[0] = "viewvc";

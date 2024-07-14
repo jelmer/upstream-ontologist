@@ -21,7 +21,7 @@ pub fn guess_from_debian_patch(
 
     let mut upstream_data: Vec<UpstreamDatumWithMetadata> = Vec::new();
 
-    for line in reader.lines().flatten() {
+    for line in reader.lines().map_while(Result::ok) {
         if line.starts_with("Forwarded: ") {
             let forwarded = match line.split_once(':') {
                 Some((_, url)) => url.trim(),

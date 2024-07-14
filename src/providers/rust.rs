@@ -153,6 +153,12 @@ fn parse_crates_io(data: serde_json::Value) -> Vec<UpstreamDatum> {
 
 pub struct CratesIo;
 
+impl Default for CratesIo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CratesIo {
     pub fn new() -> Self {
         Self

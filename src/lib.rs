@@ -1129,6 +1129,12 @@ pub trait Forge: Send + Sync {
 
 pub struct GitHub;
 
+impl Default for GitHub {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GitHub {
     pub fn new() -> Self {
         Self
@@ -1328,6 +1334,12 @@ static DEFAULT_ASCII_SET: percent_encoding::AsciiSet = percent_encoding::CONTROL
     .add(b'%');
 
 pub struct GitLab;
+
+impl Default for GitLab {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl GitLab {
     pub fn new() -> Self {
@@ -1641,6 +1653,12 @@ fn extend_from_external_guesser(
 
 pub struct SourceForge;
 
+impl Default for SourceForge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SourceForge {
     pub fn new() -> Self {
         Self
@@ -1688,6 +1706,12 @@ impl Forge for SourceForge {
 }
 
 pub struct Launchpad;
+
+impl Default for Launchpad {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl Launchpad {
     pub fn new() -> Self {
@@ -2382,17 +2406,9 @@ impl ToPyObject for UpstreamVersion {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct GuesserSettings {
     pub trust_package: bool,
-}
-
-impl Default for GuesserSettings {
-    fn default() -> Self {
-        GuesserSettings {
-            trust_package: false,
-        }
-    }
 }
 
 pub struct UpstreamMetadataGuesser {
@@ -2497,36 +2513,31 @@ const STATIC_GUESSERS: &[(
 ];
 
 fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
-    let mut candidates: Vec<(
-        String,
-        Box<
-            dyn FnOnce(
-                &std::path::Path,
-                &GuesserSettings,
-            ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>,
-        >,
-    )> = Vec::new();
+    let mut candidates: Vec<Box<dyn Guesser>> = Vec::new();
 
     let path = path.canonicalize().unwrap();
 
     for (name, cb) in STATIC_GUESSERS {
         let subpath = path.join(name);
         if subpath.exists() {
-            candidates.push((
-                name.to_string(),
-                Box::new(move |_path, s: &GuesserSettings| cb(&subpath, s)),
-            ));
+            candidates.push(Box::new(PathGuesser {
+                name: name.to_string(),
+                subpath: subpath.clone(),
+                cb: Box::new(|p, s| cb(p, s)),
+            }));
         }
     }
 
     for name in ["SECURITY.md", ".github/SECURITY.md", "docs/SECURITY.md"].iter() {
         if path.join(name).exists() {
-            candidates.push((
-                name.to_string(),
-                Box::new(move |path, s: &GuesserSettings| {
-                    crate::providers::security_md::guess_from_security_md(name, path, s)
+            let subpath = path.join(name);
+            candidates.push(Box::new(PathGuesser {
+                name: name.to_string(),
+                subpath: subpath.clone(),
+                cb: Box::new(|p, s| {
+                    crate::providers::security_md::guess_from_security_md(name, p, s)
                 }),
-            ));
+            }));
         }
     }
 
@@ -2535,49 +2546,41 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
         let entry = entry.unwrap();
         let filename = entry.file_name().to_string_lossy().to_string();
         if filename.ends_with(".egg-info") {
-            candidates.push((
-                format!("{}/PKG-INFO", filename),
-                Box::new(move |_path, s| {
-                    crate::providers::python::guess_from_pkg_info(
-                        entry.path().join("PKG-INFO").as_path(),
-                        s,
-                    )
-                }),
-            ));
+            candidates.push(Box::new(PathGuesser {
+                name: format!("{}/PKG-INFO", filename),
+                subpath: entry.path().join("PKG-INFO"),
+                cb: Box::new(move |p, s| crate::providers::python::guess_from_pkg_info(p, s)),
+            }));
             found_pkg_info = true;
         } else if filename.ends_with(".dist-info") {
-            candidates.push((
-                format!("{}/METADATA", filename),
-                Box::new(move |_path, s| {
-                    crate::providers::python::guess_from_pkg_info(
-                        entry.path().join("PKG-INFO").as_path(),
-                        s,
-                    )
-                }),
-            ));
+            candidates.push(Box::new(PathGuesser {
+                name: format!("{}/METADATA", filename),
+                subpath: entry.path().join("METADATA"),
+                cb: Box::new(move |p, s| crate::providers::python::guess_from_pkg_info(p, s)),
+            }));
             found_pkg_info = true;
         }
     }
 
     if !found_pkg_info && path.join("setup.py").exists() {
-        candidates.push((
-            "setup.py".to_string(),
-            Box::new(|path, s| {
+        candidates.push(Box::new(PathGuesser {
+            name: "setup.py".to_string(),
+            subpath: path.join("setup.py"),
+            cb: Box::new(|path, s| {
                 crate::providers::python::guess_from_setup_py(path, s.trust_package)
             }),
-        ));
+        }));
     }
 
     for entry in std::fs::read_dir(&path).unwrap() {
         let entry = entry.unwrap();
 
         if entry.file_name().to_string_lossy().ends_with(".gemspec") {
-            candidates.push((
-                entry.file_name().to_string_lossy().to_string(),
-                Box::new(move |_path, s| {
-                    crate::providers::ruby::guess_from_gemspec(entry.path().as_path(), s)
-                }),
-            ));
+            candidates.push(Box::new(PathGuesser {
+                name: entry.file_name().to_string_lossy().to_string(),
+                subpath: entry.path(),
+                cb: Box::new(move |p, s| crate::providers::ruby::guess_from_gemspec(p, s)),
+            }));
         }
     }
 
@@ -2589,12 +2592,11 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
         if entry.file_type().unwrap().is_dir() {
             let description_name = format!("{}/DESCRIPTION", entry.file_name().to_string_lossy());
             if path.join(&description_name).exists() {
-                candidates.push((
-                    description_name,
-                    Box::new(move |_path, s| {
-                        crate::providers::r::guess_from_r_description(entry.path().as_path(), s)
-                    }),
-                ));
+                candidates.push(Box::new(PathGuesser {
+                    name: description_name,
+                    subpath: path.join("DESCRIPTION"),
+                    cb: Box::new(move |p, s| crate::providers::r::guess_from_r_description(p, s)),
+                }));
             }
         }
     }
@@ -2616,10 +2618,11 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
 
     if doap_filenames.len() == 1 {
         let doap_filename = doap_filenames.remove(0);
-        candidates.push((
-            doap_filename.to_string_lossy().to_string(),
-            Box::new(|path, s| crate::providers::doap::guess_from_doap(path, s.trust_package)),
-        ));
+        candidates.push(Box::new(PathGuesser {
+            name: doap_filename.to_string_lossy().to_string(),
+            subpath: path.join(&doap_filename),
+            cb: Box::new(|p, s| crate::providers::doap::guess_from_doap(p, s.trust_package)),
+        }));
     } else if doap_filenames.len() > 1 {
         log::warn!(
             "Multiple DOAP files found: {:?}, ignoring all.",
@@ -2645,12 +2648,13 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
 
     if metainfo_filenames.len() == 1 {
         let metainfo_filename = metainfo_filenames.remove(0);
-        candidates.push((
-            metainfo_filename.to_string_lossy().to_string(),
-            Box::new(|path, s| {
-                crate::providers::metainfo::guess_from_metainfo(path, s.trust_package)
+        candidates.push(Box::new(PathGuesser {
+            name: metainfo_filename.to_string_lossy().to_string(),
+            subpath: path.join(&metainfo_filename),
+            cb: Box::new(|p, s| {
+                crate::providers::metainfo::guess_from_metainfo(p, s.trust_package)
             }),
-        ));
+        }));
     } else if metainfo_filenames.len() > 1 {
         log::warn!(
             "Multiple metainfo files found: {:?}, ignoring all.",
@@ -2672,10 +2676,13 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
 
     if cabal_filenames.len() == 1 {
         let cabal_filename = cabal_filenames.remove(0);
-        candidates.push((
-            cabal_filename.to_string_lossy().to_string(),
-            Box::new(|path, s| crate::providers::haskell::guess_from_cabal(path, s.trust_package)),
-        ));
+        candidates.push(Box::new(PathGuesser {
+            name: cabal_filename.to_string_lossy().to_string(),
+            subpath: path.join(&cabal_filename),
+            cb: Box::new(|path, s| {
+                crate::providers::haskell::guess_from_cabal(path, s.trust_package)
+            }),
+        }));
     } else if cabal_filenames.len() > 1 {
         log::warn!(
             "Multiple cabal files found: {:?}, ignoring all.",
@@ -2715,10 +2722,11 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
         .collect::<Vec<_>>();
 
     for filename in readme_filenames {
-        candidates.push((
-            filename.to_string_lossy().to_string(),
-            Box::new(|path, s| crate::readme::guess_from_readme(path, s.trust_package)),
-        ));
+        candidates.push(Box::new(PathGuesser {
+            name: filename.to_string_lossy().to_string(),
+            subpath: path.join(&filename),
+            cb: Box::new(|path, s| crate::readme::guess_from_readme(path, s.trust_package)),
+        }));
     }
 
     let mut nuspec_filenames = std::fs::read_dir(&path)
@@ -2735,10 +2743,13 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
 
     if nuspec_filenames.len() == 1 {
         let nuspec_filename = nuspec_filenames.remove(0);
-        candidates.push((
-            nuspec_filename.to_string_lossy().to_string(),
-            Box::new(|path, s| crate::providers::nuspec::guess_from_nuspec(path, s.trust_package)),
-        ));
+        candidates.push(Box::new(PathGuesser {
+            name: nuspec_filename.to_string_lossy().to_string(),
+            subpath: path.join(&nuspec_filename),
+            cb: Box::new(|path, s| {
+                crate::providers::nuspec::guess_from_nuspec(path, s.trust_package)
+            }),
+        }));
     } else if nuspec_filenames.len() > 1 {
         log::warn!(
             "Multiple nuspec files found: {:?}, ignoring all.",
@@ -2761,10 +2772,13 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
     match opam_filenames.len().cmp(&1) {
         Ordering::Equal => {
             let opam_filename = opam_filenames.remove(0);
-            candidates.push((
-                opam_filename.to_string_lossy().to_string(),
-                Box::new(|path, s| crate::providers::ocaml::guess_from_opam(path, s.trust_package)),
-            ));
+            candidates.push(Box::new(PathGuesser {
+                name: opam_filename.to_string_lossy().to_string(),
+                subpath: path.join(&opam_filename),
+                cb: Box::new(|path, s| {
+                    crate::providers::ocaml::guess_from_opam(path, s.trust_package)
+                }),
+            }));
         }
         Ordering::Greater => {
             log::warn!(
@@ -2793,30 +2807,32 @@ fn find_guessers(path: &std::path::Path) -> Vec<UpstreamMetadataGuesser> {
     };
 
     for filename in debian_patches {
-        candidates.push((
-            filename.clone(),
-            Box::new(crate::providers::debian::guess_from_debian_patch),
-        ));
+        candidates.push(Box::new(PathGuesser {
+            name: filename.clone(),
+            subpath: path.join(&filename),
+            cb: Box::new(crate::providers::debian::guess_from_debian_patch),
+        }));
     }
 
-    candidates.push((
-        "environment".to_string(),
-        Box::new(|_path, _| crate::guess_from_environment()),
-    ));
-    candidates.push((".".to_string(), Box::new(crate::guess_from_path)));
+    candidates.push(Box::new(EnvironmentGuesser::new()));
+    candidates.push(Box::new(PathGuesser {
+        name: ".".to_string(),
+        subpath: path.clone(),
+        cb: Box::new(crate::guess_from_path),
+    }));
 
     candidates
         .into_iter()
-        .map(|(name, cb)| {
+        .map(|mut guesser| {
+            let name = guesser.name();
             assert!(
                 !name.is_empty() && !name.starts_with('/'),
                 "invalid name: {}",
                 name
             );
-            let path = path.join(name);
             UpstreamMetadataGuesser {
                 name: path.clone(),
-                guess: Box::new(move |s| cb(&path, s)),
+                guess: Box::new(move |s| guesser.guess(s)),
             }
         })
         .collect()
@@ -3456,4 +3472,58 @@ pub fn filter_bad_guesses(
         }
         !bad
     })
+}
+
+pub(crate) trait Guesser {
+    fn name(&self) -> &str;
+
+    fn guess(
+        &mut self,
+        settings: &GuesserSettings,
+    ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>;
+}
+
+pub struct PathGuesser {
+    name: String,
+    subpath: std::path::PathBuf,
+    cb: Box<
+        dyn FnMut(
+            &std::path::Path,
+            &GuesserSettings,
+        ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>,
+    >,
+}
+
+impl Guesser for PathGuesser {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn guess(
+        &mut self,
+        settings: &GuesserSettings,
+    ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+        (self.cb)(&self.subpath, settings)
+    }
+}
+
+pub struct EnvironmentGuesser;
+
+impl EnvironmentGuesser {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Guesser for EnvironmentGuesser {
+    fn name(&self) -> &str {
+        "environment"
+    }
+
+    fn guess(
+        &mut self,
+        _settings: &GuesserSettings,
+    ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+        crate::guess_from_environment()
+    }
 }
