@@ -16,12 +16,10 @@ use url::Url;
 
 static USER_AGENT: &str = concat!("upstream-ontologist/", env!("CARGO_PKG_VERSION"));
 
-// Too aggressive?
-const DEFAULT_URLLIB_TIMEOUT: u64 = 3;
-
 pub mod debian;
 pub mod extrapolate;
 pub mod homepage;
+pub mod http;
 pub mod providers;
 pub mod readme;
 pub mod vcs;
@@ -962,9 +960,7 @@ pub fn load_json_url(
     http_url: &Url,
     timeout: Option<std::time::Duration>,
 ) -> Result<serde_json::Value, HTTPJSONError> {
-    let timeout = timeout.unwrap_or(std::time::Duration::from_secs(DEFAULT_URLLIB_TIMEOUT));
     let mut headers = HeaderMap::new();
-    headers.insert(reqwest::header::USER_AGENT, USER_AGENT.parse().unwrap());
     headers.insert(reqwest::header::ACCEPT, "application/json".parse().unwrap());
 
     if let Some(hostname) = http_url.host_str() {
@@ -978,7 +974,7 @@ pub fn load_json_url(
         }
     }
 
-    let client = reqwest::blocking::Client::builder()
+    let client = crate::http::build_client()
         .timeout(timeout)
         .default_headers(headers)
         .build()
@@ -1046,15 +1042,7 @@ pub fn check_url_canonical(url: &Url) -> Result<Url, CanonicalizeError> {
         ));
     }
 
-    let timeout = std::time::Duration::from_secs(DEFAULT_URLLIB_TIMEOUT);
-    let mut headers = reqwest::header::HeaderMap::new();
-    headers.insert(
-        reqwest::header::USER_AGENT,
-        USER_AGENT.parse().expect("valid user agent"),
-    );
-    let client = reqwest::blocking::Client::builder()
-        .default_headers(headers)
-        .timeout(timeout)
+    let client = crate::http::build_client()
         .build()
         .map_err(|e| CanonicalizeError::Unverifiable(url.clone(), format!("HTTP error {}", e)))?;
 

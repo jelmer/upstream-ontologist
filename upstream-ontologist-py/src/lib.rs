@@ -44,6 +44,7 @@ fn drop_vcs_in_scheme(url: &str) -> String {
 }
 
 #[pyfunction]
+#[pyo3(signature = (repo_url, branch=None, subpath=None))]
 fn unsplit_vcs_url(
     repo_url: &str,
     branch: Option<&str>,
@@ -830,7 +831,6 @@ impl UpstreamMetadata {
 
 #[pyfunction]
 fn guess_upstream_info(
-    py: Python,
     path: std::path::PathBuf,
     trust_package: Option<bool>,
 ) -> PyResult<Vec<PyObject>> {
@@ -844,7 +844,7 @@ fn guess_upstream_info(
                 continue;
             }
         };
-        result.push(datum.to_object(py));
+        result.push(Python::with_gil(|py| datum.to_object(py)));
     }
 
     Ok(result)
@@ -908,13 +908,10 @@ fn extend_upstream_metadata(
     net_access: Option<bool>,
     consult_external_directory: Option<bool>,
 ) -> PyResult<()> {
-    let minimum_certainty =
-        minimum_certainty
-            .map(|s| s.parse())
-            .transpose()
-            .map_err(|e: String| {
-                PyValueError::new_err(format!("Invalid minimum_certainty: {}", e.to_string()))
-            })?;
+    let minimum_certainty = minimum_certainty
+        .map(|s| s.parse())
+        .transpose()
+        .map_err(|e: String| PyValueError::new_err(format!("Invalid minimum_certainty: {}", e)))?;
     upstream_ontologist::extend_upstream_metadata(
         &mut metadata.0,
         path.as_path(),
@@ -1076,7 +1073,10 @@ fn _upstream_ontologist(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<UpstreamDatum>()?;
     m.add("InvalidUrl", py.get_type_bound::<InvalidUrl>())?;
     m.add("UnverifiableUrl", py.get_type_bound::<UnverifiableUrl>())?;
-    m.add("NoSuchForgeProject", py.get_type_bound::<NoSuchForgeProject>())?;
+    m.add(
+        "NoSuchForgeProject",
+        py.get_type_bound::<NoSuchForgeProject>(),
+    )?;
     m.add_wrapped(wrap_pyfunction!(known_bad_guess))?;
     let readmem = PyModule::new_bound(py, "readme")?;
     readmem.add_wrapped(wrap_pyfunction!(readme_skip_paragraph))?;

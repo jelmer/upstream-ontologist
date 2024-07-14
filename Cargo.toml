@@ -47,8 +47,7 @@ scraper = "0.19.0"
 members = [ "upstream-ontologist-py",]
 
 [features]
-default = ["git-config", "launchpad", "opam", "dist-ini", "cargo", "r-description", "pyproject-toml", "python-pkginfo", "default-tls", "debian", "pyo3"]
-default-tls = ["reqwest/default-tls"]
+default = ["git-config", "launchpad", "opam", "dist-ini", "cargo", "r-description", "pyproject-toml", "python-pkginfo", "debian", "pyo3"]
 git-config = ["dep:gix-config"]
 launchpad = ["dep:distro-info"]
 opam = ["dep:opam-file-rs"]
@@ -57,7 +56,6 @@ cargo = ["dep:toml"]
 r-description = ["dep:mailparse"]
 pyproject-toml = ["dep:pyproject-toml"]
 python-pkginfo = ["dep:python-pkginfo"]
-rustls-tls = ["reqwest/rustls-tls"]
 debcargo = ["dep:debcargo"]
 debian = ["debcargo", "dep:debian-watch", "dep:makefile-lossless", "dep:debian-changelog", "dep:debian-control", "dep:debian-copyright"]
 pyo3 = []
@@ -72,7 +70,7 @@ tempfile = "3.8.1"
 workspace = true
 
 [dependencies.reqwest]
-version = "^0.12"
+version = ">=0.12"
 features = [ "blocking", "json",]
 default-features = false
 
