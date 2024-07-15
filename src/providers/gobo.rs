@@ -121,6 +121,12 @@ pub fn guess_from_gobo(package: &str) -> Result<Vec<UpstreamDatum>, crate::Provi
 
 pub struct Gobo;
 
+impl Default for Gobo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Gobo {
     pub fn new() -> Self {
         Self

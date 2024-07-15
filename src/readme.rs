@@ -387,7 +387,7 @@ pub fn guess_from_readme(
             origin: Some(path.into()),
         });
     }
-    ret.extend(extra_metadata.into_iter());
+    ret.extend(extra_metadata);
 
     let prefer_public = |url: &url::Url| -> i32 {
         if url.scheme().contains("ssh") {

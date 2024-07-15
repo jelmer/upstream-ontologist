@@ -926,7 +926,7 @@ fn guess_from_setup_py_parsed(
                     }
                 }
                 "license" => {
-                    if let Some(license) = get_str_from_expr(&value) {
+                    if let Some(license) = get_str_from_expr(value) {
                         ret.push(UpstreamDatumWithMetadata {
                             datum: UpstreamDatum::License(license),
                             certainty: Some(Certainty::Certain),
@@ -935,7 +935,7 @@ fn guess_from_setup_py_parsed(
                     }
                 }
                 "download_url" => {
-                    if let Some(download_url) = get_str_from_expr(&value) {
+                    if let Some(download_url) = get_str_from_expr(value) {
                         ret.push(UpstreamDatumWithMetadata {
                             datum: UpstreamDatum::Download(download_url),
                             certainty: Some(Certainty::Certain),
@@ -944,7 +944,7 @@ fn guess_from_setup_py_parsed(
                     }
                 }
                 "url" => {
-                    if let Some(url) = get_str_from_expr(&value) {
+                    if let Some(url) = get_str_from_expr(value) {
                         ret.extend(parse_python_url(url.as_str()));
                     }
                 }
@@ -954,10 +954,10 @@ fn guess_from_setup_py_parsed(
                     }
                 }
                 "maintainer" => {
-                    if let Some(maintainer) = get_str_from_expr(&value) {
+                    if let Some(maintainer) = get_str_from_expr(value) {
                         let maintainer_email = setup_args.get("maintainer_email");
                         let maintainer_email = if let Some(maintainer_email) = maintainer_email {
-                            get_str_from_expr(&maintainer_email.bind(py))
+                            get_str_from_expr(maintainer_email.bind(py))
                         } else {
                             None
                         };
@@ -973,10 +973,10 @@ fn guess_from_setup_py_parsed(
                     }
                 }
                 "author" => {
-                    if let Some(author) = get_str_from_expr(&value) {
+                    if let Some(author) = get_str_from_expr(value) {
                         let author_email = setup_args.get("author_email");
                         let author_email = if let Some(author_email) = author_email {
-                            get_str_from_expr(&author_email.bind(py))
+                            get_str_from_expr(author_email.bind(py))
                         } else {
                             None
                         };
@@ -1075,7 +1075,7 @@ fn parse_python_classifiers<'a>(
                 Some(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::License(value.into()),
                     certainty,
-                    origin: origin,
+                    origin,
                 })
             }
             ("Natural Language", _) => None,

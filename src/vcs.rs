@@ -608,43 +608,75 @@ pub fn guess_repo_from_url(url: &url::Url, net_access: Option<bool>) -> Option<S
 #[test]
 fn test_guess_repo_url() {
     assert_eq!(
-            Some("https://github.com/jelmer/blah".to_string()),
-            guess_repo_from_url(&"https://github.com/jelmer/blah".parse().unwrap(), Some(false)));
-
-    assert_eq!(
-            Some("https://github.com/jelmer/blah".to_string()),
-        guess_repo_from_url(&"https://github.com/jelmer/blah/blob/README".parse().unwrap(), Some(false))
-    );
-    assert_eq!(
-            None, guess_repo_from_url(&"https://github.com/jelmer".parse().unwrap(), Some(false)));
-
-    assert_eq!(
-            None, guess_repo_from_url(&"https://www.jelmer.uk/".parse().unwrap(), Some(false)));
-
-    assert_eq!(
-        Some("http://code.launchpad.net/blah".to_string()),
-        guess_repo_from_url(&"http://code.launchpad.net/blah".parse().unwrap(), Some(false)),
+        Some("https://github.com/jelmer/blah".to_string()),
+        guess_repo_from_url(
+            &"https://github.com/jelmer/blah".parse().unwrap(),
+            Some(false)
+        )
     );
 
     assert_eq!(
-        Some("https://code.launchpad.net/bzr".to_string()),
-        guess_repo_from_url(&"http://launchpad.net/bzr/+download".parse().unwrap(), Some(false)),
+        Some("https://github.com/jelmer/blah".to_string()),
+        guess_repo_from_url(
+            &"https://github.com/jelmer/blah/blob/README"
+                .parse()
+                .unwrap(),
+            Some(false)
+        )
     );
-
     assert_eq!(
-        Some("https://git.savannah.gnu.org/git/auctex.git".to_string()),
-        guess_repo_from_url(&"https://git.savannah.gnu.org/git/auctex.git".parse().unwrap(), Some(false)),
+        None,
+        guess_repo_from_url(&"https://github.com/jelmer".parse().unwrap(), Some(false))
     );
 
     assert_eq!(
         None,
-        guess_repo_from_url(&"https://git.savannah.gnu.org/blah/auctex.git".parse().unwrap(), Some(false)),
+        guess_repo_from_url(&"https://www.jelmer.uk/".parse().unwrap(), Some(false))
+    );
+
+    assert_eq!(
+        Some("http://code.launchpad.net/blah".to_string()),
+        guess_repo_from_url(
+            &"http://code.launchpad.net/blah".parse().unwrap(),
+            Some(false)
+        ),
+    );
+
+    assert_eq!(
+        Some("https://code.launchpad.net/bzr".to_string()),
+        guess_repo_from_url(
+            &"http://launchpad.net/bzr/+download".parse().unwrap(),
+            Some(false)
+        ),
+    );
+
+    assert_eq!(
+        Some("https://git.savannah.gnu.org/git/auctex.git".to_string()),
+        guess_repo_from_url(
+            &"https://git.savannah.gnu.org/git/auctex.git"
+                .parse()
+                .unwrap(),
+            Some(false)
+        ),
+    );
+
+    assert_eq!(
+        None,
+        guess_repo_from_url(
+            &"https://git.savannah.gnu.org/blah/auctex.git"
+                .parse()
+                .unwrap(),
+            Some(false)
+        ),
     );
 
     assert_eq!(
         Some("https://bitbucket.org/fenics-project/dolfin".to_string()),
         guess_repo_from_url(
-            &"https://bitbucket.org/fenics-project/dolfin/downloads/".parse().unwrap(), Some(false)
+            &"https://bitbucket.org/fenics-project/dolfin/downloads/"
+                .parse()
+                .unwrap(),
+            Some(false)
         ),
     );
 }
@@ -737,7 +769,7 @@ pub fn browse_url_from_repo_url(
             .url
             .path_segments()
             .map(|segments| segments.into_iter().collect::<Vec<&str>>())
-            .unwrap_or_else(Vec::new);
+            .unwrap_or_default();
         if path_elements.len() >= 2 && path_elements[0] == "repos" && path_elements[1] == "asf" {
             let mut path_elements = path_elements.into_iter().skip(1).collect::<Vec<&str>>();
             path_elements[0] = "viewvc";
@@ -907,7 +939,7 @@ pub fn find_secure_repo_url(
     // Sites we know to be available over https
     if let Some(hostname) = url.host_str() {
         if is_gitlab_site(hostname, net_access)
-            || vec![
+            || [
                 "github.com",
                 "git.launchpad.net",
                 "bazaar.launchpad.net",
@@ -925,7 +957,7 @@ pub fn find_secure_repo_url(
     }
 
     if let Some(host) = url.host_str() {
-        if vec!["git.savannah.gnu.org", "git.sv.gnu.org"].contains(&host) {
+        if ["git.savannah.gnu.org", "git.sv.gnu.org"].contains(&host) {
             if url.scheme() == "http" {
                 url = derive_with_scheme(&url, "https");
             } else {
@@ -965,9 +997,9 @@ pub struct VcsLocation {
     pub subpath: Option<String>,
 }
 
-impl ToString for VcsLocation {
-    fn to_string(&self) -> String {
-        unsplit_vcs_url(self)
+impl std::fmt::Display for VcsLocation {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", unsplit_vcs_url(self))
     }
 }
 

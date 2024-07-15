@@ -22,6 +22,4 @@ log = "0.4"
 
 [features]
 default = []
-default-tls = ["upstream-ontologist/default-tls", "reqwest/default-tls"]
-rustls-tls = ["upstream-ontologist/rustls-tls", "reqwest/rustls-tls"]
 extension-module = ["pyo3/extension-module"]

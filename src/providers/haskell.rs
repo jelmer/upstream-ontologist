@@ -243,6 +243,12 @@ pub fn guess_from_hackage(
 
 pub struct Hackage;
 
+impl Default for Hackage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Hackage {
     pub fn new() -> Self {
         Self

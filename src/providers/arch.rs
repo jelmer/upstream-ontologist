@@ -158,6 +158,12 @@ pub fn guess_from_aur(package: &str) -> Vec<UpstreamDatum> {
 
 pub struct Aur;
 
+impl Default for Aur {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Aur {
     pub fn new() -> Self {
         Self

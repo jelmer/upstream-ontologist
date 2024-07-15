@@ -1,17 +1,12 @@
 use crate::{Certainty, Origin, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 
-use reqwest::blocking::Client;
-use reqwest::header::USER_AGENT;
 use scraper::{Html, Selector};
 
 pub fn guess_from_homepage(
     url: &url::Url,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
-    let client = Client::new();
-    let response = client
-        .get(url.clone())
-        .header(USER_AGENT, crate::USER_AGENT)
-        .send()?;
+    let client = crate::http::build_client().build().unwrap();
+    let response = client.get(url.clone()).send()?;
 
     let body = response.text()?;
     Ok(guess_from_page(&body, url))
