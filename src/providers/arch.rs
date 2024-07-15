@@ -45,9 +45,9 @@ pub fn parse_pkgbuild_variables(file: &str) -> HashMap<String, Vec<String>> {
         }
 
         if let Some((key, value)) = line.split_once('=') {
-            if value.starts_with('(') {
+            if let Some(value) = value.strip_prefix('(') {
                 if value.trim_end().ends_with(')') {
-                    let value = &value[1..value.len() - 1];
+                    let value = &value[0..value.len() - 1];
                     let value_parts = match shlex::split(value) {
                         Some(value_parts) => value_parts,
                         None => {
@@ -57,7 +57,7 @@ pub fn parse_pkgbuild_variables(file: &str) -> HashMap<String, Vec<String>> {
                     };
                     variables.insert(key.to_owned(), value_parts);
                 } else {
-                    keep = Some((key.to_owned(), value[1..].to_owned()));
+                    keep = Some((key.to_owned(), value.to_owned()));
                 }
             } else {
                 let value_parts = match shlex::split(value) {

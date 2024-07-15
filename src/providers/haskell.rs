@@ -46,73 +46,6 @@ pub fn parse_cabal_lines(
     ret
 }
 
-#[cfg(test)]
-mod parse_tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_cabal_lines() {
-        let lines = r#"Name:          foo
-Version:    0.0
-License: BSD3
-Author: John Doe
-Maintainer: John Doe <joe@example.com>
-Cabal-Version: >= 1.10
-Homepage: https://example.com
-
-Executable program1
-  Build-Depends:  HUnit
-  Main-Is:       Main.hs
-
-source-repository head
-  type: git
-  location: https://github.com/example/blah
-"#;
-        let parsed = parse_cabal_lines(lines.lines().map(|s| s.to_owned()));
-
-        assert_eq!(
-            parsed,
-            vec![
-                (None, "name".to_owned(), "foo".to_owned()),
-                (None, "version".to_owned(), "0.0".to_owned()),
-                (None, "license".to_owned(), "BSD3".to_owned()),
-                (None, "author".to_owned(), "John Doe".to_owned()),
-                (
-                    None,
-                    "maintainer".to_owned(),
-                    "John Doe <joe@example.com>".to_owned()
-                ),
-                (None, "cabal-version".to_owned(), ">= 1.10".to_owned()),
-                (
-                    None,
-                    "homepage".to_owned(),
-                    "https://example.com".to_owned()
-                ),
-                (
-                    Some("executable program1".to_owned()),
-                    "build-depends".to_owned(),
-                    "HUnit".to_owned()
-                ),
-                (
-                    Some("executable program1".to_owned()),
-                    "main-is".to_owned(),
-                    "Main.hs".to_owned()
-                ),
-                (
-                    Some("source-repository head".to_owned()),
-                    "type".to_owned(),
-                    "git".to_owned()
-                ),
-                (
-                    Some("source-repository head".to_owned()),
-                    "location".to_owned(),
-                    "https://github.com/example/blah".to_owned()
-                )
-            ]
-        );
-    }
-}
-
 pub fn guess_from_cabal_lines(
     lines: impl Iterator<Item = String>,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
@@ -281,5 +214,72 @@ impl crate::ThirdPartyRepository for Hackage {
             .into_iter()
             .map(|v| v.datum)
             .collect())
+    }
+}
+
+#[cfg(test)]
+mod parse_tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_cabal_lines() {
+        let lines = r#"Name:          foo
+Version:    0.0
+License: BSD3
+Author: John Doe
+Maintainer: John Doe <joe@example.com>
+Cabal-Version: >= 1.10
+Homepage: https://example.com
+
+Executable program1
+  Build-Depends:  HUnit
+  Main-Is:       Main.hs
+
+source-repository head
+  type: git
+  location: https://github.com/example/blah
+"#;
+        let parsed = parse_cabal_lines(lines.lines().map(|s| s.to_owned()));
+
+        assert_eq!(
+            parsed,
+            vec![
+                (None, "name".to_owned(), "foo".to_owned()),
+                (None, "version".to_owned(), "0.0".to_owned()),
+                (None, "license".to_owned(), "BSD3".to_owned()),
+                (None, "author".to_owned(), "John Doe".to_owned()),
+                (
+                    None,
+                    "maintainer".to_owned(),
+                    "John Doe <joe@example.com>".to_owned()
+                ),
+                (None, "cabal-version".to_owned(), ">= 1.10".to_owned()),
+                (
+                    None,
+                    "homepage".to_owned(),
+                    "https://example.com".to_owned()
+                ),
+                (
+                    Some("executable program1".to_owned()),
+                    "build-depends".to_owned(),
+                    "HUnit".to_owned()
+                ),
+                (
+                    Some("executable program1".to_owned()),
+                    "main-is".to_owned(),
+                    "Main.hs".to_owned()
+                ),
+                (
+                    Some("source-repository head".to_owned()),
+                    "type".to_owned(),
+                    "git".to_owned()
+                ),
+                (
+                    Some("source-repository head".to_owned()),
+                    "location".to_owned(),
+                    "https://github.com/example/blah".to_owned()
+                )
+            ]
+        );
     }
 }

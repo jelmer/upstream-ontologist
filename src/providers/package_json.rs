@@ -93,7 +93,7 @@ pub fn guess_from_package_json(
                                 origin: Some(path.into()),
                             });
                         }
-                        Err(e) if e == url::ParseError::RelativeUrlWithoutBase => {
+                        Err(url::ParseError::RelativeUrlWithoutBase) => {
                             // Some people seem to default to github. :(
                             let repo_url = format!("https://github.com/{}", repo_url);
                             upstream_data.push(UpstreamDatumWithMetadata {

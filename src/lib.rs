@@ -113,13 +113,13 @@ impl FromStr for Certainty {
     }
 }
 
-impl ToString for Certainty {
-    fn to_string(&self) -> String {
+impl std::fmt::Display for Certainty {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Certainty::Certain => "certain".to_string(),
-            Certainty::Confident => "confident".to_string(),
-            Certainty::Likely => "likely".to_string(),
-            Certainty::Possible => "possible".to_string(),
+            Certainty::Certain => write!(f, "certain"),
+            Certainty::Confident => write!(f, "confident"),
+            Certainty::Likely => write!(f, "likely"),
+            Certainty::Possible => write!(f, "possible"),
         }
     }
 }
@@ -2111,7 +2111,7 @@ pub fn get_repology_metadata(srcname: &str, repo: Option<&str>) -> Option<serde_
 
     match load_json_url(&Url::parse(url.as_str()).unwrap(), None) {
         Ok(json) => Some(json),
-        Err(HTTPJSONError::Error { status, .. }) if status == 404 => None,
+        Err(HTTPJSONError::Error { status: 404, .. }) => None,
         Err(e) => {
             debug!("Failed to load repology metadata: {:?}", e);
             None
@@ -2523,7 +2523,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
             candidates.push(Box::new(PathGuesser {
                 name: name.to_string(),
                 subpath: subpath.clone(),
-                cb: Box::new(|p, s| cb(p, s)),
+                cb: Box::new(cb),
             }));
         }
     }
@@ -2549,14 +2549,14 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
             candidates.push(Box::new(PathGuesser {
                 name: format!("{}/PKG-INFO", filename),
                 subpath: entry.path().join("PKG-INFO"),
-                cb: Box::new(move |p, s| crate::providers::python::guess_from_pkg_info(p, s)),
+                cb: Box::new(crate::providers::python::guess_from_pkg_info),
             }));
             found_pkg_info = true;
         } else if filename.ends_with(".dist-info") {
             candidates.push(Box::new(PathGuesser {
                 name: format!("{}/METADATA", filename),
                 subpath: entry.path().join("METADATA"),
-                cb: Box::new(move |p, s| crate::providers::python::guess_from_pkg_info(p, s)),
+                cb: Box::new(crate::providers::python::guess_from_pkg_info),
             }));
             found_pkg_info = true;
         }
@@ -2579,7 +2579,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
             candidates.push(Box::new(PathGuesser {
                 name: entry.file_name().to_string_lossy().to_string(),
                 subpath: entry.path(),
-                cb: Box::new(move |p, s| crate::providers::ruby::guess_from_gemspec(p, s)),
+                cb: Box::new(crate::providers::ruby::guess_from_gemspec),
             }));
         }
     }
@@ -2595,7 +2595,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
                 candidates.push(Box::new(PathGuesser {
                     name: description_name,
                     subpath: path.join("DESCRIPTION"),
-                    cb: Box::new(move |p, s| crate::providers::r::guess_from_r_description(p, s)),
+                    cb: Box::new(crate::providers::r::guess_from_r_description),
                 }));
             }
         }

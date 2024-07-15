@@ -170,17 +170,12 @@ pub fn guess_from_pyproject_toml(
             });
         }
 
-        if let Some(license) = inner_project.license {
-            match license {
-                pyproject_toml::License::String(license) => {
-                    ret.push(UpstreamDatumWithMetadata {
-                        datum: UpstreamDatum::License(license),
-                        certainty: Some(Certainty::Certain),
-                        origin: Some(path.into()),
-                    });
-                }
-                _ => {}
-            }
+        if let Some(pyproject_toml::License::String(license)) = inner_project.license.as_ref() {
+            ret.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::License(license.clone()),
+                certainty: Some(Certainty::Certain),
+                origin: Some(path.into()),
+            });
         }
 
         fn contact_to_person(contact: &pyproject_toml::Contact) -> Person {
@@ -661,7 +656,10 @@ fn guess_from_setup_py_executed(
             });
         }
 
-        if let Some(url) = result.call_method0("get_url")?.extract::<Option<String>>()? {
+        if let Some(url) = result
+            .call_method0("get_url")?
+            .extract::<Option<String>>()?
+        {
             ret.extend(parse_python_url(&url));
         }
 
@@ -1071,13 +1069,11 @@ fn parse_python_classifiers<'a>(
         match (category, subcategory) {
             ("Development Status", _) => None,
             ("Intended Audience", _) => None,
-            ("License", "OSI Approved") => {
-                Some(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::License(value.into()),
-                    certainty,
-                    origin,
-                })
-            }
+            ("License", "OSI Approved") => Some(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::License(value.into()),
+                certainty,
+                origin,
+            }),
             ("Natural Language", _) => None,
             ("Operating System", _) => None,
             ("Programming Language", _) => None,

@@ -556,14 +556,13 @@ fn test_ul_is_field_list() {
             </ul>"#,
     );
 
-    assert_eq!(
+    assert!(
         ul_is_field_list(
             el.root_element()
                 .select(&Selector::parse("ul").unwrap())
                 .next()
                 .unwrap()
-        ),
-        true
+        )
     );
 
     let el = scraper::Html::parse_fragment(
@@ -572,14 +571,13 @@ fn test_ul_is_field_list() {
             </ul>"#,
     );
 
-    assert_eq!(
-        ul_is_field_list(
+    assert!(
+        !ul_is_field_list(
             el.root_element()
                 .select(&Selector::parse("ul").unwrap())
                 .next()
                 .unwrap()
-        ),
-        false
+        )
     );
 }
 

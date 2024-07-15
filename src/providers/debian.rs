@@ -720,6 +720,34 @@ pub fn guess_from_debian_watch(
     Ok(ret)
 }
 
+pub fn debian_is_native(path: &Path) -> std::io::Result<Option<bool>> {
+    let format_file_path = path.join("source/format");
+    match File::open(format_file_path) {
+        Ok(mut file) => {
+            let mut content = String::new();
+            file.read_to_string(&mut content)?;
+            return Ok(Some(content.trim() == "3.0 (native)"));
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e),
+    }
+
+    let changelog_file = path.join("changelog");
+    match File::open(changelog_file) {
+        Ok(mut file) => {
+            let cl = debian_changelog::ChangeLog::read(&mut file)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            let first_entry = cl.entries().next().unwrap();
+            let version = first_entry.version().unwrap();
+            return Ok(Some(version.debian_revision.is_none()));
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e),
+    }
+
+    Ok(None)
+}
+
 #[cfg(test)]
 mod watch_tests {
     use super::*;
@@ -760,32 +788,4 @@ https://github.com/jelmer/dulwich/tags/dulwich-(.*).tar.gz
             guess_from_debian_watch(&path, &GuesserSettings::default()).unwrap()
         );
     }
-}
-
-pub fn debian_is_native(path: &Path) -> std::io::Result<Option<bool>> {
-    let format_file_path = path.join("source/format");
-    match File::open(format_file_path) {
-        Ok(mut file) => {
-            let mut content = String::new();
-            file.read_to_string(&mut content)?;
-            return Ok(Some(content.trim() == "3.0 (native)"));
-        }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-        Err(e) => return Err(e),
-    }
-
-    let changelog_file = path.join("changelog");
-    match File::open(changelog_file) {
-        Ok(mut file) => {
-            let cl = debian_changelog::ChangeLog::read(&mut file)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-            let first_entry = cl.entries().next().unwrap();
-            let version = first_entry.version().unwrap();
-            return Ok(Some(version.debian_revision.is_none()));
-        }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-        Err(e) => return Err(e),
-    }
-
-    Ok(None)
 }
