@@ -1872,16 +1872,13 @@ pub fn check_bug_submit_url_canonical(
 }
 
 fn sf_git_extract_url(page: &str) -> Option<String> {
-    use select::document::Document;
-    use select::predicate::Attr;
+    use scraper::Html;
 
-    let soup = Document::from(page);
+    let soup = Html::parse_document(page);
 
-    let el = soup.find(Attr("id", "access_url")).next();
-    el?;
+    let selector = scraper::Selector::parse("[id=access_url]").unwrap();
 
-    let el = el.unwrap();
-    el.attr("value")?;
+    let el = soup.select(&selector).next()?;
 
     let value = el.attr("value").unwrap();
     let access_command: Vec<&str> = value.split(' ').collect();
