@@ -865,9 +865,9 @@ dependencies = [
 
 [[package]]
 name = "debian-copyright"
-version = "0.1.12"
+version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a432d19eb472c475423e49a9f62fedc41aa5ed658f8d5e60e0c6f0f515f95be"
+checksum = "932841dfa0330c99ba781a7e57643e308dd95db04b96486d8171c827f1713304"
 dependencies = [
  "deb822-lossless",
  "debversion",
