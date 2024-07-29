@@ -203,16 +203,19 @@ impl SourceForge {
 }
 
 #[pyfunction]
+#[pyo3(signature = (url, ))]
 fn plausible_vcs_url(url: &str) -> PyResult<bool> {
     Ok(upstream_ontologist::vcs::plausible_url(url))
 }
 
 #[pyfunction]
+#[pyo3(signature = (url, ))]
 fn plausible_vcs_browse_url(url: &str) -> PyResult<bool> {
     Ok(upstream_ontologist::vcs::plausible_browse_url(url))
 }
 
 #[pyfunction]
+#[pyo3(signature = (url, ))]
 fn check_url_canonical(url: &str) -> PyResult<String> {
     Ok(upstream_ontologist::check_url_canonical(
         &Url::parse(url).map_err(|e| InvalidUrl::new_err((url.to_string(), e.to_string())))?,
@@ -228,6 +231,7 @@ fn check_url_canonical(url: &str) -> PyResult<String> {
 }
 
 #[pyfunction]
+#[pyo3(signature = (url, net_access=None))]
 fn guess_repo_from_url(url: &str, net_access: Option<bool>) -> PyResult<Option<String>> {
     if let Ok(url) = Url::parse(url) {
         Ok(upstream_ontologist::vcs::guess_repo_from_url(
@@ -239,16 +243,19 @@ fn guess_repo_from_url(url: &str, net_access: Option<bool>) -> PyResult<Option<S
 }
 
 #[pyfunction]
+#[pyo3(signature = (hostname))]
 fn probe_gitlab_host(hostname: &str) -> bool {
     upstream_ontologist::vcs::probe_gitlab_host(hostname)
 }
 
 #[pyfunction]
+#[pyo3(signature = (hostname, net_access=None))]
 fn is_gitlab_site(hostname: &str, net_access: Option<bool>) -> bool {
     upstream_ontologist::vcs::is_gitlab_site(hostname, net_access)
 }
 
 #[pyfunction]
+#[pyo3(signature = (url, version=None))]
 fn check_repository_url_canonical(url: &str, version: Option<&str>) -> PyResult<String> {
     Ok(upstream_ontologist::vcs::check_repository_url_canonical(
         Url::parse(url).map_err(|e| PyRuntimeError::new_err(format!("Invalid URL: {}", e)))?,
@@ -265,6 +272,7 @@ fn check_repository_url_canonical(url: &str, version: Option<&str>) -> PyResult<
 }
 
 #[pyfunction]
+#[pyo3(signature = (url, version=None))]
 fn probe_upstream_branch_url(url: &str, version: Option<&str>) -> Option<bool> {
     upstream_ontologist::vcs::probe_upstream_branch_url(
         &Url::parse(url).expect("URL parsing failed"),
@@ -273,6 +281,7 @@ fn probe_upstream_branch_url(url: &str, version: Option<&str>) -> Option<bool> {
 }
 
 #[pyfunction]
+#[pyo3(signature = (package, distribution=None, suite=None))]
 fn guess_from_launchpad(
     py: Python,
     package: &str,
@@ -293,6 +302,7 @@ fn guess_from_launchpad(
 }
 
 #[pyfunction]
+#[pyo3(signature = (url, branch=None, subpath=None, net_access=None))]
 fn browse_url_from_repo_url(
     url: &str,
     branch: Option<&str>,
@@ -311,6 +321,7 @@ fn browse_url_from_repo_url(
 }
 
 #[pyfunction]
+#[pyo3(signature = (url, net_access=None))]
 fn canonical_git_repo_url(url: &str, net_access: Option<bool>) -> PyResult<String> {
     let url =
         Url::parse(url).map_err(|e| PyRuntimeError::new_err(format!("Invalid URL: {}", e)))?;
@@ -321,6 +332,7 @@ fn canonical_git_repo_url(url: &str, net_access: Option<bool>) -> PyResult<Strin
 }
 
 #[pyfunction]
+#[pyo3(signature = (url, net_access=None))]
 fn find_public_repo_url(url: &str, net_access: Option<bool>) -> PyResult<Option<String>> {
     Ok(upstream_ontologist::vcs::find_public_repo_url(
         url, net_access,
@@ -328,31 +340,31 @@ fn find_public_repo_url(url: &str, net_access: Option<bool>) -> PyResult<Option<
 }
 
 #[pyfunction]
+#[pyo3(signature = (url, net_access=None))]
 fn find_forge(url: &str, net_access: Option<bool>) -> Option<Forge> {
     let url = Url::parse(url).ok()?;
 
     let forge = upstream_ontologist::find_forge(&url, net_access);
 
-    if let Some(forge) = forge {
-        Some(Forge(forge))
-    } else {
-        None
-    }
+    forge.map(Forge)
 }
 
 #[pyfunction]
+#[pyo3(signature = (url, net_access=None))]
 fn repo_url_from_merge_request_url(url: &str, net_access: Option<bool>) -> Option<String> {
     let url = Url::parse(url).ok()?;
     upstream_ontologist::repo_url_from_merge_request_url(&url, net_access).map(|x| x.to_string())
 }
 
 #[pyfunction]
+#[pyo3(signature = (url, net_access=None))]
 fn bug_database_from_issue_url(url: &str, net_access: Option<bool>) -> Option<String> {
     let url = Url::parse(url).ok()?;
     upstream_ontologist::bug_database_from_issue_url(&url, net_access).map(|x| x.to_string())
 }
 
 #[pyfunction]
+#[pyo3(signature = (url, net_access=None))]
 fn guess_bug_database_url_from_repo_url(url: &str, net_access: Option<bool>) -> Option<String> {
     let url = Url::parse(url).ok()?;
     upstream_ontologist::guess_bug_database_url_from_repo_url(&url, net_access)
@@ -360,6 +372,7 @@ fn guess_bug_database_url_from_repo_url(url: &str, net_access: Option<bool>) -> 
 }
 
 #[pyfunction]
+#[pyo3(signature = (url, net_access=None))]
 fn bug_database_url_from_bug_submit_url(url: &str, net_access: Option<bool>) -> Option<String> {
     let url = Url::parse(url).ok()?;
     upstream_ontologist::bug_database_url_from_bug_submit_url(&url, net_access)
@@ -367,6 +380,7 @@ fn bug_database_url_from_bug_submit_url(url: &str, net_access: Option<bool>) -> 
 }
 
 #[pyfunction]
+#[pyo3(signature = (url, net_access=None))]
 fn bug_submit_url_from_bug_database_url(url: &str, net_access: Option<bool>) -> Option<String> {
     let url = Url::parse(url).ok()?;
     upstream_ontologist::bug_submit_url_from_bug_database_url(&url, net_access)
@@ -374,6 +388,7 @@ fn bug_submit_url_from_bug_database_url(url: &str, net_access: Option<bool>) -> 
 }
 
 #[pyfunction]
+#[pyo3(signature = (url, net_access=None))]
 fn check_bug_database_canonical(url: &str, net_access: Option<bool>) -> PyResult<String> {
     let url =
         Url::parse(url).map_err(|e| PyRuntimeError::new_err(format!("Invalid URL: {}", e)))?;
@@ -391,6 +406,7 @@ fn check_bug_database_canonical(url: &str, net_access: Option<bool>) -> PyResult
 }
 
 #[pyfunction]
+#[pyo3(signature = (url, net_access=None))]
 fn check_bug_submit_url_canonical(url: &str, net_access: Option<bool>) -> PyResult<String> {
     let url =
         Url::parse(url).map_err(|e| PyRuntimeError::new_err(format!("Invalid URL: {}", e)))?;
@@ -451,6 +467,7 @@ fn upstream_package_to_debian_source_name(package: UpstreamPackage) -> PyResult<
 }
 
 #[pyfunction]
+#[pyo3(signature = (url, branch=None, net_access=None))]
 pub fn find_secure_repo_url(
     url: String,
     branch: Option<&str>,
@@ -472,6 +489,7 @@ fn convert_cvs_list_to_str(urls: Vec<String>) -> Option<String> {
 }
 
 #[pyfunction]
+#[pyo3(signature = (location, branch=None, subpath=None))]
 fn fixup_broken_git_details(
     location: &str,
     branch: Option<&str>,
@@ -504,6 +522,7 @@ struct UpstreamDatum(pub(crate) upstream_ontologist::UpstreamDatumWithMetadata);
 #[pymethods]
 impl UpstreamDatum {
     #[new]
+    #[pyo3(signature = (field, value, certainty=None, origin=None))]
     fn new(
         py: Python,
         field: String,
@@ -681,18 +700,14 @@ impl UpstreamDatum {
     }
 
     fn __str__(&self) -> PyResult<String> {
-        Ok(format!(
-            "{}: {}",
-            self.0.datum.field(),
-            self.0.datum.to_string()
-        ))
+        Ok(format!("{}: {}", self.0.datum.field(), self.0.datum))
     }
 
     fn __repr__(slf: PyRef<Self>) -> PyResult<String> {
         Ok(format!(
             "UpstreamDatum({}, {}, {}, certainty={})",
             slf.0.datum.field(),
-            slf.0.datum.to_string(),
+            slf.0.datum,
             slf.0
                 .origin
                 .as_ref()
@@ -701,7 +716,7 @@ impl UpstreamDatum {
             slf.0
                 .certainty
                 .as_ref()
-                .map(|c| format!("Some({})", c.to_string()))
+                .map(|c| format!("Some({})", c))
                 .unwrap_or_else(|| "None".to_string()),
         ))
     }
@@ -715,18 +730,18 @@ struct UpstreamMetadata(pub(crate) upstream_ontologist::UpstreamMetadata);
 impl UpstreamMetadata {
     fn __getitem__(&self, field: &str) -> PyResult<UpstreamDatum> {
         self.0
-            .get(&field)
+            .get(field)
             .map(|datum| UpstreamDatum(datum.clone()))
             .ok_or_else(|| PyKeyError::new_err(format!("No such field: {}", field)))
     }
 
     fn __delitem__(&mut self, field: &str) -> PyResult<()> {
-        self.0.remove(&field);
+        self.0.remove(field);
         Ok(())
     }
 
     fn __contains__(&self, field: &str) -> bool {
-        self.0.contains_key(&field)
+        self.0.contains_key(field)
     }
 
     pub fn items(&self) -> Vec<(String, UpstreamDatum)> {
@@ -748,11 +763,12 @@ impl UpstreamMetadata {
             .collect()
     }
 
+    #[pyo3(signature = (field, default=None))]
     pub fn get(&self, py: Python, field: &str, default: Option<PyObject>) -> PyObject {
         let default = default.unwrap_or_else(|| py.None());
         let value = self
             .0
-            .get(&field)
+            .get(field)
             .map(|datum| UpstreamDatum(datum.clone()).into_py(py));
 
         value.unwrap_or(default)
@@ -780,6 +796,7 @@ impl UpstreamMetadata {
     }
 
     #[classmethod]
+    #[pyo3(signature = (d, default_certainty=None))]
     pub fn from_dict(
         _cls: &Bound<PyType>,
         py: Python,
@@ -787,8 +804,8 @@ impl UpstreamMetadata {
         default_certainty: Option<Certainty>,
     ) -> PyResult<Self> {
         let mut data = Vec::new();
-        let mut di = d.iter();
-        while let Some(t) = di.next() {
+        let di = d.iter();
+        for t in di {
             let t = t.to_object(py);
             let mut datum: upstream_ontologist::UpstreamDatumWithMetadata =
                 if let Ok(wm) = t.extract(py) {
@@ -830,6 +847,7 @@ impl UpstreamMetadata {
 }
 
 #[pyfunction]
+#[pyo3(signature = (path, trust_package=None))]
 fn guess_upstream_info(
     path: std::path::PathBuf,
     trust_package: Option<bool>,
@@ -865,6 +883,7 @@ fn description_from_readme_md(
 }
 
 #[pyfunction]
+#[pyo3(signature = (path, trust_package=None, net_access=None, consult_external_directory=None, check=None))]
 fn get_upstream_info(
     py: Python,
     path: std::path::PathBuf,
@@ -901,6 +920,7 @@ fn check_upstream_metadata(metadata: &mut UpstreamMetadata) -> PyResult<()> {
 }
 
 #[pyfunction]
+#[pyo3(signature = (metadata, path, minimum_certainty=None, net_access=None, consult_external_directory=None))]
 fn extend_upstream_metadata(
     metadata: &mut UpstreamMetadata,
     path: std::path::PathBuf,
@@ -923,6 +943,7 @@ fn extend_upstream_metadata(
 }
 
 #[pyfunction]
+#[pyo3(signature = (path, trust_package=None, net_access=None, consult_external_directory=None, check=None))]
 fn guess_upstream_metadata(
     path: std::path::PathBuf,
     trust_package: Option<bool>,
@@ -942,6 +963,7 @@ fn guess_upstream_metadata(
 }
 
 #[pyfunction]
+#[pyo3(signature = (path, trust_package=None, minimum_certainty=None))]
 fn guess_upstream_metadata_items(
     py: Python,
     path: std::path::PathBuf,
@@ -955,7 +977,7 @@ fn guess_upstream_metadata_items(
             .map(|s| s.parse())
             .transpose()
             .map_err(|e: String| {
-                PyValueError::new_err(format!("Invalid minimum_certainty: {}", e.to_string()))
+                PyValueError::new_err(format!("Invalid minimum_certainty: {}", e))
             })?,
     );
     Ok(metadata
