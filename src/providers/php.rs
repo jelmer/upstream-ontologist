@@ -32,48 +32,58 @@ pub fn guess_from_pecl_package(package: &str) -> Result<Vec<UpstreamDatum>, Prov
     guess_from_pecl_page(&body)
 }
 
-struct TextMatches<'a>(&'a str);
-
-impl<'a> select::predicate::Predicate for TextMatches<'a> {
-    fn matches(&self, node: &select::node::Node) -> bool {
-        node.text() == self.0
-    }
+fn find_tags_by_text<'a>(
+    document: &'a scraper::Html,
+    tag_name: &'a str,
+    text: &'a str,
+) -> Vec<scraper::ElementRef<'a>> {
+    let selector = scraper::Selector::parse(tag_name).unwrap();
+    document
+        .select(&selector)
+        .filter(move |node| node.text().any(|t| t.contains(text)))
+        .collect()
 }
 
 fn guess_from_pecl_page(body: &str) -> Result<Vec<UpstreamDatum>, ProviderError> {
-    use select::document::Document;
-    use select::predicate::{And, Name};
-    let document =
-        Document::from_read(body.as_bytes()).map_err(|e| ProviderError::Other(e.to_string()))?;
+    use scraper::Html;
+    let document = Html::parse_document(body);
     let mut ret = Vec::new();
 
-    if let Some(node) = document
-        .find(And(Name("a"), TextMatches("Browse Source")))
-        .next()
-    {
+    let browse_source_selector = find_tags_by_text(&document, "a", "Browse Source")
+        .into_iter()
+        .next();
+
+    if let Some(node) = browse_source_selector {
         ret.push(UpstreamDatum::RepositoryBrowse(
-            node.attr("href").unwrap().to_string(),
+            node.value().attr("href").unwrap().to_string(),
         ));
     }
 
-    if let Some(node) = document
-        .find(And(Name("a"), TextMatches("Package Bugs")))
-        .next()
-    {
+    let package_bugs_selector = find_tags_by_text(&document, "a", "Package Bugs")
+        .into_iter()
+        .next();
+
+    if let Some(node) = package_bugs_selector {
         ret.push(UpstreamDatum::BugDatabase(
-            node.attr("href").unwrap().to_string(),
+            node.value().attr("href").unwrap().to_string(),
         ));
     }
 
-    if let Some(node) = document
-        .find(And(Name("th"), TextMatches("Homepage")))
+    use scraper::Element;
+
+    let homepage_selector = find_tags_by_text(&document, "th", "Homepage")
+        .into_iter()
         .next()
-    {
-        if let Some(node) = node.parent().and_then(|node| node.find(Name("a")).next()) {
-            ret.push(UpstreamDatum::Homepage(
-                node.attr("href").unwrap().to_string(),
-            ));
-        }
+        .unwrap()
+        .parent_element()
+        .unwrap()
+        .select(&scraper::Selector::parse("td a").unwrap())
+        .next();
+
+    if let Some(node) = homepage_selector {
+        ret.push(UpstreamDatum::Homepage(
+            node.value().attr("href").unwrap().to_string(),
+        ));
     }
 
     Ok(ret)
