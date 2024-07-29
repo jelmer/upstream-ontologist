@@ -1368,9 +1368,9 @@ dependencies = [
 
 [[package]]
 name = "gix-actor"
-version = "0.31.4"
+version = "0.31.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9b8ee65074b2bbb91d9d97c15d172ea75043aefebf9869b5b329149dc76501c"
+checksum = "a0e454357e34b833cc3a00b6efbbd3dd4d18b24b9fb0c023876ec2645e8aa3f2"
 dependencies = [
  "bstr",
  "gix-date",
@@ -1382,9 +1382,9 @@ dependencies = [
 
 [[package]]
 name = "gix-config"
-version = "0.37.0"
+version = "0.38.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53fafe42957e11d98e354a66b6bd70aeea00faf2f62dd11164188224a507c840"
+checksum = "28f53fd03d1bf09ebcc2c8654f08969439c4556e644ca925f27cf033bc43e658"
 dependencies = [
  "bstr",
  "gix-config-value",
@@ -1403,9 +1403,9 @@ dependencies = [
 
 [[package]]
 name = "gix-config-value"
-version = "0.14.6"
+version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fbd06203b1a9b33a78c88252a625031b094d9e1b647260070c25b09910c0a804"
+checksum = "b328997d74dd15dc71b2773b162cb4af9a25c424105e4876e6d0686ab41c383e"
 dependencies = [
  "bitflags 2.6.0",
  "bstr",
@@ -1443,9 +1443,9 @@ dependencies = [
 
 [[package]]
 name = "gix-fs"
-version = "0.11.1"
+version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3338ff92a2164f5209f185ec0cd316f571a72676bb01d27e22f2867ba69f77a"
+checksum = "6adf99c27cdf17b1c4d77680c917e0d94d8783d4e1c73d3be0d1d63107163d7a"
 dependencies = [
  "fastrand",
  "gix-features",
@@ -1454,9 +1454,9 @@ dependencies = [
 
 [[package]]
 name = "gix-glob"
-version = "0.16.3"
+version = "0.16.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2a29ad0990cf02c48a7aac76ed0dbddeb5a0d070034b83675cc3bbf937eace4"
+checksum = "fa7df15afa265cc8abe92813cd354d522f1ac06b29ec6dfa163ad320575cb447"
 dependencies = [
  "bitflags 2.6.0",
  "bstr",
@@ -1506,9 +1506,9 @@ dependencies = [
 
 [[package]]
 name = "gix-path"
-version = "0.10.8"
+version = "0.10.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca987128ffb056d732bd545db5db3d8b103d252fbf083c2567bb0796876619a4"
+checksum = "8d23d5bbda31344d8abc8de7c075b3cf26e5873feba7c4a15d916bce67382bd9"
 dependencies = [
  "bstr",
  "gix-trace",
@@ -1519,12 +1519,11 @@ dependencies = [
 
 [[package]]
 name = "gix-ref"
-version = "0.44.1"
+version = "0.45.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3394a2997e5bc6b22ebc1e1a87b41eeefbcfcff3dbfa7c4bd73cb0ac8f1f3e2e"
+checksum = "636e96a0a5562715153fee098c217110c33a6f8218f08f4687ff99afde159bb5"
 dependencies = [
  "gix-actor",
- "gix-date",
  "gix-features",
  "gix-fs",
  "gix-hash",
@@ -1541,9 +1540,9 @@ dependencies = [
 
 [[package]]
 name = "gix-sec"
-version = "0.10.6"
+version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fddc27984a643b20dd03e97790555804f98cf07404e0e552c0ad8133266a79a1"
+checksum = "1547d26fa5693a7f34f05b4a3b59a90890972922172653bcb891ab3f09f436df"
 dependencies = [
  "bitflags 2.6.0",
  "gix-path",
@@ -1682,27 +1681,13 @@ dependencies = [
 
 [[package]]
 name = "html5ever"
-version = "0.26.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bea68cab48b8459f17cf1c944c67ddc572d272d9f2b274140f223ecb1da4a3b7"
-dependencies = [
- "log",
- "mac",
- "markup5ever 0.11.0",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
-name = "html5ever"
 version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c13771afe0e6e846f1e67d038d4cb29998a6779f93c809212e4e9c32efd244d4"
 dependencies = [
  "log",
  "mac",
- "markup5ever 0.12.1",
+ "markup5ever",
  "proc-macro2",
  "quote",
  "syn 2.0.71",
@@ -2217,20 +2202,6 @@ name = "maplit"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3e2e65a1a2e43cfcb47a895c4c8b10d1f4a61097f9f254f183aee60cad9c651d"
-
-[[package]]
-name = "markup5ever"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a2629bb1404f3d34c2e921f21fd34ba00b206124c81f65c50b43b6aaefeb016"
-dependencies = [
- "log",
- "phf 0.10.1",
- "phf_codegen 0.10.0",
- "string_cache",
- "string_cache_codegen",
- "tendril",
-]
 
 [[package]]
 name = "markup5ever"
@@ -3256,7 +3227,7 @@ dependencies = [
  "cssparser",
  "ego-tree",
  "getopts",
- "html5ever 0.27.0",
+ "html5ever",
  "once_cell",
  "selectors",
  "tendril",
@@ -4093,7 +4064,7 @@ dependencies = [
  "distro-info",
  "env_logger 0.11.5",
  "gix-config",
- "html5ever 0.27.0",
+ "html5ever",
  "lazy-regex",
  "lazy_static",
  "log",
