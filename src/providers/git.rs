@@ -12,7 +12,7 @@ pub fn guess_from_git_config(
     let mut results = Vec::new();
 
     // Check if there's a remote named "upstream"
-    if let Some(remote_upstream) = config_file.string_by_key("remote.upstream.url") {
+    if let Some(remote_upstream) = config_file.string_by("remote", Some("upstream".into()), "url") {
         let url = remote_upstream.to_string();
         if !url.starts_with("../") {
             results.push(UpstreamDatumWithMetadata {
@@ -25,7 +25,7 @@ pub fn guess_from_git_config(
 
     // Check if there's a remote named "origin"
     if !settings.trust_package {
-        if let Some(remote_origin) = config_file.string_by_key("remote.origin.url") {
+        if let Some(remote_origin) = config_file.string_by("remote", Some("origin".into()), "url") {
             let url = remote_origin.to_string();
             if !url.starts_with("../") {
                 results.push(UpstreamDatumWithMetadata {
