@@ -56,18 +56,15 @@ jobs:
           python -m pip install --upgrade ".[dev]"
           python -m ruff check py tests
           python -m ruff format --check py tests
-        continue-on-error: true
       - name: Style checks (yamllint)
         run: |
           python -m pip install --upgrade yamllint
           yamllint .
-        continue-on-error: true
       - name: Typing checks
         run: |
           pip install -U mypy types-docutils types-Markdown types-toml \
              types-beautifulsoup4
-          python -m mypy upstream_ontologist/ tests/
-        continue-on-error: true
+          python -m mypy py/upstream_ontologist/ tests/
       - name: Test suite run
         run: |
           python -m unittest tests.test_suite
