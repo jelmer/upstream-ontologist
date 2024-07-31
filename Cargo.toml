@@ -110,8 +110,8 @@ version = ">=0.5"
 optional = true
 
 [workspace.dependencies]
-pyo3 = ">=0.21"
-pyo3-log = { git = "https://github.com/jelmer/pyo3-log", branch = "pyo3-0.22" }
+pyo3 = ">=0.22"
+pyo3-log = ">=0.11"
 
 [[bin]]
 name = "autodoap"

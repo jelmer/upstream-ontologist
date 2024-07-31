@@ -251,14 +251,12 @@ dependencies = [
 
 [[package]]
 name = "breezyshim"
-version = "0.1.131"
+version = "0.1.137"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "417b64e3fed9399fa60d9d20e6f2fb5ffa3dcfce894e7b60b7c8da1f044f029e"
+checksum = "c85c8d2d9992a748149697c2ac59a72fe3092eb069bcfd2c3f21a6b3c7cedd86"
 dependencies = [
  "chrono",
  "ctor",
- "debian-control",
- "debversion",
  "dirty-tracker",
  "lazy-regex",
  "lazy_static",
@@ -752,9 +750,9 @@ dependencies = [
 
 [[package]]
 name = "curl-sys"
-version = "0.4.73+curl-8.8.0"
+version = "0.4.74+curl-8.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "450ab250ecf17227c39afb9a2dd9261dc0035cb80f2612472fc0c4aac2dcb84d"
+checksum = "8af10b986114528fcdc4b63b6f5f021b7057618411046a4de2ba0f0149a097bf"
 dependencies = [
  "cc",
  "libc",
@@ -778,7 +776,6 @@ version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e9086252eef3fadf8ba2090c0dff8da6ff7bbfd04baf15b094f55cc12f1c9fc5"
 dependencies = [
- "pyo3",
  "regex",
  "rowan",
  "serde",
@@ -831,9 +828,9 @@ dependencies = [
 
 [[package]]
 name = "debian-changelog"
-version = "0.1.11"
+version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71be2258e81c0c1f83f5e87340a11bf5c2336b3424fb2a7c7aa1be5a00c32577"
+checksum = "9608e140c8637c6e33acc349ba20872ec6184e516957506a51d1a48146ea3e34"
 dependencies = [
  "chrono",
  "debversion",
@@ -852,7 +849,6 @@ checksum = "8c24d781770afb3bbfc9de716ec9a5ebbb3c03efd41056845706b99582ac7d04"
 dependencies = [
  "deb822-lossless",
  "debversion",
- "pyo3",
  "regex",
  "rowan",
  "url",
@@ -883,12 +879,11 @@ dependencies = [
 
 [[package]]
 name = "debversion"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b792f1c685a4959fb027386b96e27733a65d5c36bea1f880541a917223074b30"
+checksum = "9b6c96844ac16a110ee3ea355b7e511ffe0221242caebb2cc5e1bbfd285744cf"
 dependencies = [
  "lazy-regex",
- "pyo3",
 ]
 
 [[package]]
@@ -972,9 +967,9 @@ dependencies = [
 
 [[package]]
 name = "dirty-tracker"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "00c9e5d637f18b3287eeee5fe2a3f84473b28d91b2374abe18ebc885e2eb0c5f"
+checksum = "57f673af5cabab0d10b822fae4b348c2f5fdc56d90474e26f5dcde0f94fce488"
 dependencies = [
  "notify",
  "tempfile",
@@ -2353,18 +2348,18 @@ dependencies = [
 
 [[package]]
 name = "num_enum"
-version = "0.7.2"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02339744ee7253741199f897151b38e72257d13802d4ee837285cc2990a90845"
+checksum = "4e613fc340b2220f734a8595782c551f1250e969d87d3be1ae0579e8d4065179"
 dependencies = [
  "num_enum_derive",
 ]
 
 [[package]]
 name = "num_enum_derive"
-version = "0.7.2"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "681030a937600a36906c185595136d26abfebb4aa9c65701cefcaf8578bb982b"
+checksum = "af1844ef2428cc3e1cb900be36181049ef3d3193c63e43026cfe202983b27a56"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -2513,9 +2508,9 @@ dependencies = [
 
 [[package]]
 name = "patchkit"
-version = "0.1.7"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2dd7a34dd536de8450551d043fd13cb9071a982b0260dca6e7862de96f5af9e"
+checksum = "1628449e4d9f7e8501e9389daf6242adfd8284c2364a3f2a87e16176756b6768"
 dependencies = [
  "chrono",
  "lazy-regex",
@@ -2532,9 +2527,9 @@ checksum = "8835116a5c179084a830efb3adc117ab007512b535bc1a21c991d3b32a6b44dd"
 
 [[package]]
 name = "pep440_rs"
-version = "0.6.0"
+version = "0.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca0a570e7ec9171250cac57614e901f62408094b54b3798bb920d3cf0d4a0e09"
+checksum = "466eada3179c2e069ca897b99006cbb33f816290eaeec62464eea907e22ae385"
 dependencies = [
  "once_cell",
  "serde",
@@ -2544,9 +2539,9 @@ dependencies = [
 
 [[package]]
 name = "pep508_rs"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "581c27e97a3f38c5d691962af7da93c2672b5227d59cf165b87a9b1fd53dd724"
+checksum = "3f8877489a99ccc80012333123e434f84e645fe1ede3b30e9d3b815887a12979"
 dependencies = [
  "derivative",
  "once_cell",
@@ -2717,9 +2712,13 @@ checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
 
 [[package]]
 name = "ppv-lite86"
-version = "0.2.17"
+version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
+checksum = "2288c0e17cc8d342c712bb43a257a80ebffce59cdb33d5000d8348f3ec02528b"
+dependencies = [
+ "zerocopy",
+ "zerocopy-derive",
+]
 
 [[package]]
 name = "precomputed-hash"
@@ -2829,8 +2828,9 @@ dependencies = [
 
 [[package]]
 name = "pyo3-log"
-version = "0.10.0"
-source = "git+https://github.com/jelmer/pyo3-log?branch=pyo3-0.22#7d91336d63df8f1b0cf3aa2d2182e842a2831513"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ac84e6eec1159bc2a575c9ae6723baa6ee9d45873e9bebad1e3ad7e8d28a443"
 dependencies = [
  "arc-swap",
  "log",
@@ -2872,7 +2872,7 @@ dependencies = [
  "pep440_rs",
  "pep508_rs",
  "serde",
- "toml 0.8.16",
+ "toml 0.8.17",
 ]
 
 [[package]]
@@ -3618,9 +3618,9 @@ dependencies = [
 
 [[package]]
 name = "target-lexicon"
-version = "0.12.15"
+version = "0.12.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4873307b7c257eddcb50c9bedf158eb669578359fb28428bef438fec8e6ba7c2"
+checksum = "61c41af27dd6d1e27b1b16b489db798443478cef1f06a660c96db617ba5de3b1"
 
 [[package]]
 name = "tempfile"
@@ -3843,21 +3843,21 @@ dependencies = [
 
 [[package]]
 name = "toml"
-version = "0.8.16"
+version = "0.8.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81967dd0dd2c1ab0bc3468bd7caecc32b8a4aa47d0c8c695d8c2b2108168d62c"
+checksum = "7a44eede9b727419af8095cb2d72fab15487a541f54647ad4414b34096ee4631"
 dependencies = [
  "serde",
  "serde_spanned",
  "toml_datetime",
- "toml_edit 0.22.17",
+ "toml_edit 0.22.18",
 ]
 
 [[package]]
 name = "toml_datetime"
-version = "0.6.7"
+version = "0.6.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8fb9f64314842840f1d940ac544da178732128f1c78c21772e876579e0da1db"
+checksum = "0dd7358ecb8fc2f8d014bf86f6f638ce72ba252a2c3a2572f2a795f1d23efb41"
 dependencies = [
  "serde",
 ]
@@ -3888,9 +3888,9 @@ dependencies = [
 
 [[package]]
 name = "toml_edit"
-version = "0.22.17"
+version = "0.22.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d9f8729f5aea9562aac1cc0441f5d6de3cff1ee0c5d67293eeca5eb36ee7c16"
+checksum = "1490595c74d930da779e944f5ba2ecdf538af67df1a9848cbd156af43c1b7cf0"
 dependencies = [
  "indexmap 2.2.6",
  "serde",
@@ -4093,7 +4093,7 @@ dependencies = [
  "shlex",
  "tempfile",
  "textwrap",
- "toml 0.8.16",
+ "toml 0.8.17",
  "url",
  "xml",
  "xmltree",
@@ -4540,6 +4540,7 @@ version = "0.7.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b9b4fd18abc82b8136838da5d50bae7bdea537c574d8dc1a34ed098d6c166f0"
 dependencies = [
+ "byteorder",
  "zerocopy-derive",
 ]
 
