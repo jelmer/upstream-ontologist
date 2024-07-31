@@ -71,10 +71,6 @@ class ReadmeTestCase(TestCase):
         if readme_rst is not None:
             if platform.python_implementation() == "PyPy":
                 self.skipTest("Skipping README.rst tests on pypy")
-            try:
-                import docutils  # noqa: F401
-            except ModuleNotFoundError:
-                self.skipTest("Skipping README.rst tests, docutils not available")
             actual_description, unused_rst = description_from_readme_rst(readme_rst)
             self.assertEqual(actual_description, description)
 

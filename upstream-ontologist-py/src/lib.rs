@@ -429,12 +429,6 @@ fn known_bad_guess(py: Python, datum: PyObject) -> PyResult<bool> {
     Ok(datum.known_bad_guess())
 }
 
-#[pyfunction(name = "skip_paragraph")]
-fn readme_skip_paragraph(py: Python, para: &str) -> PyResult<(bool, PyObject)> {
-    let (skip, para) = upstream_ontologist::readme::skip_paragraph(para);
-    Ok((skip, para.to_object(py)))
-}
-
 #[pyfunction]
 fn fixup_rcp_style_git_repo_url(url: &str) -> PyResult<String> {
     Ok(upstream_ontologist::vcs::fixup_rcp_style_git_repo_url(url)
@@ -1022,13 +1016,22 @@ fn update_from_guesses(
 }
 
 #[pyfunction]
-fn parse_first_header_text(text: &str) -> (Option<&str>, Option<&str>, Option<&str>) {
-    upstream_ontologist::readme::parse_first_header_text(text)
+fn description_from_readme_plain(text: &str) -> PyResult<(Option<String>, Vec<UpstreamDatum>)> {
+    let (description, data) = upstream_ontologist::readme::description_from_readme_plain(text)?;
+
+    Ok((description, data.into_iter().map(UpstreamDatum).collect()))
 }
 
 #[pyfunction]
-fn description_from_readme_plain(text: &str) -> PyResult<(Option<String>, Vec<UpstreamDatum>)> {
-    let (description, data) = upstream_ontologist::readme::description_from_readme_plain(text)?;
+fn description_from_readme_html(text: &str) -> PyResult<(Option<String>, Vec<UpstreamDatum>)> {
+    let (description, data) = upstream_ontologist::readme::description_from_readme_html(text)?;
+
+    Ok((description, data.into_iter().map(UpstreamDatum).collect()))
+}
+
+#[pyfunction]
+fn description_from_readme_rst(text: &str) -> PyResult<(Option<String>, Vec<UpstreamDatum>)> {
+    let (description, data) = upstream_ontologist::readme::description_from_readme_rst(text)?;
 
     Ok((description, data.into_iter().map(UpstreamDatum).collect()))
 }
@@ -1085,7 +1088,8 @@ fn _upstream_ontologist(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(guess_upstream_info))?;
     m.add_wrapped(wrap_pyfunction!(get_upstream_info))?;
     m.add_wrapped(wrap_pyfunction!(description_from_readme_md))?;
-    m.add_wrapped(wrap_pyfunction!(parse_first_header_text))?;
+    m.add_wrapped(wrap_pyfunction!(description_from_readme_html))?;
+    m.add_wrapped(wrap_pyfunction!(description_from_readme_rst))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;
@@ -1100,9 +1104,6 @@ fn _upstream_ontologist(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
         py.get_type_bound::<NoSuchForgeProject>(),
     )?;
     m.add_wrapped(wrap_pyfunction!(known_bad_guess))?;
-    let readmem = PyModule::new_bound(py, "readme")?;
-    readmem.add_wrapped(wrap_pyfunction!(readme_skip_paragraph))?;
-    m.add_submodule(&readmem)?;
     m.add(
         "ParseError",
         py.get_type_bound::<upstream_ontologist::ParseError>(),
