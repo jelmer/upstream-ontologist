@@ -20,7 +20,8 @@
 import logging
 import platform
 import re
-from typing import Iterable, List, Optional, Tuple
+from collections.abc import Iterable
+from typing import Optional
 from urllib.parse import urlparse
 
 from . import UpstreamDatum, _upstream_ontologist
@@ -245,7 +246,7 @@ def _parse_field_list(tab):
         yield from _parse_field(name, body)
 
 
-def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
+def _description_from_basic_soup(soup) -> tuple[Optional[str], Iterable[UpstreamDatum]]:
     # Drop any headers
     metadata = []
     if soup is None:
@@ -265,7 +266,7 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[Upstream
     if table:
         metadata.extend(_parse_field_list(table))
 
-    paragraphs: List[str] = []
+    paragraphs: list[str] = []
     paragraphs.extend(_extract_paragraphs(soup.children, metadata))
 
     if len(paragraphs) == 0:
@@ -282,7 +283,7 @@ def _description_from_basic_soup(soup) -> Tuple[Optional[str], Iterable[Upstream
 
 def description_from_readme_html(
     html_text: str,
-) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
+) -> tuple[Optional[str], Iterable[UpstreamDatum]]:
     """Description from HTML."""
     try:
         from bs4 import BeautifulSoup, FeatureNotFound
@@ -299,7 +300,7 @@ def description_from_readme_html(
 
 def description_from_readme_rst(
     rst_text: str,
-) -> Tuple[Optional[str], Iterable[UpstreamDatum]]:
+) -> tuple[Optional[str], Iterable[UpstreamDatum]]:
     """Description from README.rst."""
     if platform.python_implementation() == "PyPy":
         logger.debug("docutils does not appear to work on PyPy, skipping README.rst.")

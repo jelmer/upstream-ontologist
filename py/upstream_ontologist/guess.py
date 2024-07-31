@@ -16,7 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
 import logging
-from typing import Iterable, Iterator
+from collections.abc import Iterable, Iterator
 
 from . import (
     UpstreamDatum,
