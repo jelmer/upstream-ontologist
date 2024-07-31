@@ -41,6 +41,8 @@ debian-control = { version = "0.1", optional = true }
 pulldown-cmark = "0.11"
 debcargo = { version = "2.6", optional = true }
 scraper = "0.19.1"
+rst_parser = "0.4.0"
+rst_renderer = "0.4.0"
 
 [workspace]
 members = [ "upstream-ontologist-py",]
