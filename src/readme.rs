@@ -196,14 +196,9 @@ pub fn skip_paragraph(para: &str) -> (bool, Vec<UpstreamDatumWithMetadata>) {
 pub fn description_from_readme_rst(
     long_description: &str,
 ) -> PyResult<(Option<String>, Vec<UpstreamDatumWithMetadata>)> {
-    Python::with_gil(|py| {
-        let readme_mod = Python::import_bound(py, "upstream_ontologist.readme").unwrap();
-        let (description, extra_md): (Option<String>, Vec<UpstreamDatumWithMetadata>) = readme_mod
-            .call_method1("description_from_readme_rst", (long_description,))?
-            .extract()?;
+    let html = rst_to_html(long_description);
 
-        Ok((description, extra_md))
-    })
+    description_from_readme_html(&html)
 }
 
 pub fn description_from_readme_md(
@@ -556,14 +551,12 @@ fn test_ul_is_field_list() {
             </ul>"#,
     );
 
-    assert!(
-        ul_is_field_list(
-            el.root_element()
-                .select(&Selector::parse("ul").unwrap())
-                .next()
-                .unwrap()
-        )
-    );
+    assert!(ul_is_field_list(
+        el.root_element()
+            .select(&Selector::parse("ul").unwrap())
+            .next()
+            .unwrap()
+    ));
 
     let el = scraper::Html::parse_fragment(
         r#"<ul>
@@ -571,14 +564,12 @@ fn test_ul_is_field_list() {
             </ul>"#,
     );
 
-    assert!(
-        !ul_is_field_list(
-            el.root_element()
-                .select(&Selector::parse("ul").unwrap())
-                .next()
-                .unwrap()
-        )
-    );
+    assert!(!ul_is_field_list(
+        el.root_element()
+            .select(&Selector::parse("ul").unwrap())
+            .next()
+            .unwrap()
+    ));
 }
 
 pub fn description_from_readme_html(
@@ -592,4 +583,13 @@ pub fn description_from_readme_html(
 
         Ok((description, extra_md))
     })
+}
+
+fn rst_to_html(rst_text: &str) -> String {
+    use rst_parser::parse;
+    use rst_renderer::render_html;
+    let document = parse(&rst_text).unwrap();
+    let mut output = Vec::new();
+    render_html(&document, &mut std::io::Cursor::new(&mut output), true).unwrap();
+    String::from_utf8(output).unwrap()
 }
