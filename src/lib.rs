@@ -18,6 +18,7 @@ static USER_AGENT: &str = concat!("upstream-ontologist/", env!("CARGO_PKG_VERSIO
 
 pub mod debian;
 pub mod extrapolate;
+pub mod forges;
 pub mod homepage;
 pub mod http;
 pub mod providers;
@@ -222,11 +223,11 @@ impl From<&str> for Person {
 }
 
 #[cfg(test)]
-mod person_tests {
+mod tests {
     use super::*;
 
     #[test]
-    fn test_from_str() {
+    fn test_person_from_str() {
         assert_eq!(
             Person::from("Foo Bar <foo@example.com>"),
             Person {
@@ -252,6 +253,7 @@ mod person_tests {
             }
         );
     }
+
 }
 
 impl ToPyObject for Person {
@@ -1700,7 +1702,7 @@ impl Forge for SourceForge {
             metadata,
             max_certainty,
             &["Homepage", "Name", "Repository", "Bug-Database"],
-            || guess_from_sf(project, subproject.as_deref()),
+            || crate::forges::sourceforge::guess_from_sf(project, subproject.as_deref()),
         )
     }
 }
@@ -1871,173 +1873,6 @@ pub fn check_bug_submit_url_canonical(
     }
 }
 
-fn sf_git_extract_url(page: &str) -> Option<String> {
-    use scraper::Html;
-
-    let soup = Html::parse_document(page);
-
-    let selector = scraper::Selector::parse("[id=access_url]").unwrap();
-
-    let el = soup.select(&selector).next()?;
-
-    let value = el.attr("value").unwrap();
-    let access_command: Vec<&str> = value.split(' ').collect();
-    if access_command.len() < 3 || access_command[..2] != ["git", "clone"] {
-        return None;
-    }
-
-    Some(access_command[2].to_string())
-}
-
-pub fn get_sf_metadata(project: &str) -> Option<serde_json::Value> {
-    let url = format!("https://sourceforge.net/rest/p/{}", project);
-    match load_json_url(&Url::parse(url.as_str()).unwrap(), None) {
-        Ok(data) => Some(data),
-        Err(HTTPJSONError::Error { status, .. }) if status == reqwest::StatusCode::NOT_FOUND => {
-            None
-        }
-        r => panic!("Unexpected result from {}: {:?}", url, r),
-    }
-}
-
-pub fn guess_from_sf(sf_project: &str, subproject: Option<&str>) -> Vec<UpstreamDatum> {
-    let mut results = Vec::new();
-    match get_sf_metadata(sf_project) {
-        Some(data) => {
-            if let Some(name) = data.get("name") {
-                results.push(UpstreamDatum::Name(name.to_string()));
-            }
-            if let Some(external_homepage) = data.get("external_homepage") {
-                results.push(UpstreamDatum::Homepage(external_homepage.to_string()));
-            }
-            if let Some(preferred_support_url) = data.get("preferred_support_url") {
-                let preferred_support_url = Url::parse(preferred_support_url.as_str().unwrap())
-                    .expect("preferred_support_url is not a valid URL");
-                match check_bug_database_canonical(&preferred_support_url, Some(true)) {
-                    Ok(canonical_url) => {
-                        results.push(UpstreamDatum::BugDatabase(canonical_url.to_string()));
-                    }
-                    Err(_) => {
-                        results.push(UpstreamDatum::BugDatabase(
-                            preferred_support_url.to_string(),
-                        ));
-                    }
-                }
-            }
-
-            let vcs_names = ["hg", "git", "svn", "cvs", "bzr"];
-            let mut vcs_tools: Vec<(&str, Option<&str>, &str)> =
-                data.get("tools").map_or_else(Vec::new, |tools| {
-                    tools
-                        .as_array()
-                        .unwrap()
-                        .iter()
-                        .filter(|tool| {
-                            vcs_names.contains(&tool.get("name").unwrap().as_str().unwrap())
-                        })
-                        .map(|tool| {
-                            (
-                                tool.get("name").map_or("", |n| n.as_str().unwrap()),
-                                tool.get("mount_label").map(|l| l.as_str().unwrap()),
-                                tool.get("url").map_or("", |u| u.as_str().unwrap()),
-                            )
-                        })
-                        .collect::<Vec<(&str, Option<&str>, &str)>>()
-                });
-
-            if vcs_tools.len() > 1 {
-                vcs_tools.retain(|tool| {
-                    if let Some(url) = tool.2.strip_suffix('/') {
-                        !["www", "homepage"].contains(&url.rsplit('/').next().unwrap_or(""))
-                    } else {
-                        true
-                    }
-                });
-            }
-
-            if vcs_tools.len() > 1 && subproject.is_some() {
-                let new_vcs_tools: Vec<(&str, Option<&str>, &str)> = vcs_tools
-                    .iter()
-                    .filter(|tool| tool.1 == subproject)
-                    .cloned()
-                    .collect();
-                if !new_vcs_tools.is_empty() {
-                    vcs_tools = new_vcs_tools;
-                }
-            }
-
-            if vcs_tools.iter().any(|tool| tool.0 == "cvs") {
-                vcs_tools.retain(|tool| tool.0 != "cvs");
-            }
-
-            if vcs_tools.len() == 1 {
-                let (kind, _, url) = vcs_tools[0];
-                match kind {
-                    "git" => {
-                        let url = format!("https://sourceforge.net/{}", url);
-                        let client = reqwest::blocking::Client::new();
-                        let response = client
-                            .head(url)
-                            .header("User-Agent", USER_AGENT)
-                            .send()
-                            .unwrap();
-                        let url = sf_git_extract_url(&response.text().unwrap());
-                        if let Some(url) = url {
-                            results.push(UpstreamDatum::Repository(url));
-                        }
-                    }
-                    "svn" => {
-                        let url = format!("https://svn.code.sf.net/{}", url);
-                        results.push(UpstreamDatum::Repository(url));
-                    }
-                    "hg" => {
-                        let url = format!("https://hg.code.sf.net/{}", url);
-                        results.push(UpstreamDatum::Repository(url));
-                    }
-                    "cvs" => {
-                        let url = format!(
-                            "cvs+pserver://anonymous@{}.cvs.sourceforge.net/cvsroot/{}",
-                            sf_project,
-                            url.strip_suffix('/')
-                                .unwrap_or("")
-                                .rsplit('/')
-                                .nth(1)
-                                .unwrap_or("")
-                        );
-                        results.push(UpstreamDatum::Repository(url));
-                    }
-                    "bzr" => {
-                        // TODO: Implement Bazaar (BZR) handling
-                    }
-                    _ => {
-                        error!("Unknown VCS kind: {}", kind);
-                    }
-                }
-            } else if vcs_tools.len() > 1 {
-                warn!("Multiple possible VCS URLs found");
-            }
-        }
-        None => {
-            debug!("No SourceForge metadata found for {}", sf_project);
-        }
-    }
-    results
-}
-
-pub fn extract_sf_project_name(url: &str) -> Option<String> {
-    let projects_regex = regex!(r"https?://sourceforge\.net/(projects|p)/([^/]+)");
-    if let Some(captures) = projects_regex.captures(url) {
-        return captures.get(2).map(|m| m.as_str().to_string());
-    }
-
-    let sf_regex = regex!(r"https?://(.*).(sf|sourceforge).(net|io)/.*");
-    if let Some(captures) = sf_regex.captures(url) {
-        return captures.get(1).map(|m| m.as_str().to_string());
-    }
-
-    None
-}
-
 pub fn extract_pecl_package_name(url: &str) -> Option<String> {
     let pecl_regex = regex!(r"https?://pecl\.php\.net/package/(.*)");
     if let Some(captures) = pecl_regex.captures(url) {
@@ -2057,7 +1892,7 @@ pub fn extract_hackage_package(url: &str) -> Option<String> {
 /// Obtain metadata from a URL related to the project
 pub fn metadata_from_url(url: &str, origin: &Origin) -> Vec<UpstreamDatumWithMetadata> {
     let mut results = Vec::new();
-    if let Some(sf_project) = extract_sf_project_name(url) {
+    if let Some(sf_project) = crate::forges::sourceforge::extract_sf_project_name(url) {
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::SourceForgeProject(sf_project),
             certainty: Some(Certainty::Certain),
@@ -2920,7 +2755,7 @@ pub fn extend_upstream_metadata(
             None => continue,
         };
 
-        if let Some(project) = extract_sf_project_name(value.datum.as_str().unwrap()) {
+        if let Some(project) = crate::forges::sourceforge::extract_sf_project_name(value.datum.as_str().unwrap()) {
             let certainty = Some(
                 std::cmp::min(Some(Certainty::Likely), value.certainty)
                     .unwrap_or(Certainty::Likely),
