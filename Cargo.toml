@@ -43,6 +43,7 @@ debcargo = { version = "2.6", optional = true }
 scraper = "0.20.0"
 rst_parser = "0.4.0"
 rst_renderer = "0.4.0"
+select = "0.6.0"
 
 [workspace]
 members = [ "upstream-ontologist-py",]
