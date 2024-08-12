@@ -1,4 +1,6 @@
 use crate::{ProviderError, UpstreamDatum};
+use select::document::Document;
+use select::predicate::{Name, And, Text, Predicate};
 
 pub fn guess_from_pecl_package(package: &str) -> Result<Vec<UpstreamDatum>, ProviderError> {
     let url = format!("https://pecl.php.net/packages/{}", package);
@@ -32,21 +34,25 @@ pub fn guess_from_pecl_package(package: &str) -> Result<Vec<UpstreamDatum>, Prov
     guess_from_pecl_page(&body)
 }
 
+struct TextContains<'a>(&'a str);
+
+impl<'a> Predicate for TextContains<'a> {
+    fn matches(&self, node: &select::node::Node) -> bool {
+        node.text().contains(&self.0)
+    }
+}
+
 fn find_tags_by_text<'a>(
-    document: &'a scraper::Html,
+    document: &'a Document,
     tag_name: &'a str,
     text: &'a str,
-) -> Vec<scraper::ElementRef<'a>> {
-    let selector = scraper::Selector::parse(tag_name).unwrap();
-    document
-        .select(&selector)
-        .filter(move |node| node.text().any(|t| t.contains(text)))
+) -> Vec<select::node::Node<'a>> {
+    document.find(And(Name(tag_name), TextContains(text)))
         .collect()
 }
 
 fn guess_from_pecl_page(body: &str) -> Result<Vec<UpstreamDatum>, ProviderError> {
-    use scraper::Html;
-    let document = Html::parse_document(body);
+    let document = Document::from(body);
     let mut ret = Vec::new();
 
     let browse_source_selector = find_tags_by_text(&document, "a", "Browse Source")
@@ -55,7 +61,7 @@ fn guess_from_pecl_page(body: &str) -> Result<Vec<UpstreamDatum>, ProviderError>
 
     if let Some(node) = browse_source_selector {
         ret.push(UpstreamDatum::RepositoryBrowse(
-            node.value().attr("href").unwrap().to_string(),
+            node.attr("href").unwrap().to_string(),
         ));
     }
 
@@ -65,24 +71,22 @@ fn guess_from_pecl_page(body: &str) -> Result<Vec<UpstreamDatum>, ProviderError>
 
     if let Some(node) = package_bugs_selector {
         ret.push(UpstreamDatum::BugDatabase(
-            node.value().attr("href").unwrap().to_string(),
+            node.attr("href").unwrap().to_string(),
         ));
     }
-
-    use scraper::Element;
 
     let homepage_selector = find_tags_by_text(&document, "th", "Homepage")
         .into_iter()
         .next()
         .unwrap()
-        .parent_element()
+        .parent()
         .unwrap()
-        .select(&scraper::Selector::parse("td a").unwrap())
+        .find(Name("td").descendant(Name("a")))
         .next();
 
     if let Some(node) = homepage_selector {
         ret.push(UpstreamDatum::Homepage(
-            node.value().attr("href").unwrap().to_string(),
+            node.attr("href").unwrap().to_string(),
         ));
     }
 
@@ -127,7 +131,7 @@ mod pecl_tests {
 
     #[test]
     fn test_guess_from_pecl_page() {
-        let text = include_str!("pecl.html");
+        let text = include_str!("../testdata/pecl.html");
         let ret = guess_from_pecl_page(text).unwrap();
         assert_eq!(
             ret,
