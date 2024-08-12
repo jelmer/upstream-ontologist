@@ -1,7 +1,9 @@
 use crate::{Certainty, Origin, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use lazy_regex::regex;
 use pyo3::prelude::*;
-use scraper::{ElementRef, Selector};
+use select::document::Document;
+use select::node::Node;
+use select::predicate::{Name, Predicate};
 use std::io::BufRead;
 use std::iter::Iterator;
 
@@ -527,10 +529,10 @@ pub fn description_from_readme_plain(
     Ok((description, metadata))
 }
 
-fn ul_is_field_list(el: ElementRef) -> bool {
+fn ul_is_field_list(el: Node) -> bool {
     let names = ["Issues", "Home", "Documentation", "License"];
-    for li in el.select(&Selector::parse("li").unwrap()) {
-        let text = li.text().collect::<String>();
+    for li in el.find(Name("li")) {
+        let text = li.text();
         if let Some((_, name)) = lazy_regex::regex_captures!(r"([A-Za-z]+)\s*:.*", text.trim()) {
             if !names.contains(&name) {
                 return false;
@@ -544,32 +546,26 @@ fn ul_is_field_list(el: ElementRef) -> bool {
 
 #[test]
 fn test_ul_is_field_list() {
-    let el = scraper::Html::parse_fragment(
-        r#"<ul>
+    let el = Document::from(
+        r#"<html><body><ul>
             <li>Issues: <a href="https://github.com/serde-rs/serde/issues">blah</a></li>
             <li>Home: <a href="https://serde.rs/">blah</a></li>
-            </ul>"#,
+            </ul></body></html>"#,
     );
 
-    assert!(ul_is_field_list(
-        el.root_element()
-            .select(&Selector::parse("ul").unwrap())
-            .next()
-            .unwrap()
-    ));
+    let ul = el.find(Name("ul")).next().unwrap();
 
-    let el = scraper::Html::parse_fragment(
-        r#"<ul>
+    assert!(ul_is_field_list(ul));
+
+    let el = Document::from(
+        r#"<html><body><ul>
             <li>Some other thing</li>
-            </ul>"#,
+            </ul></body></html>"#,
     );
 
-    assert!(!ul_is_field_list(
-        el.root_element()
-            .select(&Selector::parse("ul").unwrap())
-            .next()
-            .unwrap()
-    ));
+    let ul = el.find(Name("ul")).next().unwrap();
+
+    assert!(!ul_is_field_list(ul));
 }
 
 pub fn description_from_readme_html(
