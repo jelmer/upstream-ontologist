@@ -2,24 +2,8 @@ use crate::UpstreamDatum;
 use log::{debug, error, warn};
 use crate::{load_json_url, HTTPJSONError};
 use crate::check_bug_database_canonical;
-use crate::USER_AGENT;
 use reqwest::Url;
 use lazy_regex::regex;
-
-fn sf_git_extract_url(page: &str) -> Option<String> {
-    let document = select::document::Document::from(page);
-    use select::predicate::Attr;
-
-    let el = document.find(Attr("id", "access_url")).next()?;
-
-    let value = el.attr("value").unwrap();
-    let access_command: Vec<&str> = value.split(' ').collect();
-    if access_command.len() < 3 || access_command[..2] != ["git", "clone"] {
-        return None;
-    }
-
-    Some(access_command[2].to_string())
-}
 
 pub fn get_sf_metadata(project: &str) -> Option<serde_json::Value> {
     let url = format!("https://sourceforge.net/rest/p/{}", project);
@@ -56,7 +40,7 @@ fn parse_sf_json(data: serde_json::Value, project: &str, subproject: Option<&str
     }
 
     let vcs_names = ["hg", "git", "svn", "cvs", "bzr"];
-    let mut vcs_tools: Vec<(&str, Option<&str>, &str)> =
+    let mut vcs_tools =
         data.get("tools").map_or_else(Vec::new, |tools| {
             tools
                 .as_array()
@@ -69,16 +53,16 @@ fn parse_sf_json(data: serde_json::Value, project: &str, subproject: Option<&str
                     (
                         tool.get("name").map_or("", |n| n.as_str().unwrap()),
                         tool.get("mount_label").map(|l| l.as_str().unwrap()),
-                        tool.get("url").map_or("", |u| u.as_str().unwrap()),
+                        tool.clone()
                     )
                 })
-                .collect::<Vec<(&str, Option<&str>, &str)>>()
+                .collect::<Vec<(&str, Option<&str>, serde_json::Value)>>()
         });
 
     if vcs_tools.len() > 1 {
         vcs_tools.retain(|tool| {
-            if let Some(url) = tool.2.strip_suffix('/') {
-                !["www", "homepage"].contains(&url.rsplit('/').next().unwrap_or(""))
+            if let Some(url) = tool.2.get("url").and_then(|x| x.as_str()).and_then(|url| url.strip_suffix('/')) {
+                !["www", "web", "homepage"].contains(&url.rsplit('/').next().unwrap_or(""))
             } else {
                 true
             }
@@ -86,11 +70,11 @@ fn parse_sf_json(data: serde_json::Value, project: &str, subproject: Option<&str
     }
 
     if vcs_tools.len() > 1 && subproject.is_some() {
-        let new_vcs_tools: Vec<(&str, Option<&str>, &str)> = vcs_tools
+        let new_vcs_tools = vcs_tools
             .iter()
             .filter(|tool| tool.1 == subproject)
             .cloned()
-            .collect();
+            .collect::<Vec<_>>();
         if !new_vcs_tools.is_empty() {
             vcs_tools = new_vcs_tools;
         }
@@ -101,34 +85,28 @@ fn parse_sf_json(data: serde_json::Value, project: &str, subproject: Option<&str
     }
 
     if vcs_tools.len() == 1 {
-        let (kind, _, url) = vcs_tools[0];
+        let (kind, _, data) = &vcs_tools[0];
         match kind {
-            "git" => {
-                let url = format!("https://sourceforge.net/{}", url);
-                let client = reqwest::blocking::Client::new();
-                let response = client
-                    .head(url)
-                    .header("User-Agent", USER_AGENT)
-                    .send()
-                    .unwrap();
-                let url = sf_git_extract_url(&response.text().unwrap());
-                if let Some(url) = url {
-                    results.push(UpstreamDatum::Repository(url));
+            &"git" => {
+                if let Some(url) = data.get("clone_url_https_anon").and_then(|x| x.as_str()) {
+                    results.push(UpstreamDatum::Repository(url.to_owned()));
                 }
             }
-            "svn" => {
-                let url = Url::parse("https://svn.code.sf.net/{}").unwrap().join(url).unwrap();
-                results.push(UpstreamDatum::Repository(url.to_string()));
+            &"svn" => {
+                if let Some(url) = data.get("clone_url_https_anon").and_then(|x| x.as_str()) {
+                    results.push(UpstreamDatum::Repository(url.to_owned()));
+                }
             }
-            "hg" => {
-                let url = format!("https://hg.code.sf.net/{}", url);
-                results.push(UpstreamDatum::Repository(url));
+            &"hg" => {
+                if let Some(url) = data.get("clone_url_ro").and_then(|x| x.as_str()) {
+                    results.push(UpstreamDatum::Repository(url.to_owned()));
+                }
             }
-            "cvs" => {
+            &"cvs" => {
                 let url = format!(
                     "cvs+pserver://anonymous@{}.cvs.sourceforge.net/cvsroot/{}",
                     project,
-                    url.strip_suffix('/')
+                    data.get("url").unwrap().as_str().unwrap().strip_suffix('/')
                         .unwrap_or("")
                         .rsplit('/')
                         .nth(1)
@@ -136,7 +114,7 @@ fn parse_sf_json(data: serde_json::Value, project: &str, subproject: Option<&str
                 );
                 results.push(UpstreamDatum::Repository(url));
             }
-            "bzr" => {
+            &"bzr" => {
                 // TODO: Implement Bazaar (BZR) handling
             }
             _ => {
@@ -181,12 +159,47 @@ pub fn extract_sf_project_name(url: &str) -> Option<String> {
 mod tests {
     use super::*;
     #[test]
-    fn test_parse_sf_json() {
+    fn test_parse_sf_json_svn() {
+        // From https://sourceforge.net/rest/p/gtab
         let data: serde_json::Value = serde_json::from_str(include_str!("../testdata/gtab.json")).unwrap();
         assert_eq!(parse_sf_json(data, "gtab", Some("gtab")), vec![
             UpstreamDatum::Name("gtab".to_string()),
             UpstreamDatum::Homepage("http://gtab.sourceforge.net".to_string()),
-            UpstreamDatum::Repository("https://sourceforge.net/p/gtab/svn/".to_string()),
+            UpstreamDatum::Repository("https://svn.code.sf.net/p/gtab/svn/trunk".to_string()),
+        ]);
+    }
+
+    #[test]
+    fn test_parse_sf_json_git() {
+        // From https://sourceforge.net/rest/p/zsh
+        let data: serde_json::Value = serde_json::from_str(include_str!("../testdata/zsh.json")).unwrap();
+        assert_eq!(parse_sf_json(data, "zsh", Some("zsh")), vec![
+            UpstreamDatum::Name("zsh".to_string()),
+            UpstreamDatum::Homepage("http://zsh.sourceforge.net/".to_string()),
+            UpstreamDatum::Repository("https://git.code.sf.net/p/zsh/code".to_string()),
+        ]);
+    }
+
+    #[test]
+    fn test_parse_sf_json_hg_diff() {
+        // From https://sourceforge.net/rest/p/hg-diff
+        let data: serde_json::Value = serde_json::from_str(include_str!("../testdata/hg-diff.json")).unwrap();
+        assert_eq!(parse_sf_json(data, "hg-diff", Some("hg-diff")), vec![
+            UpstreamDatum::Name("hg-diff".to_string()),
+            UpstreamDatum::Homepage("http://hg-diff.sourceforge.net/".to_string()),
+            UpstreamDatum::Repository("http://hg.code.sf.net/p/hg-diff/code".to_string())
+        ]);
+    }
+
+    #[test]
+    fn test_parse_sf_json_docdb_v() {
+        // From https://sourceforge.net/rest/p/docdb-v
+        let data: serde_json::Value = serde_json::from_str(include_str!("../testdata/docdb-v.json")).unwrap();
+        assert_eq!(parse_sf_json(data, "docdb-v", Some("docdb-v")), vec![
+            UpstreamDatum::Name("DocDB".to_string()),
+            UpstreamDatum::Homepage("http://docdb-v.sourceforge.net".to_string()),
+            UpstreamDatum::BugDatabase("http://sourceforge.net/tracker/?func=add&group_id=164024&atid=830064".to_string()),
+            UpstreamDatum::Repository("https://git.code.sf.net/p/docdb-v/git".to_string())
         ]);
     }
 }
