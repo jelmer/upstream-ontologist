@@ -76,7 +76,12 @@ fn generate_readme_tests(testdata_dir: &Path, dest_path: &Path) -> std::io::Resu
                 writeln!(w, "    let (actual_description, actual_md) = description_from_readme_md(readme_md).unwrap();")?;
                 writeln!(
                     w,
-                    "    let actual_md = serde_yaml::to_value(actual_md).unwrap();"
+                    "    let {}actual_md = serde_yaml::to_value(actual_md).unwrap();",
+                    if !path.join("expected.yaml").exists() {
+                        "_"
+                    } else {
+                        ""
+                    }
                 )?;
                 writeln!(
                     w,
@@ -112,7 +117,12 @@ fn generate_readme_tests(testdata_dir: &Path, dest_path: &Path) -> std::io::Resu
                 writeln!(w, "    let (actual_description, actual_md) = description_from_readme_rst(readme_rst).unwrap();")?;
                 writeln!(
                     w,
-                    "    let actual_md = serde_yaml::to_value(actual_md).unwrap();"
+                    "    let {}actual_md = serde_yaml::to_value(actual_md).unwrap();",
+                    if !path.join("expected.yaml").exists() {
+                        "_"
+                    } else {
+                        ""
+                    }
                 )?;
                 writeln!(
                     w,
@@ -149,7 +159,12 @@ fn generate_readme_tests(testdata_dir: &Path, dest_path: &Path) -> std::io::Resu
                 writeln!(w, "    let (actual_description, actual_md) = description_from_readme_plain(readme_plain).unwrap();")?;
                 writeln!(
                     w,
-                    "    let actual_md = serde_yaml::to_value(actual_md).unwrap();"
+                    "    let {}actual_md = serde_yaml::to_value(actual_md).unwrap();",
+                    if !path.join("expected.yaml").exists() {
+                        "_"
+                    } else {
+                        ""
+                    }
                 )?;
                 writeln!(
                     w,
