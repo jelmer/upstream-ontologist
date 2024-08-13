@@ -604,6 +604,9 @@ pub fn guess_from_setup_cfg(
 fn guess_from_setup_py_executed(
     path: &Path,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    // Ensure only one thread can run this function at a time
+    static SETUP_PY_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _lock = SETUP_PY_LOCK.lock().unwrap();
     let mut ret = Vec::new();
     // Import setuptools, just in case it replaces distutils
     use pyo3::types::PyDict;

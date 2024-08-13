@@ -5,6 +5,7 @@ Author:
 Bug-Database: https://github.com/jelmer/upstream-ontologist/issues
 Bug-Submit: https://github.com/jelmer/upstream-ontologist/issues/new
 Contact: Jelmer Vernooij <jelmer@jelmer.uk>
+Description: "This is a python project that does something.\n"
 Homepage: https://github.com/jelmer/upstream-ontologist
 Maintainer: !Person
   name: Jelmer Vernooij

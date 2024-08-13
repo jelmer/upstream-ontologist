@@ -817,20 +817,19 @@ fn is_semi_header(el: &Node) -> bool {
 
 fn extract_paragraphs<'a>(
     children: impl Iterator<Item = Node<'a>>,
+    mut paragraphs: &mut Vec<String>,
     metadata: &mut Vec<UpstreamDatumWithMetadata>,
-) -> Vec<String> {
-    let mut paragraphs = Vec::new();
-
+) {
     for child in children {
         match child.name() {
             Some("div") => {
-                paragraphs.extend(extract_paragraphs(child.children(), metadata));
+                extract_paragraphs(child.children(), &mut paragraphs, metadata);
                 if !paragraphs.is_empty() && child.is(Class("section")) {
                     break;
                 }
             }
             Some("section") => {
-                paragraphs.extend(extract_paragraphs(child.children(), metadata));
+                extract_paragraphs(child.children(), &mut paragraphs, metadata);
                 if !paragraphs.is_empty() {
                     break;
                 }
@@ -876,7 +875,9 @@ fn extract_paragraphs<'a>(
             }
             Some(h) if h.starts_with("h") => {
                 if paragraphs.is_empty() {
-                    if !["About", "Introduction", "Overview"].contains(&render(&child).trim()) {
+                    if !["About", "Introduction", "Overview", "Documentation"]
+                        .contains(&render(&child).trim())
+                    {
                         metadata.extend(parse_first_header(&child));
                     }
                 } else {
@@ -889,8 +890,6 @@ fn extract_paragraphs<'a>(
             }
         }
     }
-
-    paragraphs
 }
 
 fn parse_field(name: &str, body: &NodeOrText) -> Vec<UpstreamDatumWithMetadata> {
@@ -1061,7 +1060,9 @@ fn description_from_basic_soup(
         metadata.extend(parse_ul_field_list(&table));
     }
 
-    let paragraphs = extract_paragraphs(child_iter, &mut metadata);
+    let mut paragraphs: Vec<String> = Vec::new();
+
+    extract_paragraphs(child_iter, &mut paragraphs, &mut metadata);
 
     if paragraphs.is_empty() {
         log::debug!("Empty description; no paragraphs.");
@@ -1288,10 +1289,10 @@ This is a test of RST to HTML conversion."#;
             </div>"#,
         );
 
-        assert_eq!(
-            super::extract_paragraphs(root(&fragment).children(), &mut vec![]),
-            vec!["Some text\n", "Some more text\n"]
-        );
+        let mut paragraphs = Vec::new();
+        super::extract_paragraphs(root(&fragment).children(), &mut paragraphs, &mut vec![]);
+
+        assert_eq!(paragraphs, vec!["Some text\n", "Some more text\n"]);
     }
 
     #[test]
