@@ -22,7 +22,11 @@ fn generate_upstream_tests(testdata_dir: &Path, dest_path: &Path) -> std::io::Re
             // Generate a test function for this directory
             writeln!(w, "#[test]")?;
             writeln!(w, "fn test_{}() {{", dir_name.replace(['-', '.'], "_"))?;
-            writeln!(w, "    let dir = PathBuf::from(\"testdata/{}\");", dir_name)?;
+            writeln!(
+                w,
+                "    let dir = PathBuf::from(\"{}/testdata/{}\");",
+                manifest_dir, dir_name
+            )?;
             writeln!(w, "    let expected: serde_yaml::Value = serde_yaml::from_str(include_str!(\"{}/testdata/{}/expected.yaml\")).unwrap();", manifest_dir, dir_name)?;
             writeln!(w, "    let actual: serde_yaml::Value = serde_yaml::to_value(crate::get_upstream_info(&dir, Some(true), Some(false), Some(false), Some(false)).unwrap()).unwrap();")?;
             writeln!(w, "    assert_eq!(actual, expected);")?;
