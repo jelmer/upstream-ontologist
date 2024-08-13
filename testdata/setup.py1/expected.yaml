@@ -1,16 +1,16 @@
+Author:
+ - !Person
+   name: Jelmer Vernooij
+   email: jelmer@jelmer.uk
 Bug-Database: https://github.com/jelmer/upstream-ontologist/issues
 Bug-Submit: https://github.com/jelmer/upstream-ontologist/issues/new
 Contact: Jelmer Vernooij <jelmer@jelmer.uk>
 Homepage: https://github.com/jelmer/upstream-ontologist
+Maintainer: !Person
+  name: Jelmer Vernooij
+  email: jelmer@jelmer.uk
 Name: upstream-ontologist
 Repository: https://github.com/jelmer/upstream-ontologist.git
 Repository-Browse: https://github.com/jelmer/upstream-ontologist
 Summary: tracking of upstream project metadata
 Version: 0.1.35
-Author:
- - !Person
-   name: Jelmer Vernooij
-   email: jelmer@jelmer.uk
-Maintainer: !Person
-  name: Jelmer Vernooij
-  email: jelmer@jelmer.uk

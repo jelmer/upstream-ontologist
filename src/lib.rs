@@ -26,6 +26,11 @@ pub mod readme;
 pub mod vcs;
 pub mod vcs_command;
 
+#[cfg(test)]
+mod upstream_tests {
+    include!(concat!(env!("OUT_DIR"), "/upstream_tests.rs"));
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum Certainty {
     Possible,
@@ -133,11 +138,90 @@ impl FromPyObject<'_> for Certainty {
     }
 }
 
-#[derive(Default, Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[derive(Default, Clone, Debug, PartialEq, Eq)]
 pub struct Person {
     pub name: Option<String>,
     pub email: Option<String>,
     pub url: Option<String>,
+}
+
+impl serde::ser::Serialize for Person {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        let mut map = serde_yaml::Mapping::new();
+        if let Some(name) = &self.name {
+            map.insert(
+                serde_yaml::Value::String("name".to_string()),
+                serde_yaml::Value::String(name.to_string()),
+            );
+        }
+        if let Some(email) = &self.email {
+            map.insert(
+                serde_yaml::Value::String("email".to_string()),
+                serde_yaml::Value::String(email.to_string()),
+            );
+        }
+        if let Some(url) = &self.url {
+            map.insert(
+                serde_yaml::Value::String("url".to_string()),
+                serde_yaml::Value::String(url.to_string()),
+            );
+        }
+        let tag = serde_yaml::value::TaggedValue {
+            tag: serde_yaml::value::Tag::new("!Person"),
+            value: serde_yaml::Value::Mapping(map),
+        };
+        tag.serialize(serializer)
+    }
+}
+
+impl<'a> serde::de::Deserialize<'a> for Person {
+    fn deserialize<D>(deserializer: D) -> Result<Person, D::Error>
+    where
+        D: serde::de::Deserializer<'a>,
+    {
+        let value = serde_yaml::Value::deserialize(deserializer)?;
+        if let serde_yaml::Value::Mapping(map) = value {
+            let mut name = None;
+            let mut email = None;
+            let mut url = None;
+            for (k, v) in map {
+                match k {
+                    serde_yaml::Value::String(k) => match k.as_str() {
+                        "name" => {
+                            if let serde_yaml::Value::String(s) = v {
+                                name = Some(s);
+                            }
+                        }
+                        "email" => {
+                            if let serde_yaml::Value::String(s) = v {
+                                email = Some(s);
+                            }
+                        }
+                        "url" => {
+                            if let serde_yaml::Value::String(s) = v {
+                                url = Some(s);
+                            }
+                        }
+                        n => {
+                            return Err(serde::de::Error::custom(format!("unknown key: {}", n)));
+                        }
+                    },
+                    n => {
+                        return Err(serde::de::Error::custom(format!(
+                            "expected string key, got {:?}",
+                            n
+                        )));
+                    }
+                }
+            }
+            Ok(Person { name, email, url })
+        } else {
+            Err(serde::de::Error::custom("expected mapping"))
+        }
+    }
 }
 
 impl std::fmt::Display for Person {
@@ -253,7 +337,6 @@ mod tests {
             }
         );
     }
-
 }
 
 impl ToPyObject for Person {
@@ -363,7 +446,7 @@ pub enum UpstreamDatum {
     Webservice(String),
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct UpstreamDatumWithMetadata {
     pub datum: UpstreamDatum,
     pub origin: Option<Origin>,
@@ -777,11 +860,16 @@ impl serde::ser::Serialize for UpstreamDatum {
     }
 }
 
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct UpstreamMetadata(Vec<UpstreamDatumWithMetadata>);
 
 impl UpstreamMetadata {
     pub fn new() -> Self {
         UpstreamMetadata(Vec::new())
+    }
+
+    pub fn sort(&mut self) {
+        self.0.sort_by(|a, b| a.datum.field().cmp(b.datum.field()));
     }
 
     pub fn from_data(data: Vec<UpstreamDatumWithMetadata>) -> Self {
@@ -2755,7 +2843,9 @@ pub fn extend_upstream_metadata(
             None => continue,
         };
 
-        if let Some(project) = crate::forges::sourceforge::extract_sf_project_name(value.datum.as_str().unwrap()) {
+        if let Some(project) =
+            crate::forges::sourceforge::extract_sf_project_name(value.datum.as_str().unwrap())
+        {
             let certainty = Some(
                 std::cmp::min(Some(Certainty::Likely), value.certainty)
                     .unwrap_or(Certainty::Likely),
@@ -3023,6 +3113,9 @@ pub fn summarize_upstream_metadata(
     }
 
     fix_upstream_metadata(&mut upstream_metadata);
+
+    // Sort by name
+    upstream_metadata.sort();
 
     Ok(upstream_metadata)
 }
