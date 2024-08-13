@@ -31,6 +31,11 @@ mod upstream_tests {
     include!(concat!(env!("OUT_DIR"), "/upstream_tests.rs"));
 }
 
+#[cfg(test)]
+mod readme_tests {
+    include!(concat!(env!("OUT_DIR"), "/readme_tests.rs"));
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum Certainty {
     Possible,
