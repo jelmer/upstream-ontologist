@@ -863,20 +863,6 @@ fn guess_upstream_info(
 }
 
 #[pyfunction]
-fn description_from_readme_md(
-    py: Python,
-    contents: &str,
-) -> PyResult<(Option<String>, Vec<PyObject>)> {
-    let (description, metadata) =
-        upstream_ontologist::readme::description_from_readme_md(contents)?;
-    let metadata = metadata
-        .into_iter()
-        .map(|datum| datum.to_object(py))
-        .collect();
-    Ok((description, metadata))
-}
-
-#[pyfunction]
 #[pyo3(signature = (path, trust_package=None, net_access=None, consult_external_directory=None, check=None))]
 fn get_upstream_info(
     py: Python,
@@ -1015,27 +1001,6 @@ fn update_from_guesses(
     .collect())
 }
 
-#[pyfunction]
-fn description_from_readme_plain(text: &str) -> PyResult<(Option<String>, Vec<UpstreamDatum>)> {
-    let (description, data) = upstream_ontologist::readme::description_from_readme_plain(text)?;
-
-    Ok((description, data.into_iter().map(UpstreamDatum).collect()))
-}
-
-#[pyfunction]
-fn description_from_readme_html(text: &str) -> PyResult<(Option<String>, Vec<UpstreamDatum>)> {
-    let (description, data) = upstream_ontologist::readme::description_from_readme_html(text)?;
-
-    Ok((description, data.into_iter().map(UpstreamDatum).collect()))
-}
-
-#[pyfunction]
-fn description_from_readme_rst(text: &str) -> PyResult<(Option<String>, Vec<UpstreamDatum>)> {
-    let (description, data) = upstream_ontologist::readme::description_from_readme_rst(text)?;
-
-    Ok((description, data.into_iter().map(UpstreamDatum).collect()))
-}
-
 #[pymodule]
 fn _upstream_ontologist(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     pyo3_log::init();
@@ -1073,7 +1038,6 @@ fn _upstream_ontologist(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(fix_upstream_metadata))?;
     m.add_wrapped(wrap_pyfunction!(guess_upstream_metadata_items))?;
     m.add_wrapped(wrap_pyfunction!(update_from_guesses))?;
-    m.add_wrapped(wrap_pyfunction!(description_from_readme_plain))?;
     let debianm = PyModule::new_bound(py, "debian")?;
     debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_source_name))?;
     debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_binary_name))?;
@@ -1087,9 +1051,6 @@ fn _upstream_ontologist(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(fixup_broken_git_details))?;
     m.add_wrapped(wrap_pyfunction!(guess_upstream_info))?;
     m.add_wrapped(wrap_pyfunction!(get_upstream_info))?;
-    m.add_wrapped(wrap_pyfunction!(description_from_readme_md))?;
-    m.add_wrapped(wrap_pyfunction!(description_from_readme_html))?;
-    m.add_wrapped(wrap_pyfunction!(description_from_readme_rst))?;
     m.add_class::<Forge>()?;
     m.add_class::<GitHub>()?;
     m.add_class::<GitLab>()?;
