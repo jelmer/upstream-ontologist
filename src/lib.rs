@@ -1,5 +1,5 @@
 use lazy_regex::regex;
-use log::{debug, error, warn};
+use log::{debug, warn};
 use percent_encoding::utf8_percent_encode;
 use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;

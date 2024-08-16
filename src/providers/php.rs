@@ -1,6 +1,6 @@
 use crate::{ProviderError, UpstreamDatum};
 use select::document::Document;
-use select::predicate::{Name, And, Text, Predicate};
+use select::predicate::{Name, And, Predicate};
 
 pub fn guess_from_pecl_package(package: &str) -> Result<Vec<UpstreamDatum>, ProviderError> {
     let url = format!("https://pecl.php.net/packages/{}", package);
@@ -38,7 +38,7 @@ struct TextContains<'a>(&'a str);
 
 impl<'a> Predicate for TextContains<'a> {
     fn matches(&self, node: &select::node::Node) -> bool {
-        node.text().contains(&self.0)
+        node.text().contains(self.0)
     }
 }
 
