@@ -7,7 +7,7 @@ fn generate_upstream_tests(testdata_dir: &Path, dest_path: &Path) -> std::io::Re
     let mut w = fs::File::create(dest_path)?;
 
     writeln!(w, "use std::path::PathBuf;")?;
-    writeln!(w, "use pretty_assertions::{{assert_eq, assert_ne}};")?;
+    writeln!(w, "use pretty_assertions::assert_eq;")?;
 
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
 
@@ -43,8 +43,7 @@ fn generate_readme_tests(testdata_dir: &Path, dest_path: &Path) -> std::io::Resu
 
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
-    write!(w, "use std::path::PathBuf;")?;
-    write!(w, "use pretty_assertions::{{assert_eq, assert_ne}};")?;
+    write!(w, "use pretty_assertions::assert_eq;")?;
     write!(w, "use crate::readme::{{description_from_readme_md, description_from_readme_rst, description_from_readme_plain}};")?;
 
     for entry in fs::read_dir(testdata_dir).unwrap() {
