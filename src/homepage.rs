@@ -1,7 +1,7 @@
 use crate::{Certainty, Origin, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 
 use select::document::Document;
-use select::predicate::{Attr, Name};
+use select::predicate::Name;
 
 pub fn guess_from_homepage(
     url: &url::Url,

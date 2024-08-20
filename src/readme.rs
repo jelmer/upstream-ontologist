@@ -817,19 +817,19 @@ fn is_semi_header(el: &Node) -> bool {
 
 fn extract_paragraphs<'a>(
     children: impl Iterator<Item = Node<'a>>,
-    mut paragraphs: &mut Vec<String>,
+    paragraphs: &mut Vec<String>,
     metadata: &mut Vec<UpstreamDatumWithMetadata>,
 ) {
     for child in children {
         match child.name() {
             Some("div") => {
-                extract_paragraphs(child.children(), &mut paragraphs, metadata);
+                extract_paragraphs(child.children(), paragraphs, metadata);
                 if !paragraphs.is_empty() && child.is(Class("section")) {
                     break;
                 }
             }
             Some("section") => {
-                extract_paragraphs(child.children(), &mut paragraphs, metadata);
+                extract_paragraphs(child.children(), paragraphs, metadata);
                 if !paragraphs.is_empty() {
                     break;
                 }
