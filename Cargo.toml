@@ -10,7 +10,7 @@ homepage = "https://github.com/jelmer/upstream-ontologist"
 default-run = "guess-upstream-metadata"
 
 [workspace.package]
-version = "0.1.38"
+version = "0.1.39"
 
 [dependencies]
 log = "0.4"
