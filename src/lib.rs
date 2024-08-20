@@ -933,6 +933,14 @@ impl UpstreamMetadata {
     }
 }
 
+impl std::ops::Index<&str> for UpstreamMetadata {
+    type Output = UpstreamDatumWithMetadata;
+
+    fn index(&self, index: &str) -> &Self::Output {
+        self.get(index).unwrap()
+    }
+}
+
 impl Default for UpstreamMetadata {
     fn default() -> Self {
         UpstreamMetadata::new()
@@ -944,6 +952,16 @@ impl Iterator for UpstreamMetadata {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.0.pop()
+    }
+}
+
+impl From<UpstreamDatum> for UpstreamDatumWithMetadata {
+    fn from(d: UpstreamDatum) -> Self {
+        UpstreamDatumWithMetadata {
+            datum: d,
+            certainty: None,
+            origin: None,
+        }
     }
 }
 
