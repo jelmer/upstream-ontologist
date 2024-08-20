@@ -99,7 +99,7 @@ version = "0.4"
 optional = true
 
 [dependencies.toml]
-version = ">=0.5"
+version = ">=0.8"
 optional = true
 
 [dependencies.mailparse]

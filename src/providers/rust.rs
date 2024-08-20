@@ -2,13 +2,14 @@ use crate::{
     Certainty, GuesserSettings, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata,
 };
 use log::debug;
+use toml::value::Table;
 
 pub fn guess_from_cargo(
     path: &std::path::Path,
     _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     // see https://doc.rust-lang.org/cargo/reference/manifest.html
-    let doc: toml::Table = toml::from_str(&std::fs::read_to_string(path)?)
+    let doc: Table = toml::from_str(&std::fs::read_to_string(path)?)
         .map_err(|e| ProviderError::ParseError(e.to_string()))?;
 
     let package = match doc.get("package") {
