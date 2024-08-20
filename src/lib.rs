@@ -2973,7 +2973,7 @@ pub fn extend_upstream_metadata(
         // TODO(jelmer): Don't assume debian/control exists
         let package = match debian_control::Control::from_file_relaxed(path.join("debian/control"))
         {
-            Ok((control, _)) => control.source().and_then(|s| s.get("Package")),
+            Ok((control, _)) => control.source().and_then(|s| s.name()),
             Err(_) => None,
         };
 

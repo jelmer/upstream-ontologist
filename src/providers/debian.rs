@@ -447,7 +447,7 @@ pub fn guess_from_debian_control(
         });
     }
 
-    if let Some(go_import_path) = source.get("XS-Go-Import-Path") {
+    if let Some(go_import_path) = source.as_deb822().get("XS-Go-Import-Path") {
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::GoImportPath(go_import_path.to_string()),
             certainty: Some(Certainty::Certain),
