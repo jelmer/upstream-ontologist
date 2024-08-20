@@ -40,10 +40,10 @@ debian-copyright = { version = "0.1", optional = true }
 debian-control = { version = "0.1", optional = true }
 pulldown-cmark = "0.12"
 debcargo = { version = "2.6", optional = true }
-#rst_parser = "0.4.0"
-#rst_renderer = "0.4.0"
-rst_parser = { git = "https://github.com/jelmer/rust-rst" }
-rst_renderer = { git = "https://github.com/jelmer/rust-rst" }
+rst_parser = "0.4.0"
+rst_renderer = "0.4.0"
+#rst_parser = { git = "https://github.com/jelmer/rust-rst" }
+#rst_renderer = { git = "https://github.com/jelmer/rust-rst" }
 select = "0.6.0"
 
 [workspace]
