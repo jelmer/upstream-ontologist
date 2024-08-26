@@ -816,10 +816,11 @@ dependencies = [
 
 [[package]]
 name = "debian-control"
-version = "0.1.24"
+version = "0.1.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdefd28dd8634f61fd45702506e4b25f8191fd9825e4104c38916a691a632f39"
+checksum = "f49bd469785eb1517e90a521ede8cb1f6b7e13c6267e80b23969e4f4cbc640a5"
 dependencies = [
+ "chrono",
  "deb822-lossless",
  "debversion",
  "regex",
@@ -961,10 +962,9 @@ dependencies = [
 [[package]]
 name = "document_tree"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "018530fdab9f8e4f196bdc4e4d420222cb83b25d392b12e5aaab2201647d85e0"
+source = "git+https://github.com/jelmer/rust-rst#399b999bee08e6d21eb8fccfc32b133f374c644a"
 dependencies = [
- "failure",
+ "anyhow",
  "regex",
  "serde",
  "serde_derive",
@@ -1045,15 +1045,6 @@ checksum = "534c5cf6194dfab3db3242765c03bbe257cf92f22b38f6bc0c58d59108a820ba"
 dependencies = [
  "libc",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "error-chain"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9435d864e017c3c6afeac1654189b06cdb491cf2ff73dbf0d73b0f292f42ff8"
-dependencies = [
- "backtrace",
 ]
 
 [[package]]
@@ -2991,11 +2982,10 @@ dependencies = [
 [[package]]
 name = "rst_parser"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d17bab4d5d74e0ec6d96f438cae821506d05f56ffe54f6f0a181cc139272fc80"
+source = "git+https://github.com/jelmer/rust-rst#399b999bee08e6d21eb8fccfc32b133f374c644a"
 dependencies = [
+ "anyhow",
  "document_tree",
- "failure",
  "pest",
  "pest_derive",
 ]
@@ -3003,11 +2993,10 @@ dependencies = [
 [[package]]
 name = "rst_renderer"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "280c2b35ffdb112dbf4a927597abb7288071f03f7d9f14dd9fea8c0781af4e80"
+source = "git+https://github.com/jelmer/rust-rst#399b999bee08e6d21eb8fccfc32b133f374c644a"
 dependencies = [
+ "anyhow",
  "document_tree",
- "failure",
  "serde-xml-rs",
  "serde_json",
 ]
@@ -3196,13 +3185,13 @@ dependencies = [
 
 [[package]]
 name = "serde-xml-rs"
-version = "0.3.1"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "27d98dfc234faa8532d66c837de56bf4276a259a43dd10ef96feb2fb7ab333b1"
+checksum = "65162e9059be2f6a3421ebbb4fef3e74b7d9e7c60c50a0e292c6239f19f1edfa"
 dependencies = [
- "error-chain",
  "log",
  "serde",
+ "thiserror",
  "xml-rs",
 ]
 
