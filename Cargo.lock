@@ -3979,6 +3979,7 @@ dependencies = [
  "rst_renderer",
  "rust-ini",
  "select",
+ "semver",
  "serde",
  "serde_json",
  "serde_yaml",

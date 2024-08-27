@@ -1,3 +1,5 @@
+use serde::Deserialize;
+use std::collections::HashMap;
 use crate::{
     Certainty, GuesserSettings, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata,
 };
@@ -117,37 +119,112 @@ pub fn cargo_translate_dashes(crate_name: &str) -> Result<Option<String>, crate:
     Ok(None)
 }
 
-fn parse_crates_io(data: serde_json::Value) -> Vec<UpstreamDatum> {
-    let crate_data = &data["crate"];
+#[derive(Deserialize)]
+pub struct Crate {
+    pub badges: Vec<String>,
+    pub created_at: String,
+    pub description: String,
+    pub documentation: String,
+    pub downloads: i64,
+    pub homepage: Option<String>,
+    pub id: String,
+    pub keywords: Vec<String>,
+    pub license: Option<String>,
+    pub links: HashMap<String, Option<String>>,
+    pub max_stable_version: semver::Version,
+    pub max_version: semver::Version,
+    pub name: String,
+    pub newest_version: semver::Version,
+    pub recent_downloads: i64,
+    pub repository: Option<String>,
+    pub updated_at: String,
+    pub versions: Vec<i32>,
+}
+
+#[derive(Deserialize)]
+pub struct User {
+    pub avatar: String,
+    pub id: i32,
+    pub login: String,
+    pub name: String,
+    pub url: String,
+}
+
+#[derive(Deserialize)]
+pub struct AuditAction {
+    pub action: String,
+    pub time: String,
+    pub user: User
+}
+
+#[derive(Deserialize)]
+pub struct CrateVersion {
+    pub audit_actions: Vec<AuditAction>,
+    pub bin_names: Vec<String>,
+    pub checksum: String,
+    #[serde(rename = "crate")]
+    pub crate_: String,
+    pub crate_size: i64,
+    pub created_at: String,
+    pub dl_path: String,
+    pub downloads: i64,
+    pub features: HashMap<String, Vec<String>>,
+    pub has_lib: bool,
+    pub id: i32,
+    pub lib_links: Option<HashMap<String, String>>,
+    pub license: Option<String>,
+    pub links: HashMap<String, Option<String>>,
+    pub num: semver::Version,
+    pub published_by: Option<User>,
+    pub readme_path: String,
+    pub rust_version: Option<String>,
+    pub updated_at: String,
+    pub yanked: bool,
+}
+
+#[derive(Deserialize)]
+pub struct CrateInfo {
+    pub categories: Vec<String>,
+    #[serde(rename = "crate")]
+    crate_: Crate,
+    pub keywords: Vec<String>,
+    pub versions: Vec<CrateVersion>,
+}
+
+pub fn load_crate_info(cratename: &str) -> Result<Option<CrateInfo>, crate::ProviderError> {
+    let http_url = format!("https://crates.io/api/v1/crates/{}", cratename);
+
+    let data = crate::load_json_url(&http_url.parse().unwrap(), None)?;
+
+    Ok(Some(serde_json::from_value(data).unwrap()))
+}
+
+
+fn parse_crates_io(data: &CrateInfo) -> Vec<UpstreamDatum> {
+    let crate_data = &data.crate_;
     let mut results = Vec::new();
     results.push(UpstreamDatum::Name(
-        crate_data["name"].as_str().unwrap().to_string(),
+        crate_data.name.to_string(),
     ));
-    if let Some(homepage) = crate_data.get("homepage") {
-        results.push(UpstreamDatum::Homepage(
-            homepage.as_str().unwrap().to_string(),
-        ));
+    if let Some(homepage) = crate_data.homepage.as_ref() {
+        results.push(UpstreamDatum::Homepage(homepage.to_string()));
     }
-    if let Some(repository) = crate_data.get("repository") {
+    if let Some(repository) = crate_data.repository.as_ref() {
         results.push(UpstreamDatum::Repository(
-            repository.as_str().unwrap().to_string(),
+            repository.to_string(),
         ));
     }
-    if let Some(description) = crate_data.get("description") {
-        results.push(UpstreamDatum::Summary(
-            description.as_str().unwrap().to_string(),
+    results.push(UpstreamDatum::Summary(
+            crate_data.description.to_string(),
         ));
-    }
-    if let Some(license) = crate_data.get("license") {
+    if let Some(license) = crate_data.license.as_ref() {
         results.push(UpstreamDatum::License(
-            license.as_str().unwrap().to_string(),
+            license.to_string(),
         ));
     }
-    if let Some(version) = crate_data.get("newest_version") {
-        results.push(UpstreamDatum::Version(
-            version.as_str().unwrap().to_string(),
-        ));
-    }
+    results.push(UpstreamDatum::Version(
+        crate_data.newest_version.to_string(),
+    ));
 
     results
 }
@@ -180,12 +257,24 @@ impl crate::ThirdPartyRepository for CratesIo {
     }
 
     fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, ProviderError> {
-        let data = crate::load_json_url(
-            &format!("https://crates.io/api/v1/crates/{}", name)
-                .parse()
-                .unwrap(),
-            None,
-        )?;
-        Ok(parse_crates_io(data))
+        let data = load_crate_info(name)?;
+        if data.is_none() {
+            return Ok(Vec::new());
+        }
+        Ok(parse_crates_io(&data.unwrap()))
+    }
+}
+
+#[cfg(test)]
+mod crates_io_tests {
+    use super::*;
+
+    #[test]
+    fn test_load_crate_info() {
+        let data = include_str!("../testdata/crates.io.json");
+
+        let crate_info: CrateInfo = serde_json::from_str(data).unwrap();
+
+        assert_eq!(crate_info.crate_.name, "breezy");
     }
 }
