@@ -46,6 +46,7 @@ debcargo = { version = "2.6", optional = true }
 rst_parser = { git = "https://github.com/jelmer/rust-rst" }
 rst_renderer = { git = "https://github.com/jelmer/rust-rst" }
 select = "0.6.0"
+semver = { version = "1.0.23", features = ["serde"] }
 
 [workspace]
 members = [ "upstream-ontologist-py",]
