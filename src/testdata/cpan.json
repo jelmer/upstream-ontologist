@@ -1,0 +1,41 @@
+{
+   "version" : "0.02",
+   "directory" : false,
+   "mime" : "text/x-script.perl-module",
+   "download_url" : "https://cpan.metacpan.org/authors/id/C/CT/CTRLSOFT/Parse-Pidl-0.02.tar.gz",
+   "sloc" : 5,
+   "status" : "latest",
+   "pod_lines" : [],
+   "version_numified" : 0.02,
+   "stat" : {
+      "uid" : 1009,
+      "gid" : 1009,
+      "mode" : 33188,
+      "mtime" : 1135865157,
+      "size" : 316
+   },
+   "indexed" : true,
+   "release" : "Parse-Pidl-0.02",
+   "pod" : "",
+   "author" : "CTRLSOFT",
+   "deprecated" : false,
+   "path" : "lib/Parse/Pidl.pm",
+   "level" : 2,
+   "distribution" : "Parse-Pidl",
+   "module" : [
+      {
+         "indexed" : true,
+         "authorized" : true,
+         "version" : "0.02",
+         "name" : "Parse::Pidl",
+         "version_numified" : 0.02
+      }
+   ],
+   "id" : "GIj7X35DE9AYnQ6_TrGxB_VTeOU",
+   "binary" : false,
+   "slop" : 0,
+   "maturity" : "released",
+   "name" : "Pidl.pm",
+   "authorized" : true,
+   "date" : "2005-12-29T14:10:44"
+}
