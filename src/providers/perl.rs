@@ -1,3 +1,4 @@
+use serde::Deserialize;
 use crate::{
     Certainty, GuesserSettings, Origin, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata,
 };
@@ -434,4 +435,71 @@ pub fn guess_from_makefile_pl(
     }
 
     Ok(results)
+}
+
+#[derive(Deserialize)]
+pub struct Module {
+    pub version_numified: f64,
+    pub version: String,
+    pub authorized: bool,
+    pub name: String,
+    pub indexed: bool
+}
+
+#[derive(Deserialize)]
+pub struct Stat {
+    pub uid: isize,
+    pub mtime: isize,
+    pub size: isize,
+    pub mode: isize,
+    pub gid: isize,
+}
+
+#[derive(Deserialize)]
+pub struct CpanModule {
+    pub maturity: String,
+    pub release: String,
+    pub author: String,
+    pub slop: isize,
+    pub download_url: url::Url,
+    pub module: Vec<Module>,
+    pub pod_lines: Vec<String>,
+    pub version: String,
+    pub deprecated: bool,
+    pub level: isize,
+    pub mime: String,
+    pub date: String,
+    pub path: String,
+    pub distribution: String,
+    pub pod: String,
+    pub name: String,
+    pub sloc: isize,
+    pub stat: Stat,
+    pub version_numified: f64,
+    pub binary: bool,
+    pub id: String,
+    pub directory: bool,
+    pub indexed: bool,
+    pub authorized: bool,
+}
+
+pub fn load_cpan_data(module: &str) -> Result<Option<CpanModule>, crate::ProviderError> {
+    let url = format!("https://fastapi.metacpan.org/v1/release/{}", module).parse().unwrap();
+
+    let data = crate::load_json_url(&url, None)?;
+
+    Ok(Some(serde_json::from_value(data).unwrap()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_load_from_json() {
+        let text = include_str!("../testdata/cpan.json");
+        let cpan_module: CpanModule = serde_json::from_str(text).unwrap();
+
+        assert_eq!("Parse-Pidl-0.02", cpan_module.release);
+    }
 }
