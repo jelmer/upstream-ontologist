@@ -767,7 +767,7 @@ dependencies = [
  "maplit",
  "reqwest",
  "tokio",
- "xmltree",
+ "xmltree 0.10.3",
 ]
 
 [[package]]
@@ -3989,7 +3989,7 @@ dependencies = [
  "toml 0.8.19",
  "url",
  "xml",
- "xmltree",
+ "xmltree 0.11.0",
 ]
 
 [[package]]
@@ -4464,6 +4464,15 @@ name = "xmltree"
 version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7d8a75eaf6557bb84a65ace8609883db44a29951042ada9b393151532e41fcb"
+dependencies = [
+ "xml-rs",
+]
+
+[[package]]
+name = "xmltree"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b619f8c85654798007fb10afa5125590b43b088c225a25fc2fec100a9fad0fc6"
 dependencies = [
  "xml-rs",
 ]
