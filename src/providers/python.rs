@@ -1,3 +1,4 @@
+use serde::Deserialize;
 use crate::{
     vcs, Certainty, GuesserSettings, Origin, Person, ProviderError, UpstreamDatum,
     UpstreamDatumWithMetadata,
@@ -1087,4 +1088,110 @@ fn parse_python_classifiers<'a>(
             }
         }
     })
+}
+
+#[derive(Deserialize)]
+pub struct PypiProjectInfo {
+    pub author: Option<String>,
+    pub author_email: Option<String>,
+    pub bugtrack_url: Option<String>,
+    pub classifiers: Vec<String>,
+    pub description: String,
+    pub description_content_type: Option<String>,
+    pub docs_url: Option<String>,
+    pub download_url: Option<String>,
+    pub downloads: HashMap<String, isize>,
+    pub dynamic: Option<bool>,
+    pub home_page: Option<String>,
+    pub keywords: Option<String>,
+    pub license: Option<String>,
+    pub maintainer: Option<String>,
+    pub maintainer_email: Option<String>,
+    pub name: String,
+    pub package_url: String,
+    pub platform: Option<String>,
+    pub project_url: String,
+    pub project_urls: HashMap<String, String>,
+    pub provides_extra: Option<bool>,
+    pub release_url: String,
+    pub requires_dist: Option<Vec<String>>,
+    pub requires_python: Option<String>,
+    pub summary: String,
+    pub version: String,
+    pub yanked: Option<bool>,
+    pub yanked_reason: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct Digests {
+    pub md5: String,
+    pub sha256: String,
+    pub blake2b_256: String,
+}
+
+#[derive(Deserialize)]
+pub struct PypiRelease {
+    pub comment_text: String,
+    pub digests: Digests,
+    pub downloads: isize,
+    pub filename: String,
+    pub has_sig: bool,
+    pub md5_digest: String,
+    pub packagetype: String,
+    pub python_version: String,
+    pub requires_python: Option<String>,
+    pub size: isize,
+    pub upload_time: String,
+    pub upload_time_iso_8601: String,
+    pub url: String,
+    pub yanked: bool,
+    pub yanked_reason: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct PypiUrl {
+    pub comment_text: String,
+    pub digests: Digests,
+    pub filename: String,
+    pub has_sig: bool,
+    pub packagetype: String,
+    pub python_version: String,
+    pub requires_python: Option<String>,
+    pub size: isize,
+    pub upload_time: String,
+    pub upload_time_iso_8601: String,
+    pub url: String,
+    pub yanked: bool,
+    pub yanked_reason: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct PypiProject {
+    pub info: PypiProjectInfo,
+    pub last_serial: isize,
+    pub releases: HashMap<String, Vec<PypiRelease>>,
+    pub urls: Vec<PypiUrl>,
+    pub vulnerabilities: Vec<String>,
+
+}
+
+pub fn load_pypi_project(name: &str) -> Result<Option<PypiProject>, ProviderError> {
+    let http_url = format!("https://pypi.org/pypi/{}/json", name).parse().unwrap();
+    let data = crate::load_json_url(&http_url, None)?;
+    let pypi_data: PypiProject = serde_json::from_value(data).map_err(|e| crate::ProviderError::Other(e.to_string()))?;
+    Ok(Some(pypi_data))
+}
+
+#[cfg(test)]
+mod pypi_tests {
+    use super::*;
+
+    #[test]
+    fn test_pypi_upstream_info() {
+        let data = include_str!("../testdata/pypi.json");
+
+        let pypi_data: PypiProject = serde_json::from_str(data).unwrap();
+
+        assert_eq!(pypi_data.info.name, "merge3");
+    }
 }
