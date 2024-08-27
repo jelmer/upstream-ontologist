@@ -1,3 +1,4 @@
+use serde::Deserialize;
 use crate::{
     Certainty, GuesserSettings, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata,
 };
@@ -133,4 +134,69 @@ pub fn guess_from_gemspec(
     }
 
     Ok(results)
+}
+
+#[derive(Deserialize)]
+pub struct RubygemMetadata {
+    pub changelog_uri: Option<url::Url>,
+    pub source_code_uri: Option<url::Url>,
+}
+
+#[derive(Deserialize)]
+pub struct RubygemDependency {
+    pub name: String,
+    pub requirements: String,
+}
+
+#[derive(Deserialize)]
+pub struct RubygemDependencies {
+    pub development: Vec<RubygemDependency>,
+    pub runtime: Vec<RubygemDependency>,
+}
+
+#[derive(Deserialize)]
+pub struct Rubygem {
+    pub name: String,
+    pub downloads: usize,
+    pub version: String,
+    pub version_created_at: String,
+    pub version_downloads: usize,
+    pub platform: String,
+    pub authors: String,
+    pub info: String,
+    pub licenses: Vec<String>,
+    pub metadata: RubygemMetadata,
+    pub yanked: bool,
+    pub sha: String,
+    pub spec_sha: String,
+    pub project_uri: url::Url,
+    pub gem_uri: url::Url,
+    pub homepage_uri: Option<url::Url>,
+    pub wiki_uri: Option<url::Url>,
+    pub documentation_uri: Option<url::Url>,
+    pub mailing_list_uri: Option<url::Url>,
+    pub source_code_uri: Option<url::Url>,
+    pub bug_tracker_uri: Option<url::Url>,
+    pub changelog_uri: Option<url::Url>,
+    pub funding_uri: Option<url::Url>,
+    pub dependencies: RubygemDependencies,
+}
+
+pub fn load_rubygem(name: &str) -> Result<Option<Rubygem>, ProviderError> {
+    let url = format!("https://rubygems.org/api/v1/gems/{}.json", name).parse().unwrap();
+    let data = crate::load_json_url(&url, None)?;
+    let gem: Rubygem = serde_json::from_value(data).unwrap();
+    Ok(Some(gem))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_parse_gem() {
+        let gemspec = include_str!("../testdata/rubygem.json");
+
+        let gem: super::Rubygem = serde_json::from_str(gemspec).unwrap();
+
+        assert_eq!(gem.name, "bullet");
+    }
 }
