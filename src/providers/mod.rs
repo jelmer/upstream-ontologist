@@ -13,6 +13,7 @@ pub mod maven;
 pub mod meson;
 pub mod metadata_json;
 pub mod metainfo;
+pub mod node;
 pub mod nuspec;
 #[cfg(feature = "opam")]
 pub mod ocaml;
