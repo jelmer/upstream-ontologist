@@ -1,9 +1,9 @@
-use serde::Deserialize;
 use crate::{
     vcs, Certainty, GuesserSettings, Origin, Person, ProviderError, UpstreamDatum,
-    UpstreamDatumWithMetadata,, UpstreamMetadata
+    UpstreamDatumWithMetadata, UpstreamMetadata,
 };
 use log::{debug, warn};
+use serde::Deserialize;
 
 use pyo3::prelude::*;
 use std::collections::HashMap;
@@ -1172,7 +1172,6 @@ pub struct PypiProject {
     pub releases: HashMap<String, Vec<PypiRelease>>,
     pub urls: Vec<PypiUrl>,
     pub vulnerabilities: Vec<String>,
-
 }
 
 impl TryInto<UpstreamMetadata> for PypiProject {
@@ -1240,7 +1239,9 @@ impl TryInto<UpstreamMetadata> for PypiProject {
 
         if let Some(keywords) = self.info.keywords {
             metadata.insert(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Keywords(keywords.split(',').map(|s| s.trim().to_string()).collect()),
+                datum: UpstreamDatum::Keywords(
+                    keywords.split(',').map(|s| s.trim().to_string()).collect(),
+                ),
                 certainty: Some(Certainty::Certain),
                 origin: None,
             });
@@ -1253,22 +1254,33 @@ impl TryInto<UpstreamMetadata> for PypiProject {
             ));
         }
 
-        if let Some(description) = self.info.summary {
-            metadata.insert(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Summary(description),
-                certainty: Some(Certainty::Certain),
-                origin: None,
-            });
+        for url_data in self.urls {
+            if url_data.packagetype == "sdist" {
+                metadata.insert(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Download(url_data.url),
+                    certainty: Some(Certainty::Certain),
+                    origin: None,
+                });
+            }
         }
+
+        metadata.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Summary(self.info.summary),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
 
         Ok(metadata)
     }
 }
 
 pub fn load_pypi_project(name: &str) -> Result<Option<PypiProject>, ProviderError> {
-    let http_url = format!("https://pypi.org/pypi/{}/json", name).parse().unwrap();
+    let http_url = format!("https://pypi.org/pypi/{}/json", name)
+        .parse()
+        .unwrap();
     let data = crate::load_json_url(&http_url, None)?;
-    let pypi_data: PypiProject = serde_json::from_value(data).map_err(|e| crate::ProviderError::Other(e.to_string()))?;
+    let pypi_data: PypiProject =
+        serde_json::from_value(data).map_err(|e| crate::ProviderError::Other(e.to_string()))?;
     Ok(Some(pypi_data))
 }
 
