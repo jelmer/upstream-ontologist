@@ -9,14 +9,6 @@ use std::io::BufRead;
 use std::iter::Iterator;
 use url::Url;
 
-struct Root;
-
-impl Predicate for Root {
-    fn matches(&self, node: &Node) -> bool {
-        node.parent().is_none()
-    }
-}
-
 pub fn skip_paragraph(para: &str) -> (bool, Vec<UpstreamDatumWithMetadata>) {
     let mut ret = Vec::<UpstreamDatumWithMetadata>::new();
     let re = regex!(r"(?ms)^See .* for more (details|information)\.");

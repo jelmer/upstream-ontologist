@@ -1,4 +1,6 @@
-use crate::{Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{
+    Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata, UpstreamMetadata,
+};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
@@ -132,6 +134,14 @@ pub fn guess_from_cabal(
             .lines()
             .map(|line| line.expect("Failed to read line")),
     )
+}
+
+pub fn remote_hackage_data(package: &str) -> Result<UpstreamMetadata, ProviderError> {
+    let mut ret = UpstreamMetadata::new();
+    for datum in guess_from_hackage(package)? {
+        ret.insert(datum);
+    }
+    Ok(ret)
 }
 
 pub fn guess_from_hackage(

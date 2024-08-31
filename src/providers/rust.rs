@@ -1,9 +1,10 @@
-use serde::Deserialize;
-use std::collections::HashMap;
 use crate::{
     Certainty, GuesserSettings, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata,
+    UpstreamMetadata,
 };
 use log::debug;
+use serde::Deserialize;
+use std::collections::HashMap;
 use toml::value::Table;
 
 pub fn guess_from_cargo(
@@ -154,7 +155,7 @@ pub struct User {
 pub struct AuditAction {
     pub action: String,
     pub time: String,
-    pub user: User
+    pub user: User,
 }
 
 #[derive(Deserialize)]
@@ -191,6 +192,58 @@ pub struct CrateInfo {
     pub versions: Vec<CrateVersion>,
 }
 
+impl TryFrom<CrateInfo> for UpstreamMetadata {
+    type Error = crate::ProviderError;
+
+    fn try_from(value: CrateInfo) -> Result<Self, Self::Error> {
+        let mut ret = UpstreamMetadata::default();
+
+        ret.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Name(value.crate_.name.to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+
+        if let Some(homepage) = value.crate_.homepage {
+            ret.insert(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Homepage(homepage),
+                certainty: Some(Certainty::Certain),
+                origin: None,
+            });
+        }
+
+        if let Some(repository) = value.crate_.repository {
+            ret.insert(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Repository(repository),
+                certainty: Some(Certainty::Certain),
+                origin: None,
+            });
+        }
+
+        ret.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Summary(value.crate_.description.to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+
+        if let Some(license) = value.crate_.license {
+            ret.insert(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::License(license),
+                certainty: Some(Certainty::Certain),
+                origin: None,
+            });
+        }
+
+        ret.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Version(value.crate_.newest_version.to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+
+        Ok(ret)
+    }
+}
+
 pub fn load_crate_info(cratename: &str) -> Result<Option<CrateInfo>, crate::ProviderError> {
     let http_url = format!("https://crates.io/api/v1/crates/{}", cratename);
 
@@ -199,28 +252,19 @@ pub fn load_crate_info(cratename: &str) -> Result<Option<CrateInfo>, crate::Prov
     Ok(Some(serde_json::from_value(data).unwrap()))
 }
 
-
 fn parse_crates_io(data: &CrateInfo) -> Vec<UpstreamDatum> {
     let crate_data = &data.crate_;
     let mut results = Vec::new();
-    results.push(UpstreamDatum::Name(
-        crate_data.name.to_string(),
-    ));
+    results.push(UpstreamDatum::Name(crate_data.name.to_string()));
     if let Some(homepage) = crate_data.homepage.as_ref() {
         results.push(UpstreamDatum::Homepage(homepage.to_string()));
     }
     if let Some(repository) = crate_data.repository.as_ref() {
-        results.push(UpstreamDatum::Repository(
-            repository.to_string(),
-        ));
+        results.push(UpstreamDatum::Repository(repository.to_string()));
     }
-    results.push(UpstreamDatum::Summary(
-            crate_data.description.to_string(),
-        ));
+    results.push(UpstreamDatum::Summary(crate_data.description.to_string()));
     if let Some(license) = crate_data.license.as_ref() {
-        results.push(UpstreamDatum::License(
-            license.to_string(),
-        ));
+        results.push(UpstreamDatum::License(license.to_string()));
     }
     results.push(UpstreamDatum::Version(
         crate_data.newest_version.to_string(),
@@ -262,6 +306,16 @@ impl crate::ThirdPartyRepository for CratesIo {
             return Ok(Vec::new());
         }
         Ok(parse_crates_io(&data.unwrap()))
+    }
+}
+
+pub fn remote_crate_data(name: &str) -> Result<UpstreamMetadata, crate::ProviderError> {
+    let data = load_crate_info(name)?;
+
+    if let Some(data) = data {
+        Ok(data.try_into()?)
+    } else {
+        Ok(UpstreamMetadata::default())
     }
 }
 

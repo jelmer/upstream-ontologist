@@ -1,5 +1,8 @@
 //! See https://golang.org/doc/modules/gomod-ref
-use crate::{Certainty, GuesserSettings, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
+use crate::{
+    Certainty, GuesserSettings, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata,
+    UpstreamMetadata,
+};
 use log::debug;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -31,4 +34,23 @@ pub fn guess_from_go_mod(
     }
 
     Ok(results)
+}
+
+pub fn remote_go_metadata(package: &str) -> Result<UpstreamMetadata, ProviderError> {
+    let mut ret = UpstreamMetadata::default();
+    if package.starts_with("github.com/") {
+        ret.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::GoImportPath(package.to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+
+        let parts: Vec<&str> = package.split('/').collect();
+        ret.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Repository(format!("https://{}", parts[..3].join("/"))),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+    }
+    Ok(ret)
 }

@@ -1,8 +1,9 @@
-use serde::Deserialize;
 use crate::{
     Certainty, GuesserSettings, Origin, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata,
+    UpstreamMetadata,
 };
 use lazy_regex::regex;
+use serde::Deserialize;
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -443,7 +444,7 @@ pub struct Module {
     pub version: String,
     pub authorized: bool,
     pub name: String,
-    pub indexed: bool
+    pub indexed: bool,
 }
 
 #[derive(Deserialize)]
@@ -483,12 +484,63 @@ pub struct CpanModule {
     pub authorized: bool,
 }
 
+impl TryFrom<CpanModule> for UpstreamMetadata {
+    type Error = crate::ProviderError;
+
+    fn try_from(value: CpanModule) -> Result<Self, Self::Error> {
+        let mut metadata = UpstreamMetadata::default();
+
+        metadata.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Name(value.name),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+
+        metadata.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Version(value.version),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+
+        metadata.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Homepage(value.download_url.to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+
+        metadata.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Download(value.download_url.to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+
+        metadata.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Author(vec![crate::Person::from(value.author.as_str())]),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+
+        Ok(metadata)
+    }
+}
+
 pub fn load_cpan_data(module: &str) -> Result<Option<CpanModule>, crate::ProviderError> {
-    let url = format!("https://fastapi.metacpan.org/v1/release/{}", module).parse().unwrap();
+    let url = format!("https://fastapi.metacpan.org/v1/release/{}", module)
+        .parse()
+        .unwrap();
 
     let data = crate::load_json_url(&url, None)?;
 
     Ok(Some(serde_json::from_value(data).unwrap()))
+}
+
+pub fn remote_cpan_data(module: &str) -> Result<UpstreamMetadata, crate::ProviderError> {
+    let data = load_cpan_data(module)?;
+
+    match data {
+        Some(data) => data.try_into(),
+        None => Ok(UpstreamMetadata::default()),
+    }
 }
 
 #[cfg(test)]
