@@ -23,6 +23,7 @@ pub mod homepage;
 pub mod http;
 pub mod providers;
 pub mod readme;
+pub mod repology;
 pub mod vcs;
 pub mod vcs_command;
 
@@ -2257,7 +2258,6 @@ pub enum ProviderError {
     IoError(std::io::Error),
     Other(String),
     HttpJsonError(HTTPJSONError),
-    Python(PyErr),
     ExtrapolationLimitExceeded(usize),
 }
 
@@ -2268,7 +2268,6 @@ impl std::fmt::Display for ProviderError {
             ProviderError::IoError(e) => write!(f, "IO error: {}", e),
             ProviderError::Other(e) => write!(f, "Other error: {}", e),
             ProviderError::HttpJsonError(e) => write!(f, "HTTP JSON error: {}", e),
-            ProviderError::Python(e) => write!(f, "Python error: {}", e),
             ProviderError::ExtrapolationLimitExceeded(e) => {
                 write!(f, "Extrapolation limit exceeded: {}", e)
             }
@@ -2311,7 +2310,6 @@ impl From<ProviderError> for PyErr {
             ProviderError::ParseError(e) => ParseError::new_err((e,)),
             ProviderError::Other(e) => PyRuntimeError::new_err((e,)),
             ProviderError::HttpJsonError(e) => PyRuntimeError::new_err((e.to_string(),)),
-            ProviderError::Python(e) => e,
             ProviderError::ExtrapolationLimitExceeded(e) => {
                 PyRuntimeError::new_err((e.to_string(),))
             }

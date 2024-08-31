@@ -241,8 +241,6 @@ fn main() {
         )
         .init();
 
-    pyo3::prepare_freethreaded_python();
-
     let path = args.path.canonicalize().unwrap();
 
     let upstream_info = upstream_ontologist::get_upstream_info(
