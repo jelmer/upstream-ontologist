@@ -1,9 +1,9 @@
-use serde::Deserialize;
 use crate::{
     vcs, Certainty, GuesserSettings, Origin, Person, ProviderError, UpstreamDatum,
-    UpstreamDatumWithMetadata,
+    UpstreamDatumWithMetadata, UpstreamMetadata,
 };
 use log::{debug, warn};
+use serde::Deserialize;
 
 use pyo3::prelude::*;
 use std::collections::HashMap;
@@ -1111,7 +1111,7 @@ pub struct PypiProjectInfo {
     pub package_url: String,
     pub platform: Option<String>,
     pub project_url: String,
-    pub project_urls: HashMap<String, String>,
+    pub project_urls: Option<HashMap<String, String>>,
     pub provides_extra: Option<bool>,
     pub release_url: String,
     pub requires_dist: Option<Vec<String>>,
@@ -1172,14 +1172,125 @@ pub struct PypiProject {
     pub releases: HashMap<String, Vec<PypiRelease>>,
     pub urls: Vec<PypiUrl>,
     pub vulnerabilities: Vec<String>,
+}
 
+impl TryInto<UpstreamMetadata> for PypiProject {
+    type Error = ProviderError;
+
+    fn try_into(self) -> Result<UpstreamMetadata, Self::Error> {
+        let mut metadata = UpstreamMetadata::default();
+        if let Some(author) = self.info.author {
+            metadata.insert(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Author(vec![Person {
+                    name: Some(author),
+                    email: self.info.author_email,
+                    url: None,
+                }]),
+                certainty: Some(Certainty::Certain),
+                origin: None,
+            });
+        }
+
+        metadata.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Description(self.info.description),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+
+        if let Some(homepage) = self.info.home_page {
+            metadata.insert(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Homepage(homepage),
+                certainty: Some(Certainty::Certain),
+                origin: None,
+            });
+        }
+
+        if let Some(license) = self.info.license {
+            metadata.insert(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::License(license),
+                certainty: Some(Certainty::Certain),
+                origin: None,
+            });
+        }
+
+        metadata.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Name(self.info.name),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+
+        if let Some(maintainer) = self.info.maintainer {
+            metadata.insert(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Maintainer(Person {
+                    name: Some(maintainer),
+                    email: self.info.maintainer_email,
+                    url: None,
+                }),
+                certainty: Some(Certainty::Certain),
+                origin: None,
+            });
+        }
+
+        metadata.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Version(self.info.version),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+
+        if let Some(keywords) = self.info.keywords {
+            metadata.insert(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Keywords(
+                    keywords.split(',').map(|s| s.trim().to_string()).collect(),
+                ),
+                certainty: Some(Certainty::Certain),
+                origin: None,
+            });
+        }
+
+        if let Some(urls) = self.info.project_urls {
+            metadata.0.extend(parse_python_project_urls(
+                urls.into_iter(),
+                &Origin::Other("pypi".to_string()),
+            ));
+        }
+
+        for url_data in self.urls {
+            if url_data.packagetype == "sdist" {
+                metadata.insert(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Download(url_data.url),
+                    certainty: Some(Certainty::Certain),
+                    origin: None,
+                });
+            }
+        }
+
+        metadata.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Summary(self.info.summary),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+
+        Ok(metadata)
+    }
 }
 
 pub fn load_pypi_project(name: &str) -> Result<Option<PypiProject>, ProviderError> {
-    let http_url = format!("https://pypi.org/pypi/{}/json", name).parse().unwrap();
+    let http_url = format!("https://pypi.org/pypi/{}/json", name)
+        .parse()
+        .unwrap();
     let data = crate::load_json_url(&http_url, None)?;
-    let pypi_data: PypiProject = serde_json::from_value(data).map_err(|e| crate::ProviderError::Other(e.to_string()))?;
+    let pypi_data: PypiProject =
+        serde_json::from_value(data).map_err(|e| crate::ProviderError::Other(e.to_string()))?;
     Ok(Some(pypi_data))
+}
+
+pub fn remote_pypi_metadata(name: &str) -> Result<UpstreamMetadata, ProviderError> {
+    let pypi = load_pypi_project(name)?;
+
+    match pypi {
+        Some(pypi) => pypi.try_into(),
+        None => Ok(UpstreamMetadata::default()),
+    }
 }
 
 #[cfg(test)]

@@ -4,18 +4,10 @@ use pyo3::prelude::*;
 use regex::Regex;
 use select::document::Document;
 use select::node::Node;
-use select::predicate::{And, Class, Name, Predicate, Text};
+use select::predicate::{And, Class, Name, Text};
 use std::io::BufRead;
 use std::iter::Iterator;
 use url::Url;
-
-struct Root;
-
-impl Predicate for Root {
-    fn matches(&self, node: &Node) -> bool {
-        node.parent().is_none()
-    }
-}
 
 pub fn skip_paragraph(para: &str) -> (bool, Vec<UpstreamDatumWithMetadata>) {
     let mut ret = Vec::<UpstreamDatumWithMetadata>::new();
@@ -1186,6 +1178,14 @@ This is a test of RST to HTML conversion."#;
                 origin: None,
             }]
         );
+    }
+
+    struct Root;
+
+    impl select::predicate::Predicate for Root {
+        fn matches(&self, node: &Node) -> bool {
+            node.parent().is_none()
+        }
     }
 
     fn root(doc: &Document) -> Node {
