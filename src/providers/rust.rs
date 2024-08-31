@@ -124,8 +124,8 @@ pub fn cargo_translate_dashes(crate_name: &str) -> Result<Option<String>, crate:
 pub struct Crate {
     pub badges: Vec<String>,
     pub created_at: String,
-    pub description: String,
-    pub documentation: String,
+    pub description: Option<String>,
+    pub documentation: Option<String>,
     pub downloads: i64,
     pub homepage: Option<String>,
     pub id: String,
@@ -139,7 +139,7 @@ pub struct Crate {
     pub recent_downloads: i64,
     pub repository: Option<String>,
     pub updated_at: String,
-    pub versions: Vec<i32>,
+    pub versions: Option<Vec<i32>>,
 }
 
 #[derive(Deserialize)]
@@ -220,11 +220,13 @@ impl TryFrom<CrateInfo> for UpstreamMetadata {
             });
         }
 
-        ret.insert(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::Summary(value.crate_.description.to_string()),
-            certainty: Some(Certainty::Certain),
-            origin: None,
-        });
+        if let Some(description) = value.crate_.description {
+            ret.insert(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Summary(description),
+                certainty: Some(Certainty::Certain),
+                origin: None,
+            });
+        }
 
         if let Some(license) = value.crate_.license {
             ret.insert(UpstreamDatumWithMetadata {
@@ -252,6 +254,7 @@ pub fn load_crate_info(cratename: &str) -> Result<Option<CrateInfo>, crate::Prov
     Ok(Some(serde_json::from_value(data).unwrap()))
 }
 
+// TODO: dedupe with TryFrom implementation above
 fn parse_crates_io(data: &CrateInfo) -> Vec<UpstreamDatum> {
     let crate_data = &data.crate_;
     let mut results = Vec::new();
@@ -262,7 +265,9 @@ fn parse_crates_io(data: &CrateInfo) -> Vec<UpstreamDatum> {
     if let Some(repository) = crate_data.repository.as_ref() {
         results.push(UpstreamDatum::Repository(repository.to_string()));
     }
-    results.push(UpstreamDatum::Summary(crate_data.description.to_string()));
+    if let Some(description) = crate_data.description.as_ref() {
+        results.push(UpstreamDatum::Summary(description.to_string()));
+    }
     if let Some(license) = crate_data.license.as_ref() {
         results.push(UpstreamDatum::License(license.to_string()));
     }

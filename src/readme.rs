@@ -1,6 +1,5 @@
 use crate::{Certainty, Origin, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use lazy_regex::regex;
-use pyo3::prelude::*;
 use regex::Regex;
 use select::document::Document;
 use select::node::Node;
@@ -199,7 +198,7 @@ pub fn skip_paragraph(para: &str) -> (bool, Vec<UpstreamDatumWithMetadata>) {
 
 pub fn description_from_readme_rst(
     long_description: &str,
-) -> PyResult<(Option<String>, Vec<UpstreamDatumWithMetadata>)> {
+) -> Result<(Option<String>, Vec<UpstreamDatumWithMetadata>), ProviderError> {
     // Work around https://github.com/flying-sheep/rust-rst/issues/55
 
     let mut fields: Vec<(&str, String)> = Vec::new();
@@ -247,7 +246,7 @@ pub fn description_from_readme_rst(
 
 pub fn description_from_readme_md(
     long_description: &str,
-) -> PyResult<(Option<String>, Vec<UpstreamDatumWithMetadata>)> {
+) -> Result<(Option<String>, Vec<UpstreamDatumWithMetadata>), ProviderError> {
     let parser = pulldown_cmark::Parser::new(long_description);
 
     let mut html_output = String::new();
@@ -417,8 +416,7 @@ pub fn guess_from_readme(
             Ok((None, metadata))
         }
         _ => Ok((None, vec![])),
-    }
-    .map_err(ProviderError::Python)?;
+    }?;
     if let Some(description) = description {
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Description(description),
@@ -1074,7 +1072,7 @@ fn description_from_basic_soup(
 
 pub fn description_from_readme_html(
     html_text: &str,
-) -> PyResult<(Option<String>, Vec<UpstreamDatumWithMetadata>)> {
+) -> Result<(Option<String>, Vec<UpstreamDatumWithMetadata>), ProviderError> {
     let soup = Document::from(html_text);
     Ok(description_from_basic_soup(&soup))
 }

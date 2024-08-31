@@ -610,7 +610,9 @@ fn guess_from_setup_py_executed(
     let _lock = SETUP_PY_LOCK.lock().unwrap();
     let mut ret = Vec::new();
     // Import setuptools, just in case it replaces distutils
+    //
     use pyo3::types::PyDict;
+    pyo3::prepare_freethreaded_python();
     let mut long_description = None;
     Python::with_gil(|py| {
         let _ = py.import_bound("setuptools");
@@ -760,6 +762,7 @@ pub fn guess_from_setup_py(
 fn guess_from_setup_py_parsed(
     path: &Path,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    pyo3::prepare_freethreaded_python();
     let code = match std::fs::read_to_string(path) {
         Ok(setup_text) => setup_text,
         Err(e) => {
