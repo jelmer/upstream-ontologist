@@ -756,9 +756,9 @@ dependencies = [
 
 [[package]]
 name = "debbugs"
-version = "0.1.3"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58e8c415756d1158232b46272d2a75901ef304e5bdded12658aeeb1f3a366ff8"
+checksum = "a6f8df1ed3ad28bd8380c05e317dcff67cd84957a334ccd713bfa81f9631f5dc"
 dependencies = [
  "debversion",
  "lazy-regex",
@@ -767,7 +767,7 @@ dependencies = [
  "maplit",
  "reqwest",
  "tokio",
- "xmltree 0.10.3",
+ "xmltree",
 ]
 
 [[package]]
@@ -4047,7 +4047,7 @@ dependencies = [
  "toml 0.8.19",
  "url",
  "xml",
- "xmltree 0.11.0",
+ "xmltree",
 ]
 
 [[package]]
@@ -4506,15 +4506,6 @@ dependencies = [
  "log",
  "mac",
  "markup5ever 0.11.0",
-]
-
-[[package]]
-name = "xmltree"
-version = "0.10.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7d8a75eaf6557bb84a65ace8609883db44a29951042ada9b393151532e41fcb"
-dependencies = [
- "xml-rs",
 ]
 
 [[package]]
