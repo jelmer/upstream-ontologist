@@ -74,7 +74,7 @@ pub fn url_from_git_clone_command(command: &[u8]) -> Option<String> {
     let url = args
         .get(2)
         .cloned()
-        .unwrap_or_else(|| args.get(0).cloned().unwrap_or_default());
+        .unwrap_or_else(|| args.first().cloned().unwrap_or_default());
     if vcs::plausible_url(&url) {
         Some(url)
     } else {
@@ -96,22 +96,15 @@ fn test_url_from_git_clone_command() {
 
     assert_eq!(
         Some("https://github.com/jelmer/blah".to_string()),
-        url_from_git_clone_command(
-            b"git clone https://github.com/jelmer/blah target"
-        ),
+        url_from_git_clone_command(b"git clone https://github.com/jelmer/blah target"),
     );
 
     assert_eq!(
         Some("https://github.com/jelmer/blah".to_string()),
-        url_from_git_clone_command(
-            b"git clone -b foo https://github.com/jelmer/blah target"
-        ),
+        url_from_git_clone_command(b"git clone -b foo https://github.com/jelmer/blah target"),
     );
 
-    assert_eq!(
-        None,
-        url_from_git_clone_command(
-            b"git ls-tree"));
+    assert_eq!(None, url_from_git_clone_command(b"git ls-tree"));
 }
 
 pub fn url_from_fossil_clone_command(command: &[u8]) -> Option<String> {
@@ -134,7 +127,7 @@ pub fn url_from_fossil_clone_command(command: &[u8]) -> Option<String> {
     let url = args
         .get(2)
         .cloned()
-        .unwrap_or_else(|| args.get(0).cloned().unwrap_or_default());
+        .unwrap_or_else(|| args.first().cloned().unwrap_or_default());
     if vcs::plausible_url(&url) {
         Some(url)
     } else {
@@ -146,9 +139,7 @@ pub fn url_from_fossil_clone_command(command: &[u8]) -> Option<String> {
 fn test_url_from_fossil_clone_command() {
     assert_eq!(
         Some("https://example.com/repo/blah".to_string()),
-        url_from_fossil_clone_command(
-            b"fossil clone https://example.com/repo/blah blah.fossil"
-        ),
+        url_from_fossil_clone_command(b"fossil clone https://example.com/repo/blah blah.fossil"),
     );
 }
 
@@ -193,7 +184,7 @@ pub fn url_from_svn_co_command(command: &[u8]) -> Option<String> {
     if args[0] != "svn" || args[1] != "co" {
         return None;
     }
-    let url_schemes = vec!["svn+ssh", "http", "https", "svn"];
+    let url_schemes = ["svn+ssh", "http", "https", "svn"];
     args.into_iter().find(|arg| {
         url_schemes
             .iter()

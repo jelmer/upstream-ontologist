@@ -170,17 +170,12 @@ pub fn guess_from_pyproject_toml(
             });
         }
 
-        if let Some(license) = inner_project.license {
-            match license {
-                pyproject_toml::License::String(license) => {
-                    ret.push(UpstreamDatumWithMetadata {
-                        datum: UpstreamDatum::License(license),
-                        certainty: Some(Certainty::Certain),
-                        origin: Some(path.into()),
-                    });
-                }
-                _ => {}
-            }
+        if let Some(pyproject_toml::License::String(license)) = inner_project.license.as_ref() {
+            ret.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::License(license.clone()),
+                certainty: Some(Certainty::Certain),
+                origin: Some(path.into()),
+            });
         }
 
         fn contact_to_person(contact: &pyproject_toml::Contact) -> Person {
@@ -609,16 +604,19 @@ pub fn guess_from_setup_cfg(
 fn guess_from_setup_py_executed(
     path: &Path,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    // Ensure only one thread can run this function at a time
+    static SETUP_PY_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _lock = SETUP_PY_LOCK.lock().unwrap();
     let mut ret = Vec::new();
     // Import setuptools, just in case it replaces distutils
     use pyo3::types::PyDict;
     let mut long_description = None;
     Python::with_gil(|py| {
-        let _ = py.import("setuptools");
+        let _ = py.import_bound("setuptools");
 
-        let run_setup = py.import("distutils.core")?.getattr("run_setup")?;
+        let run_setup = py.import_bound("distutils.core")?.getattr("run_setup")?;
 
-        let os = py.import("os")?;
+        let os = py.import_bound("os")?;
 
         let orig = match os.getattr("getcwd")?.call0() {
             Ok(orig) => Some(orig.extract::<String>()?),
@@ -633,10 +631,10 @@ fn guess_from_setup_py_executed(
         os.getattr("chdir")?.call1((parent,))?;
 
         let result = || -> PyResult<_> {
-            let kwargs = PyDict::new(py);
+            let kwargs = PyDict::new_bound(py);
             kwargs.set_item("stop_after", "config")?;
 
-            run_setup.call((path,), Some(kwargs))
+            run_setup.call((path,), Some(&kwargs))
         }();
 
         if let Some(orig) = orig {
@@ -661,8 +659,11 @@ fn guess_from_setup_py_executed(
             });
         }
 
-        if let Some(url) = result.call_method0("get_url")?.extract()? {
-            ret.extend(parse_python_url(url));
+        if let Some(url) = result
+            .call_method0("get_url")?
+            .extract::<Option<String>>()?
+        {
+            ret.extend(parse_python_url(&url));
         }
 
         if let Some(download_url) = result.call_method0("get_download_url")?.extract()? {
@@ -770,7 +771,7 @@ fn guess_from_setup_py_parsed(
     let mut ret = Vec::new();
 
     Python::with_gil(|py| {
-        let ast = py.import("ast").unwrap();
+        let ast = py.import_bound("ast").unwrap();
 
         // Based on pypi.py in https://github.com/nexB/scancode-toolkit/blob/develop/src/packagedcode/pypi.py
         //
@@ -790,14 +791,14 @@ fn guess_from_setup_py_parsed(
             let statement = statement?;
             // We only care about function calls or assignments to functions named
             // `setup` or `main`
-            if (statement.is_instance(ast_expr)?
-                || statement.is_instance(ast_call)?
-                || statement.is_instance(ast_assign)?)
-                && statement.getattr("value")?.is_instance(ast_call)?
+            if (statement.is_instance(&ast_expr)?
+                || statement.is_instance(&ast_call)?
+                || statement.is_instance(&ast_assign)?)
+                && statement.getattr("value")?.is_instance(&ast_call)?
                 && statement
                     .getattr("value")?
                     .getattr("func")?
-                    .is_instance(ast_name)?
+                    .is_instance(&ast_name)?
                 && (statement.getattr("value")?.getattr("func")?.getattr("id")?.extract::<String>()? == "setup" ||
                     // we also look for main as sometimes this is used instead of
                     // setup()
@@ -820,10 +821,10 @@ fn guess_from_setup_py_parsed(
         let ast_str = ast.getattr("Str").unwrap();
         let ast_constant = ast.getattr("Constant").unwrap();
 
-        let get_str_from_expr = |expr: &PyAny| -> Option<String> {
-            if expr.is_instance(ast_str).ok()? {
+        let get_str_from_expr = |expr: &Bound<PyAny>| -> Option<String> {
+            if expr.is_instance(&ast_str).ok()? {
                 Some(expr.getattr("s").ok()?.extract::<String>().ok()?)
-            } else if expr.is_instance(ast_constant).ok()? {
+            } else if expr.is_instance(&ast_constant).ok()? {
                 Some(expr.getattr("value").ok()?.extract::<String>().ok()?)
             } else {
                 None
@@ -834,17 +835,17 @@ fn guess_from_setup_py_parsed(
         let ast_tuple = ast.getattr("Tuple").unwrap();
         let ast_set = ast.getattr("Set").unwrap();
 
-        let get_str_list_from_expr = |expr: &PyAny| -> Option<Vec<String>> {
+        let get_str_list_from_expr = |expr: &Bound<PyAny>| -> Option<Vec<String>> {
             // We collect the elements of a list if the element
             // and tag function calls
-            if expr.is_instance(ast_list).ok()?
-                || expr.is_instance(ast_tuple).ok()?
-                || expr.is_instance(ast_set).ok()?
+            if expr.is_instance(&ast_list).ok()?
+                || expr.is_instance(&ast_tuple).ok()?
+                || expr.is_instance(&ast_set).ok()?
             {
                 let mut ret = Vec::new();
                 for elt in expr.getattr("elts").ok()?.iter().ok()? {
                     let elt = elt.ok()?;
-                    if let Some(value) = get_str_from_expr(elt) {
+                    if let Some(value) = get_str_from_expr(&elt) {
                         ret.push(value);
                     } else {
                         return None;
@@ -856,17 +857,17 @@ fn guess_from_setup_py_parsed(
             }
         };
 
-        let ast = py.import("ast").unwrap();
+        let ast = py.import_bound("ast").unwrap();
         let ast_dict = ast.getattr("Dict").unwrap();
 
-        let get_dict_from_expr = |expr: &PyAny| -> Option<HashMap<String, String>> {
-            if expr.is_instance(ast_dict).ok()? {
+        let get_dict_from_expr = |expr: &Bound<PyAny>| -> Option<HashMap<String, String>> {
+            if expr.is_instance(&ast_dict).ok()? {
                 let mut ret = HashMap::new();
                 let keys = expr.getattr("keys").ok()?;
                 let values = expr.getattr("values").ok()?;
                 for (key, value) in keys.iter().ok()?.zip(values.iter().ok()?) {
-                    if let Some(key) = get_str_from_expr(key.ok()?) {
-                        if let Some(value) = get_str_from_expr(value.ok()?) {
+                    if let Some(key) = get_str_from_expr(&key.ok()?) {
+                        if let Some(value) = get_str_from_expr(&value.ok()?) {
                             ret.insert(key, value);
                         } else {
                             return None;
@@ -885,7 +886,7 @@ fn guess_from_setup_py_parsed(
         // version=get_version or version__version__
 
         for (key, value) in setup_args.iter() {
-            let value = value.as_ref(py);
+            let value = value.bind(py);
             match key.as_str() {
                 "name" => {
                     if let Some(name) = get_str_from_expr(value) {
@@ -918,7 +919,7 @@ fn guess_from_setup_py_parsed(
                     if let Some(description) = get_str_from_expr(value) {
                         let content_type = setup_args.get("long_description_content_type");
                         let content_type = if let Some(content_type) = content_type {
-                            get_str_from_expr(content_type.as_ref(py))
+                            get_str_from_expr(content_type.bind(py))
                         } else {
                             None
                         };
@@ -957,7 +958,7 @@ fn guess_from_setup_py_parsed(
                     if let Some(maintainer) = get_str_from_expr(value) {
                         let maintainer_email = setup_args.get("maintainer_email");
                         let maintainer_email = if let Some(maintainer_email) = maintainer_email {
-                            get_str_from_expr(maintainer_email.as_ref(py))
+                            get_str_from_expr(maintainer_email.bind(py))
                         } else {
                             None
                         };
@@ -976,7 +977,7 @@ fn guess_from_setup_py_parsed(
                     if let Some(author) = get_str_from_expr(value) {
                         let author_email = setup_args.get("author_email");
                         let author_email = if let Some(author_email) = author_email {
-                            get_str_from_expr(author_email.as_ref(py))
+                            get_str_from_expr(author_email.bind(py))
                         } else {
                             None
                         };
@@ -992,7 +993,7 @@ fn guess_from_setup_py_parsed(
                     } else if let Some(author) = get_str_list_from_expr(value) {
                         let author_emails = setup_args.get("author_email");
                         let author_emails = if let Some(author_emails) = author_emails {
-                            get_str_list_from_expr(author_emails.as_ref(py)).map_or_else(|| vec![None; author.len()], |v| v.into_iter().map(Some).collect())
+                            get_str_list_from_expr(author_emails.bind(py)).map_or_else(|| vec![None; author.len()], |v| v.into_iter().map(Some).collect())
                         } else {
                             vec![None; author.len()]
                         };
@@ -1071,13 +1072,11 @@ fn parse_python_classifiers<'a>(
         match (category, subcategory) {
             ("Development Status", _) => None,
             ("Intended Audience", _) => None,
-            ("License", "OSI Approved") => {
-                Some(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::License(value.into()),
-                    certainty,
-                    origin: origin,
-                })
-            }
+            ("License", "OSI Approved") => Some(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::License(value.into()),
+                certainty,
+                origin,
+            }),
             ("Natural Language", _) => None,
             ("Operating System", _) => None,
             ("Programming Language", _) => None,

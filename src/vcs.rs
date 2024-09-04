@@ -111,8 +111,8 @@ fn probe_upstream_github_branch_url(url: &url::Url, version: Option<&str>) -> Op
             }
             Some(true)
         }
-        Err(crate::HTTPJSONError::Error { status, .. }) if status == 404 => Some(false),
-        Err(crate::HTTPJSONError::Error { status, .. }) if status == 403 => {
+        Err(crate::HTTPJSONError::Error { status: 404, .. }) => Some(false),
+        Err(crate::HTTPJSONError::Error { status: 403, .. }) => {
             debug!("github api rate limit exceeded");
             None
         }
@@ -151,11 +151,12 @@ fn version_in_tags(version: &str, tag_names: &[&str]) -> bool {
 }
 
 fn probe_upstream_breezy_branch_url(url: &url::Url, version: Option<&str>) -> Option<bool> {
+    use pyo3::prelude::*;
     let tags: HashMap<String, Vec<u8>> = pyo3::Python::with_gil(|py| {
-        let breezy_ui = py.import("breezy.ui")?;
-        let branch_mod = py.import("breezy.branch")?;
-        py.import("breezy.bzr")?;
-        py.import("breezy.git")?;
+        let breezy_ui = py.import_bound("breezy.ui")?;
+        let branch_mod = py.import_bound("breezy.branch")?;
+        py.import_bound("breezy.bzr")?;
+        py.import_bound("breezy.git")?;
         let old_ui = breezy_ui.getattr("ui_factory")?;
         breezy_ui.setattr("ui_factory", breezy_ui.call_method0("SilentUIFactory")?)?;
         let branch_cls = branch_mod.getattr("Branch")?;
@@ -277,13 +278,13 @@ pub fn check_repository_url_canonical(
 
                 Ok(url::Url::parse(data["clone_url"].as_str().unwrap()).unwrap())
             }
-            Err(crate::HTTPJSONError::Error { status, .. }) if status == 404 => {
+            Err(crate::HTTPJSONError::Error { status: 404, .. }) => {
                 return Err(crate::CanonicalizeError::InvalidUrl(
                     url,
                     "GitHub URL does not exist".to_string(),
                 ))
             }
-            Err(crate::HTTPJSONError::Error { status, .. }) if status == 403 => {
+            Err(crate::HTTPJSONError::Error { status: 403, .. }) => {
                 return Err(crate::CanonicalizeError::Unverifiable(
                     url,
                     "GitHub URL rate-limited".to_string(),
@@ -337,8 +338,10 @@ pub fn probe_gitlab_host(hostname: &str) -> bool {
     match crate::load_json_url(&url::Url::parse(url.as_str()).unwrap(), None) {
         Ok(_data) => true,
         Err(crate::HTTPJSONError::Error {
-            status, response, ..
-        }) if status == 401 => {
+            status: 401,
+            response,
+            ..
+        }) => {
             if let Ok(data) = response.json::<serde_json::Value>() {
                 if let Some(message) = data["message"].as_str() {
                     if message == "401 Unauthorized" {
@@ -607,43 +610,75 @@ pub fn guess_repo_from_url(url: &url::Url, net_access: Option<bool>) -> Option<S
 #[test]
 fn test_guess_repo_url() {
     assert_eq!(
-            Some("https://github.com/jelmer/blah".to_string()),
-            guess_repo_from_url(&"https://github.com/jelmer/blah".parse().unwrap(), Some(false)));
-
-    assert_eq!(
-            Some("https://github.com/jelmer/blah".to_string()),
-        guess_repo_from_url(&"https://github.com/jelmer/blah/blob/README".parse().unwrap(), Some(false))
-    );
-    assert_eq!(
-            None, guess_repo_from_url(&"https://github.com/jelmer".parse().unwrap(), Some(false)));
-
-    assert_eq!(
-            None, guess_repo_from_url(&"https://www.jelmer.uk/".parse().unwrap(), Some(false)));
-
-    assert_eq!(
-        Some("http://code.launchpad.net/blah".to_string()),
-        guess_repo_from_url(&"http://code.launchpad.net/blah".parse().unwrap(), Some(false)),
+        Some("https://github.com/jelmer/blah".to_string()),
+        guess_repo_from_url(
+            &"https://github.com/jelmer/blah".parse().unwrap(),
+            Some(false)
+        )
     );
 
     assert_eq!(
-        Some("https://code.launchpad.net/bzr".to_string()),
-        guess_repo_from_url(&"http://launchpad.net/bzr/+download".parse().unwrap(), Some(false)),
+        Some("https://github.com/jelmer/blah".to_string()),
+        guess_repo_from_url(
+            &"https://github.com/jelmer/blah/blob/README"
+                .parse()
+                .unwrap(),
+            Some(false)
+        )
     );
-
     assert_eq!(
-        Some("https://git.savannah.gnu.org/git/auctex.git".to_string()),
-        guess_repo_from_url(&"https://git.savannah.gnu.org/git/auctex.git".parse().unwrap(), Some(false)),
+        None,
+        guess_repo_from_url(&"https://github.com/jelmer".parse().unwrap(), Some(false))
     );
 
     assert_eq!(
         None,
-        guess_repo_from_url(&"https://git.savannah.gnu.org/blah/auctex.git".parse().unwrap(), Some(false)),
+        guess_repo_from_url(&"https://www.jelmer.uk/".parse().unwrap(), Some(false))
+    );
+
+    assert_eq!(
+        Some("http://code.launchpad.net/blah".to_string()),
+        guess_repo_from_url(
+            &"http://code.launchpad.net/blah".parse().unwrap(),
+            Some(false)
+        ),
+    );
+
+    assert_eq!(
+        Some("https://code.launchpad.net/bzr".to_string()),
+        guess_repo_from_url(
+            &"http://launchpad.net/bzr/+download".parse().unwrap(),
+            Some(false)
+        ),
+    );
+
+    assert_eq!(
+        Some("https://git.savannah.gnu.org/git/auctex.git".to_string()),
+        guess_repo_from_url(
+            &"https://git.savannah.gnu.org/git/auctex.git"
+                .parse()
+                .unwrap(),
+            Some(false)
+        ),
+    );
+
+    assert_eq!(
+        None,
+        guess_repo_from_url(
+            &"https://git.savannah.gnu.org/blah/auctex.git"
+                .parse()
+                .unwrap(),
+            Some(false)
+        ),
     );
 
     assert_eq!(
         Some("https://bitbucket.org/fenics-project/dolfin".to_string()),
         guess_repo_from_url(
-            &"https://bitbucket.org/fenics-project/dolfin/downloads/".parse().unwrap(), Some(false)
+            &"https://bitbucket.org/fenics-project/dolfin/downloads/"
+                .parse()
+                .unwrap(),
+            Some(false)
         ),
     );
 }
@@ -736,7 +771,7 @@ pub fn browse_url_from_repo_url(
             .url
             .path_segments()
             .map(|segments| segments.into_iter().collect::<Vec<&str>>())
-            .unwrap_or_else(Vec::new);
+            .unwrap_or_default();
         if path_elements.len() >= 2 && path_elements[0] == "repos" && path_elements[1] == "asf" {
             let mut path_elements = path_elements.into_iter().skip(1).collect::<Vec<&str>>();
             path_elements[0] = "viewvc";
@@ -862,8 +897,8 @@ pub fn try_open_branch(
 ) -> Option<Box<dyn breezyshim::branch::Branch>> {
     use pyo3::prelude::*;
     match Python::with_gil(|py| {
-        let uim = py.import("breezy.ui")?;
-        let controldirm = py.import("breezy.controldir")?;
+        let uim = py.import_bound("breezy.ui")?;
+        let controldirm = py.import_bound("breezy.controldir")?;
         let controldir_cls = controldirm.getattr("ControlDir")?;
 
         let old_ui_factory = uim.getattr("ui_factory")?;
@@ -906,7 +941,7 @@ pub fn find_secure_repo_url(
     // Sites we know to be available over https
     if let Some(hostname) = url.host_str() {
         if is_gitlab_site(hostname, net_access)
-            || vec![
+            || [
                 "github.com",
                 "git.launchpad.net",
                 "bazaar.launchpad.net",
@@ -924,7 +959,7 @@ pub fn find_secure_repo_url(
     }
 
     if let Some(host) = url.host_str() {
-        if vec!["git.savannah.gnu.org", "git.sv.gnu.org"].contains(&host) {
+        if ["git.savannah.gnu.org", "git.sv.gnu.org"].contains(&host) {
             if url.scheme() == "http" {
                 url = derive_with_scheme(&url, "https");
             } else {
@@ -964,9 +999,9 @@ pub struct VcsLocation {
     pub subpath: Option<String>,
 }
 
-impl ToString for VcsLocation {
-    fn to_string(&self) -> String {
-        unsplit_vcs_url(self)
+impl std::fmt::Display for VcsLocation {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", unsplit_vcs_url(self))
     }
 }
 

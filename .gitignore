@@ -13,3 +13,4 @@ target
 *.swp
 src/vcs.rs
 upstream_ontologist/_upstream_ontologist.*.so
+py/upstream_ontologist/_upstream_ontologist.*.so
