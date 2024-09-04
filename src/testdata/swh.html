@@ -1,0 +1,65 @@
+<h1>swh-loader-git</h1>
+<p>The Software Heritage Git Loader is a tool and a library to walk a local
+Git repository and inject into the SWH dataset all contained files that
+weren't known before.</p>
+<p>The main entry points are:</p>
+<ul>
+<li>
+<p>:class:<code>swh.loader.git.loader.GitLoader</code> for the main loader which can ingest either
+local or remote git repository's contents. This is the main implementation deployed in
+production.</p>
+</li>
+<li>
+<p>:class:<code>swh.loader.git.from_disk.GitLoaderFromDisk</code> which ingests only local git clone
+repository.</p>
+</li>
+<li>
+<p>:class:<code>swh.loader.git.loader.GitLoaderFromArchive</code> which ingests a git repository
+wrapped in an archive.</p>
+</li>
+</ul>
+<h2>License</h2>
+<p>This program is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the
+Free Software Foundation, either version 3 of the License, or (at your
+option) any later version.</p>
+<p>This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
+Public License for more details.</p>
+<p>See top-level LICENSE file for the full text of the GNU General Public
+License along with this program.</p>
+<h2>Dependencies</h2>
+<h3>Runtime</h3>
+<ul>
+<li>python3</li>
+<li>python3-dulwich</li>
+<li>python3-retrying</li>
+<li>python3-swh.core</li>
+<li>python3-swh.model</li>
+<li>python3-swh.storage</li>
+<li>python3-swh.scheduler</li>
+</ul>
+<h3>Test</h3>
+<ul>
+<li>python3-nose</li>
+</ul>
+<h2>Requirements</h2>
+<ul>
+<li>implementation language, Python3</li>
+<li>coding guidelines: conform to PEP8</li>
+<li>Git access: via dulwich</li>
+</ul>
+<h2>CLI Run</h2>
+<p>You can run the loader from a remote origin (<em>loader</em>) or from an origin on disk
+(<em>from_disk</em>) directly by calling:</p>
+<pre><code>swh loader -C &lt;config-file&gt; run git &lt;git-repository-url&gt;
+</code></pre>
+<p>or "git_disk".</p>
+<h2>Configuration sample</h2>
+<p>/tmp/git.yml:</p>
+<pre><code>storage:
+  cls: remote
+  args:
+    url: http://localhost:5002/
+</code></pre>

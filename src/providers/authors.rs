@@ -14,7 +14,7 @@ pub fn guess_from_authors(
 
     let mut authors: Vec<Person> = Vec::new();
 
-    for line in reader.lines().flatten() {
+    for line in reader.lines().map_while(Result::ok) {
         let mut m = line.trim().to_string();
         if m.is_empty() {
             continue;

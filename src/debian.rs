@@ -32,6 +32,23 @@ pub fn upstream_package_to_debian_source_name(package: &crate::UpstreamPackage) 
     upstream_name_to_debian_source_name(package.name.as_str())
 }
 
+pub fn upstream_package_to_debian_binary_name(package: &crate::UpstreamPackage) -> String {
+    if package.family == "rust" {
+        return format!("rust-{}", package.name.to_lowercase());
+    } else if package.family == "perl" {
+        return format!("lib{}-perl", package.name.to_lowercase().replace("::", "-"));
+    } else if package.family == "node" {
+        return format!("node-{}", package.name.to_lowercase());
+    }
+
+    // TODO(jelmer)
+    package.name.to_lowercase().replace('_', "-")
+}
+
+pub fn valid_debian_package_name(name: &str) -> bool {
+    lazy_regex::regex_is_match!("[a-z0-9][a-z0-9+-.]+", name)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -48,21 +65,4 @@ mod tests {
             upstream_name_to_debian_source_name("Made Up Name (MUN)")
         );
     }
-}
-
-pub fn upstream_package_to_debian_binary_name(package: &crate::UpstreamPackage) -> String {
-    if package.family == "rust" {
-        return format!("rust-{}", package.name.to_lowercase());
-    } else if package.family == "perl" {
-        return format!("lib{}-perl", package.name.to_lowercase().replace("::", "-"));
-    } else if package.family == "node" {
-        return format!("node-{}", package.name.to_lowercase());
-    }
-
-    // TODO(jelmer)
-    package.name.to_lowercase().replace('_', "-")
-}
-
-pub fn valid_debian_package_name(name: &str) -> bool {
-    lazy_regex::regex_is_match!("[a-z0-9][a-z0-9+-.]+", name)
 }

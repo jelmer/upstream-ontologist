@@ -1,3 +1,9 @@
+upstream-ontologist (0.1.39-1) UNRELEASED; urgency=low
+
+  * New upstream release.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Thu, 05 Sep 2024 00:32:24 -0000
+
 upstream-ontologist (0.1.37-1) unstable; urgency=low
 
   * New upstream release.

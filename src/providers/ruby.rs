@@ -55,7 +55,7 @@ pub fn guess_from_gemspec(
         Err(format!("Could not parse value: {}", value))
     }
 
-    for line in reader.lines().flatten() {
+    for line in reader.lines().map_while(Result::ok) {
         if line.starts_with('#') {
             continue;
         }
@@ -65,8 +65,8 @@ pub fn guess_from_gemspec(
         if line == "Gem::Specification.new do |s|\n" || line == "end\n" {
             continue;
         }
-        if line.starts_with("  s.") {
-            let (key, rawval) = match line[4..].split_once('=') {
+        if let Some(line) = line.strip_prefix("  s.") {
+            let (key, rawval) = match line.split_once('=') {
                 Some((key, rawval)) => (key.trim(), rawval),
                 _ => continue,
             };
