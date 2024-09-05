@@ -2,12 +2,12 @@ Index: upstream-ontologist/Cargo.toml
 ===================================================================
 --- upstream-ontologist.orig/Cargo.toml
 +++ upstream-ontologist/Cargo.toml
-@@ -96,7 +96,7 @@ version = ">=0.5"
+@@ -79,7 +79,7 @@ features = [ "blocking", "json",]
+ default-features = false
+ 
+ [dependencies.rust-ini]
+-version = "0.21"
++version = ">=0.18"
  optional = true
  
- [dependencies.mailparse]
--version = "0.15"
-+version = "0.14"
- optional = true
- 
- [dependencies.pyproject-toml]
+ [dependencies.serde]

@@ -2,12 +2,12 @@ Index: upstream-ontologist/Cargo.toml
 ===================================================================
 --- upstream-ontologist.orig/Cargo.toml
 +++ upstream-ontologist/Cargo.toml
-@@ -72,7 +72,7 @@ tempfile = "3.8.1"
+@@ -74,7 +74,7 @@ tempfile = "3.12.0"
  workspace = true
  
  [dependencies.reqwest]
--version = "^0.12"
-+version = "^0.11"
+-version = ">=0.12"
++version = ">=0.11"
  features = [ "blocking", "json",]
  default-features = false
  
@@ -15,12 +15,12 @@ Index: upstream-ontologist/upstream-ontologist-py/Cargo.toml
 ===================================================================
 --- upstream-ontologist.orig/upstream-ontologist-py/Cargo.toml
 +++ upstream-ontologist/upstream-ontologist-py/Cargo.toml
-@@ -14,7 +14,7 @@ crate-type = ["cdylib"]
+@@ -15,7 +15,7 @@ crate-type = ["cdylib"]
  upstream-ontologist = { path = ".." }
  pyo3 = { workspace = true }
  pyo3-log = { workspace = true }
 -reqwest = { version = "^0.12", features=["blocking", "json"], default-features = false }
-+reqwest = { version = "^0.11", features=["blocking", "json"], default-features = false }
- url = "2.2"
++reqwest = { version = ">=0.11", features=["blocking", "json"], default-features = false }
+ url = "2.5"
  serde_json = "1"
  log = "0.4"

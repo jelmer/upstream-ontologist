@@ -2,12 +2,12 @@ Index: upstream-ontologist/Cargo.toml
 ===================================================================
 --- upstream-ontologist.orig/Cargo.toml
 +++ upstream-ontologist/Cargo.toml
-@@ -76,7 +76,7 @@ features = [ "blocking", "json",]
- default-features = false
+@@ -67,7 +67,7 @@ cli = ["dep:clap", "dep:env_logger"]
  
- [dependencies.rust-ini]
--version = "0.21"
-+version = "0.18"
- optional = true
+ [dev-dependencies]
+ pretty_assertions = "1.4.0"
+-tempfile = "3.12.0"
++tempfile = ">=3"
  
- [dependencies.serde]
+ [dependencies.pyo3]
+ workspace = true

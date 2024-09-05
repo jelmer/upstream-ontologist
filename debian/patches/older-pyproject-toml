@@ -2,12 +2,12 @@ Index: upstream-ontologist/Cargo.toml
 ===================================================================
 --- upstream-ontologist.orig/Cargo.toml
 +++ upstream-ontologist/Cargo.toml
-@@ -114,7 +114,7 @@ optional = true
+@@ -107,7 +107,7 @@ version = ">=0.14"
+ optional = true
  
- [workspace.dependencies]
- pyo3 = "0.20"
--pyo3-log = "0.8"
-+pyo3-log = "0.9"
+ [dependencies.pyproject-toml]
+-version = ">=0.11"
++version = ">=0.7"
+ optional = true
  
- [[bin]]
- name = "autodoap"
+ [dependencies.python-pkginfo]

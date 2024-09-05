@@ -1,0 +1,13 @@
+Index: upstream-ontologist/Cargo.toml
+===================================================================
+--- upstream-ontologist.orig/Cargo.toml
++++ upstream-ontologist/Cargo.toml
+@@ -33,7 +33,7 @@ debian-changelog = { version = "0.1", op
+ debbugs = "0.1"
+ clap = { version = "4", features = ["derive", "env"], optional = true }
+ maplit = "1"
+-env_logger = { version = ">=0.11", optional = true }
++env_logger = { version = ">=0.10", optional = true }
+ xml = "0.8"
+ makefile-lossless = { version = "0.1", optional = true }
+ debian-copyright = { version = "0.1", optional = true }
