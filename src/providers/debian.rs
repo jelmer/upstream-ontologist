@@ -542,7 +542,7 @@ pub fn guess_from_debian_copyright(
     let mut ret = vec![];
     let text = &std::fs::read_to_string(path)?;
     let mut urls = vec![];
-    match debian_copyright::Copyright::from_str_relaxed(text) {
+    match debian_copyright::lossless::Copyright::from_str_relaxed(text) {
         Ok((c, _)) => {
             let header = c.header().unwrap();
             if let Some(upstream_name) = header.upstream_name() {
@@ -616,13 +616,13 @@ pub fn guess_from_debian_copyright(
                 });
             }
         }
-        Err(debian_copyright::Error::IoError(e)) => {
+        Err(debian_copyright::lossless::Error::IoError(e)) => {
             unreachable!("IO error: {}", e);
         }
-        Err(debian_copyright::Error::ParseError(e)) => {
+        Err(debian_copyright::lossless::Error::ParseError(e)) => {
             return Err(ProviderError::ParseError(e.to_string()));
         }
-        Err(debian_copyright::Error::NotMachineReadable) => {
+        Err(debian_copyright::lossless::Error::NotMachineReadable) => {
             for line in text.lines() {
                 if let Some(name) = line.strip_prefix("Upstream-Name: ") {
                     ret.push(UpstreamDatumWithMetadata {
