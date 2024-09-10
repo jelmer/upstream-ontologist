@@ -311,39 +311,6 @@ impl From<&str> for Person {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_person_from_str() {
-        assert_eq!(
-            Person::from("Foo Bar <foo@example.com>"),
-            Person {
-                name: Some("Foo Bar".to_string()),
-                email: Some("foo@example.com".to_string()),
-                url: None
-            }
-        );
-        assert_eq!(
-            Person::from("Foo Bar"),
-            Person {
-                name: Some("Foo Bar".to_string()),
-                email: None,
-                url: None
-            }
-        );
-        assert_eq!(
-            Person::from("foo@example.com"),
-            Person {
-                name: None,
-                email: Some("foo@example.com".to_string()),
-                url: None
-            }
-        );
-    }
-}
-
 impl ToPyObject for Person {
     fn to_object(&self, py: Python) -> PyObject {
         let m = PyModule::import_bound(py, "upstream_ontologist").unwrap();
@@ -880,6 +847,14 @@ impl UpstreamMetadata {
         UpstreamMetadata(Vec::new())
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
     pub fn sort(&mut self) {
         self.0.sort_by(|a, b| a.datum.field().cmp(b.datum.field()));
     }
@@ -930,6 +905,173 @@ impl UpstreamMetadata {
     pub fn remove(&mut self, field: &str) -> Option<UpstreamDatumWithMetadata> {
         let index = self.0.iter().position(|d| d.datum.field() == field)?;
         Some(self.0.remove(index))
+    }
+
+    pub fn name(&self) -> Option<&str> {
+        self.get("Name").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn homepage(&self) -> Option<&str> {
+        self.get("Homepage").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn repository(&self) -> Option<&str> {
+        self.get("Repository").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn repository_browse(&self) -> Option<&str> {
+        self.get("Repository-Browse").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn description(&self) -> Option<&str> {
+        self.get("Description").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn summary(&self) -> Option<&str> {
+        self.get("Summary").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn license(&self) -> Option<&str> {
+        self.get("License").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn author(&self) -> Option<&Vec<Person>> {
+        self.get("Author").map(|d| match &d.datum {
+            UpstreamDatum::Author(authors) => authors,
+            _ => unreachable!(),
+        })
+    }
+
+    pub fn maintainer(&self) -> Option<&Person> {
+        self.get("Maintainer").map(|d| match &d.datum {
+            UpstreamDatum::Maintainer(maintainer) => maintainer,
+            _ => unreachable!(),
+        })
+    }
+
+    pub fn bug_database(&self) -> Option<&str> {
+        self.get("Bug-Database").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn bug_submit(&self) -> Option<&str> {
+        self.get("Bug-Submit").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn contact(&self) -> Option<&str> {
+        self.get("Contact").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn cargo_crate(&self) -> Option<&str> {
+        self.get("Cargo-Crate").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn security_md(&self) -> Option<&str> {
+        self.get("Security-MD").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn security_contact(&self) -> Option<&str> {
+        self.get("Security-Contact").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn version(&self) -> Option<&str> {
+        self.get("Version").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn keywords(&self) -> Option<&Vec<String>> {
+        self.get("Keywords").map(|d| match &d.datum {
+            UpstreamDatum::Keywords(keywords) => keywords,
+            _ => unreachable!(),
+        })
+    }
+
+    pub fn documentation(&self) -> Option<&str> {
+        self.get("Documentation").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn api_documentation(&self) -> Option<&str> {
+        self.get("API-Documentation").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn go_import_path(&self) -> Option<&str> {
+        self.get("Go-Import-Path").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn download(&self) -> Option<&str> {
+        self.get("Download").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn wiki(&self) -> Option<&str> {
+        self.get("Wiki").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn mailing_list(&self) -> Option<&str> {
+        self.get("MailingList").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn sourceforge_project(&self) -> Option<&str> {
+        self.get("SourceForge-Project")
+            .and_then(|d| d.datum.as_str())
+    }
+
+    pub fn archive(&self) -> Option<&str> {
+        self.get("Archive").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn demo(&self) -> Option<&str> {
+        self.get("Demo").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn pecl_package(&self) -> Option<&str> {
+        self.get("Pecl-Package").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn haskell_package(&self) -> Option<&str> {
+        self.get("Haskell-Package").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn funding(&self) -> Option<&str> {
+        self.get("Funding").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn changelog(&self) -> Option<&str> {
+        self.get("Changelog").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn debian_itp(&self) -> Option<i32> {
+        self.get("Debian-ITP").and_then(|d| match &d.datum {
+            UpstreamDatum::DebianITP(itp) => Some(*itp),
+            _ => unreachable!(),
+        })
+    }
+
+    pub fn screenshots(&self) -> Option<&Vec<String>> {
+        self.get("Screenshots").map(|d| match &d.datum {
+            UpstreamDatum::Screenshots(screenshots) => screenshots,
+            _ => unreachable!(),
+        })
+    }
+
+    pub fn donation(&self) -> Option<&str> {
+        self.get("Donation").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn cite_as(&self) -> Option<&str> {
+        self.get("Cite-As").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn registry(&self) -> Option<&Vec<(String, String)>> {
+        self.get("Registry").map(|d| match &d.datum {
+            UpstreamDatum::Registry(registry) => registry,
+            _ => unreachable!(),
+        })
+    }
+
+    pub fn webservice(&self) -> Option<&str> {
+        self.get("Webservice").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn copyright(&self) -> Option<&str> {
+        self.get("Copyright").and_then(|d| d.datum.as_str())
     }
 }
 
@@ -1923,29 +2065,6 @@ pub fn bug_database_url_from_bug_submit_url(url: &Url, net_access: Option<bool>)
     } else {
         None
     }
-}
-
-#[test]
-fn test_bug_database_url_from_bug_submit_url() {
-    let url = Url::parse("https://bugs.launchpad.net/bugs/+filebug").unwrap();
-    assert_eq!(
-        bug_database_url_from_bug_submit_url(&url, None).unwrap(),
-        Url::parse("https://bugs.launchpad.net/bugs").unwrap()
-    );
-
-    let url = Url::parse("https://github.com/dulwich/dulwich/issues/new").unwrap();
-
-    assert_eq!(
-        bug_database_url_from_bug_submit_url(&url, None).unwrap(),
-        Url::parse("https://github.com/dulwich/dulwich/issues").unwrap()
-    );
-
-    let url = Url::parse("https://sourceforge.net/p/dulwich/bugs/new").unwrap();
-
-    assert_eq!(
-        bug_database_url_from_bug_submit_url(&url, None).unwrap(),
-        Url::parse("https://sourceforge.net/p/dulwich/bugs").unwrap()
-    );
 }
 
 pub fn guess_bug_database_url_from_repo_url(url: &Url, net_access: Option<bool>) -> Option<Url> {
@@ -3430,5 +3549,81 @@ impl Guesser for EnvironmentGuesser {
         _settings: &GuesserSettings,
     ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
         crate::guess_from_environment()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_upstream_metadata() {
+        let mut data = UpstreamMetadata::new();
+        assert_eq!(data.len(), 0);
+
+        data.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Homepage("https://example.com".to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+
+        assert_eq!(data.len(), 1);
+        assert_eq!(
+            data.get("Homepage").unwrap().datum.as_str().unwrap(),
+            "https://example.com"
+        );
+
+        assert_eq!(data.homepage(), Some("https://example.com"));
+    }
+
+    #[test]
+    fn test_bug_database_url_from_bug_submit_url() {
+        let url = Url::parse("https://bugs.launchpad.net/bugs/+filebug").unwrap();
+        assert_eq!(
+            bug_database_url_from_bug_submit_url(&url, None).unwrap(),
+            Url::parse("https://bugs.launchpad.net/bugs").unwrap()
+        );
+
+        let url = Url::parse("https://github.com/dulwich/dulwich/issues/new").unwrap();
+
+        assert_eq!(
+            bug_database_url_from_bug_submit_url(&url, None).unwrap(),
+            Url::parse("https://github.com/dulwich/dulwich/issues").unwrap()
+        );
+
+        let url = Url::parse("https://sourceforge.net/p/dulwich/bugs/new").unwrap();
+
+        assert_eq!(
+            bug_database_url_from_bug_submit_url(&url, None).unwrap(),
+            Url::parse("https://sourceforge.net/p/dulwich/bugs").unwrap()
+        );
+    }
+
+    #[test]
+    fn test_person_from_str() {
+        assert_eq!(
+            Person::from("Foo Bar <foo@example.com>"),
+            Person {
+                name: Some("Foo Bar".to_string()),
+                email: Some("foo@example.com".to_string()),
+                url: None
+            }
+        );
+        assert_eq!(
+            Person::from("Foo Bar"),
+            Person {
+                name: Some("Foo Bar".to_string()),
+                email: None,
+                url: None
+            }
+        );
+        assert_eq!(
+            Person::from("foo@example.com"),
+            Person {
+                name: None,
+                email: Some("foo@example.com".to_string()),
+                url: None
+            }
+        );
     }
 }
