@@ -133,12 +133,6 @@ UpstreamDatum = _upstream_ontologist.UpstreamDatum
 UpstreamMetadata = _upstream_ontologist.UpstreamMetadata
 
 
-class UpstreamPackage:
-    def __init__(self, family, name):
-        self.family = family
-        self.name = name
-
-
 # If we're setting them new, put Name and Contact first
 def upstream_metadata_sort_key(x):
     (k, v) = x
