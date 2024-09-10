@@ -436,11 +436,6 @@ fn fixup_rcp_style_git_repo_url(url: &str) -> PyResult<String> {
 }
 
 #[pyfunction]
-fn valid_debian_package_name(name: &str) -> PyResult<bool> {
-    Ok(upstream_ontologist::debian::valid_debian_package_name(name))
-}
-
-#[pyfunction]
 fn debian_to_upstream_version(version: &str) -> PyResult<String> {
     Ok(upstream_ontologist::debian::debian_to_upstream_version(version).to_string())
 }
@@ -1041,7 +1036,6 @@ fn _upstream_ontologist(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     let debianm = PyModule::new_bound(py, "debian")?;
     debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_source_name))?;
     debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_binary_name))?;
-    debianm.add_wrapped(wrap_pyfunction!(valid_debian_package_name))?;
     debianm.add_wrapped(wrap_pyfunction!(debian_to_upstream_version))?;
     debianm.add_wrapped(wrap_pyfunction!(upstream_name_to_debian_source_name))?;
     m.add("debian", debianm)?;

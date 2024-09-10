@@ -14,9 +14,7 @@ pub fn upstream_name_to_debian_source_name(mut upstream_name: &str) -> String {
     }
 
     // Convert to lowercase and replace characters
-    upstream_name
-        .to_lowercase()
-        .replace(['_', ' ', '/'], "-")
+    upstream_name.to_lowercase().replace(['_', ' ', '/'], "-")
 }
 
 pub fn upstream_package_to_debian_source_name(package: &crate::UpstreamPackage) -> String {
@@ -43,10 +41,6 @@ pub fn upstream_package_to_debian_binary_name(package: &crate::UpstreamPackage) 
 
     // TODO(jelmer)
     package.name.to_lowercase().replace('_', "-")
-}
-
-pub fn valid_debian_package_name(name: &str) -> bool {
-    lazy_regex::regex_is_match!("[a-z0-9][a-z0-9+-.]+", name)
 }
 
 #[cfg(test)]
