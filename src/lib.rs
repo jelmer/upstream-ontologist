@@ -16,7 +16,6 @@ use url::Url;
 
 static USER_AGENT: &str = concat!("upstream-ontologist/", env!("CARGO_PKG_VERSION"));
 
-pub mod debian;
 pub mod extrapolate;
 pub mod forges;
 pub mod homepage;
@@ -2314,45 +2313,6 @@ impl From<ProviderError> for PyErr {
                 PyRuntimeError::new_err((e.to_string(),))
             }
         }
-    }
-}
-
-#[derive(Debug)]
-pub struct UpstreamPackage {
-    pub family: String,
-    pub name: String,
-}
-
-impl FromPyObject<'_> for UpstreamPackage {
-    fn extract_bound(obj: &Bound<PyAny>) -> PyResult<Self> {
-        let family = obj.getattr("family")?.extract::<String>()?;
-        let name = obj.getattr("name")?.extract::<String>()?;
-        Ok(UpstreamPackage { family, name })
-    }
-}
-
-impl ToPyObject for UpstreamPackage {
-    fn to_object(&self, py: Python) -> PyObject {
-        let dict = pyo3::types::PyDict::new_bound(py);
-        dict.set_item("family", self.family.clone()).unwrap();
-        dict.set_item("name", self.name.clone()).unwrap();
-        dict.into()
-    }
-}
-
-#[derive(Debug)]
-pub struct UpstreamVersion(String);
-
-impl FromPyObject<'_> for UpstreamVersion {
-    fn extract_bound(obj: &Bound<PyAny>) -> PyResult<Self> {
-        let version = obj.extract::<String>()?;
-        Ok(UpstreamVersion(version))
-    }
-}
-
-impl ToPyObject for UpstreamVersion {
-    fn to_object(&self, py: Python) -> PyObject {
-        self.0.to_object(py)
     }
 }
 

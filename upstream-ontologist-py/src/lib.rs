@@ -4,7 +4,7 @@ use pyo3::import_exception;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple, PyType};
 use std::str::FromStr;
-use upstream_ontologist::{CanonicalizeError, Certainty, Origin, UpstreamPackage};
+use upstream_ontologist::{CanonicalizeError, Certainty, Origin};
 use url::Url;
 
 import_exception!(urllib.error, HTTPError);
@@ -433,31 +433,6 @@ fn known_bad_guess(py: Python, datum: PyObject) -> PyResult<bool> {
 fn fixup_rcp_style_git_repo_url(url: &str) -> PyResult<String> {
     Ok(upstream_ontologist::vcs::fixup_rcp_style_git_repo_url(url)
         .map_or(url.to_string(), |u| u.to_string()))
-}
-
-#[pyfunction]
-fn valid_debian_package_name(name: &str) -> PyResult<bool> {
-    Ok(upstream_ontologist::debian::valid_debian_package_name(name))
-}
-
-#[pyfunction]
-fn debian_to_upstream_version(version: &str) -> PyResult<String> {
-    Ok(upstream_ontologist::debian::debian_to_upstream_version(version).to_string())
-}
-
-#[pyfunction]
-fn upstream_name_to_debian_source_name(name: &str) -> PyResult<String> {
-    Ok(upstream_ontologist::debian::upstream_name_to_debian_source_name(name))
-}
-
-#[pyfunction]
-fn upstream_package_to_debian_binary_name(package: UpstreamPackage) -> PyResult<String> {
-    Ok(upstream_ontologist::debian::upstream_package_to_debian_binary_name(&package))
-}
-
-#[pyfunction]
-fn upstream_package_to_debian_source_name(package: UpstreamPackage) -> PyResult<String> {
-    Ok(upstream_ontologist::debian::upstream_package_to_debian_source_name(&package))
 }
 
 #[pyfunction]
@@ -1038,13 +1013,6 @@ fn _upstream_ontologist(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(fix_upstream_metadata))?;
     m.add_wrapped(wrap_pyfunction!(guess_upstream_metadata_items))?;
     m.add_wrapped(wrap_pyfunction!(update_from_guesses))?;
-    let debianm = PyModule::new_bound(py, "debian")?;
-    debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_source_name))?;
-    debianm.add_wrapped(wrap_pyfunction!(upstream_package_to_debian_binary_name))?;
-    debianm.add_wrapped(wrap_pyfunction!(valid_debian_package_name))?;
-    debianm.add_wrapped(wrap_pyfunction!(debian_to_upstream_version))?;
-    debianm.add_wrapped(wrap_pyfunction!(upstream_name_to_debian_source_name))?;
-    m.add("debian", debianm)?;
     m.add_wrapped(wrap_pyfunction!(find_secure_repo_url))?;
     m.add_wrapped(wrap_pyfunction!(sanitize_url))?;
     m.add_wrapped(wrap_pyfunction!(convert_cvs_list_to_str))?;
