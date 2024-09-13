@@ -1,6 +1,12 @@
 #!/usr/bin/python3
 from setuptools import setup
 from setuptools_rust import Binding, RustExtension
+import sys
+
+extra_features = []
+
+if sys.platform != 'win32':
+    extra_features.append('debcargo')
 
 setup(
     rust_extensions=[
@@ -8,7 +14,7 @@ setup(
             "upstream_ontologist._upstream_ontologist",
             "upstream-ontologist-py/Cargo.toml",
             binding=Binding.PyO3,
-            features=["extension-module"],
+            features=["extension-module"] + extra_features
         ),
     ],
     data_files=[("share/man/man1", ["man/guess-upstream-metadata.1"])],
