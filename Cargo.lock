@@ -4009,6 +4009,7 @@ dependencies = [
  "pyo3",
  "pyproject-toml",
  "python-pkginfo",
+ "quote",
  "regex",
  "reqwest",
  "rst_parser",
