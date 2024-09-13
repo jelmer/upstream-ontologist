@@ -62,7 +62,7 @@ r-description = ["dep:mailparse"]
 pyproject-toml = ["dep:pyproject-toml"]
 python-pkginfo = ["dep:python-pkginfo"]
 debcargo = ["dep:debcargo"]
-debian = ["debcargo", "dep:debian-watch", "dep:makefile-lossless", "dep:debian-changelog", "dep:debian-control", "dep:debian-copyright"]
+debian = ["dep:debian-watch", "dep:makefile-lossless", "dep:debian-changelog", "dep:debian-control", "dep:debian-copyright"]
 pyo3 = []
 cli = ["dep:clap", "dep:env_logger"]
 
