@@ -418,6 +418,8 @@ pub enum UpstreamDatum {
     Donation(String),
     /// Link to a life instance of the webservice
     Webservice(String),
+    /// Name of the buildsystem used
+    BuildSystem(String),
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -474,6 +476,7 @@ impl UpstreamDatum {
             UpstreamDatum::CiteAs(..) => "Cite-As",
             UpstreamDatum::Donation(..) => "Donation",
             UpstreamDatum::Webservice(..) => "Webservice",
+            UpstreamDatum::BuildSystem(..) => "BuildSystem",
         }
     }
 
@@ -516,6 +519,7 @@ impl UpstreamDatum {
             UpstreamDatum::Registry(_) => None,
             UpstreamDatum::Donation(d) => Some(d),
             UpstreamDatum::Webservice(w) => Some(w),
+            UpstreamDatum::BuildSystem(b) => Some(b),
         }
     }
 
@@ -558,6 +562,7 @@ impl UpstreamDatum {
             UpstreamDatum::CiteAs(_c) => None,
             UpstreamDatum::Donation(_d) => None,
             UpstreamDatum::Webservice(w) => Some(w.parse().ok()?),
+            UpstreamDatum::BuildSystem(_) => None,
         }
     }
 
@@ -758,6 +763,9 @@ impl std::fmt::Display for UpstreamDatum {
             UpstreamDatum::Webservice(w) => {
                 write!(f, "Webservice: {}", w)
             }
+            UpstreamDatum::BuildSystem(bs) => {
+                write!(f, "BuildSystem: {}", bs)
+            }
         }
     }
 }
@@ -835,6 +843,7 @@ impl serde::ser::Serialize for UpstreamDatum {
             }
             UpstreamDatum::Donation(d) => serializer.serialize_str(d),
             UpstreamDatum::Webservice(w) => serializer.serialize_str(w),
+            UpstreamDatum::BuildSystem(bs) => serializer.serialize_str(bs),
         }
     }
 }
@@ -1068,6 +1077,10 @@ impl UpstreamMetadata {
 
     pub fn webservice(&self) -> Option<&str> {
         self.get("Webservice").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn buildsystem(&self) -> Option<&str> {
+        self.get("BuildSystem").and_then(|d| d.datum.as_str())
     }
 
     pub fn copyright(&self) -> Option<&str> {
@@ -2290,6 +2303,7 @@ impl FromPyObject<'_> for UpstreamDatum {
             }
             "Donation" => Ok(UpstreamDatum::Donation(val.extract::<String>()?)),
             "Webservice" => Ok(UpstreamDatum::Webservice(val.extract::<String>()?)),
+            "BuildSystem" => Ok(UpstreamDatum::BuildSystem(val.extract::<String>()?)),
             _ => Err(PyRuntimeError::new_err(format!("Unknown field: {}", field))),
         }
     }
@@ -2346,6 +2360,7 @@ impl ToPyObject for UpstreamDatum {
                     .to_object(py),
                 UpstreamDatum::Donation(d) => d.to_object(py),
                 UpstreamDatum::Webservice(w) => w.to_object(py),
+                UpstreamDatum::BuildSystem(b) => b.to_object(py),
             },
         )
             .to_object(py)
