@@ -39,7 +39,7 @@ makefile-lossless = { version = "0.1", optional = true }
 debian-copyright = { version = "0.1", optional = true }
 debian-control = { version = "0.1", optional = true }
 pulldown-cmark = "0.12"
-debcargo = { version = "2.6", optional = true }
+debcargo = { version = "2.7", optional = true }
 # See https://github.com/flying-sheep/rust-rst/issues/56
 #rst_parser = "0.4.0"
 #rst_renderer = "0.4.0"
