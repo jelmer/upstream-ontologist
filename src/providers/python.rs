@@ -9,6 +9,7 @@ use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::path::Path;
 
+#[cfg(feature = "python-pkginfo")]
 pub fn guess_from_pkg_info(
     path: &Path,
     _settings: &GuesserSettings,
@@ -116,6 +117,7 @@ pub fn guess_from_pkg_info(
     Ok(ret)
 }
 
+#[cfg(feature = "pyproject-toml")]
 pub fn guess_from_pyproject_toml(
     path: &Path,
     _settings: &GuesserSettings,
@@ -450,6 +452,7 @@ pub fn parse_python_url(url: &str) -> Vec<UpstreamDatumWithMetadata> {
     }]
 }
 
+#[cfg(feature = "setup-cfg")]
 pub fn guess_from_setup_cfg(
     path: &Path,
     _settings: &GuesserSettings,

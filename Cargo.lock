@@ -1048,7 +1048,7 @@ dependencies = [
 [[package]]
 name = "document_tree"
 version = "0.4.0"
-source = "git+https://github.com/jelmer/rust-rst#399b999bee08e6d21eb8fccfc32b133f374c644a"
+source = "git+https://github.com/flying-sheep/rust-rst#ebca18e58a134bedc9dfb3288f20c169dac38f0b"
 dependencies = [
  "anyhow",
  "regex",
@@ -4114,7 +4114,7 @@ dependencies = [
 [[package]]
 name = "rst_parser"
 version = "0.4.0"
-source = "git+https://github.com/jelmer/rust-rst#399b999bee08e6d21eb8fccfc32b133f374c644a"
+source = "git+https://github.com/flying-sheep/rust-rst#ebca18e58a134bedc9dfb3288f20c169dac38f0b"
 dependencies = [
  "anyhow",
  "document_tree",
@@ -4125,7 +4125,7 @@ dependencies = [
 [[package]]
 name = "rst_renderer"
 version = "0.4.0"
-source = "git+https://github.com/jelmer/rust-rst#399b999bee08e6d21eb8fccfc32b133f374c644a"
+source = "git+https://github.com/flying-sheep/rust-rst#ebca18e58a134bedc9dfb3288f20c169dac38f0b"
 dependencies = [
  "anyhow",
  "document_tree",

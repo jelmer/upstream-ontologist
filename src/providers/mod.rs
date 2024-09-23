@@ -27,7 +27,6 @@ pub mod python;
 pub mod r;
 pub mod repology;
 pub mod ruby;
-#[cfg(feature = "cargo")]
 pub mod rust;
 pub mod security_md;
 pub mod waf;
