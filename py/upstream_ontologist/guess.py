@@ -26,47 +26,14 @@ from . import (
 logger = logging.getLogger(__name__)
 
 
-NoSuchForgeProject = _upstream_ontologist.NoSuchForgeProject
-
-
 def guess_upstream_info(path, trust_package):
     return iter(_upstream_ontologist.guess_upstream_info(path, trust_package))
-
-
-url_from_cvs_co_command = _upstream_ontologist.url_from_cvs_co_command
-url_from_svn_co_command = _upstream_ontologist.url_from_svn_co_command
-url_from_git_clone_command = _upstream_ontologist.url_from_git_clone_command
-url_from_fossil_clone_command = _upstream_ontologist.url_from_fossil_clone_command
-url_from_vcs_command = _upstream_ontologist.url_from_vcs_command
 
 
 class NoSuchPackage(Exception):
     def __init__(self, package):
         self.package = package
 
-
-GitHub = _upstream_ontologist.GitHub
-GitLab = _upstream_ontologist.GitLab
-SourceForge = _upstream_ontologist.SourceForge
-Launchpad = _upstream_ontologist.Launchpad
-
-find_forge = _upstream_ontologist.find_forge
-repo_url_from_merge_request_url = _upstream_ontologist.repo_url_from_merge_request_url
-bug_database_from_issue_url = _upstream_ontologist.bug_database_from_issue_url
-guess_bug_database_url_from_repo_url = (
-    _upstream_ontologist.guess_bug_database_url_from_repo_url
-)
-bug_database_url_from_bug_submit_url = (
-    _upstream_ontologist.bug_database_url_from_bug_submit_url
-)
-bug_submit_url_from_bug_database_url = (
-    _upstream_ontologist.bug_submit_url_from_bug_database_url
-)
-check_bug_database_canonical = _upstream_ontologist.check_bug_database_canonical
-check_bug_submit_url_canonical = _upstream_ontologist.check_bug_submit_url_canonical
-check_url_canonical = _upstream_ontologist.check_url_canonical
-
-get_upstream_info = _upstream_ontologist.get_upstream_info
 
 check_upstream_metadata = _upstream_ontologist.check_upstream_metadata
 extend_upstream_metadata = _upstream_ontologist.extend_upstream_metadata
