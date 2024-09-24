@@ -35,3 +35,5 @@ jobs:
       - name: Run tests
         run: cargo test --verbose --features=debcargo
         if: matrix.os != 'windows-latest'
+      - name: Check formatting
+        run: cargo fmt --all -- --check
