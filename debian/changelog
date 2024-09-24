@@ -1,9 +1,10 @@
-upstream-ontologist (0.1.40-1) UNRELEASED; urgency=low
+upstream-ontologist (0.1.42-1) UNRELEASED; urgency=low
 
   * New upstream release.
-  * New upstream release.
+   + Drop executables, these will be provided by the upstream-ontologist
+     package in the future.
 
- -- Jelmer Vernooĳ <jelmer@debian.org>  Tue, 24 Sep 2024 18:01:22 -0000
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Tue, 24 Sep 2024 19:52:24 -0000
 
 upstream-ontologist (0.1.37-1) unstable; urgency=low
 
