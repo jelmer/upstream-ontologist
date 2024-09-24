@@ -5136,7 +5136,7 @@ dependencies = [
 
 [[package]]
 name = "upstream-ontologist"
-version = "0.1.40"
+version = "0.1.41"
 dependencies = [
  "breezyshim",
  "chrono",
@@ -5187,7 +5187,7 @@ dependencies = [
 
 [[package]]
 name = "upstream-ontologist-py"
-version = "0.1.40"
+version = "0.1.41"
 dependencies = [
  "log",
  "pyo3",
