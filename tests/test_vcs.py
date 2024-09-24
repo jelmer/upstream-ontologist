@@ -97,4 +97,3 @@ class FixupRcpStyleUrlTests(TestCase):
             "ssh://git@salsa.debian.org/jelmer/example",
             fixup_rcp_style_git_repo_url("ssh://git@salsa.debian.org/jelmer/example"),
         )
-
