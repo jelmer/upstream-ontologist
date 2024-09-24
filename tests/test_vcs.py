@@ -19,33 +19,10 @@
 from unittest import TestCase
 
 from upstream_ontologist.vcs import (
-    browse_url_from_repo_url,
     canonical_git_repo_url,
     find_public_repo_url,
     fixup_rcp_style_git_repo_url,
-    guess_repo_from_url,
-    is_gitlab_site,
-    plausible_url,
 )
-
-
-class PlausibleUrlTests(TestCase):
-    def test_url(self):
-        self.assertFalse(plausible_url("the"))
-        self.assertFalse(plausible_url("1"))
-        self.assertTrue(plausible_url("git@foo:blah"))
-        self.assertTrue(plausible_url("git+ssh://git@foo/blah"))
-        self.assertTrue(plausible_url("https://foo/blah"))
-
-
-class TestIsGitLabSite(TestCase):
-    def test_not_gitlab(self):
-        self.assertFalse(is_gitlab_site("foo.example.com"))
-        self.assertFalse(is_gitlab_site("github.com"))
-
-    def test_gitlab(self):
-        self.assertTrue(is_gitlab_site("gitlab.somehost.com"))
-        self.assertTrue(is_gitlab_site("salsa.debian.org"))
 
 
 class CanonicalizeVcsUrlTests(TestCase):
@@ -121,50 +98,3 @@ class FixupRcpStyleUrlTests(TestCase):
             fixup_rcp_style_git_repo_url("ssh://git@salsa.debian.org/jelmer/example"),
         )
 
-
-class GuessRepoFromUrlTests(TestCase):
-    def test_travis_ci_org(self):
-        self.assertEqual(
-            "https://github.com/jelmer/dulwich",
-            guess_repo_from_url("https://travis-ci.org/jelmer/dulwich"),
-        )
-
-    def test_coveralls(self):
-        self.assertEqual(
-            "https://github.com/jelmer/dulwich",
-            guess_repo_from_url("https://coveralls.io/r/jelmer/dulwich"),
-        )
-
-    def test_gitlab(self):
-        self.assertEqual(
-            "https://gitlab.com/jelmer/dulwich",
-            guess_repo_from_url("https://gitlab.com/jelmer/dulwich"),
-        )
-        self.assertEqual(
-            "https://gitlab.com/jelmer/dulwich",
-            guess_repo_from_url("https://gitlab.com/jelmer/dulwich/tags"),
-        )
-
-
-class BrowseUrlFromRepoUrl(TestCase):
-    def test_github(self):
-        self.assertEqual(
-            "https://github.com/jelmer/dulwich",
-            browse_url_from_repo_url("https://github.com/jelmer/dulwich"),
-        )
-        self.assertEqual(
-            "https://github.com/jelmer/dulwich",
-            browse_url_from_repo_url("https://github.com/jelmer/dulwich.git"),
-        )
-        self.assertEqual(
-            "https://github.com/jelmer/dulwich/tree/foo",
-            browse_url_from_repo_url(
-                "https://github.com/jelmer/dulwich.git", branch="foo"
-            ),
-        )
-        self.assertEqual(
-            "https://github.com/jelmer/dulwich/tree/HEAD/foo",
-            browse_url_from_repo_url(
-                "https://github.com/jelmer/dulwich.git", subpath="foo"
-            ),
-        )

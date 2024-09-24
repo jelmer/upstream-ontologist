@@ -1,21 +1,12 @@
 use crate::{Certainty, Origin, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use lazy_regex::regex;
-use pyo3::prelude::*;
 use regex::Regex;
 use select::document::Document;
 use select::node::Node;
-use select::predicate::{And, Class, Name, Predicate, Text};
+use select::predicate::{And, Class, Name, Text};
 use std::io::BufRead;
 use std::iter::Iterator;
 use url::Url;
-
-struct Root;
-
-impl Predicate for Root {
-    fn matches(&self, node: &Node) -> bool {
-        node.parent().is_none()
-    }
-}
 
 pub fn skip_paragraph(para: &str) -> (bool, Vec<UpstreamDatumWithMetadata>) {
     let mut ret = Vec::<UpstreamDatumWithMetadata>::new();
@@ -207,7 +198,7 @@ pub fn skip_paragraph(para: &str) -> (bool, Vec<UpstreamDatumWithMetadata>) {
 
 pub fn description_from_readme_rst(
     long_description: &str,
-) -> PyResult<(Option<String>, Vec<UpstreamDatumWithMetadata>)> {
+) -> Result<(Option<String>, Vec<UpstreamDatumWithMetadata>), ProviderError> {
     // Work around https://github.com/flying-sheep/rust-rst/issues/55
 
     let mut fields: Vec<(&str, String)> = Vec::new();
@@ -255,7 +246,7 @@ pub fn description_from_readme_rst(
 
 pub fn description_from_readme_md(
     long_description: &str,
-) -> PyResult<(Option<String>, Vec<UpstreamDatumWithMetadata>)> {
+) -> Result<(Option<String>, Vec<UpstreamDatumWithMetadata>), ProviderError> {
     let parser = pulldown_cmark::Parser::new(long_description);
 
     let mut html_output = String::new();
@@ -425,8 +416,7 @@ pub fn guess_from_readme(
             Ok((None, metadata))
         }
         _ => Ok((None, vec![])),
-    }
-    .map_err(ProviderError::Python)?;
+    }?;
     if let Some(description) = description {
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Description(description),
@@ -1082,14 +1072,14 @@ fn description_from_basic_soup(
 
 pub fn description_from_readme_html(
     html_text: &str,
-) -> PyResult<(Option<String>, Vec<UpstreamDatumWithMetadata>)> {
+) -> Result<(Option<String>, Vec<UpstreamDatumWithMetadata>), ProviderError> {
     let soup = Document::from(html_text);
     Ok(description_from_basic_soup(&soup))
 }
 
 fn rst_to_html(rst_text: &str) -> String {
-    use rst_parser::parse;
     use rst_renderer::render_html;
+    use uo_rst_parser::parse;
     let document = parse(rst_text).unwrap();
     let mut output = Vec::new();
     render_html(&document, &mut std::io::Cursor::new(&mut output), true).unwrap();
@@ -1186,6 +1176,14 @@ This is a test of RST to HTML conversion."#;
                 origin: None,
             }]
         );
+    }
+
+    struct Root;
+
+    impl select::predicate::Predicate for Root {
+        fn matches(&self, node: &Node) -> bool {
+            node.parent().is_none()
+        }
     }
 
     fn root(doc: &Document) -> Node {

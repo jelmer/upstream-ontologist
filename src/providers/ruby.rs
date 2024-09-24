@@ -1,7 +1,9 @@
 use crate::{
     Certainty, GuesserSettings, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata,
+    UpstreamMetadata,
 };
 use log::debug;
+use serde::Deserialize;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
@@ -133,4 +135,175 @@ pub fn guess_from_gemspec(
     }
 
     Ok(results)
+}
+
+#[derive(Deserialize)]
+pub struct RubygemMetadata {
+    pub changelog_uri: Option<url::Url>,
+    pub source_code_uri: Option<url::Url>,
+}
+
+#[derive(Deserialize)]
+pub struct RubygemDependency {
+    pub name: String,
+    pub requirements: String,
+}
+
+#[derive(Deserialize)]
+pub struct RubygemDependencies {
+    pub development: Vec<RubygemDependency>,
+    pub runtime: Vec<RubygemDependency>,
+}
+
+#[derive(Deserialize)]
+pub struct Rubygem {
+    pub name: String,
+    pub downloads: usize,
+    pub version: String,
+    pub version_created_at: String,
+    pub version_downloads: usize,
+    pub platform: String,
+    pub authors: String,
+    pub info: String,
+    pub licenses: Vec<String>,
+    pub metadata: RubygemMetadata,
+    pub yanked: bool,
+    pub sha: String,
+    pub spec_sha: String,
+    pub project_uri: url::Url,
+    pub gem_uri: url::Url,
+    pub homepage_uri: Option<url::Url>,
+    pub wiki_uri: Option<url::Url>,
+    pub documentation_uri: Option<url::Url>,
+    pub mailing_list_uri: Option<url::Url>,
+    pub source_code_uri: Option<url::Url>,
+    pub bug_tracker_uri: Option<url::Url>,
+    pub changelog_uri: Option<url::Url>,
+    pub funding_uri: Option<url::Url>,
+    pub dependencies: RubygemDependencies,
+}
+
+impl TryFrom<Rubygem> for UpstreamMetadata {
+    type Error = ProviderError;
+
+    fn try_from(gem: Rubygem) -> Result<Self, ProviderError> {
+        let mut metadata = UpstreamMetadata::default();
+        metadata.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Name(gem.name),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+
+        metadata.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Version(gem.version),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+
+        metadata.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Author(vec![Person::from(gem.authors.as_str())]),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+
+        metadata.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Homepage(gem.homepage_uri.unwrap_or(gem.project_uri).to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+
+        if let Some(wiki_uri) = gem.wiki_uri {
+            metadata.insert(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Wiki(wiki_uri.to_string()),
+                certainty: Some(Certainty::Certain),
+                origin: None,
+            });
+        }
+
+        if let Some(mailing_list_uri) = gem.mailing_list_uri {
+            metadata.insert(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::MailingList(mailing_list_uri.to_string()),
+                certainty: Some(Certainty::Certain),
+                origin: None,
+            });
+        }
+
+        if let Some(bug_tracker_uri) = gem.bug_tracker_uri {
+            metadata.insert(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::BugDatabase(bug_tracker_uri.to_string()),
+                certainty: Some(Certainty::Certain),
+                origin: None,
+            });
+        }
+
+        if let Some(funding_uri) = gem.funding_uri {
+            metadata.insert(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Funding(funding_uri.to_string()),
+                certainty: Some(Certainty::Certain),
+                origin: None,
+            });
+        }
+
+        if let Some(source_code_uri) = gem.source_code_uri {
+            metadata.insert(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Repository(source_code_uri.to_string()),
+                certainty: Some(Certainty::Certain),
+                origin: None,
+            });
+        }
+
+        metadata.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::License(gem.licenses.join(", ")),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+
+        if let Some(documentation_uri) = gem.documentation_uri {
+            metadata.insert(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Documentation(documentation_uri.to_string()),
+                certainty: Some(Certainty::Certain),
+                origin: None,
+            });
+        }
+
+        if let Some(changelog_uri) = gem.changelog_uri {
+            metadata.insert(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Changelog(changelog_uri.to_string()),
+                certainty: Some(Certainty::Certain),
+                origin: None,
+            });
+        }
+
+        Ok(metadata)
+    }
+}
+
+pub fn load_rubygem(name: &str) -> Result<Option<Rubygem>, ProviderError> {
+    let url = format!("https://rubygems.org/api/v1/gems/{}.json", name)
+        .parse()
+        .unwrap();
+    let data = crate::load_json_url(&url, None)?;
+    let gem: Rubygem = serde_json::from_value(data).unwrap();
+    Ok(Some(gem))
+}
+
+pub fn remote_rubygem_metadata(name: &str) -> Result<UpstreamMetadata, ProviderError> {
+    let gem = load_rubygem(name)?;
+
+    match gem {
+        Some(gem) => gem.try_into(),
+        None => Ok(UpstreamMetadata::default()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_parse_gem() {
+        let gemspec = include_str!("../testdata/rubygem.json");
+
+        let gem: super::Rubygem = serde_json::from_str(gemspec).unwrap();
+
+        assert_eq!(gem.name, "bullet");
+    }
 }

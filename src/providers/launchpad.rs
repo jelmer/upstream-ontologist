@@ -7,8 +7,8 @@ pub fn guess_from_launchpad(
     distribution: Option<&str>,
     suite: Option<&str>,
 ) -> Option<Vec<UpstreamDatum>> {
-    use distro_info::UbuntuDistroInfo;
     use distro_info::DistroInfo;
+    use distro_info::UbuntuDistroInfo;
     let distribution = distribution.unwrap_or("ubuntu");
     let suite = suite.map_or_else(
         || {
