@@ -243,6 +243,7 @@ found in the source directory into .mo files and installs them.
     );
 }
 
+#[cfg(feature = "debian")]
 pub fn guess_from_debian_changelog(
     path: &Path,
     _settings: &GuesserSettings,
@@ -384,6 +385,7 @@ pub fn parse_debcargo_source_name(
     }
 }
 
+#[cfg(feature = "debian")]
 pub fn guess_from_debian_rules(
     path: &Path,
     _settings: &GuesserSettings,
@@ -423,6 +425,7 @@ pub fn guess_from_debian_rules(
     Ok(ret)
 }
 
+#[cfg(feature = "debian")]
 pub fn guess_from_debian_control(
     path: &Path,
     _settings: &GuesserSettings,
@@ -535,6 +538,7 @@ pub fn guess_from_debian_control(
     Ok(ret)
 }
 
+#[cfg(feature = "debian")]
 pub fn guess_from_debian_copyright(
     path: &Path,
     _settings: &GuesserSettings,
@@ -666,6 +670,7 @@ pub fn guess_from_debian_copyright(
     Ok(ret)
 }
 
+#[cfg(feature = "debian")]
 pub fn guess_from_debian_watch(
     path: &Path,
     _settings: &GuesserSettings,
@@ -721,6 +726,7 @@ pub fn guess_from_debian_watch(
     Ok(ret)
 }
 
+#[cfg(feature = "debian")]
 pub fn debian_is_native(path: &Path) -> std::io::Result<Option<bool>> {
     let format_file_path = path.join("source/format");
     match File::open(format_file_path) {

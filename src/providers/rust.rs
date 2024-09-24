@@ -5,12 +5,13 @@ use crate::{
 use log::debug;
 use serde::Deserialize;
 use std::collections::HashMap;
-use toml::value::Table;
 
+#[cfg(feature = "cargo")]
 pub fn guess_from_cargo(
     path: &std::path::Path,
     _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    use toml::value::Table;
     // see https://doc.rust-lang.org/cargo/reference/manifest.html
     let doc: Table = toml::from_str(&std::fs::read_to_string(path)?)
         .map_err(|e| ProviderError::ParseError(e.to_string()))?;

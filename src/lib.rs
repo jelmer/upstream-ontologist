@@ -1,9 +1,12 @@
 use lazy_regex::regex;
 use log::{debug, warn};
 use percent_encoding::utf8_percent_encode;
-use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
+#[cfg(feature = "pyo3")]
+use pyo3::{
+    exceptions::{PyRuntimeError, PyTypeError, PyValueError},
+    prelude::*,
+    types::PyDict,
+};
 use reqwest::header::HeaderMap;
 use serde::ser::SerializeSeq;
 use std::cmp::Ordering;
@@ -79,6 +82,7 @@ impl From<url::Url> for Origin {
     }
 }
 
+#[cfg(feature = "pyo3")]
 impl ToPyObject for Origin {
     fn to_object(&self, py: Python) -> PyObject {
         match self {
@@ -89,6 +93,7 @@ impl ToPyObject for Origin {
     }
 }
 
+#[cfg(feature = "pyo3")]
 impl IntoPy<PyObject> for Origin {
     fn into_py(self, py: Python) -> PyObject {
         match self {
@@ -99,6 +104,7 @@ impl IntoPy<PyObject> for Origin {
     }
 }
 
+#[cfg(feature = "pyo3")]
 impl FromPyObject<'_> for Origin {
     fn extract_bound(ob: &Bound<PyAny>) -> PyResult<Self> {
         if let Ok(path) = ob.extract::<PathBuf>() {
@@ -311,6 +317,7 @@ impl From<&str> for Person {
     }
 }
 
+#[cfg(feature = "pyo3")]
 impl ToPyObject for Person {
     fn to_object(&self, py: Python) -> PyObject {
         let m = PyModule::import_bound(py, "upstream_ontologist").unwrap();
@@ -334,6 +341,7 @@ fn parseaddr(text: &str) -> Option<(String, String)> {
     None
 }
 
+#[cfg(feature = "pyo3")]
 impl FromPyObject<'_> for Person {
     fn extract_bound(ob: &Bound<PyAny>) -> PyResult<Self> {
         let name = ob.getattr("name")?.extract::<Option<String>>()?;
@@ -1168,6 +1176,7 @@ impl serde::ser::Serialize for UpstreamMetadata {
     }
 }
 
+#[cfg(feature = "pyo3")]
 impl ToPyObject for UpstreamDatumWithMetadata {
     fn to_object(&self, py: Python) -> PyObject {
         let m = PyModule::import_bound(py, "upstream_ontologist.guess").unwrap();
@@ -2235,6 +2244,7 @@ pub fn guess_from_path(
     Ok(ret)
 }
 
+#[cfg(feature = "pyo3")]
 impl FromPyObject<'_> for UpstreamDatum {
     fn extract_bound(obj: &Bound<PyAny>) -> PyResult<Self> {
         let (field, val): (String, Bound<PyAny>) = if let Ok((field, val)) =
@@ -2309,6 +2319,7 @@ impl FromPyObject<'_> for UpstreamDatum {
     }
 }
 
+#[cfg(feature = "pyo3")]
 impl ToPyObject for UpstreamDatum {
     fn to_object(&self, py: Python) -> PyObject {
         (
@@ -2367,6 +2378,7 @@ impl ToPyObject for UpstreamDatum {
     }
 }
 
+#[cfg(feature = "pyo3")]
 impl FromPyObject<'_> for UpstreamDatumWithMetadata {
     fn extract_bound(obj: &Bound<PyAny>) -> PyResult<Self> {
         let certainty = obj.getattr("certainty")?.extract::<Option<String>>()?;
@@ -2473,22 +2485,27 @@ const STATIC_GUESSERS: &[(
     &str,
     fn(&std::path::Path, &GuesserSettings) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>,
 )] = &[
+    #[cfg(feature = "debian")]
     (
         "debian/watch",
         crate::providers::debian::guess_from_debian_watch,
     ),
+    #[cfg(feature = "debian")]
     (
         "debian/control",
         crate::providers::debian::guess_from_debian_control,
     ),
+    #[cfg(feature = "debian")]
     (
         "debian/changelog",
         crate::providers::debian::guess_from_debian_changelog,
     ),
+    #[cfg(feature = "debian")]
     (
         "debian/rules",
         crate::providers::debian::guess_from_debian_rules,
     ),
+    #[cfg(feature = "python-pkginfo")]
     ("PKG-INFO", crate::providers::python::guess_from_pkg_info),
     (
         "package.json",
@@ -2506,7 +2523,9 @@ const STATIC_GUESSERS: &[(
         "package.yaml",
         crate::providers::package_yaml::guess_from_package_yaml,
     ),
+    #[cfg(feature = "dist-ini")]
     ("dist.ini", crate::providers::perl::guess_from_dist_ini),
+    #[cfg(feature = "debian")]
     (
         "debian/copyright",
         crate::providers::debian::guess_from_debian_copyright,
@@ -2519,18 +2538,23 @@ const STATIC_GUESSERS: &[(
         "configure",
         crate::providers::autoconf::guess_from_configure,
     ),
+    #[cfg(feature = "r-description")]
     ("DESCRIPTION", crate::providers::r::guess_from_r_description),
+    #[cfg(feature = "cargo")]
     ("Cargo.toml", crate::providers::rust::guess_from_cargo),
     ("pom.xml", crate::providers::maven::guess_from_pom_xml),
+    #[cfg(feature = "git-config")]
     (".git/config", crate::providers::git::guess_from_git_config),
     (
         "debian/get-orig-source.sh",
         crate::vcs_command::guess_from_get_orig_source,
     ),
+    #[cfg(feature = "pyproject-toml")]
     (
         "pyproject.toml",
         crate::providers::python::guess_from_pyproject_toml,
     ),
+    #[cfg(feature = "setup-cfg")]
     ("setup.cfg", crate::providers::python::guess_from_setup_cfg),
     ("go.mod", crate::providers::go::guess_from_go_mod),
     (
@@ -2586,6 +2610,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
     }
 
     let mut found_pkg_info = path.join("PKG-INFO").exists();
+    #[cfg(feature = "python-pkginfo")]
     for entry in std::fs::read_dir(&path).unwrap() {
         let entry = entry.unwrap();
         let filename = entry.file_name().to_string_lossy().to_string();
@@ -2629,6 +2654,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
     }
 
     // TODO(jelmer): Perhaps scan all directories if no other primary project information file has been found?
+    #[cfg(feature = "r-description")]
     for entry in std::fs::read_dir(&path).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
@@ -2801,6 +2827,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
         );
     }
 
+    #[cfg(feature = "opam")]
     let mut opam_filenames = std::fs::read_dir(&path)
         .unwrap()
         .filter_map(|entry| {
@@ -2813,6 +2840,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
         })
         .collect::<Vec<_>>();
 
+    #[cfg(feature = "opam")]
     match opam_filenames.len().cmp(&1) {
         Ordering::Equal => {
             let opam_filename = opam_filenames.remove(0);
@@ -3034,6 +3062,7 @@ pub fn extend_upstream_metadata(
     }
 
     let archive = upstream_metadata.get("Archive");
+    #[cfg(feature = "cargo")]
     if archive.is_some()
         && archive.unwrap().datum.as_str().unwrap() == "crates.io"
         && upstream_metadata.contains_key("Cargo-Crate")
@@ -3079,6 +3108,7 @@ pub fn extend_upstream_metadata(
             .unwrap();
     }
 
+    #[cfg(feature = "debian")]
     if net_access && consult_external_directory {
         // TODO(jelmer): Don't assume debian/control exists
         let package = match debian_control::Control::from_file_relaxed(path.join("debian/control"))
@@ -3088,6 +3118,7 @@ pub fn extend_upstream_metadata(
         };
 
         if let Some(package) = package {
+            #[cfg(feature = "launchpad")]
             extend_from_lp(
                 upstream_metadata.mut_items(),
                 minimum_certainty,
@@ -3149,6 +3180,7 @@ pub trait ThirdPartyRepository {
     fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, ProviderError>;
 }
 
+#[cfg(feature = "launchpad")]
 fn extend_from_lp(
     upstream_metadata: &mut Vec<UpstreamDatumWithMetadata>,
     minimum_certainty: Certainty,
