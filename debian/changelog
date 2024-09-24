@@ -1,4 +1,4 @@
-upstream-ontologist (0.1.42-1) UNRELEASED; urgency=low
+upstream-ontologist (0.1.42-1) unstable; urgency=low
 
   * New upstream release.
    + Drop executables, these will be provided by the upstream-ontologist
