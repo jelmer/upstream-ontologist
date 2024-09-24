@@ -72,23 +72,25 @@ mod tests {
             </html>
         "#;
         let result = guess_from_page(text, &basehref);
-        assert_eq!(result, vec![
-            UpstreamDatumWithMetadata {
-                origin: Some(Origin::Url(basehref.clone())),
-                datum: UpstreamDatum::Repository("https://github.com/owner/repo".to_string()),
-                certainty: Some(Certainty::Possible),
-            },
-            UpstreamDatumWithMetadata {
-                origin: Some(Origin::Url(basehref.clone())),
-                datum: UpstreamDatum::Repository("https://git.samba.org/samba.org".to_string()),
-                certainty: Some(Certainty::Possible),
-            },
-            UpstreamDatumWithMetadata {
-                origin: Some(Origin::Url(basehref.clone())),
-                datum: UpstreamDatum::BugDatabase("https://bugs.debian.org/123".to_string()),
-                certainty: Some(Certainty::Possible),
-            },
-        ]);
+        assert_eq!(
+            result,
+            vec![
+                UpstreamDatumWithMetadata {
+                    origin: Some(Origin::Url(basehref.clone())),
+                    datum: UpstreamDatum::Repository("https://github.com/owner/repo".to_string()),
+                    certainty: Some(Certainty::Possible),
+                },
+                UpstreamDatumWithMetadata {
+                    origin: Some(Origin::Url(basehref.clone())),
+                    datum: UpstreamDatum::Repository("https://git.samba.org/samba.org".to_string()),
+                    certainty: Some(Certainty::Possible),
+                },
+                UpstreamDatumWithMetadata {
+                    origin: Some(Origin::Url(basehref.clone())),
+                    datum: UpstreamDatum::BugDatabase("https://bugs.debian.org/123".to_string()),
+                    certainty: Some(Certainty::Possible),
+                },
+            ]
+        );
     }
 }
-
