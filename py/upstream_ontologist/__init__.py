@@ -61,8 +61,6 @@ import ruamel.yaml
 
 from . import _upstream_ontologist
 
-get_upstream_info = _upstream_ontologist.get_upstream_info
-
 SUPPORTED_CERTAINTIES = ["certain", "confident", "likely", "possible", None]
 
 version_string = "0.1.38"
