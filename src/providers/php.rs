@@ -1,6 +1,6 @@
 use crate::{ProviderError, UpstreamDatum};
 use select::document::Document;
-use select::predicate::{Name, And, Predicate};
+use select::predicate::{And, Name, Predicate};
 
 pub fn guess_from_pecl_package(package: &str) -> Result<Vec<UpstreamDatum>, ProviderError> {
     let url = format!("https://pecl.php.net/packages/{}", package);
@@ -47,7 +47,8 @@ fn find_tags_by_text<'a>(
     tag_name: &'a str,
     text: &'a str,
 ) -> Vec<select::node::Node<'a>> {
-    document.find(And(Name(tag_name), TextContains(text)))
+    document
+        .find(And(Name(tag_name), TextContains(text)))
         .collect()
 }
 
