@@ -11,3 +11,4 @@ rst-parser
 older-xmltree
 relax-pretty-assertions
 relax-tempfile
+drop-script

@@ -1,0 +1,14 @@
+Index: upstream-ontologist/pyproject.toml
+===================================================================
+--- upstream-ontologist.orig/pyproject.toml
++++ upstream-ontologist/pyproject.toml
+@@ -45,9 +45,6 @@ readme = [
+ testing = ["breezy>=3.3.0"]
+ dev = ["ruff==0.6.7"]
+ 
+-[project.scripts]
+-guess-upstream-metadata = "upstream_ontologist.__main__:main"
+-
+ [tool.setuptools]
+ include-package-data = false
+ 

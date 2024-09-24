@@ -1,7 +1,5 @@
-[source]
-
-[source.mirror]
-directory = "/usr/share/cargo/registry/"
-
 [source.crates-io]
-replace-with = "mirror"
+replace-with = "dh-cargo-registry"
+
+[source.dh-cargo-registry]
+directory = "/usr/share/cargo/registry/"

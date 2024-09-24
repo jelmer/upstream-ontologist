@@ -1,18 +1,14 @@
 #!/usr/bin/make -f
 
-%:
-	dh $@ --buildsystem=rust
-	CARGO_HOME=$(shell pwd)/debian/cargo_home dh $@ --buildsystem=pybuild --with=python3
+export CARGO_HOME=$(shell pwd)/debian/cargo_home
 
-override_dh_auto_test:
-	@echo "Skipping tests"
+%:
+	dh $@ --buildsystem=pybuild --with=python3
 
 override_dh_auto_clean:
 	if test -f Cargo.lock.saved; then mv Cargo.lock.saved Cargo.lock; fi
-	dh_auto_clean --buildsystem=rust
-	dh_auto_clean --buildsystem=pybuild
+	dh_auto_clean
 
 override_dh_auto_build:
 	mv Cargo.lock Cargo.lock.saved
-	dh_auto_build --buildsystem=rust
-	CARGO_HOME=$(shell pwd)/debian/cargo_home dh_auto_build --buildsystem=pybuild
+	dh_auto_build
