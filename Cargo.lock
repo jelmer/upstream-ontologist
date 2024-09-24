@@ -1059,18 +1059,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "document_tree"
-version = "0.4.0"
-source = "git+https://github.com/flying-sheep/rust-rst#ebca18e58a134bedc9dfb3288f20c169dac38f0b"
-dependencies = [
- "anyhow",
- "regex",
- "serde",
- "serde_derive",
- "url",
-]
-
-[[package]]
 name = "dunce"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4134,23 +4122,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "rst_parser"
-version = "0.4.0"
-source = "git+https://github.com/flying-sheep/rust-rst#ebca18e58a134bedc9dfb3288f20c169dac38f0b"
-dependencies = [
- "anyhow",
- "document_tree 0.4.0 (git+https://github.com/flying-sheep/rust-rst)",
- "pest",
- "pest_derive",
-]
-
-[[package]]
 name = "rst_renderer"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "280c2b35ffdb112dbf4a927597abb7288071f03f7d9f14dd9fea8c0781af4e80"
 dependencies = [
- "document_tree 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "document_tree",
  "failure",
  "serde-xml-rs",
  "serde_json",
@@ -5194,14 +5171,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "80277544afabbdd7ddd9117d7b5b2d61dba3819609f8810c619e590d8d1d8cdb"
 dependencies = [
  "anyhow",
- "document_tree 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "document_tree",
  "pest",
  "pest_derive",
 ]
 
 [[package]]
 name = "upstream-ontologist"
-version = "0.1.39"
+version = "0.1.40"
 dependencies = [
  "breezyshim",
  "chrono",
@@ -5233,7 +5210,6 @@ dependencies = [
  "quote",
  "regex",
  "reqwest",
- "rst_parser",
  "rst_renderer",
  "rust-ini",
  "select",
@@ -5253,7 +5229,7 @@ dependencies = [
 
 [[package]]
 name = "upstream-ontologist-py"
-version = "0.1.39"
+version = "0.1.40"
 dependencies = [
  "log",
  "pyo3",

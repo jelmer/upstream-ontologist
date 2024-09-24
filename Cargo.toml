@@ -10,7 +10,7 @@ homepage = "https://github.com/jelmer/upstream-ontologist"
 default-run = "guess-upstream-metadata"
 
 [workspace.package]
-version = "0.1.39"
+version = "0.1.40"
 
 [dependencies]
 log = "0.4"
@@ -43,7 +43,7 @@ debcargo = { version = "2.7", optional = true }
 # See https://github.com/flying-sheep/rust-rst/issues/56
 uo_rst_parser = "0.4.2"
 rst_renderer = "0.4.0"
-rst_parser = { git = "https://github.com/flying-sheep/rust-rst" }
+#rst_parser = { git = "https://github.com/flying-sheep/rust-rst" }
 #rst_renderer = { git = "https://github.com/flying-sheep/rust-rst" }
 select = "0.6.0"
 semver = { version = "1.0.23", features = ["serde"] }
