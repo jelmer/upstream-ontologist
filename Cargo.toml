@@ -19,7 +19,7 @@ serde_json = "1.0"
 lazy_static = "1"
 regex = "1"
 url = "2"
-xmltree = "0.11"
+xmltree = ">=0.10"
 configparser = "3"
 serde_yaml = "0.9"
 percent-encoding = "2"
@@ -33,12 +33,12 @@ debian-changelog = { version = "0.1", optional = true }
 debbugs = "0.1"
 clap = { version = "4", features = ["derive", "env"], optional = true }
 maplit = "1"
-env_logger = { version = ">=0.11", optional = true }
+env_logger = { version = ">=0.10", optional = true }
 xml = "0.8"
 makefile-lossless = { version = "0.1", optional = true }
 debian-copyright = { version = "0.1", optional = true }
 debian-control = { version = "0.1", optional = true }
-pulldown-cmark = "0.12"
+pulldown-cmark = ">=0.9"
 debcargo = { version = "2.7", optional = true }
 # See https://github.com/flying-sheep/rust-rst/issues/56
 uo_rst_parser = "0.4.2"
@@ -46,7 +46,7 @@ rst_renderer = "0.4.0"
 #rst_parser = { git = "https://github.com/flying-sheep/rust-rst" }
 #rst_renderer = { git = "https://github.com/flying-sheep/rust-rst" }
 select = "0.6.0"
-semver = { version = "1.0.23", features = ["serde"] }
+semver = { version = "1", features = ["serde"] }
 
 [workspace]
 members = [ "upstream-ontologist-py",]
@@ -70,8 +70,8 @@ cli = ["dep:clap", "dep:env_logger"]
 [lib]
 
 [dev-dependencies]
-pretty_assertions = "1.4.1"
-tempfile = "3.12.0"
+pretty_assertions = ">=1.4"
+tempfile = ">=3"
 
 [build-dependencies]
 quote = "1.0.37"
@@ -80,12 +80,12 @@ quote = "1.0.37"
 workspace = true
 
 [dependencies.reqwest]
-version = ">=0.12"
+version = ">=0.11"
 features = [ "blocking", "json",]
 default-features = false
 
 [dependencies.rust-ini]
-version = "0.21"
+version = ">=0.18"
 optional = true
 
 [dependencies.serde]
@@ -109,11 +109,11 @@ version = ">=0.8"
 optional = true
 
 [dependencies.mailparse]
-version = "0.15"
+version = ">=0.14"
 optional = true
 
 [dependencies.pyproject-toml]
-version = ">=0.11"
+version = ">=0.7"
 optional = true
 
 [dependencies.python-pkginfo]
