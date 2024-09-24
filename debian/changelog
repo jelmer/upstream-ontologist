@@ -3,6 +3,7 @@ upstream-ontologist (0.1.42-1) UNRELEASED; urgency=low
   * New upstream release.
    + Drop executables, these will be provided by the upstream-ontologist
      package in the future.
+   + Fixes compatibility with newer pyo3 0.22. Closes: #1078418
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Tue, 24 Sep 2024 19:52:24 -0000
 
