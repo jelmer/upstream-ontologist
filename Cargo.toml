@@ -10,7 +10,7 @@ homepage = "https://github.com/jelmer/upstream-ontologist"
 default-run = "guess-upstream-metadata"
 
 [workspace.package]
-version = "0.1.39"
+version = "0.1.40"
 
 [dependencies]
 log = "0.4"
@@ -19,7 +19,7 @@ serde_json = "1.0"
 lazy_static = "1"
 regex = "1"
 url = "2"
-xmltree = "0.10"
+xmltree = "0.11"
 configparser = "3"
 serde_yaml = "0.9"
 percent-encoding = "2"
@@ -39,18 +39,20 @@ makefile-lossless = { version = "0.1", optional = true }
 debian-copyright = { version = "0.1", optional = true }
 debian-control = { version = "0.1", optional = true }
 pulldown-cmark = "0.12"
-debcargo = { version = "2.6", optional = true }
-rst_parser = "0.4.0"
+debcargo = { version = "2.7", optional = true }
+# See https://github.com/flying-sheep/rust-rst/issues/56
+uo_rst_parser = "0.4.2"
 rst_renderer = "0.4.0"
-#rst_parser = { git = "https://github.com/jelmer/rust-rst" }
-#rst_renderer = { git = "https://github.com/jelmer/rust-rst" }
+#rst_parser = { git = "https://github.com/flying-sheep/rust-rst" }
+#rst_renderer = { git = "https://github.com/flying-sheep/rust-rst" }
 select = "0.6.0"
+semver = { version = "1.0.23", features = ["serde"] }
 
 [workspace]
 members = [ "upstream-ontologist-py",]
 
 [features]
-default = ["git-config", "launchpad", "opam", "dist-ini", "cargo", "r-description", "pyproject-toml", "python-pkginfo", "debian", "pyo3"]
+default = ["git-config", "launchpad", "opam", "dist-ini", "cargo", "r-description", "pyproject-toml", "python-pkginfo", "debian", "pyo3", "setup-cfg"]
 git-config = ["dep:gix-config"]
 launchpad = ["dep:distro-info"]
 opam = ["dep:opam-file-rs"]
@@ -59,16 +61,20 @@ cargo = ["dep:toml"]
 r-description = ["dep:mailparse"]
 pyproject-toml = ["dep:pyproject-toml"]
 python-pkginfo = ["dep:python-pkginfo"]
+setup-cfg = ["dep:rust-ini"]
 debcargo = ["dep:debcargo"]
-debian = ["debcargo", "dep:debian-watch", "dep:makefile-lossless", "dep:debian-changelog", "dep:debian-control", "dep:debian-copyright"]
+debian = ["dep:debian-watch", "dep:makefile-lossless", "dep:debian-changelog", "dep:debian-control", "dep:debian-copyright"]
 pyo3 = []
 cli = ["dep:clap", "dep:env_logger"]
 
 [lib]
 
 [dev-dependencies]
-pretty_assertions = "1.4.0"
+pretty_assertions = "1.4.1"
 tempfile = "3.12.0"
+
+[build-dependencies]
+quote = "1.0.37"
 
 [dependencies.pyo3]
 workspace = true

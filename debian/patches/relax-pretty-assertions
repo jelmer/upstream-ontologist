@@ -2,12 +2,12 @@ Index: upstream-ontologist/Cargo.toml
 ===================================================================
 --- upstream-ontologist.orig/Cargo.toml
 +++ upstream-ontologist/Cargo.toml
-@@ -67,7 +67,7 @@ cli = ["dep:clap", "dep:env_logger"]
+@@ -69,7 +69,7 @@ cli = ["dep:clap", "dep:env_logger"]
+ [lib]
  
  [dev-dependencies]
- pretty_assertions = "1.4.0"
--tempfile = "3.12.0"
-+tempfile = ">=3"
+-pretty_assertions = "1.4.1"
++pretty_assertions = ">=1.4"
+ tempfile = "3.12.0"
  
- [dependencies.pyo3]
- workspace = true
+ [build-dependencies]

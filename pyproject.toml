@@ -8,17 +8,6 @@ warn_unused_configs = true
 check_untyped_defs = true
 ignore_missing_imports = false
 
-[[tool.mypy.overrides]]
-module = [
-    # No type hints yet
-    "ruamel.*",
-    "setuptools.*",
-    "pcre.*",
-    "lxml.*",
-    "breezy.*",
-]
-ignore_missing_imports = true
-
 [project]
 name = "upstream-ontologist"
 authors = [{name = "Jelmer Vernooij", email = "jelmer@jelmer.uk"}]
@@ -54,7 +43,7 @@ readme = [
 ]
 "setup.cfg" = ["setuptools"]
 testing = ["breezy>=3.3.0"]
-dev = ["ruff==0.6.1"]
+dev = ["ruff==0.6.7"]
 
 [project.scripts]
 guess-upstream-metadata = "upstream_ontologist.__main__:main"

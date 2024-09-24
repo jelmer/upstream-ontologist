@@ -39,6 +39,10 @@ struct Args {
     #[clap(long)]
     from_homepage: Option<url::Url>,
 
+    /// Find data based on specified repology id
+    #[clap(long)]
+    from_repology: Option<String>,
+
     /// Pull in external (not maintained by upstream) directory data
     #[clap(long)]
     consult_external_directory: bool,
@@ -61,10 +65,19 @@ fn main() {
         )
         .init();
 
-    pyo3::prepare_freethreaded_python();
-
     if let Some(from_homepage) = args.from_homepage {
         for d in upstream_ontologist::homepage::guess_from_homepage(&from_homepage).unwrap() {
+            println!(
+                "{}: {:?} - certainty {} (from {:?})",
+                d.datum.field(),
+                d.datum,
+                d.certainty
+                    .map_or_else(|| "unknown".to_string(), |d| d.to_string()),
+                d.origin
+            );
+        }
+    } else if let Some(id) = args.from_repology {
+        for d in upstream_ontologist::repology::find_upstream_from_repology(&id).unwrap() {
             println!(
                 "{}: {:?} - certainty {} (from {:?})",
                 d.datum.field(),
@@ -119,22 +132,6 @@ fn main() {
             }
             Err(upstream_ontologist::ProviderError::ExtrapolationLimitExceeded(l)) => {
                 eprintln!("Extraoplation limit exceeded: {}", l);
-                std::process::exit(1);
-            }
-            Err(upstream_ontologist::ProviderError::Python(e)) => {
-                eprintln!("Python error: {}", e);
-                if args.debug {
-                    pyo3::Python::with_gil(|py| {
-                        if let Some(tb) = e.traceback(py) {
-                            for line in tb.format().unwrap().lines() {
-                                eprintln!("{}", line);
-                            }
-                        } else {
-                            panic!("No traceback");
-                        }
-                    });
-                }
-
                 std::process::exit(1);
             }
         };

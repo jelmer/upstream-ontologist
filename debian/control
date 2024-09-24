@@ -53,6 +53,25 @@ Maintainer: Jelmer Vernooĳ <jelmer@debian.org>
 Vcs-Git: https://salsa.debian.org/jelmer/upstream-ontologist.git
 Vcs-Browser: https://salsa.debian.org/jelmer/upstream-ontologist
 
+Package: librust-upstream-ontologist-dev
+Architecture: any
+Depends: ${misc:Depends},
+		 ${shlibs:Depends}
+Description: discover metadata about upstream projects (Rust library)
+ The upstream ontologist discovers metadata about the upstream part of a
+ package by reading common project metadata files. It currently supports:
+ .
+  * setup.py/PKG-INFO files
+  * package.json files
+  * package.xml files
+  * dist.ini files
+  * META.json / META.yml files
+  * GNU configure files
+  * R DESCRIPTION files
+  * pom.xml files
+  * Cargo.toml files
+  * and other formats
+
 Package: python3-upstream-ontologist
 Architecture: any
 Replaces: lintian-brush (<< 0.95)

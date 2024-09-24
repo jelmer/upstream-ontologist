@@ -1,13 +1,15 @@
 use crate::{
     vcs, Certainty, GuesserSettings, Origin, Person, ProviderError, UpstreamDatum,
-    UpstreamDatumWithMetadata,
+    UpstreamDatumWithMetadata, UpstreamMetadata,
 };
 use log::{debug, warn};
+use serde::Deserialize;
 
 use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::path::Path;
 
+#[cfg(feature = "python-pkginfo")]
 pub fn guess_from_pkg_info(
     path: &Path,
     _settings: &GuesserSettings,
@@ -115,6 +117,7 @@ pub fn guess_from_pkg_info(
     Ok(ret)
 }
 
+#[cfg(feature = "pyproject-toml")]
 pub fn guess_from_pyproject_toml(
     path: &Path,
     _settings: &GuesserSettings,
@@ -449,6 +452,7 @@ pub fn parse_python_url(url: &str) -> Vec<UpstreamDatumWithMetadata> {
     }]
 }
 
+#[cfg(feature = "setup-cfg")]
 pub fn guess_from_setup_cfg(
     path: &Path,
     _settings: &GuesserSettings,
@@ -609,7 +613,9 @@ fn guess_from_setup_py_executed(
     let _lock = SETUP_PY_LOCK.lock().unwrap();
     let mut ret = Vec::new();
     // Import setuptools, just in case it replaces distutils
+    //
     use pyo3::types::PyDict;
+    pyo3::prepare_freethreaded_python();
     let mut long_description = None;
     Python::with_gil(|py| {
         let _ = py.import_bound("setuptools");
@@ -759,6 +765,7 @@ pub fn guess_from_setup_py(
 fn guess_from_setup_py_parsed(
     path: &Path,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    pyo3::prepare_freethreaded_python();
     let code = match std::fs::read_to_string(path) {
         Ok(setup_text) => setup_text,
         Err(e) => {
@@ -1087,4 +1094,221 @@ fn parse_python_classifiers<'a>(
             }
         }
     })
+}
+
+#[derive(Deserialize)]
+pub struct PypiProjectInfo {
+    pub author: Option<String>,
+    pub author_email: Option<String>,
+    pub bugtrack_url: Option<String>,
+    pub classifiers: Vec<String>,
+    pub description: String,
+    pub description_content_type: Option<String>,
+    pub docs_url: Option<String>,
+    pub download_url: Option<String>,
+    pub downloads: HashMap<String, isize>,
+    pub dynamic: Option<bool>,
+    pub home_page: Option<String>,
+    pub keywords: Option<String>,
+    pub license: Option<String>,
+    pub maintainer: Option<String>,
+    pub maintainer_email: Option<String>,
+    pub name: String,
+    pub package_url: String,
+    pub platform: Option<String>,
+    pub project_url: String,
+    pub project_urls: Option<HashMap<String, String>>,
+    pub provides_extra: Option<bool>,
+    pub release_url: String,
+    pub requires_dist: Option<Vec<String>>,
+    pub requires_python: Option<String>,
+    pub summary: String,
+    pub version: String,
+    pub yanked: Option<bool>,
+    pub yanked_reason: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct Digests {
+    pub md5: String,
+    pub sha256: String,
+    pub blake2b_256: String,
+}
+
+#[derive(Deserialize)]
+pub struct PypiRelease {
+    pub comment_text: String,
+    pub digests: Digests,
+    pub downloads: isize,
+    pub filename: String,
+    pub has_sig: bool,
+    pub md5_digest: String,
+    pub packagetype: String,
+    pub python_version: String,
+    pub requires_python: Option<String>,
+    pub size: isize,
+    pub upload_time: String,
+    pub upload_time_iso_8601: String,
+    pub url: String,
+    pub yanked: bool,
+    pub yanked_reason: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct PypiUrl {
+    pub comment_text: String,
+    pub digests: Digests,
+    pub filename: String,
+    pub has_sig: bool,
+    pub packagetype: String,
+    pub python_version: String,
+    pub requires_python: Option<String>,
+    pub size: isize,
+    pub upload_time: String,
+    pub upload_time_iso_8601: String,
+    pub url: String,
+    pub yanked: bool,
+    pub yanked_reason: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct PypiProject {
+    pub info: PypiProjectInfo,
+    pub last_serial: isize,
+    pub releases: HashMap<String, Vec<PypiRelease>>,
+    pub urls: Vec<PypiUrl>,
+    pub vulnerabilities: Vec<String>,
+}
+
+impl TryInto<UpstreamMetadata> for PypiProject {
+    type Error = ProviderError;
+
+    fn try_into(self) -> Result<UpstreamMetadata, Self::Error> {
+        let mut metadata = UpstreamMetadata::default();
+        if let Some(author) = self.info.author {
+            metadata.insert(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Author(vec![Person {
+                    name: Some(author),
+                    email: self.info.author_email,
+                    url: None,
+                }]),
+                certainty: Some(Certainty::Certain),
+                origin: None,
+            });
+        }
+
+        metadata.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Description(self.info.description),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+
+        if let Some(homepage) = self.info.home_page {
+            metadata.insert(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Homepage(homepage),
+                certainty: Some(Certainty::Certain),
+                origin: None,
+            });
+        }
+
+        if let Some(license) = self.info.license {
+            metadata.insert(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::License(license),
+                certainty: Some(Certainty::Certain),
+                origin: None,
+            });
+        }
+
+        metadata.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Name(self.info.name),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+
+        if let Some(maintainer) = self.info.maintainer {
+            metadata.insert(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Maintainer(Person {
+                    name: Some(maintainer),
+                    email: self.info.maintainer_email,
+                    url: None,
+                }),
+                certainty: Some(Certainty::Certain),
+                origin: None,
+            });
+        }
+
+        metadata.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Version(self.info.version),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+
+        if let Some(keywords) = self.info.keywords {
+            metadata.insert(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Keywords(
+                    keywords.split(',').map(|s| s.trim().to_string()).collect(),
+                ),
+                certainty: Some(Certainty::Certain),
+                origin: None,
+            });
+        }
+
+        if let Some(urls) = self.info.project_urls {
+            metadata.0.extend(parse_python_project_urls(
+                urls.into_iter(),
+                &Origin::Other("pypi".to_string()),
+            ));
+        }
+
+        for url_data in self.urls {
+            if url_data.packagetype == "sdist" {
+                metadata.insert(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Download(url_data.url),
+                    certainty: Some(Certainty::Certain),
+                    origin: None,
+                });
+            }
+        }
+
+        metadata.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Summary(self.info.summary),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+
+        Ok(metadata)
+    }
+}
+
+pub fn load_pypi_project(name: &str) -> Result<Option<PypiProject>, ProviderError> {
+    let http_url = format!("https://pypi.org/pypi/{}/json", name)
+        .parse()
+        .unwrap();
+    let data = crate::load_json_url(&http_url, None)?;
+    let pypi_data: PypiProject =
+        serde_json::from_value(data).map_err(|e| crate::ProviderError::Other(e.to_string()))?;
+    Ok(Some(pypi_data))
+}
+
+pub fn remote_pypi_metadata(name: &str) -> Result<UpstreamMetadata, ProviderError> {
+    let pypi = load_pypi_project(name)?;
+
+    match pypi {
+        Some(pypi) => pypi.try_into(),
+        None => Ok(UpstreamMetadata::default()),
+    }
+}
+
+#[cfg(test)]
+mod pypi_tests {
+    use super::*;
+
+    #[test]
+    fn test_pypi_upstream_info() {
+        let data = include_str!("../testdata/pypi.json");
+
+        let pypi_data: PypiProject = serde_json::from_str(data).unwrap();
+
+        assert_eq!(pypi_data.info.name, "merge3");
+    }
 }

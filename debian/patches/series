@@ -1,8 +1,13 @@
 older-reqwest
+relax-semver
+older-pulldown-cmark
 older-env-logger
-older-mailparse
 older-pyproject-toml
 older-rust-ini
 drop-xml
-older-tempfile
 fix-gix-config
+older-mailparse
+rst-parser
+older-xmltree
+relax-pretty-assertions
+relax-tempfile

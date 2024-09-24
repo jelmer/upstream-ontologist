@@ -61,8 +61,6 @@ import ruamel.yaml
 
 from . import _upstream_ontologist
 
-get_upstream_info = _upstream_ontologist.get_upstream_info
-
 SUPPORTED_CERTAINTIES = ["certain", "confident", "likely", "possible", None]
 
 version_string = "0.1.38"
@@ -131,12 +129,6 @@ class Person:
 
 UpstreamDatum = _upstream_ontologist.UpstreamDatum
 UpstreamMetadata = _upstream_ontologist.UpstreamMetadata
-
-
-class UpstreamPackage:
-    def __init__(self, family, name):
-        self.family = family
-        self.name = name
 
 
 # If we're setting them new, put Name and Contact first

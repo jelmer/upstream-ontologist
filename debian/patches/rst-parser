@@ -1,0 +1,27 @@
+Index: upstream-ontologist/Cargo.toml
+===================================================================
+--- upstream-ontologist.orig/Cargo.toml
++++ upstream-ontologist/Cargo.toml
+@@ -40,7 +40,7 @@ debian-control = { version = "0.1", opti
+ pulldown-cmark = ">=0.9"
+ debcargo = { version = "2.7", optional = true }
+ # See https://github.com/flying-sheep/rust-rst/issues/56
+-uo_rst_parser = "0.4.2"
++rst_parser = "0.4.0"
+ rst_renderer = "0.4.0"
+ #rst_parser = { git = "https://github.com/flying-sheep/rust-rst" }
+ #rst_renderer = { git = "https://github.com/flying-sheep/rust-rst" }
+Index: upstream-ontologist/src/readme.rs
+===================================================================
+--- upstream-ontologist.orig/src/readme.rs
++++ upstream-ontologist/src/readme.rs
+@@ -1078,8 +1078,8 @@ pub fn description_from_readme_html(
+ }
+ 
+ fn rst_to_html(rst_text: &str) -> String {
++    use rst_parser::parse;
+     use rst_renderer::render_html;
+-    use uo_rst_parser::parse;
+     let document = parse(rst_text).unwrap();
+     let mut output = Vec::new();
+     render_html(&document, &mut std::io::Cursor::new(&mut output), true).unwrap();

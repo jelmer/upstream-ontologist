@@ -6,6 +6,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
+#[cfg(feature = "opam")]
 pub fn guess_from_opam(
     path: &Path,
     _trust_package: bool,

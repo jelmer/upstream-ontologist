@@ -1,0 +1,13 @@
+Index: upstream-ontologist/Cargo.toml
+===================================================================
+--- upstream-ontologist.orig/Cargo.toml
++++ upstream-ontologist/Cargo.toml
+@@ -46,7 +46,7 @@ rst_renderer = "0.4.0"
+ #rst_parser = { git = "https://github.com/flying-sheep/rust-rst" }
+ #rst_renderer = { git = "https://github.com/flying-sheep/rust-rst" }
+ select = "0.6.0"
+-semver = { version = "1.0.23", features = ["serde"] }
++semver = { version = "1", features = ["serde"] }
+ 
+ [workspace]
+ members = [ "upstream-ontologist-py",]

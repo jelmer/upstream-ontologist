@@ -13,6 +13,7 @@ pub mod maven;
 pub mod meson;
 pub mod metadata_json;
 pub mod metainfo;
+pub mod node;
 pub mod nuspec;
 #[cfg(feature = "opam")]
 pub mod ocaml;
@@ -26,7 +27,6 @@ pub mod python;
 pub mod r;
 pub mod repology;
 pub mod ruby;
-#[cfg(feature = "cargo")]
 pub mod rust;
 pub mod security_md;
 pub mod waf;

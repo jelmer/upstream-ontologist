@@ -243,6 +243,7 @@ found in the source directory into .mo files and installs them.
     );
 }
 
+#[cfg(feature = "debian")]
 pub fn guess_from_debian_changelog(
     path: &Path,
     _settings: &GuesserSettings,
@@ -384,6 +385,7 @@ pub fn parse_debcargo_source_name(
     }
 }
 
+#[cfg(feature = "debian")]
 pub fn guess_from_debian_rules(
     path: &Path,
     _settings: &GuesserSettings,
@@ -423,6 +425,7 @@ pub fn guess_from_debian_rules(
     Ok(ret)
 }
 
+#[cfg(feature = "debian")]
 pub fn guess_from_debian_control(
     path: &Path,
     _settings: &GuesserSettings,
@@ -535,14 +538,16 @@ pub fn guess_from_debian_control(
     Ok(ret)
 }
 
+#[cfg(feature = "debian")]
 pub fn guess_from_debian_copyright(
     path: &Path,
     _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    use debian_copyright::lossless::{Copyright, Error};
     let mut ret = vec![];
     let text = &std::fs::read_to_string(path)?;
     let mut urls = vec![];
-    match debian_copyright::Copyright::from_str_relaxed(text) {
+    match Copyright::from_str_relaxed(text) {
         Ok((c, _)) => {
             let header = c.header().unwrap();
             if let Some(upstream_name) = header.upstream_name() {
@@ -616,13 +621,13 @@ pub fn guess_from_debian_copyright(
                 });
             }
         }
-        Err(debian_copyright::Error::IoError(e)) => {
+        Err(Error::IoError(e)) => {
             unreachable!("IO error: {}", e);
         }
-        Err(debian_copyright::Error::ParseError(e)) => {
+        Err(Error::ParseError(e)) => {
             return Err(ProviderError::ParseError(e.to_string()));
         }
-        Err(debian_copyright::Error::NotMachineReadable) => {
+        Err(Error::NotMachineReadable) => {
             for line in text.lines() {
                 if let Some(name) = line.strip_prefix("Upstream-Name: ") {
                     ret.push(UpstreamDatumWithMetadata {
@@ -665,6 +670,7 @@ pub fn guess_from_debian_copyright(
     Ok(ret)
 }
 
+#[cfg(feature = "debian")]
 pub fn guess_from_debian_watch(
     path: &Path,
     _settings: &GuesserSettings,
@@ -720,6 +726,7 @@ pub fn guess_from_debian_watch(
     Ok(ret)
 }
 
+#[cfg(feature = "debian")]
 pub fn debian_is_native(path: &Path) -> std::io::Result<Option<bool>> {
     let format_file_path = path.join("source/format");
     match File::open(format_file_path) {

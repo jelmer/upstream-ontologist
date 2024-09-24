@@ -1,9 +1,12 @@
 use lazy_regex::regex;
 use log::{debug, warn};
 use percent_encoding::utf8_percent_encode;
-use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
+#[cfg(feature = "pyo3")]
+use pyo3::{
+    exceptions::{PyRuntimeError, PyTypeError, PyValueError},
+    prelude::*,
+    types::PyDict,
+};
 use reqwest::header::HeaderMap;
 use serde::ser::SerializeSeq;
 use std::cmp::Ordering;
@@ -16,13 +19,13 @@ use url::Url;
 
 static USER_AGENT: &str = concat!("upstream-ontologist/", env!("CARGO_PKG_VERSION"));
 
-pub mod debian;
 pub mod extrapolate;
 pub mod forges;
 pub mod homepage;
 pub mod http;
 pub mod providers;
 pub mod readme;
+pub mod repology;
 pub mod vcs;
 pub mod vcs_command;
 
@@ -79,6 +82,7 @@ impl From<url::Url> for Origin {
     }
 }
 
+#[cfg(feature = "pyo3")]
 impl ToPyObject for Origin {
     fn to_object(&self, py: Python) -> PyObject {
         match self {
@@ -89,6 +93,7 @@ impl ToPyObject for Origin {
     }
 }
 
+#[cfg(feature = "pyo3")]
 impl IntoPy<PyObject> for Origin {
     fn into_py(self, py: Python) -> PyObject {
         match self {
@@ -99,6 +104,7 @@ impl IntoPy<PyObject> for Origin {
     }
 }
 
+#[cfg(feature = "pyo3")]
 impl FromPyObject<'_> for Origin {
     fn extract_bound(ob: &Bound<PyAny>) -> PyResult<Self> {
         if let Ok(path) = ob.extract::<PathBuf>() {
@@ -311,39 +317,7 @@ impl From<&str> for Person {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_person_from_str() {
-        assert_eq!(
-            Person::from("Foo Bar <foo@example.com>"),
-            Person {
-                name: Some("Foo Bar".to_string()),
-                email: Some("foo@example.com".to_string()),
-                url: None
-            }
-        );
-        assert_eq!(
-            Person::from("Foo Bar"),
-            Person {
-                name: Some("Foo Bar".to_string()),
-                email: None,
-                url: None
-            }
-        );
-        assert_eq!(
-            Person::from("foo@example.com"),
-            Person {
-                name: None,
-                email: Some("foo@example.com".to_string()),
-                url: None
-            }
-        );
-    }
-}
-
+#[cfg(feature = "pyo3")]
 impl ToPyObject for Person {
     fn to_object(&self, py: Python) -> PyObject {
         let m = PyModule::import_bound(py, "upstream_ontologist").unwrap();
@@ -367,6 +341,7 @@ fn parseaddr(text: &str) -> Option<(String, String)> {
     None
 }
 
+#[cfg(feature = "pyo3")]
 impl FromPyObject<'_> for Person {
     fn extract_bound(ob: &Bound<PyAny>) -> PyResult<Self> {
         let name = ob.getattr("name")?.extract::<Option<String>>()?;
@@ -451,6 +426,8 @@ pub enum UpstreamDatum {
     Donation(String),
     /// Link to a life instance of the webservice
     Webservice(String),
+    /// Name of the buildsystem used
+    BuildSystem(String),
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -507,6 +484,7 @@ impl UpstreamDatum {
             UpstreamDatum::CiteAs(..) => "Cite-As",
             UpstreamDatum::Donation(..) => "Donation",
             UpstreamDatum::Webservice(..) => "Webservice",
+            UpstreamDatum::BuildSystem(..) => "BuildSystem",
         }
     }
 
@@ -549,6 +527,7 @@ impl UpstreamDatum {
             UpstreamDatum::Registry(_) => None,
             UpstreamDatum::Donation(d) => Some(d),
             UpstreamDatum::Webservice(w) => Some(w),
+            UpstreamDatum::BuildSystem(b) => Some(b),
         }
     }
 
@@ -591,6 +570,7 @@ impl UpstreamDatum {
             UpstreamDatum::CiteAs(_c) => None,
             UpstreamDatum::Donation(_d) => None,
             UpstreamDatum::Webservice(w) => Some(w.parse().ok()?),
+            UpstreamDatum::BuildSystem(_) => None,
         }
     }
 
@@ -791,6 +771,9 @@ impl std::fmt::Display for UpstreamDatum {
             UpstreamDatum::Webservice(w) => {
                 write!(f, "Webservice: {}", w)
             }
+            UpstreamDatum::BuildSystem(bs) => {
+                write!(f, "BuildSystem: {}", bs)
+            }
         }
     }
 }
@@ -868,6 +851,7 @@ impl serde::ser::Serialize for UpstreamDatum {
             }
             UpstreamDatum::Donation(d) => serializer.serialize_str(d),
             UpstreamDatum::Webservice(w) => serializer.serialize_str(w),
+            UpstreamDatum::BuildSystem(bs) => serializer.serialize_str(bs),
         }
     }
 }
@@ -878,6 +862,14 @@ pub struct UpstreamMetadata(Vec<UpstreamDatumWithMetadata>);
 impl UpstreamMetadata {
     pub fn new() -> Self {
         UpstreamMetadata(Vec::new())
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
     }
 
     pub fn sort(&mut self) {
@@ -930,6 +922,177 @@ impl UpstreamMetadata {
     pub fn remove(&mut self, field: &str) -> Option<UpstreamDatumWithMetadata> {
         let index = self.0.iter().position(|d| d.datum.field() == field)?;
         Some(self.0.remove(index))
+    }
+
+    pub fn name(&self) -> Option<&str> {
+        self.get("Name").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn homepage(&self) -> Option<&str> {
+        self.get("Homepage").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn repository(&self) -> Option<&str> {
+        self.get("Repository").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn repository_browse(&self) -> Option<&str> {
+        self.get("Repository-Browse").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn description(&self) -> Option<&str> {
+        self.get("Description").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn summary(&self) -> Option<&str> {
+        self.get("Summary").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn license(&self) -> Option<&str> {
+        self.get("License").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn author(&self) -> Option<&Vec<Person>> {
+        self.get("Author").map(|d| match &d.datum {
+            UpstreamDatum::Author(authors) => authors,
+            _ => unreachable!(),
+        })
+    }
+
+    pub fn maintainer(&self) -> Option<&Person> {
+        self.get("Maintainer").map(|d| match &d.datum {
+            UpstreamDatum::Maintainer(maintainer) => maintainer,
+            _ => unreachable!(),
+        })
+    }
+
+    pub fn bug_database(&self) -> Option<&str> {
+        self.get("Bug-Database").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn bug_submit(&self) -> Option<&str> {
+        self.get("Bug-Submit").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn contact(&self) -> Option<&str> {
+        self.get("Contact").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn cargo_crate(&self) -> Option<&str> {
+        self.get("Cargo-Crate").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn security_md(&self) -> Option<&str> {
+        self.get("Security-MD").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn security_contact(&self) -> Option<&str> {
+        self.get("Security-Contact").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn version(&self) -> Option<&str> {
+        self.get("Version").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn keywords(&self) -> Option<&Vec<String>> {
+        self.get("Keywords").map(|d| match &d.datum {
+            UpstreamDatum::Keywords(keywords) => keywords,
+            _ => unreachable!(),
+        })
+    }
+
+    pub fn documentation(&self) -> Option<&str> {
+        self.get("Documentation").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn api_documentation(&self) -> Option<&str> {
+        self.get("API-Documentation").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn go_import_path(&self) -> Option<&str> {
+        self.get("Go-Import-Path").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn download(&self) -> Option<&str> {
+        self.get("Download").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn wiki(&self) -> Option<&str> {
+        self.get("Wiki").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn mailing_list(&self) -> Option<&str> {
+        self.get("MailingList").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn sourceforge_project(&self) -> Option<&str> {
+        self.get("SourceForge-Project")
+            .and_then(|d| d.datum.as_str())
+    }
+
+    pub fn archive(&self) -> Option<&str> {
+        self.get("Archive").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn demo(&self) -> Option<&str> {
+        self.get("Demo").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn pecl_package(&self) -> Option<&str> {
+        self.get("Pecl-Package").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn haskell_package(&self) -> Option<&str> {
+        self.get("Haskell-Package").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn funding(&self) -> Option<&str> {
+        self.get("Funding").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn changelog(&self) -> Option<&str> {
+        self.get("Changelog").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn debian_itp(&self) -> Option<i32> {
+        self.get("Debian-ITP").and_then(|d| match &d.datum {
+            UpstreamDatum::DebianITP(itp) => Some(*itp),
+            _ => unreachable!(),
+        })
+    }
+
+    pub fn screenshots(&self) -> Option<&Vec<String>> {
+        self.get("Screenshots").map(|d| match &d.datum {
+            UpstreamDatum::Screenshots(screenshots) => screenshots,
+            _ => unreachable!(),
+        })
+    }
+
+    pub fn donation(&self) -> Option<&str> {
+        self.get("Donation").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn cite_as(&self) -> Option<&str> {
+        self.get("Cite-As").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn registry(&self) -> Option<&Vec<(String, String)>> {
+        self.get("Registry").map(|d| match &d.datum {
+            UpstreamDatum::Registry(registry) => registry,
+            _ => unreachable!(),
+        })
+    }
+
+    pub fn webservice(&self) -> Option<&str> {
+        self.get("Webservice").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn buildsystem(&self) -> Option<&str> {
+        self.get("BuildSystem").and_then(|d| d.datum.as_str())
+    }
+
+    pub fn copyright(&self) -> Option<&str> {
+        self.get("Copyright").and_then(|d| d.datum.as_str())
     }
 }
 
@@ -1013,6 +1176,7 @@ impl serde::ser::Serialize for UpstreamMetadata {
     }
 }
 
+#[cfg(feature = "pyo3")]
 impl ToPyObject for UpstreamDatumWithMetadata {
     fn to_object(&self, py: Python) -> PyObject {
         let m = PyModule::import_bound(py, "upstream_ontologist.guess").unwrap();
@@ -1925,29 +2089,6 @@ pub fn bug_database_url_from_bug_submit_url(url: &Url, net_access: Option<bool>)
     }
 }
 
-#[test]
-fn test_bug_database_url_from_bug_submit_url() {
-    let url = Url::parse("https://bugs.launchpad.net/bugs/+filebug").unwrap();
-    assert_eq!(
-        bug_database_url_from_bug_submit_url(&url, None).unwrap(),
-        Url::parse("https://bugs.launchpad.net/bugs").unwrap()
-    );
-
-    let url = Url::parse("https://github.com/dulwich/dulwich/issues/new").unwrap();
-
-    assert_eq!(
-        bug_database_url_from_bug_submit_url(&url, None).unwrap(),
-        Url::parse("https://github.com/dulwich/dulwich/issues").unwrap()
-    );
-
-    let url = Url::parse("https://sourceforge.net/p/dulwich/bugs/new").unwrap();
-
-    assert_eq!(
-        bug_database_url_from_bug_submit_url(&url, None).unwrap(),
-        Url::parse("https://sourceforge.net/p/dulwich/bugs").unwrap()
-    );
-}
-
 pub fn guess_bug_database_url_from_repo_url(url: &Url, net_access: Option<bool>) -> Option<Url> {
     if let Some(forge) = find_forge(url, net_access) {
         forge.bug_database_url_from_repo_url(url)
@@ -2103,6 +2244,7 @@ pub fn guess_from_path(
     Ok(ret)
 }
 
+#[cfg(feature = "pyo3")]
 impl FromPyObject<'_> for UpstreamDatum {
     fn extract_bound(obj: &Bound<PyAny>) -> PyResult<Self> {
         let (field, val): (String, Bound<PyAny>) = if let Ok((field, val)) =
@@ -2171,11 +2313,13 @@ impl FromPyObject<'_> for UpstreamDatum {
             }
             "Donation" => Ok(UpstreamDatum::Donation(val.extract::<String>()?)),
             "Webservice" => Ok(UpstreamDatum::Webservice(val.extract::<String>()?)),
+            "BuildSystem" => Ok(UpstreamDatum::BuildSystem(val.extract::<String>()?)),
             _ => Err(PyRuntimeError::new_err(format!("Unknown field: {}", field))),
         }
     }
 }
 
+#[cfg(feature = "pyo3")]
 impl ToPyObject for UpstreamDatum {
     fn to_object(&self, py: Python) -> PyObject {
         (
@@ -2227,12 +2371,14 @@ impl ToPyObject for UpstreamDatum {
                     .to_object(py),
                 UpstreamDatum::Donation(d) => d.to_object(py),
                 UpstreamDatum::Webservice(w) => w.to_object(py),
+                UpstreamDatum::BuildSystem(b) => b.to_object(py),
             },
         )
             .to_object(py)
     }
 }
 
+#[cfg(feature = "pyo3")]
 impl FromPyObject<'_> for UpstreamDatumWithMetadata {
     fn extract_bound(obj: &Bound<PyAny>) -> PyResult<Self> {
         let certainty = obj.getattr("certainty")?.extract::<Option<String>>()?;
@@ -2257,7 +2403,6 @@ pub enum ProviderError {
     IoError(std::io::Error),
     Other(String),
     HttpJsonError(HTTPJSONError),
-    Python(PyErr),
     ExtrapolationLimitExceeded(usize),
 }
 
@@ -2268,7 +2413,6 @@ impl std::fmt::Display for ProviderError {
             ProviderError::IoError(e) => write!(f, "IO error: {}", e),
             ProviderError::Other(e) => write!(f, "Other error: {}", e),
             ProviderError::HttpJsonError(e) => write!(f, "HTTP JSON error: {}", e),
-            ProviderError::Python(e) => write!(f, "Python error: {}", e),
             ProviderError::ExtrapolationLimitExceeded(e) => {
                 write!(f, "Extrapolation limit exceeded: {}", e)
             }
@@ -2311,50 +2455,10 @@ impl From<ProviderError> for PyErr {
             ProviderError::ParseError(e) => ParseError::new_err((e,)),
             ProviderError::Other(e) => PyRuntimeError::new_err((e,)),
             ProviderError::HttpJsonError(e) => PyRuntimeError::new_err((e.to_string(),)),
-            ProviderError::Python(e) => e,
             ProviderError::ExtrapolationLimitExceeded(e) => {
                 PyRuntimeError::new_err((e.to_string(),))
             }
         }
-    }
-}
-
-#[derive(Debug)]
-pub struct UpstreamPackage {
-    pub family: String,
-    pub name: String,
-}
-
-impl FromPyObject<'_> for UpstreamPackage {
-    fn extract_bound(obj: &Bound<PyAny>) -> PyResult<Self> {
-        let family = obj.getattr("family")?.extract::<String>()?;
-        let name = obj.getattr("name")?.extract::<String>()?;
-        Ok(UpstreamPackage { family, name })
-    }
-}
-
-impl ToPyObject for UpstreamPackage {
-    fn to_object(&self, py: Python) -> PyObject {
-        let dict = pyo3::types::PyDict::new_bound(py);
-        dict.set_item("family", self.family.clone()).unwrap();
-        dict.set_item("name", self.name.clone()).unwrap();
-        dict.into()
-    }
-}
-
-#[derive(Debug)]
-pub struct UpstreamVersion(String);
-
-impl FromPyObject<'_> for UpstreamVersion {
-    fn extract_bound(obj: &Bound<PyAny>) -> PyResult<Self> {
-        let version = obj.extract::<String>()?;
-        Ok(UpstreamVersion(version))
-    }
-}
-
-impl ToPyObject for UpstreamVersion {
-    fn to_object(&self, py: Python) -> PyObject {
-        self.0.to_object(py)
     }
 }
 
@@ -2381,22 +2485,27 @@ const STATIC_GUESSERS: &[(
     &str,
     fn(&std::path::Path, &GuesserSettings) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>,
 )] = &[
+    #[cfg(feature = "debian")]
     (
         "debian/watch",
         crate::providers::debian::guess_from_debian_watch,
     ),
+    #[cfg(feature = "debian")]
     (
         "debian/control",
         crate::providers::debian::guess_from_debian_control,
     ),
+    #[cfg(feature = "debian")]
     (
         "debian/changelog",
         crate::providers::debian::guess_from_debian_changelog,
     ),
+    #[cfg(feature = "debian")]
     (
         "debian/rules",
         crate::providers::debian::guess_from_debian_rules,
     ),
+    #[cfg(feature = "python-pkginfo")]
     ("PKG-INFO", crate::providers::python::guess_from_pkg_info),
     (
         "package.json",
@@ -2414,7 +2523,9 @@ const STATIC_GUESSERS: &[(
         "package.yaml",
         crate::providers::package_yaml::guess_from_package_yaml,
     ),
+    #[cfg(feature = "dist-ini")]
     ("dist.ini", crate::providers::perl::guess_from_dist_ini),
+    #[cfg(feature = "debian")]
     (
         "debian/copyright",
         crate::providers::debian::guess_from_debian_copyright,
@@ -2427,18 +2538,23 @@ const STATIC_GUESSERS: &[(
         "configure",
         crate::providers::autoconf::guess_from_configure,
     ),
+    #[cfg(feature = "r-description")]
     ("DESCRIPTION", crate::providers::r::guess_from_r_description),
+    #[cfg(feature = "cargo")]
     ("Cargo.toml", crate::providers::rust::guess_from_cargo),
     ("pom.xml", crate::providers::maven::guess_from_pom_xml),
+    #[cfg(feature = "git-config")]
     (".git/config", crate::providers::git::guess_from_git_config),
     (
         "debian/get-orig-source.sh",
         crate::vcs_command::guess_from_get_orig_source,
     ),
+    #[cfg(feature = "pyproject-toml")]
     (
         "pyproject.toml",
         crate::providers::python::guess_from_pyproject_toml,
     ),
+    #[cfg(feature = "setup-cfg")]
     ("setup.cfg", crate::providers::python::guess_from_setup_cfg),
     ("go.mod", crate::providers::go::guess_from_go_mod),
     (
@@ -2494,6 +2610,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
     }
 
     let mut found_pkg_info = path.join("PKG-INFO").exists();
+    #[cfg(feature = "python-pkginfo")]
     for entry in std::fs::read_dir(&path).unwrap() {
         let entry = entry.unwrap();
         let filename = entry.file_name().to_string_lossy().to_string();
@@ -2537,6 +2654,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
     }
 
     // TODO(jelmer): Perhaps scan all directories if no other primary project information file has been found?
+    #[cfg(feature = "r-description")]
     for entry in std::fs::read_dir(&path).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
@@ -2709,6 +2827,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
         );
     }
 
+    #[cfg(feature = "opam")]
     let mut opam_filenames = std::fs::read_dir(&path)
         .unwrap()
         .filter_map(|entry| {
@@ -2721,6 +2840,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
         })
         .collect::<Vec<_>>();
 
+    #[cfg(feature = "opam")]
     match opam_filenames.len().cmp(&1) {
         Ordering::Equal => {
             let opam_filename = opam_filenames.remove(0);
@@ -2942,6 +3062,7 @@ pub fn extend_upstream_metadata(
     }
 
     let archive = upstream_metadata.get("Archive");
+    #[cfg(feature = "cargo")]
     if archive.is_some()
         && archive.unwrap().datum.as_str().unwrap() == "crates.io"
         && upstream_metadata.contains_key("Cargo-Crate")
@@ -2987,6 +3108,7 @@ pub fn extend_upstream_metadata(
             .unwrap();
     }
 
+    #[cfg(feature = "debian")]
     if net_access && consult_external_directory {
         // TODO(jelmer): Don't assume debian/control exists
         let package = match debian_control::Control::from_file_relaxed(path.join("debian/control"))
@@ -2996,6 +3118,7 @@ pub fn extend_upstream_metadata(
         };
 
         if let Some(package) = package {
+            #[cfg(feature = "launchpad")]
             extend_from_lp(
                 upstream_metadata.mut_items(),
                 minimum_certainty,
@@ -3057,6 +3180,7 @@ pub trait ThirdPartyRepository {
     fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, ProviderError>;
 }
 
+#[cfg(feature = "launchpad")]
 fn extend_from_lp(
     upstream_metadata: &mut Vec<UpstreamDatumWithMetadata>,
     minimum_certainty: Certainty,
@@ -3472,5 +3596,81 @@ impl Guesser for EnvironmentGuesser {
         _settings: &GuesserSettings,
     ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
         crate::guess_from_environment()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_upstream_metadata() {
+        let mut data = UpstreamMetadata::new();
+        assert_eq!(data.len(), 0);
+
+        data.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Homepage("https://example.com".to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+
+        assert_eq!(data.len(), 1);
+        assert_eq!(
+            data.get("Homepage").unwrap().datum.as_str().unwrap(),
+            "https://example.com"
+        );
+
+        assert_eq!(data.homepage(), Some("https://example.com"));
+    }
+
+    #[test]
+    fn test_bug_database_url_from_bug_submit_url() {
+        let url = Url::parse("https://bugs.launchpad.net/bugs/+filebug").unwrap();
+        assert_eq!(
+            bug_database_url_from_bug_submit_url(&url, None).unwrap(),
+            Url::parse("https://bugs.launchpad.net/bugs").unwrap()
+        );
+
+        let url = Url::parse("https://github.com/dulwich/dulwich/issues/new").unwrap();
+
+        assert_eq!(
+            bug_database_url_from_bug_submit_url(&url, None).unwrap(),
+            Url::parse("https://github.com/dulwich/dulwich/issues").unwrap()
+        );
+
+        let url = Url::parse("https://sourceforge.net/p/dulwich/bugs/new").unwrap();
+
+        assert_eq!(
+            bug_database_url_from_bug_submit_url(&url, None).unwrap(),
+            Url::parse("https://sourceforge.net/p/dulwich/bugs").unwrap()
+        );
+    }
+
+    #[test]
+    fn test_person_from_str() {
+        assert_eq!(
+            Person::from("Foo Bar <foo@example.com>"),
+            Person {
+                name: Some("Foo Bar".to_string()),
+                email: Some("foo@example.com".to_string()),
+                url: None
+            }
+        );
+        assert_eq!(
+            Person::from("Foo Bar"),
+            Person {
+                name: Some("Foo Bar".to_string()),
+                email: None,
+                url: None
+            }
+        );
+        assert_eq!(
+            Person::from("foo@example.com"),
+            Person {
+                name: None,
+                email: Some("foo@example.com".to_string()),
+                url: None
+            }
+        );
     }
 }
