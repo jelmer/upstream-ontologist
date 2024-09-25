@@ -589,7 +589,7 @@ pub fn guess_from_debian_copyright(
                 }
             }
 
-            if let Some(upstream_bugs) = header.get("X-Upstream-Bugs") {
+            if let Some(upstream_bugs) = header.as_deb822().get("X-Upstream-Bugs") {
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::BugDatabase(upstream_bugs),
                     certainty: Some(Certainty::Certain),
@@ -597,7 +597,7 @@ pub fn guess_from_debian_copyright(
                 });
             }
 
-            if let Some(source_downloaded_from) = header.get("X-Source-Downloaded-From") {
+            if let Some(source_downloaded_from) = header.as_deb822().get("X-Source-Downloaded-From") {
                 if let Ok(url) = source_downloaded_from.parse::<url::Url>() {
                     urls.push(url.to_string());
                 }
