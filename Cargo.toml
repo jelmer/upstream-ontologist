@@ -12,7 +12,7 @@ include = ["testdata", "readme_tests", "man", "build.rs", "src/*.rs", "README.md
 exlcude = ["py", "tests", "pyproject.toml", "MANIFEST.in", "setup.py"]
 
 [workspace.package]
-version = "0.1.42"
+version = "0.1.43"
 
 [dependencies]
 log = "0.4"
@@ -98,7 +98,7 @@ version = "0.1"
 optional = true
 
 [dependencies.gix-config]
-version = ">=0.20"
+version = ">=0.40"
 optional = true
 
 [dependencies.distro-info]
