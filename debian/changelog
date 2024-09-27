@@ -1,10 +1,10 @@
-upstream-ontologist (0.1.44-1) UNRELEASED; urgency=medium
+upstream-ontologist (0.1.44-1) unstable; urgency=medium
 
   * Remove unused manpage for guess-upstream-metadata(1).
   * New upstream release.
   * Drop unnecessary dh-rust build dependency.
 
- -- Jelmer Vernooĳ <jelmer@debian.org>  Fri, 27 Sep 2024 22:06:13 -0000
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Fri, 27 Sep 2024 22:20:03 +0100
 
 upstream-ontologist (0.1.42-1) unstable; urgency=low
 
