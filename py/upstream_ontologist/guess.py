@@ -30,11 +30,6 @@ def guess_upstream_info(path, trust_package):
     return iter(_upstream_ontologist.guess_upstream_info(path, trust_package))
 
 
-class NoSuchPackage(Exception):
-    def __init__(self, package):
-        self.package = package
-
-
 check_upstream_metadata = _upstream_ontologist.check_upstream_metadata
 extend_upstream_metadata = _upstream_ontologist.extend_upstream_metadata
 guess_upstream_metadata = _upstream_ontologist.guess_upstream_metadata
