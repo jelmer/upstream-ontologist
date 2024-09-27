@@ -759,6 +759,7 @@ pub fn debian_is_native(path: &Path) -> std::io::Result<Option<bool>> {
 mod watch_tests {
     use super::*;
 
+    #[cfg(feature = "debian")]
     #[test]
     fn test_empty() {
         let td = tempfile::tempdir().unwrap();
@@ -775,6 +776,7 @@ mod watch_tests {
             .is_empty());
     }
 
+    #[cfg(feature = "debian")]
     #[test]
     fn test_simple() {
         let td = tempfile::tempdir().unwrap();
