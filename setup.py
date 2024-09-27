@@ -18,5 +18,4 @@ setup(
             features=["extension-module"] + extra_features,
         ),
     ],
-    data_files=[("share/man/man1", ["man/guess-upstream-metadata.1"])],
 )
