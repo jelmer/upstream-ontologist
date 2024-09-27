@@ -2,7 +2,7 @@ Index: upstream-ontologist/Cargo.toml
 ===================================================================
 --- upstream-ontologist.orig/Cargo.toml
 +++ upstream-ontologist/Cargo.toml
-@@ -40,7 +40,7 @@ debian-control = { version = "0.1", opti
+@@ -42,7 +42,7 @@ debian-control = { version = "0.1", opti
  pulldown-cmark = ">=0.9"
  debcargo = { version = "2.7", optional = true }
  # See https://github.com/flying-sheep/rust-rst/issues/56

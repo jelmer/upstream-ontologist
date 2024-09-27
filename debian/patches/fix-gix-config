@@ -20,3 +20,16 @@ Index: upstream-ontologist/src/providers/git.rs
              let url = remote_origin.to_string();
              if !url.starts_with("../") {
                  results.push(UpstreamDatumWithMetadata {
+Index: upstream-ontologist/Cargo.toml
+===================================================================
+--- upstream-ontologist.orig/Cargo.toml
++++ upstream-ontologist/Cargo.toml
+@@ -98,7 +98,7 @@ version = "0.1"
+ optional = true
+ 
+ [dependencies.gix-config]
+-version = ">=0.40"
++version = ">=0.36"
+ optional = true
+ 
+ [dependencies.distro-info]
