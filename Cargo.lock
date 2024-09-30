@@ -348,7 +348,7 @@ dependencies = [
  "os_info",
  "pasetors",
  "pathdiff",
- "pulldown-cmark",
+ "pulldown-cmark 0.9.6",
  "rand",
  "rustfix",
  "semver",
@@ -2867,7 +2867,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4979f22fdb869068da03c9f7528f8297c6fd2606bc3a4affe42e6a823fdb8da4"
 dependencies = [
  "cfg-if",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -3662,10 +3662,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57206b407293d2bcd3af849ce869d52068623f19e1b5ff8e8778e3309439682b"
 dependencies = [
  "bitflags",
- "getopts",
  "memchr",
  "unicase",
 ]
+
+[[package]]
+name = "pulldown-cmark"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "666f0f59e259aea2d72e6012290c09877a780935cc3c18b1ceded41f3890d59c"
+dependencies = [
+ "bitflags",
+ "getopts",
+ "memchr",
+ "pulldown-cmark-escape",
+ "unicase",
+]
+
+[[package]]
+name = "pulldown-cmark-escape"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "007d8adb5ddab6f8e3f491ac63566a7d5002cc7ed73901f72057943fa71ae1ae"
 
 [[package]]
 name = "pyo3"
@@ -5029,7 +5047,7 @@ dependencies = [
 
 [[package]]
 name = "upstream-ontologist"
-version = "0.1.43"
+version = "0.1.44"
 dependencies = [
  "breezyshim",
  "chrono",
@@ -5054,7 +5072,7 @@ dependencies = [
  "opam-file-rs",
  "percent-encoding",
  "pretty_assertions",
- "pulldown-cmark",
+ "pulldown-cmark 0.12.1",
  "pyo3",
  "pyproject-toml",
  "python-pkginfo",
@@ -5079,7 +5097,7 @@ dependencies = [
 
 [[package]]
 name = "upstream-ontologist-py"
-version = "0.1.43"
+version = "0.1.44"
 dependencies = [
  "log",
  "pyo3",
@@ -5278,7 +5296,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
