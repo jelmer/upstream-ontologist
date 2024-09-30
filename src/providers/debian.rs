@@ -597,7 +597,8 @@ pub fn guess_from_debian_copyright(
                 });
             }
 
-            if let Some(source_downloaded_from) = header.as_deb822().get("X-Source-Downloaded-From") {
+            if let Some(source_downloaded_from) = header.as_deb822().get("X-Source-Downloaded-From")
+            {
                 if let Ok(url) = source_downloaded_from.parse::<url::Url>() {
                     urls.push(url.to_string());
                 }
