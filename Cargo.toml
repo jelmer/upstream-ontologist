@@ -9,7 +9,7 @@ repository = "https://github.com/jelmer/upstream-ontologist.git"
 homepage = "https://github.com/jelmer/upstream-ontologist"
 default-run = "guess-upstream-metadata"
 include = ["testdata", "readme_tests", "man", "build.rs", "src/*.rs", "README.md", "src/**/*.rs"]
-exlcude = ["py", "tests", "pyproject.toml", "MANIFEST.in", "setup.py"]
+exclude = ["py", "tests", "pyproject.toml", "MANIFEST.in", "setup.py"]
 
 [workspace.package]
 version = "0.1.44"
