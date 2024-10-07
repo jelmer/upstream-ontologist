@@ -43,7 +43,7 @@ readme = [
 ]
 "setup.cfg" = ["setuptools"]
 testing = ["breezy>=3.3.0"]
-dev = ["ruff==0.6.8"]
+dev = ["ruff==0.6.9"]
 
 [project.scripts]
 guess-upstream-metadata = "upstream_ontologist.__main__:main"
