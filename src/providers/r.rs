@@ -5,8 +5,6 @@ use crate::{
     UpstreamDatumWithMetadata,
 };
 use log::debug;
-use std::fs::File;
-use std::io::Read;
 use url::Url;
 
 #[cfg(feature = "r-description")]
@@ -14,17 +12,12 @@ pub fn guess_from_r_description(
     path: &std::path::Path,
     _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
-    use mailparse::MailHeaderMap;
-    let mut file = File::open(path)?;
-    let mut contents = Vec::new();
-    file.read_to_end(&mut contents)?;
+    use std::str::FromStr;
+    let contents = std::fs::read_to_string(path)?;
 
-    let msg =
-        mailparse::parse_mail(&contents).map_err(|e| ProviderError::ParseError(e.to_string()))?;
-
-    let headers = msg.get_headers();
-
-    let mut results = Vec::new();
+    // TODO: Use parse_relaxed
+    let msg = r_description::lossless::RDescription::from_str(&contents)
+        .map_err(|e| ProviderError::ParseError(e.to_string()))?;
 
     fn parse_url_entry(entry: &str) -> Option<(&str, Option<&str>)> {
         let mut parts = entry.splitn(2, " (");
@@ -36,7 +29,9 @@ pub fn guess_from_r_description(
         }
     }
 
-    if let Some(package) = headers.get_first_value("Package") {
+    let mut results = Vec::new();
+
+    if let Some(package) = msg.package() {
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Name(package),
             certainty: Some(Certainty::Certain),
@@ -44,7 +39,7 @@ pub fn guess_from_r_description(
         });
     }
 
-    if let Some(repository) = headers.get_first_value("Repository") {
+    if let Some(repository) = msg.repository() {
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Archive(repository),
             certainty: Some(Certainty::Certain),
@@ -52,15 +47,15 @@ pub fn guess_from_r_description(
         });
     }
 
-    if let Some(bug_reports) = headers.get_first_value("BugReports") {
+    if let Some(bug_reports) = msg.bug_reports() {
         results.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::BugDatabase(bug_reports),
+            datum: UpstreamDatum::BugDatabase(bug_reports.to_string()),
             certainty: Some(Certainty::Certain),
             origin: Some(path.into()),
         });
     }
 
-    if let Some(version) = headers.get_first_value("Version") {
+    if let Some(version) = msg.version() {
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Version(version),
             certainty: Some(Certainty::Certain),
@@ -68,7 +63,7 @@ pub fn guess_from_r_description(
         });
     }
 
-    if let Some(license) = headers.get_first_value("License") {
+    if let Some(license) = msg.license() {
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::License(license),
             certainty: Some(Certainty::Certain),
@@ -76,7 +71,7 @@ pub fn guess_from_r_description(
         });
     }
 
-    if let Some(title) = headers.get_first_value("Title") {
+    if let Some(title) = msg.title() {
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Summary(title),
             certainty: Some(Certainty::Certain),
@@ -84,11 +79,7 @@ pub fn guess_from_r_description(
         });
     }
 
-    if let Some(desc) = headers
-        .get_first_header("Description")
-        .map(|h| h.get_value_raw())
-    {
-        let desc = String::from_utf8_lossy(desc);
+    if let Some(desc) = msg.description() {
         let lines: Vec<&str> = desc.split_inclusive('\n').collect();
         if !lines.is_empty() {
             let reflowed = format!("{}{}", lines[0], textwrap::dedent(&lines[1..].concat()));
@@ -100,7 +91,7 @@ pub fn guess_from_r_description(
         }
     }
 
-    if let Some(maintainer) = headers.get_first_value("Maintainer") {
+    if let Some(maintainer) = msg.maintainer() {
         let person = Person::from(maintainer.as_str());
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Maintainer(person),
@@ -109,8 +100,7 @@ pub fn guess_from_r_description(
         });
     }
 
-    if let Some(url) = headers.get_first_header("URL").map(|h| h.get_value_raw()) {
-        let url = String::from_utf8(url.to_vec()).unwrap();
+    if let Some(url) = msg.url() {
         let entries: Vec<&str> = url
             .split_terminator(|c| c == ',' || c == '\n')
             .map(str::trim)

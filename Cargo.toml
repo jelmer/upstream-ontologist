@@ -59,7 +59,7 @@ launchpad = ["dep:distro-info"]
 opam = ["dep:opam-file-rs"]
 dist-ini = ["dep:rust-ini"]
 cargo = ["dep:toml"]
-r-description = ["dep:mailparse"]
+r-description = ["dep:r-description"]
 pyproject-toml = ["dep:pyproject-toml"]
 python-pkginfo = ["dep:python-pkginfo"]
 setup-cfg = ["dep:rust-ini"]
@@ -109,8 +109,8 @@ optional = true
 version = ">=0.8"
 optional = true
 
-[dependencies.mailparse]
-version = ">=0.14"
+[dependencies.r-description]
+version = ">=0.2.2"
 optional = true
 
 [dependencies.pyproject-toml]
