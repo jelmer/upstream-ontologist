@@ -3826,17 +3826,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pyo3-log"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ac84e6eec1159bc2a575c9ae6723baa6ee9d45873e9bebad1e3ad7e8d28a443"
-dependencies = [
- "arc-swap",
- "log",
- "pyo3",
-]
-
-[[package]]
 name = "pyo3-macros"
 version = "0.22.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5212,19 +5201,6 @@ dependencies = [
  "uo_rst_parser",
  "url",
  "xmltree",
-]
-
-[[package]]
-name = "upstream-ontologist-py"
-version = "0.1.45"
-dependencies = [
- "log",
- "pyo3",
- "pyo3-log",
- "reqwest",
- "serde_json",
- "upstream-ontologist",
- "url",
 ]
 
 [[package]]
