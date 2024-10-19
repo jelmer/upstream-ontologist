@@ -5,6 +5,7 @@ use crate::{
 use log::{debug, warn};
 use serde::Deserialize;
 
+#[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::path::Path;
@@ -605,6 +606,7 @@ pub fn guess_from_setup_cfg(
     Ok(ret)
 }
 
+#[cfg(feature = "pyo3")]
 fn guess_from_setup_py_executed(
     path: &Path,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
@@ -751,6 +753,7 @@ fn guess_from_setup_py_executed(
     Ok(ret)
 }
 
+#[cfg(feature = "pyo3")]
 pub fn guess_from_setup_py(
     path: &Path,
     trust_package: bool,
@@ -762,6 +765,7 @@ pub fn guess_from_setup_py(
     }
 }
 
+#[cfg(feature = "pyo3")]
 fn guess_from_setup_py_parsed(
     path: &Path,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
