@@ -878,7 +878,6 @@ pub fn find_public_repo_url(repo_url: &str, net_access: Option<bool>) -> Option<
 }
 
 pub fn fixup_rcp_style_git_repo_url(url: &str) -> Option<Url> {
-    pyo3::prepare_freethreaded_python();
     breezyshim::location::rcp_location_to_url(url).ok()
 }
 
