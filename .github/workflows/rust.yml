@@ -25,6 +25,8 @@ jobs:
           python-version: "3.x"
       - name: Install breezy
         run: pip install breezy
+      - name: Install python3-setuptools
+        run: pip install setuptools
       - name: Build
         run: cargo build --verbose
       - name: Build without default features

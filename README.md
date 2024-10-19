@@ -105,7 +105,7 @@ Summary: Python Git Library
 Bug-Submit: https://github.com/dulwich/dulwich/issues/new
 ```
 
-Alternatively, there is a Python API. There are also ``autocodemeta`` and
-``autodoap`` commands that can generate output in the
-[codemeta](https://codemeta.github.io/) and
+Alternatively, there is a Python API as part of the ``upstream_ontologist``
+Python package. There are also ``autocodemeta`` and ``autodoap`` commands that
+can generate output in the [codemeta](https://codemeta.github.io/) and
 [DOAP](https://github.com/ewilderj/doap) formats, respectively.

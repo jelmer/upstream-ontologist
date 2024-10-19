@@ -1,6 +1,6 @@
 [package]
 name = "upstream-ontologist"
-version = { workspace = true }
+version = "0.1.45"
 authors = [ "Jelmer Vernooĳ <jelmer@jelmer.uk>",]
 edition = "2021"
 license = "GPL-2.0+"
@@ -9,10 +9,6 @@ repository = "https://github.com/jelmer/upstream-ontologist.git"
 homepage = "https://github.com/jelmer/upstream-ontologist"
 default-run = "guess-upstream-metadata"
 include = ["testdata", "readme_tests", "man", "build.rs", "src/*.rs", "README.md", "src/**/*.rs"]
-exclude = ["py", "tests", "pyproject.toml", "MANIFEST.in", "setup.py"]
-
-[workspace.package]
-version = "0.1.45"
 
 [dependencies]
 log = "0.4"
@@ -49,9 +45,6 @@ rst_renderer = "0.4.0"
 select = "0.6.0"
 semver = { version = "1", features = ["serde"] }
 
-[workspace]
-members = [ "upstream-ontologist-py",]
-
 [features]
 default = ["git-config", "launchpad", "opam", "dist-ini", "cargo", "r-description", "pyproject-toml", "python-pkginfo", "debian", "pyo3", "setup-cfg"]
 git-config = ["dep:gix-config"]
@@ -78,7 +71,7 @@ tempfile = ">=3"
 quote = "1.0.37"
 
 [dependencies.pyo3]
-workspace = true
+version = ">=0.22"
 
 [dependencies.reqwest]
 version = ">=0.11"
@@ -120,10 +113,6 @@ optional = true
 [dependencies.python-pkginfo]
 version = ">=0.5"
 optional = true
-
-[workspace.dependencies]
-pyo3 = ">=0.22"
-pyo3-log = ">=0.11"
 
 [[bin]]
 name = "autodoap"
