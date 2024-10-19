@@ -1,0 +1,10 @@
+# See https://github.com/jelmer/disperse
+name = "upstream-ontologist"
+release-timeout = 5
+tag-name = "v$VERSION"
+update_manpages = ["man/*.1"]
+
+[[update_version]]
+path = "Cargo.toml"
+match = "^version = \"(.*)\""
+new-line = "version = \"$VERSION\""
