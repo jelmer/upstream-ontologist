@@ -151,21 +151,12 @@ fn version_in_tags(version: &str, tag_names: &[&str]) -> bool {
 }
 
 fn probe_upstream_breezy_branch_url(url: &url::Url, version: Option<&str>) -> Option<bool> {
-    use pyo3::prelude::*;
-    let tags: HashMap<String, Vec<u8>> = pyo3::Python::with_gil(|py| {
-        let breezy_ui = py.import_bound("breezy.ui")?;
-        let branch_mod = py.import_bound("breezy.branch")?;
-        py.import_bound("breezy.bzr")?;
-        py.import_bound("breezy.git")?;
-        let old_ui = breezy_ui.getattr("ui_factory")?;
-        breezy_ui.setattr("ui_factory", breezy_ui.call_method0("SilentUIFactory")?)?;
-        let branch_cls = branch_mod.getattr("Branch")?;
-        let branch = branch_cls.call_method1("open", (url.as_str(),))?;
-        branch.call_method0("last_revision")?;
-        let tags = branch.getattr("tags")?.call_method0("get_tag_dict")?;
-        breezy_ui.setattr("ui_factory", old_ui)?;
-        tags.extract()
-    })
+    let tags: HashMap<String, breezyshim::RevisionId> = breezyshim::ui::with_silent_ui_factory(
+        || -> Result<HashMap<String, breezyshim::RevisionId>, breezyshim::error::Error> {
+            let branch = breezyshim::branch::open(url)?;
+            branch.tags()?.get_tag_dict()
+        },
+    )
     .map_err(|e| {
         warn!("failed to probe breezy branch: {:?}", e);
         e
@@ -895,38 +886,24 @@ pub fn try_open_branch(
     url: &url::Url,
     branch_name: Option<&str>,
 ) -> Option<Box<dyn breezyshim::branch::Branch>> {
-    use pyo3::prelude::*;
-    match Python::with_gil(|py| {
-        let uim = py.import_bound("breezy.ui")?;
-        let controldirm = py.import_bound("breezy.controldir")?;
-        let controldir_cls = controldirm.getattr("ControlDir")?;
+    let old_ui_factory = breezyshim::ui::get_ui_factory();
+    breezyshim::ui::install_ui_factory(&breezyshim::ui::SilentUIFactory::new());
 
-        let old_ui_factory = uim.getattr("ui_factory")?;
-        uim.setattr("ui_factory", uim.call_method0("SilentUIFactory")?)?;
+    let controldir = match breezyshim::controldir::open(url, None) {
+        Ok(c) => c,
+        Err(_) => return None,
+    };
 
-        let r = || -> PyResult<PyObject> {
-            let c = controldir_cls.call_method1("open", (url.to_string(),))?;
-            let b = c.call_method1("open_branch", (branch_name,))?;
-
-            b.call_method0("last_revision")?;
-            Ok(b.to_object(py))
-        }();
-
-        uim.setattr("ui_factory", old_ui_factory)?;
-
-        match r {
-            Ok(b) => Ok(b),
-            Err(e) => Err(e),
+    let rev = match controldir.open_branch(branch_name) {
+        Ok(b) => {
+            b.last_revision();
+            Some(b)
         }
-    }) {
-        Ok(b) => Python::with_gil(|py| {
-            Some(
-                Box::new(breezyshim::branch::RegularBranch::new(b.to_object(py)))
-                    as Box<dyn breezyshim::branch::Branch>,
-            )
-        }),
         Err(_) => None,
-    }
+    };
+
+    breezyshim::ui::install_ui_factory(old_ui_factory.as_ref());
+    rev
 }
 
 pub fn find_secure_repo_url(

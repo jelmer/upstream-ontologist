@@ -2631,6 +2631,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
         }
     }
 
+    #[cfg(feature = "pyo3")]
     if !found_pkg_info && path.join("setup.py").exists() {
         candidates.push(Box::new(PathGuesser {
             name: "setup.py".to_string(),
