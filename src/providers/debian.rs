@@ -257,7 +257,7 @@ pub fn guess_from_debian_changelog(
     })?;
 
     let first_entry = cl
-        .entries()
+        .iter()
         .next()
         .ok_or_else(|| ProviderError::ParseError("Empty changelog".to_string()))?;
 
@@ -683,7 +683,7 @@ pub fn guess_from_debian_watch(
     let get_package_name = || -> String {
         let text = std::fs::read_to_string(path.parent().unwrap().join("changelog")).unwrap();
         let cl: ChangeLog = text.parse().unwrap();
-        let first_entry = cl.entries().next().unwrap();
+        let first_entry = cl.iter().next().unwrap();
         first_entry.package().unwrap()
     };
 
@@ -745,7 +745,7 @@ pub fn debian_is_native(path: &Path) -> std::io::Result<Option<bool>> {
         Ok(mut file) => {
             let cl = debian_changelog::ChangeLog::read(&mut file)
                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-            let first_entry = cl.entries().next().unwrap();
+            let first_entry = cl.iter().next().unwrap();
             let version = first_entry.version().unwrap();
             return Ok(Some(version.debian_revision.is_none()));
         }
