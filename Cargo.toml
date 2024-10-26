@@ -27,7 +27,7 @@ textwrap = ">=0.16"
 lazy-regex = ">=2"
 breezyshim = { version = ">=0.1.206", default-features = false, features = ["auto-initialize"] }
 debian-watch = { version = "0.2", optional = true }
-debian-changelog = { version = "0.1", optional = true }
+debian-changelog = { version = "0.2", optional = true }
 debbugs = "0.1"
 clap = { version = "4", features = ["derive", "env"], optional = true }
 maplit = "1"
@@ -108,7 +108,7 @@ version = ">=0.2.2"
 optional = true
 
 [dependencies.pyproject-toml]
-version = ">=0.7"
+version = ">=0.7,<0.13"
 optional = true
 
 [dependencies.python-pkginfo]
