@@ -1,6 +1,6 @@
 [package]
 name = "upstream-ontologist"
-version = "0.1.45"
+version = "0.1.46"
 authors = [ "Jelmer Vernooĳ <jelmer@jelmer.uk>",]
 edition = "2021"
 license = "GPL-2.0+"
