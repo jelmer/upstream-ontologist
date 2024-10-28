@@ -174,7 +174,7 @@ pub fn guess_from_pyproject_toml(
             });
         }
 
-        if let Some(pyproject_toml::License::String(license)) = inner_project.license.as_ref() {
+        if let Some(pyproject_toml::License::Spdx(license)) = inner_project.license.as_ref() {
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::License(license.clone()),
                 certainty: Some(Certainty::Certain),
@@ -184,8 +184,8 @@ pub fn guess_from_pyproject_toml(
 
         fn contact_to_person(contact: &pyproject_toml::Contact) -> Person {
             Person {
-                name: contact.name.clone(),
-                email: contact.email.clone(),
+                name: contact.name().map(|s| s.to_string()),
+                email: contact.email().map(|s| s.to_string()),
                 url: None,
             }
         }
