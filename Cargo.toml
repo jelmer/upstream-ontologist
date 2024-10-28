@@ -108,7 +108,7 @@ version = ">=0.2.2"
 optional = true
 
 [dependencies.pyproject-toml]
-version = ">=0.7,<0.13"
+version = ">=0.7, <0.14"
 optional = true
 
 [dependencies.python-pkginfo]
