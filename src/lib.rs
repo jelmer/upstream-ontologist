@@ -1366,6 +1366,7 @@ pub fn with_path_segments(url: &Url, path_segments: &[&str]) -> Result<Url, ()> 
     Ok(url)
 }
 
+#[async_trait::async_trait]
 pub trait Forge: Send + Sync {
     fn repository_browse_can_be_homepage(&self) -> bool;
 
@@ -1405,7 +1406,7 @@ pub trait Forge: Send + Sync {
         None
     }
 
-    fn extend_metadata(
+    async fn extend_metadata(
         &self,
         _metadata: &mut Vec<UpstreamDatumWithMetadata>,
         _project: &str,
@@ -1915,11 +1916,14 @@ fn possible_fields_missing(
     false
 }
 
-fn extend_from_external_guesser(
+async fn extend_from_external_guesser<
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = Vec<UpstreamDatum>>,
+>(
     metadata: &mut Vec<UpstreamDatumWithMetadata>,
     max_certainty: Option<Certainty>,
     supported_fields: &[&str],
-    new_items: impl Fn() -> Vec<UpstreamDatum>,
+    new_items: F,
 ) {
     if max_certainty.is_some()
         && !possible_fields_missing(metadata, supported_fields, max_certainty.unwrap())
@@ -1928,6 +1932,7 @@ fn extend_from_external_guesser(
     }
 
     let new_items = new_items()
+        .await
         .into_iter()
         .map(|item| UpstreamDatumWithMetadata {
             datum: item,
@@ -1952,6 +1957,7 @@ impl SourceForge {
     }
 }
 
+#[async_trait::async_trait]
 impl Forge for SourceForge {
     fn name(&self) -> &'static str {
         "SourceForge"
@@ -1972,7 +1978,7 @@ impl Forge for SourceForge {
         with_path_segments(url, &["p", project, "bugs"]).ok()
     }
 
-    fn extend_metadata(
+    async fn extend_metadata(
         &self,
         metadata: &mut Vec<UpstreamDatumWithMetadata>,
         project: &str,
@@ -1987,8 +1993,11 @@ impl Forge for SourceForge {
             metadata,
             max_certainty,
             &["Homepage", "Name", "Repository", "Bug-Database"],
-            || crate::forges::sourceforge::guess_from_sf(project, subproject.as_deref()),
+            || async {
+                crate::forges::sourceforge::guess_from_sf(project, subproject.as_deref()).await
+            },
         )
+        .await
     }
 }
 
@@ -2998,7 +3007,7 @@ pub fn upstream_metadata_stream(
     stream(path, &GuesserSettings { trust_package }, guessers)
 }
 
-pub fn extend_upstream_metadata(
+pub async fn extend_upstream_metadata(
     upstream_metadata: &mut UpstreamMetadata,
     path: &std::path::Path,
     minimum_certainty: Option<Certainty>,
@@ -3058,11 +3067,13 @@ pub fn extend_upstream_metadata(
             .unwrap()
             .to_string();
         let sf_certainty = archive.unwrap().certainty;
-        SourceForge::new().extend_metadata(
-            upstream_metadata.mut_items(),
-            sf_project.as_str(),
-            sf_certainty,
-        );
+        SourceForge::new()
+            .extend_metadata(
+                upstream_metadata.mut_items(),
+                sf_project.as_str(),
+                sf_certainty,
+            )
+            .await;
     }
 
     let archive = upstream_metadata.get("Archive");
@@ -3086,6 +3097,7 @@ pub fn extend_upstream_metadata(
                 hackage_package.as_str(),
                 hackage_certainty,
             )
+            .await
             .unwrap();
     }
 
@@ -3110,6 +3122,7 @@ pub fn extend_upstream_metadata(
                 cargo_crate.as_str(),
                 crates_io_certainty,
             )
+            .await
             .unwrap();
     }
 
@@ -3133,6 +3146,7 @@ pub fn extend_upstream_metadata(
                 pecl_package.as_str(),
                 pecl_certainty,
             )
+            .await
             .unwrap();
     }
 
@@ -3153,13 +3167,15 @@ pub fn extend_upstream_metadata(
                 package.as_str(),
                 None,
                 None,
-            );
+            )
+            .await;
             crate::providers::arch::Aur::new()
                 .extend_metadata(
                     upstream_metadata.mut_items(),
                     package.as_str(),
                     Some(minimum_certainty),
                 )
+                .await
                 .unwrap();
             crate::providers::gobo::Gobo::new()
                 .extend_metadata(
@@ -3167,24 +3183,27 @@ pub fn extend_upstream_metadata(
                     package.as_str(),
                     Some(minimum_certainty),
                 )
+                .await
                 .unwrap();
             extend_from_repology(
                 upstream_metadata.mut_items(),
                 minimum_certainty,
                 package.as_str(),
-            );
+            )
+            .await;
         }
     }
     crate::extrapolate::extrapolate_fields(upstream_metadata, net_access, None)?;
     Ok(())
 }
 
+#[async_trait::async_trait]
 pub trait ThirdPartyRepository {
     fn name(&self) -> &'static str;
     fn supported_fields(&self) -> &'static [&'static str];
     fn max_supported_certainty(&self) -> Certainty;
 
-    fn extend_metadata(
+    async fn extend_metadata(
         &self,
         metadata: &mut Vec<UpstreamDatumWithMetadata>,
         name: &str,
@@ -3199,17 +3218,18 @@ pub trait ThirdPartyRepository {
             metadata,
             Some(self.max_supported_certainty()),
             self.supported_fields(),
-            || self.guess_metadata(name).unwrap(),
-        );
+            || async { self.guess_metadata(name).await.unwrap() },
+        )
+        .await;
 
         Ok(())
     }
 
-    fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, ProviderError>;
+    async fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, ProviderError>;
 }
 
 #[cfg(feature = "launchpad")]
-fn extend_from_lp(
+async fn extend_from_lp(
     upstream_metadata: &mut Vec<UpstreamDatumWithMetadata>,
     minimum_certainty: Certainty,
     package: &str,
@@ -3226,12 +3246,15 @@ fn extend_from_lp(
         return;
     }
 
-    extend_from_external_guesser(upstream_metadata, Some(lp_certainty), lp_fields, || {
-        crate::providers::launchpad::guess_from_launchpad(package, distribution, suite).unwrap()
+    extend_from_external_guesser(upstream_metadata, Some(lp_certainty), lp_fields, || async {
+        crate::providers::launchpad::guess_from_launchpad(package, distribution, suite)
+            .await
+            .unwrap()
     })
+    .await
 }
 
-fn extend_from_repology(
+async fn extend_from_repology(
     upstream_metadata: &mut Vec<UpstreamDatumWithMetadata>,
     minimum_certainty: Certainty,
     source_package: &str,
@@ -3245,9 +3268,17 @@ fn extend_from_repology(
         return;
     }
 
-    extend_from_external_guesser(upstream_metadata, Some(certainty), repology_fields, || {
-        crate::providers::repology::guess_from_repology(source_package).unwrap()
-    })
+    extend_from_external_guesser(
+        upstream_metadata,
+        Some(certainty),
+        repology_fields,
+        || async {
+            crate::providers::repology::guess_from_repology(source_package)
+                .await
+                .unwrap()
+        },
+    )
+    .await
 }
 
 /// Fix existing upstream metadata.
@@ -3284,13 +3315,15 @@ pub fn summarize_upstream_metadata(
     let mut upstream_metadata = UpstreamMetadata::new();
     upstream_metadata.update(filter_bad_guesses(metadata_items));
 
-    extend_upstream_metadata(
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    rt.block_on(extend_upstream_metadata(
         &mut upstream_metadata,
         path,
         None,
         net_access,
         consult_external_directory,
-    )?;
+    ))?;
 
     if check {
         check_upstream_metadata(&mut upstream_metadata, None);

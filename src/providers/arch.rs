@@ -170,6 +170,7 @@ impl Aur {
     }
 }
 
+#[async_trait::async_trait]
 impl crate::ThirdPartyRepository for Aur {
     fn name(&self) -> &'static str {
         "AUR"
@@ -183,7 +184,7 @@ impl crate::ThirdPartyRepository for Aur {
         crate::Certainty::Possible
     }
 
-    fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, crate::ProviderError> {
+    async fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, crate::ProviderError> {
         Ok(guess_from_aur(name))
     }
 }

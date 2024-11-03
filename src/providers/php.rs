@@ -108,6 +108,7 @@ impl Pecl {
     }
 }
 
+#[async_trait::async_trait]
 impl crate::ThirdPartyRepository for Pecl {
     fn name(&self) -> &'static str {
         "Pecl"
@@ -121,7 +122,7 @@ impl crate::ThirdPartyRepository for Pecl {
         &["Homepage", "Repository", "Bug-Database"]
     }
 
-    fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, ProviderError> {
+    async fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, ProviderError> {
         guess_from_pecl_package(name)
     }
 }

@@ -12,7 +12,7 @@ struct Project {
     pub downloads: Vec<String>,
 }
 
-pub fn guess_from_repology(
+pub async fn guess_from_repology(
     repology_project: &str,
 ) -> Result<Vec<UpstreamDatum>, crate::ProviderError> {
     let metadata: Vec<Project> = serde_json::from_value(
