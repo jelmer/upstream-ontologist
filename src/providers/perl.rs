@@ -524,18 +524,18 @@ impl TryFrom<CpanModule> for UpstreamMetadata {
     }
 }
 
-pub fn load_cpan_data(module: &str) -> Result<Option<CpanModule>, crate::ProviderError> {
+pub async fn load_cpan_data(module: &str) -> Result<Option<CpanModule>, crate::ProviderError> {
     let url = format!("https://fastapi.metacpan.org/v1/release/{}", module)
         .parse()
         .unwrap();
 
-    let data = crate::load_json_url(&url, None)?;
+    let data = crate::load_json_url(&url, None).await?;
 
     Ok(Some(serde_json::from_value(data).unwrap()))
 }
 
-pub fn remote_cpan_data(module: &str) -> Result<UpstreamMetadata, crate::ProviderError> {
-    let data = load_cpan_data(module)?;
+pub async fn remote_cpan_data(module: &str) -> Result<UpstreamMetadata, crate::ProviderError> {
+    let data = load_cpan_data(module).await?;
 
     match data {
         Some(data) => data.try_into(),

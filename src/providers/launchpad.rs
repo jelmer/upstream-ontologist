@@ -38,12 +38,15 @@ pub async fn guess_from_launchpad(
     );
 
     let sourcepackage_data =
-        load_json_url(&url::Url::parse(sourcepackage_url.as_str()).unwrap(), None).unwrap();
+        load_json_url(&url::Url::parse(sourcepackage_url.as_str()).unwrap(), None)
+            .await
+            .unwrap();
     if let Some(productseries_url) = sourcepackage_data.get("productseries_link") {
         let productseries_data = load_json_url(
             &url::Url::parse(productseries_url.as_str().unwrap()).unwrap(),
             None,
         )
+        .await
         .unwrap();
         let project_link = productseries_data.get("project_link").cloned();
 
@@ -52,6 +55,7 @@ pub async fn guess_from_launchpad(
                 &url::Url::parse(project_link.as_str().unwrap()).unwrap(),
                 None,
             )
+            .await
             .unwrap();
             let mut results = Vec::new();
 
@@ -99,6 +103,7 @@ pub async fn guess_from_launchpad(
                             .unwrap(),
                             None,
                         )
+                        .await
                         .unwrap();
                         if let Some(url) = code_import_data.get("url") {
                             results
@@ -117,6 +122,7 @@ pub async fn guess_from_launchpad(
                                 .unwrap(),
                                 None,
                             )
+                            .await
                             .unwrap();
                             results.push(UpstreamDatum::Repository(
                                 branch_data.as_object().unwrap()["bzr_identity"]
@@ -139,13 +145,16 @@ pub async fn guess_from_launchpad(
                     );
 
                     let repo_data =
-                        load_json_url(&url::Url::parse(repo_link.as_str()).unwrap(), None).unwrap();
+                        load_json_url(&url::Url::parse(repo_link.as_str()).unwrap(), None)
+                            .await
+                            .unwrap();
 
                     if let Some(code_import_link) = repo_data.get("code_import_link") {
                         let code_import_data = load_json_url(
                             &url::Url::parse(code_import_link.as_str().unwrap()).unwrap(),
                             None,
                         )
+                        .await
                         .unwrap();
 
                         if let Some(url) = code_import_data.get("url") {

@@ -1223,10 +1223,11 @@ pub trait UpstreamDataProvider {
 #[derive(Debug)]
 pub enum HTTPJSONError {
     HTTPError(reqwest::Error),
+    Timeout(tokio::time::Duration),
     Error {
         url: reqwest::Url,
         status: u16,
-        response: reqwest::blocking::Response,
+        response: reqwest::Response,
     },
 }
 
@@ -1234,6 +1235,7 @@ impl std::fmt::Display for HTTPJSONError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             HTTPJSONError::HTTPError(e) => write!(f, "{}", e),
+            HTTPJSONError::Timeout(timeout) => write!(f, "Timeout after {:?}", timeout),
             HTTPJSONError::Error {
                 url,
                 status,
@@ -1243,7 +1245,7 @@ impl std::fmt::Display for HTTPJSONError {
     }
 }
 
-pub fn load_json_url(
+pub async fn load_json_url(
     http_url: &Url,
     timeout: Option<std::time::Duration>,
 ) -> Result<serde_json::Value, HTTPJSONError> {
@@ -1262,7 +1264,6 @@ pub fn load_json_url(
     }
 
     let client = crate::http::build_client()
-        .timeout(timeout)
         .default_headers(headers)
         .build()
         .map_err(HTTPJSONError::HTTPError)?;
@@ -1274,7 +1275,12 @@ pub fn load_json_url(
         .build()
         .map_err(HTTPJSONError::HTTPError)?;
 
-    let response = client.execute(request).map_err(HTTPJSONError::HTTPError)?;
+    let timeout = timeout.unwrap_or(std::time::Duration::from_secs(30));
+
+    let response = tokio::time::timeout(timeout, client.execute(request))
+        .await
+        .map_err(|_| HTTPJSONError::Timeout(timeout))?
+        .map_err(HTTPJSONError::HTTPError)?;
 
     if !response.status().is_success() {
         return Err(HTTPJSONError::Error {
@@ -1284,7 +1290,8 @@ pub fn load_json_url(
         });
     }
 
-    let json_contents: serde_json::Value = response.json().map_err(HTTPJSONError::HTTPError)?;
+    let json_contents: serde_json::Value =
+        response.json().await.map_err(HTTPJSONError::HTTPError)?;
 
     Ok(json_contents)
 }
@@ -1321,7 +1328,7 @@ pub enum CanonicalizeError {
     RateLimited(Url),
 }
 
-pub fn check_url_canonical(url: &Url) -> Result<Url, CanonicalizeError> {
+pub async fn check_url_canonical(url: &Url) -> Result<Url, CanonicalizeError> {
     if url.scheme() != "http" && url.scheme() != "https" {
         return Err(CanonicalizeError::Unverifiable(
             url.clone(),
@@ -1333,10 +1340,10 @@ pub fn check_url_canonical(url: &Url) -> Result<Url, CanonicalizeError> {
         .build()
         .map_err(|e| CanonicalizeError::Unverifiable(url.clone(), format!("HTTP error {}", e)))?;
 
-    let response = client
-        .get(url.clone())
-        .send()
-        .map_err(|e| CanonicalizeError::Unverifiable(url.clone(), format!("HTTP error {}", e)))?;
+    let response =
+        client.get(url.clone()).send().await.map_err(|e| {
+            CanonicalizeError::Unverifiable(url.clone(), format!("HTTP error {}", e))
+        })?;
 
     match response.status() {
         status if status.is_success() => Ok(response.url().clone()),
@@ -1380,14 +1387,14 @@ pub trait Forge: Send + Sync {
         None
     }
 
-    fn check_bug_database_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError> {
+    async fn check_bug_database_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError> {
         Err(CanonicalizeError::Unverifiable(
             url.clone(),
             "Not implemented".to_string(),
         ))
     }
 
-    fn check_bug_submit_url_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError> {
+    async fn check_bug_submit_url_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError> {
         Err(CanonicalizeError::Unverifiable(
             url.clone(),
             "Not implemented".to_string(),
@@ -1429,6 +1436,7 @@ impl GitHub {
     }
 }
 
+#[async_trait::async_trait]
 impl Forge for GitHub {
     fn name(&self) -> &'static str {
         "GitHub"
@@ -1473,7 +1481,7 @@ impl Forge for GitHub {
         Some(url)
     }
 
-    fn check_bug_database_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError> {
+    async fn check_bug_database_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError> {
         assert_eq!(url.host(), Some(url::Host::Domain("github.com")));
         let path_elements = url.path_segments().unwrap().collect::<Vec<_>>();
 
@@ -1496,7 +1504,7 @@ impl Forge for GitHub {
         ))
         .unwrap();
 
-        let response = match reqwest::blocking::get(api_url) {
+        let response = match reqwest::get(api_url).await {
             Ok(response) => response,
             Err(e) if e.status() == Some(reqwest::StatusCode::NOT_FOUND) => {
                 return Err(CanonicalizeError::InvalidUrl(
@@ -1516,7 +1524,7 @@ impl Forge for GitHub {
                 ));
             }
         };
-        let data = response.json::<serde_json::Value>().map_err(|e| {
+        let data = response.json::<serde_json::Value>().await.map_err(|e| {
             CanonicalizeError::Unverifiable(
                 url.clone(),
                 format!("Unable to verify bug database URL: {}", e),
@@ -1560,11 +1568,11 @@ impl Forge for GitHub {
         Ok(url)
     }
 
-    fn check_bug_submit_url_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError> {
+    async fn check_bug_submit_url_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError> {
         let mut path_segments = url.path_segments().unwrap().collect::<Vec<_>>();
         path_segments.pop();
         let db_url = with_path_segments(url, &path_segments).unwrap();
-        let mut canonical_db_url = self.check_bug_database_canonical(&db_url)?;
+        let mut canonical_db_url = self.check_bug_database_canonical(&db_url).await?;
         canonical_db_url.set_scheme("https").expect("valid scheme");
         canonical_db_url
             .path_segments_mut()
@@ -1635,6 +1643,7 @@ impl GitLab {
     }
 }
 
+#[async_trait::async_trait]
 impl Forge for GitLab {
     fn name(&self) -> &'static str {
         "GitLab"
@@ -1682,7 +1691,7 @@ impl Forge for GitLab {
         Some(url)
     }
 
-    fn check_bug_database_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError> {
+    async fn check_bug_database_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError> {
         let host = url
             .host()
             .ok_or_else(|| CanonicalizeError::InvalidUrl(url.clone(), "no host".to_string()))?;
@@ -1711,7 +1720,7 @@ impl Forge for GitLab {
                 "GitLab URL with invalid project path".to_string(),
             )
         })?;
-        match load_json_url(&api_url, None) {
+        match load_json_url(&api_url, None).await {
             Ok(data) => {
                 // issues_enabled is only provided when the user is authenticated,
                 // so if we're not then we just fall back to checking the canonical URL
@@ -1734,7 +1743,7 @@ impl Forge for GitLab {
                     return Ok(canonical_url);
                 }
 
-                check_url_canonical(&canonical_url)
+                check_url_canonical(&canonical_url).await
             }
             Err(HTTPJSONError::Error { status, .. })
                 if status == reqwest::StatusCode::NOT_FOUND =>
@@ -1751,7 +1760,7 @@ impl Forge for GitLab {
         }
     }
 
-    fn check_bug_submit_url_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError> {
+    async fn check_bug_submit_url_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError> {
         let path_elements = url
             .path_segments()
             .expect("valid segments")
@@ -1771,7 +1780,7 @@ impl Forge for GitLab {
         }
 
         let db_url = with_path_segments(url, &path_elements[0..path_elements.len() - 1]).unwrap();
-        let mut canonical_db_url = self.check_bug_database_canonical(&db_url)?;
+        let mut canonical_db_url = self.check_bug_database_canonical(&db_url).await?;
         canonical_db_url
             .path_segments_mut()
             .expect("valid segments")
@@ -2046,7 +2055,7 @@ impl Forge for Launchpad {
     }
 }
 
-pub fn find_forge(url: &Url, net_access: Option<bool>) -> Option<Box<dyn Forge>> {
+pub async fn find_forge(url: &Url, net_access: Option<bool>) -> Option<Box<dyn Forge>> {
     if url.host_str()? == "sourceforge.net" {
         return Some(Box::new(SourceForge::new()));
     }
@@ -2059,18 +2068,18 @@ pub fn find_forge(url: &Url, net_access: Option<bool>) -> Option<Box<dyn Forge>>
         return Some(Box::new(GitHub::new()));
     }
 
-    if vcs::is_gitlab_site(url.host_str()?, net_access) {
+    if vcs::is_gitlab_site(url.host_str()?, net_access).await {
         return Some(Box::new(GitLab::new()));
     }
 
     None
 }
 
-pub fn check_bug_database_canonical(
+pub async fn check_bug_database_canonical(
     url: &Url,
     net_access: Option<bool>,
 ) -> Result<Url, CanonicalizeError> {
-    if let Some(forge) = find_forge(url, net_access) {
+    if let Some(forge) = find_forge(url, net_access).await {
         forge
             .bug_database_url_from_bug_submit_url(url)
             .ok_or(CanonicalizeError::Unverifiable(
@@ -2085,51 +2094,60 @@ pub fn check_bug_database_canonical(
     }
 }
 
-pub fn bug_submit_url_from_bug_database_url(url: &Url, net_access: Option<bool>) -> Option<Url> {
-    if let Some(forge) = find_forge(url, net_access) {
+pub async fn bug_submit_url_from_bug_database_url(
+    url: &Url,
+    net_access: Option<bool>,
+) -> Option<Url> {
+    if let Some(forge) = find_forge(url, net_access).await {
         forge.bug_submit_url_from_bug_database_url(url)
     } else {
         None
     }
 }
 
-pub fn bug_database_url_from_bug_submit_url(url: &Url, net_access: Option<bool>) -> Option<Url> {
-    if let Some(forge) = find_forge(url, net_access) {
+pub async fn bug_database_url_from_bug_submit_url(
+    url: &Url,
+    net_access: Option<bool>,
+) -> Option<Url> {
+    if let Some(forge) = find_forge(url, net_access).await {
         forge.bug_database_url_from_bug_submit_url(url)
     } else {
         None
     }
 }
 
-pub fn guess_bug_database_url_from_repo_url(url: &Url, net_access: Option<bool>) -> Option<Url> {
-    if let Some(forge) = find_forge(url, net_access) {
+pub async fn guess_bug_database_url_from_repo_url(
+    url: &Url,
+    net_access: Option<bool>,
+) -> Option<Url> {
+    if let Some(forge) = find_forge(url, net_access).await {
         forge.bug_database_url_from_repo_url(url)
     } else {
         None
     }
 }
 
-pub fn repo_url_from_merge_request_url(url: &Url, net_access: Option<bool>) -> Option<Url> {
-    if let Some(forge) = find_forge(url, net_access) {
+pub async fn repo_url_from_merge_request_url(url: &Url, net_access: Option<bool>) -> Option<Url> {
+    if let Some(forge) = find_forge(url, net_access).await {
         forge.repo_url_from_merge_request_url(url)
     } else {
         None
     }
 }
 
-pub fn bug_database_from_issue_url(url: &Url, net_access: Option<bool>) -> Option<Url> {
-    if let Some(forge) = find_forge(url, net_access) {
+pub async fn bug_database_from_issue_url(url: &Url, net_access: Option<bool>) -> Option<Url> {
+    if let Some(forge) = find_forge(url, net_access).await {
         forge.bug_database_from_issue_url(url)
     } else {
         None
     }
 }
 
-pub fn check_bug_submit_url_canonical(
+pub async fn check_bug_submit_url_canonical(
     url: &Url,
     net_access: Option<bool>,
 ) -> Result<Url, CanonicalizeError> {
-    if let Some(forge) = find_forge(url, net_access) {
+    if let Some(forge) = find_forge(url, net_access).await {
         forge
             .bug_submit_url_from_bug_database_url(url)
             .ok_or(CanonicalizeError::Unverifiable(
@@ -2204,7 +2222,7 @@ pub fn metadata_from_url(url: &str, origin: &Origin) -> Vec<UpstreamDatumWithMet
     results
 }
 
-pub fn get_repology_metadata(srcname: &str, repo: Option<&str>) -> Option<serde_json::Value> {
+pub async fn get_repology_metadata(srcname: &str, repo: Option<&str>) -> Option<serde_json::Value> {
     let repo = repo.unwrap_or("debian_unstable");
     let url = format!(
         "https://repology.org/tools/project-by?repo={}&name_type=srcname'
@@ -2212,7 +2230,7 @@ pub fn get_repology_metadata(srcname: &str, repo: Option<&str>) -> Option<serde_
         repo, srcname
     );
 
-    match load_json_url(&Url::parse(url.as_str()).unwrap(), None) {
+    match load_json_url(&Url::parse(url.as_str()).unwrap(), None).await {
         Ok(json) => Some(json),
         Err(HTTPJSONError::Error { status: 404, .. }) => None,
         Err(e) => {
@@ -2493,103 +2511,158 @@ impl std::fmt::Debug for UpstreamMetadataGuesser {
     }
 }
 
-const OLD_STATIC_GUESSERS: &[(
-    &str,
-    fn(&std::path::Path, &GuesserSettings) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>,
-)] = &[
+type OldAsyncGuesser = fn(
+    PathBuf,
+    GuesserSettings,
+) -> Pin<
+    Box<
+        dyn std::future::Future<Output = Result<Vec<UpstreamDatumWithMetadata>, ProviderError>>
+            + Send,
+    >,
+>;
+
+const OLD_STATIC_GUESSERS: &[(&str, OldAsyncGuesser)] = &[
     #[cfg(feature = "debian")]
-    (
-        "debian/watch",
-        crate::providers::debian::guess_from_debian_watch,
-    ),
+    ("debian/watch", |path, settings| {
+        Box::pin(async move {
+            crate::providers::debian::guess_from_debian_watch(&path, &settings).await
+        })
+    }),
     #[cfg(feature = "debian")]
-    (
-        "debian/control",
-        crate::providers::debian::guess_from_debian_control,
-    ),
+    ("debian/control", |path, settings| {
+        Box::pin(
+            async move { crate::providers::debian::guess_from_debian_control(&path, &settings) },
+        )
+    }),
     #[cfg(feature = "debian")]
-    (
-        "debian/changelog",
-        crate::providers::debian::guess_from_debian_changelog,
-    ),
+    ("debian/changelog", |path, settings| {
+        Box::pin(async move {
+            crate::providers::debian::guess_from_debian_changelog(&path, &settings).await
+        })
+    }),
     #[cfg(feature = "debian")]
-    (
-        "debian/rules",
-        crate::providers::debian::guess_from_debian_rules,
-    ),
+    ("debian/rules", |path, settings| {
+        Box::pin(async move { crate::providers::debian::guess_from_debian_rules(&path, &settings) })
+    }),
     #[cfg(feature = "python-pkginfo")]
-    ("PKG-INFO", crate::providers::python::guess_from_pkg_info),
-    (
-        "package.json",
-        crate::providers::package_json::guess_from_package_json,
-    ),
-    (
-        "composer.json",
-        crate::providers::composer_json::guess_from_composer_json,
-    ),
-    (
-        "package.xml",
-        crate::providers::package_xml::guess_from_package_xml,
-    ),
-    (
-        "package.yaml",
-        crate::providers::package_yaml::guess_from_package_yaml,
-    ),
+    ("PKG-INFO", |path, settings| {
+        Box::pin(
+            async move { crate::providers::python::guess_from_pkg_info(&path, &settings).await },
+        )
+    }),
+    ("package.json", |path, settings| {
+        Box::pin(async move {
+            crate::providers::package_json::guess_from_package_json(&path, &settings)
+        })
+    }),
+    ("composer.json", |path, settings| {
+        Box::pin(async move {
+            crate::providers::composer_json::guess_from_composer_json(&path, &settings)
+        })
+    }),
+    ("package.xml", |path, settings| {
+        Box::pin(
+            async move { crate::providers::package_xml::guess_from_package_xml(&path, &settings) },
+        )
+    }),
+    ("package.yaml", |path, settings| {
+        Box::pin(async move {
+            crate::providers::package_yaml::guess_from_package_yaml(&path, &settings)
+        })
+    }),
     #[cfg(feature = "dist-ini")]
-    ("dist.ini", crate::providers::perl::guess_from_dist_ini),
+    ("dist.ini", |path, settings| {
+        Box::pin(async move { crate::providers::perl::guess_from_dist_ini(&path, &settings) })
+    }),
     #[cfg(feature = "debian")]
-    (
-        "debian/copyright",
-        crate::providers::debian::guess_from_debian_copyright,
-    ),
-    ("META.json", crate::providers::perl::guess_from_meta_json),
-    ("MYMETA.json", crate::providers::perl::guess_from_meta_json),
-    ("META.yml", crate::providers::perl::guess_from_meta_yml),
-    ("MYMETA.yml", crate::providers::perl::guess_from_meta_yml),
-    (
-        "configure",
-        crate::providers::autoconf::guess_from_configure,
-    ),
+    ("debian/copyright", |path, settings| {
+        Box::pin(async move {
+            crate::providers::debian::guess_from_debian_copyright(&path, &settings).await
+        })
+    }),
+    ("META.json", |path, settings| {
+        Box::pin(async move { crate::providers::perl::guess_from_meta_json(&path, &settings) })
+    }),
+    ("MYMETA.json", |path, settings| {
+        Box::pin(async move { crate::providers::perl::guess_from_meta_json(&path, &settings) })
+    }),
+    ("META.yml", |path, settings| {
+        Box::pin(async move { crate::providers::perl::guess_from_meta_yml(&path, &settings) })
+    }),
+    ("MYMETA.yml", |path, settings| {
+        Box::pin(async move { crate::providers::perl::guess_from_meta_yml(&path, &settings) })
+    }),
+    ("configure", |path, settings| {
+        Box::pin(async move { crate::providers::autoconf::guess_from_configure(&path, &settings) })
+    }),
     #[cfg(feature = "r-description")]
-    ("DESCRIPTION", crate::providers::r::guess_from_r_description),
+    ("DESCRIPTION", |path, settings| {
+        Box::pin(
+            async move { crate::providers::r::guess_from_r_description(&path, &settings).await },
+        )
+    }),
     #[cfg(feature = "cargo")]
-    ("Cargo.toml", crate::providers::rust::guess_from_cargo),
-    ("pom.xml", crate::providers::maven::guess_from_pom_xml),
+    ("Cargo.toml", |path, settings| {
+        Box::pin(async move { crate::providers::rust::guess_from_cargo(&path, &settings) })
+    }),
+    ("pom.xml", |path, settings| {
+        Box::pin(async move { crate::providers::maven::guess_from_pom_xml(&path, &settings) })
+    }),
     #[cfg(feature = "git-config")]
-    (".git/config", crate::providers::git::guess_from_git_config),
-    (
-        "debian/get-orig-source.sh",
-        crate::vcs_command::guess_from_get_orig_source,
-    ),
+    (".git/config", |path, settings| {
+        Box::pin(async move { crate::providers::git::guess_from_git_config(&path, &settings) })
+    }),
+    ("debian/get-orig-source.sh", |path, settings| {
+        Box::pin(async move { crate::vcs_command::guess_from_get_orig_source(&path, &settings) })
+    }),
     #[cfg(feature = "pyproject-toml")]
-    (
-        "pyproject.toml",
-        crate::providers::python::guess_from_pyproject_toml,
-    ),
+    ("pyproject.toml", |path, settings| {
+        Box::pin(
+            async move { crate::providers::python::guess_from_pyproject_toml(&path, &settings) },
+        )
+    }),
     #[cfg(feature = "setup-cfg")]
-    ("setup.cfg", crate::providers::python::guess_from_setup_cfg),
-    ("go.mod", crate::providers::go::guess_from_go_mod),
-    (
-        "Makefile.PL",
-        crate::providers::perl::guess_from_makefile_pl,
-    ),
-    ("wscript", crate::providers::waf::guess_from_wscript),
-    ("AUTHORS", crate::providers::authors::guess_from_authors),
-    ("INSTALL", crate::providers::guess_from_install),
-    (
-        "pubspec.yaml",
-        crate::providers::pubspec::guess_from_pubspec_yaml,
-    ),
-    (
-        "pubspec.yml",
-        crate::providers::pubspec::guess_from_pubspec_yaml,
-    ),
-    ("meson.build", crate::providers::meson::guess_from_meson),
-    (
-        "metadata.json",
-        crate::providers::metadata_json::guess_from_metadata_json,
-    ),
-    (".travis.yml", crate::guess_from_travis_yml),
+    ("setup.cfg", |path, settings| {
+        Box::pin(
+            async move { crate::providers::python::guess_from_setup_cfg(&path, &settings).await },
+        )
+    }),
+    ("go.mod", |path, settings| {
+        Box::pin(async move { crate::providers::go::guess_from_go_mod(&path, &settings) })
+    }),
+    ("Makefile.PL", |path, settings| {
+        Box::pin(async move { crate::providers::perl::guess_from_makefile_pl(&path, &settings) })
+    }),
+    ("wscript", |path, settings| {
+        Box::pin(async move { crate::providers::waf::guess_from_wscript(&path, &settings) })
+    }),
+    ("AUTHORS", |path, settings| {
+        Box::pin(async move { crate::providers::authors::guess_from_authors(&path, &settings) })
+    }),
+    ("INSTALL", |path, settings| {
+        Box::pin(async move { crate::providers::guess_from_install(&path, &settings).await })
+    }),
+    ("pubspec.yaml", |path, settings| {
+        Box::pin(
+            async move { crate::providers::pubspec::guess_from_pubspec_yaml(&path, &settings) },
+        )
+    }),
+    ("pubspec.yml", |path, settings| {
+        Box::pin(
+            async move { crate::providers::pubspec::guess_from_pubspec_yaml(&path, &settings) },
+        )
+    }),
+    ("meson.build", |path, settings| {
+        Box::pin(async move { crate::providers::meson::guess_from_meson(&path, &settings) })
+    }),
+    ("metadata.json", |path, settings| {
+        Box::pin(async move {
+            crate::providers::metadata_json::guess_from_metadata_json(&path, &settings)
+        })
+    }),
+    (".travis.yml", |path, settings| {
+        Box::pin(async move { crate::guess_from_travis_yml(&path, &settings) })
+    }),
 ];
 
 fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
@@ -2603,7 +2676,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
             candidates.push(Box::new(PathGuesser {
                 name: name.to_string(),
                 subpath: subpath.clone(),
-                cb: Box::new(cb),
+                cb: Box::new(move |p, s| Box::pin(cb(p.to_path_buf(), s.clone()))),
             }));
         }
     }
@@ -2615,7 +2688,10 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
                 name: name.to_string(),
                 subpath: subpath.clone(),
                 cb: Box::new(|p, s| {
-                    crate::providers::security_md::guess_from_security_md(name, p, s)
+                    let name = name.to_string();
+                    Box::pin(async move {
+                        crate::providers::security_md::guess_from_security_md(&name, &p, &s)
+                    })
                 }),
             }));
         }
@@ -2630,14 +2706,22 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
             candidates.push(Box::new(PathGuesser {
                 name: format!("{}/PKG-INFO", filename),
                 subpath: entry.path().join("PKG-INFO"),
-                cb: Box::new(crate::providers::python::guess_from_pkg_info),
+                cb: Box::new(|p, s| {
+                    Box::pin(
+                        async move { crate::providers::python::guess_from_pkg_info(&p, &s).await },
+                    )
+                }),
             }));
             found_pkg_info = true;
         } else if filename.ends_with(".dist-info") {
             candidates.push(Box::new(PathGuesser {
                 name: format!("{}/METADATA", filename),
                 subpath: entry.path().join("METADATA"),
-                cb: Box::new(crate::providers::python::guess_from_pkg_info),
+                cb: Box::new(|p, s| {
+                    Box::pin(
+                        async move { crate::providers::python::guess_from_pkg_info(&p, &s).await },
+                    )
+                }),
             }));
             found_pkg_info = true;
         }
@@ -2649,7 +2733,9 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
             name: "setup.py".to_string(),
             subpath: path.join("setup.py"),
             cb: Box::new(|path, s| {
-                crate::providers::python::guess_from_setup_py(path, s.trust_package)
+                Box::pin(async move {
+                    crate::providers::python::guess_from_setup_py(&path, s.trust_package).await
+                })
             }),
         }));
     }
@@ -2661,7 +2747,11 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
             candidates.push(Box::new(PathGuesser {
                 name: entry.file_name().to_string_lossy().to_string(),
                 subpath: entry.path(),
-                cb: Box::new(crate::providers::ruby::guess_from_gemspec),
+                cb: Box::new(|p, s| {
+                    Box::pin(
+                        async move { crate::providers::ruby::guess_from_gemspec(&p, &s).await },
+                    )
+                }),
             }));
         }
     }
@@ -2678,7 +2768,11 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
                 candidates.push(Box::new(PathGuesser {
                     name: description_name,
                     subpath: path.join("DESCRIPTION"),
-                    cb: Box::new(crate::providers::r::guess_from_r_description),
+                    cb: Box::new(|p, s| {
+                        Box::pin(async move {
+                            crate::providers::r::guess_from_r_description(&p, &s).await
+                        })
+                    }),
                 }));
             }
         }
@@ -2704,7 +2798,11 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
         candidates.push(Box::new(PathGuesser {
             name: doap_filename.to_string_lossy().to_string(),
             subpath: path.join(&doap_filename),
-            cb: Box::new(|p, s| crate::providers::doap::guess_from_doap(p, s.trust_package)),
+            cb: Box::new(|p, s| {
+                Box::pin(
+                    async move { crate::providers::doap::guess_from_doap(&p, s.trust_package) },
+                )
+            }),
         }));
     } else if doap_filenames.len() > 1 {
         log::warn!(
@@ -2735,7 +2833,9 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
             name: metainfo_filename.to_string_lossy().to_string(),
             subpath: path.join(&metainfo_filename),
             cb: Box::new(|p, s| {
-                crate::providers::metainfo::guess_from_metainfo(p, s.trust_package)
+                Box::pin(async move {
+                    crate::providers::metainfo::guess_from_metainfo(&p, s.trust_package)
+                })
             }),
         }));
     } else if metainfo_filenames.len() > 1 {
@@ -2763,7 +2863,9 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
             name: cabal_filename.to_string_lossy().to_string(),
             subpath: path.join(&cabal_filename),
             cb: Box::new(|path, s| {
-                crate::providers::haskell::guess_from_cabal(path, s.trust_package)
+                Box::pin(async move {
+                    crate::providers::haskell::guess_from_cabal(&path, s.trust_package)
+                })
             }),
         }));
     } else if cabal_filenames.len() > 1 {
@@ -2808,7 +2910,11 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
         candidates.push(Box::new(PathGuesser {
             name: filename.to_string_lossy().to_string(),
             subpath: path.join(&filename),
-            cb: Box::new(|path, s| crate::readme::guess_from_readme(path, s.trust_package)),
+            cb: Box::new(|path, s| {
+                Box::pin(
+                    async move { crate::readme::guess_from_readme(&path, s.trust_package).await },
+                )
+            }),
         }));
     }
 
@@ -2830,7 +2936,9 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
             name: nuspec_filename.to_string_lossy().to_string(),
             subpath: path.join(&nuspec_filename),
             cb: Box::new(|path, s| {
-                crate::providers::nuspec::guess_from_nuspec(path, s.trust_package)
+                Box::pin(async move {
+                    crate::providers::nuspec::guess_from_nuspec(&path, s.trust_package).await
+                })
             }),
         }));
     } else if nuspec_filenames.len() > 1 {
@@ -2861,7 +2969,9 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
                 name: opam_filename.to_string_lossy().to_string(),
                 subpath: path.join(&opam_filename),
                 cb: Box::new(|path, s| {
-                    crate::providers::ocaml::guess_from_opam(path, s.trust_package)
+                    Box::pin(async move {
+                        crate::providers::ocaml::guess_from_opam(&path, s.trust_package)
+                    })
                 }),
             }));
         }
@@ -2895,7 +3005,11 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
         candidates.push(Box::new(PathGuesser {
             name: filename.clone(),
             subpath: path.join(&filename),
-            cb: Box::new(crate::providers::debian::guess_from_debian_patch),
+            cb: Box::new(|path, s| {
+                Box::pin(async move {
+                    crate::providers::debian::guess_from_debian_patch(&path, &s).await
+                })
+            }),
         }));
     }
 
@@ -2903,13 +3017,13 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
     candidates.push(Box::new(PathGuesser {
         name: ".".to_string(),
         subpath: path.clone(),
-        cb: Box::new(crate::guess_from_path),
+        cb: Box::new(|p, s| Box::pin(async move { crate::guess_from_path(&p, &s) })),
     }));
 
     candidates
 }
 
-pub fn stream(
+pub(crate) fn stream(
     path: &Path,
     config: &GuesserSettings,
     mut guessers: Vec<Box<dyn Guesser>>,
@@ -2940,22 +3054,6 @@ pub fn stream(
     futures::stream::select_all(streams)
 }
 
-pub struct UpstreamMetadataScanner {
-    stream: Pin<Box<dyn Stream<Item = Result<UpstreamDatumWithMetadata, ProviderError>> + Send>>,
-}
-
-impl UpstreamMetadataScanner {
-    pub fn from_path(path: &std::path::Path, trust_package: Option<bool>) -> Self {
-        let trust_package = trust_package.unwrap_or(false);
-
-        let guessers = find_guessers(path);
-
-        Self {
-            stream: Box::pin(stream(path, &GuesserSettings { trust_package }, guessers)),
-        }
-    }
-}
-
 fn rewrite_upstream_datum(
     guesser_name: &str,
     datum: &mut UpstreamDatumWithMetadata,
@@ -2975,25 +3073,6 @@ fn rewrite_upstream_datum(
             }
         }
     }
-}
-
-impl Iterator for UpstreamMetadataScanner {
-    type Item = Result<UpstreamDatumWithMetadata, ProviderError>;
-
-    fn next(&mut self) -> Option<Result<UpstreamDatumWithMetadata, ProviderError>> {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-
-        // Stream from .stream()
-        rt.block_on(self.stream.next())
-    }
-}
-
-#[deprecated(since = "0.1.0", note = "Please use upstream_metadata_stream instead")]
-pub fn guess_upstream_info(
-    path: &std::path::Path,
-    trust_package: Option<bool>,
-) -> impl Iterator<Item = Result<UpstreamDatumWithMetadata, ProviderError>> {
-    UpstreamMetadataScanner::from_path(path, trust_package)
 }
 
 pub fn upstream_metadata_stream(
@@ -3193,7 +3272,7 @@ pub async fn extend_upstream_metadata(
             .await;
         }
     }
-    crate::extrapolate::extrapolate_fields(upstream_metadata, net_access, None)?;
+    crate::extrapolate::extrapolate_fields(upstream_metadata, net_access, None).await?;
     Ok(())
 }
 
@@ -3282,9 +3361,9 @@ async fn extend_from_repology(
 }
 
 /// Fix existing upstream metadata.
-pub fn fix_upstream_metadata(upstream_metadata: &mut UpstreamMetadata) {
+pub async fn fix_upstream_metadata(upstream_metadata: &mut UpstreamMetadata) {
     if let Some(repository) = upstream_metadata.get_mut("Repository") {
-        let url = crate::vcs::sanitize_url(repository.datum.as_str().unwrap());
+        let url = crate::vcs::sanitize_url(repository.datum.as_str().unwrap()).await;
         repository.datum = UpstreamDatum::Repository(url.to_string());
     }
 
@@ -3304,8 +3383,8 @@ pub fn fix_upstream_metadata(upstream_metadata: &mut UpstreamMetadata) {
 /// * `trust_package`: Whether to trust the package contents and i.e. run executables in it
 /// * `net_access`: Whether to allow net access
 /// * `consult_external_directory`: Whether to pull in data from external (user-maintained) directories.
-pub fn summarize_upstream_metadata(
-    metadata_items: impl Iterator<Item = UpstreamDatumWithMetadata>,
+pub async fn summarize_upstream_metadata(
+    metadata_items: impl Stream<Item = UpstreamDatumWithMetadata>,
     path: &std::path::Path,
     net_access: Option<bool>,
     consult_external_directory: Option<bool>,
@@ -3313,23 +3392,35 @@ pub fn summarize_upstream_metadata(
 ) -> Result<UpstreamMetadata, ProviderError> {
     let check = check.unwrap_or(false);
     let mut upstream_metadata = UpstreamMetadata::new();
-    upstream_metadata.update(filter_bad_guesses(metadata_items));
 
-    let rt = tokio::runtime::Runtime::new().unwrap();
+    let metadata_items = metadata_items.filter_map(|item| async move {
+        let bad: bool = item.datum.known_bad_guess();
+        if bad {
+            log::debug!("Excluding known bad item {:?}", item);
+            None
+        } else {
+            Some(item)
+        }
+    });
 
-    rt.block_on(extend_upstream_metadata(
+    let metadata_items = metadata_items.collect::<Vec<_>>().await;
+
+    upstream_metadata.update(metadata_items.into_iter());
+
+    extend_upstream_metadata(
         &mut upstream_metadata,
         path,
         None,
         net_access,
         consult_external_directory,
-    ))?;
+    )
+    .await?;
 
     if check {
-        check_upstream_metadata(&mut upstream_metadata, None);
+        check_upstream_metadata(&mut upstream_metadata, None).await;
     }
 
-    fix_upstream_metadata(&mut upstream_metadata);
+    fix_upstream_metadata(&mut upstream_metadata).await;
 
     // Sort by name
     upstream_metadata.sort();
@@ -3347,48 +3438,58 @@ pub fn guess_upstream_metadata_items(
     path: &std::path::Path,
     trust_package: Option<bool>,
     minimum_certainty: Option<Certainty>,
-) -> impl Iterator<Item = Result<UpstreamDatumWithMetadata, ProviderError>> {
-    guess_upstream_info(path, trust_package).filter_map(move |e| match e {
-        Err(e) => Some(Err(e)),
-        Ok(UpstreamDatumWithMetadata {
-            datum,
-            certainty,
-            origin,
-        }) => {
-            if minimum_certainty.is_some() && certainty < minimum_certainty {
-                None
-            } else {
-                Some(Ok(UpstreamDatumWithMetadata {
-                    datum,
-                    certainty,
-                    origin,
-                }))
+) -> impl Stream<Item = Result<UpstreamDatumWithMetadata, ProviderError>> {
+    let items = upstream_metadata_stream(path, trust_package);
+
+    items.filter_map(move |e| async move {
+        match e {
+            Err(e) => Some(Err(e)),
+            Ok(UpstreamDatumWithMetadata {
+                datum,
+                certainty,
+                origin,
+            }) => {
+                if minimum_certainty.is_some() && certainty < minimum_certainty {
+                    None
+                } else {
+                    Some(Ok(UpstreamDatumWithMetadata {
+                        datum,
+                        certainty,
+                        origin,
+                    }))
+                }
             }
         }
     })
 }
 
-pub fn get_upstream_info(
+pub async fn get_upstream_info(
     path: &std::path::Path,
     trust_package: Option<bool>,
     net_access: Option<bool>,
     consult_external_directory: Option<bool>,
     check: Option<bool>,
 ) -> Result<UpstreamMetadata, ProviderError> {
-    let metadata_items = guess_upstream_info(path, trust_package);
-    summarize_upstream_metadata(
-        metadata_items.filter_map(|x| match x {
+    let metadata_items = upstream_metadata_stream(path, trust_package);
+
+    let metadata_items = metadata_items.filter_map(|x| async {
+        match x {
             Ok(x) => Some(x),
             Err(e) => {
                 log::error!("{}", e);
                 None
             }
-        }),
+        }
+    });
+
+    summarize_upstream_metadata(
+        metadata_items,
         path,
         net_access,
         consult_external_directory,
         check,
     )
+    .await
 }
 
 /// Guess the upstream metadata dictionary.
@@ -3398,21 +3499,24 @@ pub fn get_upstream_info(
 /// * `trust_package`: Whether to trust the package contents and i.e. run executables in it
 /// * `net_access`: Whether to allow net access
 /// * `consult_external_directory`: Whether to pull in data from external (user-maintained) directories.
-pub fn guess_upstream_metadata(
+pub async fn guess_upstream_metadata(
     path: &std::path::Path,
     trust_package: Option<bool>,
     net_access: Option<bool>,
     consult_external_directory: Option<bool>,
     check: Option<bool>,
 ) -> Result<UpstreamMetadata, ProviderError> {
-    let metadata_items =
-        guess_upstream_metadata_items(path, trust_package, None).filter_map(|x| match x {
+    let metadata_items = guess_upstream_metadata_items(path, trust_package, None);
+
+    let metadata_items = metadata_items.filter_map(|x| async {
+        match x {
             Ok(x) => Some(x),
             Err(e) => {
                 log::error!("{}", e);
                 None
             }
-        });
+        }
+    });
     summarize_upstream_metadata(
         metadata_items,
         path,
@@ -3420,19 +3524,19 @@ pub fn guess_upstream_metadata(
         consult_external_directory,
         check,
     )
+    .await
 }
 
-pub fn verify_screenshots(urls: &[&str]) -> Vec<(String, Option<bool>)> {
+pub async fn verify_screenshots(urls: &[&str]) -> Vec<(String, Option<bool>)> {
     let mut ret = Vec::new();
     for url in urls {
-        let mut request =
-            reqwest::blocking::Request::new(reqwest::Method::GET, url.parse().unwrap());
+        let mut request = reqwest::Request::new(reqwest::Method::GET, url.parse().unwrap());
         request.headers_mut().insert(
             reqwest::header::USER_AGENT,
             reqwest::header::HeaderValue::from_static(USER_AGENT),
         );
 
-        match reqwest::blocking::Client::new().execute(request) {
+        match reqwest::Client::new().execute(request).await {
             Ok(response) => {
                 let status = response.status();
                 if status.is_success() {
@@ -3456,10 +3560,14 @@ pub fn verify_screenshots(urls: &[&str]) -> Vec<(String, Option<bool>)> {
 /// Check upstream metadata.
 ///
 /// This will make network connections, etc.
-pub fn check_upstream_metadata(upstream_metadata: &mut UpstreamMetadata, version: Option<&str>) {
+pub async fn check_upstream_metadata(
+    upstream_metadata: &mut UpstreamMetadata,
+    version: Option<&str>,
+) {
     let repository = upstream_metadata.get_mut("Repository");
     if let Some(repository) = repository {
-        match vcs::check_repository_url_canonical(repository.datum.to_url().unwrap(), version) {
+        match vcs::check_repository_url_canonical(repository.datum.to_url().unwrap(), version).await
+        {
             Ok(canonical_url) => {
                 repository.datum = UpstreamDatum::Repository(canonical_url.to_string());
                 if repository.certainty == Some(Certainty::Confident) {
@@ -3472,7 +3580,8 @@ pub fn check_upstream_metadata(upstream_metadata: &mut UpstreamMetadata, version
                         subpath: None,
                     },
                     Some(true),
-                );
+                )
+                .await;
                 let certainty = repository.certainty;
                 let browse_repo = upstream_metadata.get_mut("Repository-Browse");
                 if browse_repo.is_some()
@@ -3492,7 +3601,7 @@ pub fn check_upstream_metadata(upstream_metadata: &mut UpstreamMetadata, version
     }
     let homepage = upstream_metadata.get_mut("Homepage");
     if let Some(homepage) = homepage {
-        match check_url_canonical(&homepage.datum.to_url().unwrap()) {
+        match check_url_canonical(&homepage.datum.to_url().unwrap()).await {
             Ok(canonical_url) => {
                 homepage.datum = UpstreamDatum::Homepage(canonical_url.to_string());
                 if homepage.certainty >= Some(Certainty::Likely) {
@@ -3509,7 +3618,7 @@ pub fn check_upstream_metadata(upstream_metadata: &mut UpstreamMetadata, version
         }
     }
     if let Some(repository_browse) = upstream_metadata.get_mut("Repository-Browse") {
-        match check_url_canonical(&repository_browse.datum.to_url().unwrap()) {
+        match check_url_canonical(&repository_browse.datum.to_url().unwrap()).await {
             Ok(u) => {
                 repository_browse.datum = UpstreamDatum::RepositoryBrowse(u.to_string());
                 if repository_browse.certainty >= Some(Certainty::Likely) {
@@ -3526,7 +3635,8 @@ pub fn check_upstream_metadata(upstream_metadata: &mut UpstreamMetadata, version
         }
     }
     if let Some(bug_database) = upstream_metadata.get_mut("Bug-Database") {
-        match check_bug_database_canonical(&bug_database.datum.to_url().unwrap(), Some(true)) {
+        match check_bug_database_canonical(&bug_database.datum.to_url().unwrap(), Some(true)).await
+        {
             Ok(u) => {
                 bug_database.datum = UpstreamDatum::BugDatabase(u.to_string());
                 if bug_database.certainty >= Some(Certainty::Likely) {
@@ -3544,7 +3654,8 @@ pub fn check_upstream_metadata(upstream_metadata: &mut UpstreamMetadata, version
     }
     let bug_submit = upstream_metadata.get_mut("Bug-Submit");
     if let Some(bug_submit) = bug_submit {
-        match check_bug_submit_url_canonical(&bug_submit.datum.to_url().unwrap(), Some(true)) {
+        match check_bug_submit_url_canonical(&bug_submit.datum.to_url().unwrap(), Some(true)).await
+        {
             Ok(u) => {
                 bug_submit.datum = UpstreamDatum::BugSubmit(u.to_string());
                 if bug_submit.certainty >= Some(Certainty::Likely) {
@@ -3573,7 +3684,9 @@ pub fn check_upstream_metadata(upstream_metadata: &mut UpstreamMetadata, version
                 .map(|x| x.as_str())
                 .collect::<Vec<&str>>()
                 .as_slice(),
-        ) {
+        )
+        .await
+        {
             match status {
                 Some(true) => {
                     newvalue.push(url);
@@ -3586,18 +3699,6 @@ pub fn check_upstream_metadata(upstream_metadata: &mut UpstreamMetadata, version
         }
         screenshots.as_mut().unwrap().datum = UpstreamDatum::Screenshots(newvalue);
     }
-}
-
-pub fn filter_bad_guesses(
-    guessed_items: impl Iterator<Item = UpstreamDatumWithMetadata>,
-) -> impl Iterator<Item = UpstreamDatumWithMetadata> {
-    guessed_items.filter(|item| {
-        let bad = item.datum.known_bad_guess();
-        if bad {
-            log::debug!("Excluding known bad item {:?}", item);
-        }
-        !bad
-    })
 }
 
 #[async_trait::async_trait]
@@ -3628,10 +3729,15 @@ pub struct PathGuesser {
     subpath: std::path::PathBuf,
     cb: Box<
         dyn FnMut(
-                &std::path::Path,
-                &GuesserSettings,
-            ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>
-            + Send,
+                PathBuf,
+                GuesserSettings,
+            ) -> Pin<
+                Box<
+                    dyn std::future::Future<
+                            Output = Result<Vec<UpstreamDatumWithMetadata>, ProviderError>,
+                        > + Send,
+                >,
+            > + Send,
     >,
 }
 
@@ -3645,7 +3751,7 @@ impl Guesser for PathGuesser {
         &mut self,
         settings: &GuesserSettings,
     ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
-        (self.cb)(&self.subpath, settings)
+        (self.cb)(self.subpath.clone(), settings.clone()).await
     }
 }
 
@@ -3701,25 +3807,31 @@ mod tests {
         assert_eq!(data.homepage(), Some("https://example.com"));
     }
 
-    #[test]
-    fn test_bug_database_url_from_bug_submit_url() {
+    #[tokio::test]
+    async fn test_bug_database_url_from_bug_submit_url() {
         let url = Url::parse("https://bugs.launchpad.net/bugs/+filebug").unwrap();
         assert_eq!(
-            bug_database_url_from_bug_submit_url(&url, None).unwrap(),
+            bug_database_url_from_bug_submit_url(&url, None)
+                .await
+                .unwrap(),
             Url::parse("https://bugs.launchpad.net/bugs").unwrap()
         );
 
         let url = Url::parse("https://github.com/dulwich/dulwich/issues/new").unwrap();
 
         assert_eq!(
-            bug_database_url_from_bug_submit_url(&url, None).unwrap(),
+            bug_database_url_from_bug_submit_url(&url, None)
+                .await
+                .unwrap(),
             Url::parse("https://github.com/dulwich/dulwich/issues").unwrap()
         );
 
         let url = Url::parse("https://sourceforge.net/p/dulwich/bugs/new").unwrap();
 
         assert_eq!(
-            bug_database_url_from_bug_submit_url(&url, None).unwrap(),
+            bug_database_url_from_bug_submit_url(&url, None)
+                .await
+                .unwrap(),
             Url::parse("https://sourceforge.net/p/dulwich/bugs").unwrap()
         );
     }

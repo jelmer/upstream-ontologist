@@ -84,7 +84,7 @@ pub fn strip_vcs_prefixes(url: &str) -> &str {
     url
 }
 
-fn probe_upstream_github_branch_url(url: &url::Url, version: Option<&str>) -> Option<bool> {
+async fn probe_upstream_github_branch_url(url: &url::Url, version: Option<&str>) -> Option<bool> {
     let path = url.path();
     let path = path.strip_suffix(".git").unwrap_or(path);
     let api_url = url::Url::parse(
@@ -95,7 +95,7 @@ fn probe_upstream_github_branch_url(url: &url::Url, version: Option<&str>) -> Op
         .as_str(),
     )
     .unwrap();
-    match crate::load_json_url(&api_url, None) {
+    match crate::load_json_url(&api_url, None).await {
         Ok(json) => {
             if let Some(version) = version {
                 let tags = json.as_array()?;
@@ -171,20 +171,20 @@ fn probe_upstream_breezy_branch_url(url: &url::Url, version: Option<&str>) -> Op
     }
 }
 
-pub fn probe_upstream_branch_url(url: &url::Url, version: Option<&str>) -> Option<bool> {
+pub async fn probe_upstream_branch_url(url: &url::Url, version: Option<&str>) -> Option<bool> {
     if url.scheme() == "git+ssh" || url.scheme() == "ssh" || url.scheme() == "bzr+ssh" {
         // Let's not probe anything possibly non-public.
         return None;
     }
 
     if url.host() == Some(url::Host::Domain("github.com")) {
-        probe_upstream_github_branch_url(url, version)
+        probe_upstream_github_branch_url(url, version).await
     } else {
         probe_upstream_breezy_branch_url(url, version)
     }
 }
 
-pub fn check_repository_url_canonical(
+pub async fn check_repository_url_canonical(
     mut url: url::Url,
     version: Option<&str>,
 ) -> std::result::Result<url::Url, crate::CanonicalizeError> {
@@ -209,7 +209,7 @@ pub fn check_repository_url_canonical(
             "https://api.github.com/repos/{}/{}",
             segments[0], segments[1]
         );
-        url = match crate::load_json_url(&url::Url::parse(api_url.as_str()).unwrap(), None) {
+        url = match crate::load_json_url(&url::Url::parse(api_url.as_str()).unwrap(), None).await {
             Ok(data) => {
                 if data["archived"].as_bool().unwrap_or(false) {
                     return Err(crate::CanonicalizeError::InvalidUrl(
@@ -233,7 +233,7 @@ pub fn check_repository_url_canonical(
                                 .trim_end_matches('.'),
                         )
                         .unwrap();
-                        return check_repository_url_canonical(url, version);
+                        return Box::pin(check_repository_url_canonical(url, version)).await;
                     }
 
                     if description.contains("has moved") {
@@ -250,12 +250,12 @@ pub fn check_repository_url_canonical(
                                 .trim_end_matches('.'),
                         )
                         .unwrap();
-                        return check_repository_url_canonical(url, version);
+                        return Box::pin(check_repository_url_canonical(url, version)).await;
                     }
                 }
 
                 if let Some(homepage) = data["homepage"].as_str() {
-                    if is_gitlab_site(homepage, None) {
+                    if is_gitlab_site(homepage, None).await {
                         return Err(crate::CanonicalizeError::InvalidUrl(
                             url,
                             format!("homepage is on GitLab: {}", homepage),
@@ -290,7 +290,7 @@ pub fn check_repository_url_canonical(
         }?;
     }
 
-    let is_valid = probe_upstream_branch_url(&url, version);
+    let is_valid = probe_upstream_branch_url(&url, version).await;
     if is_valid.is_none() {
         return Err(crate::CanonicalizeError::Unverifiable(
             url,
@@ -308,7 +308,7 @@ pub fn check_repository_url_canonical(
     ))
 }
 
-pub fn is_gitlab_site(hostname: &str, net_access: Option<bool>) -> bool {
+pub async fn is_gitlab_site(hostname: &str, net_access: Option<bool>) -> bool {
     if KNOWN_GITLAB_SITES.contains(&hostname) {
         return true;
     }
@@ -318,22 +318,22 @@ pub fn is_gitlab_site(hostname: &str, net_access: Option<bool>) -> bool {
     }
 
     if net_access.unwrap_or(false) {
-        probe_gitlab_host(hostname)
+        probe_gitlab_host(hostname).await
     } else {
         false
     }
 }
 
-pub fn probe_gitlab_host(hostname: &str) -> bool {
+pub async fn probe_gitlab_host(hostname: &str) -> bool {
     let url = format!("https://{}/api/v4/version", hostname);
-    match crate::load_json_url(&url::Url::parse(url.as_str()).unwrap(), None) {
+    match crate::load_json_url(&url::Url::parse(url.as_str()).unwrap(), None).await {
         Ok(_data) => true,
         Err(crate::HTTPJSONError::Error {
             status: 401,
             response,
             ..
         }) => {
-            if let Ok(data) = response.json::<serde_json::Value>() {
+            if let Ok(data) = response.json::<serde_json::Value>().await {
                 if let Some(message) = data["message"].as_str() {
                     if message == "401 Unauthorized" {
                         true
@@ -357,7 +357,7 @@ pub fn probe_gitlab_host(hostname: &str) -> bool {
     }
 }
 
-pub fn guess_repo_from_url(url: &url::Url, net_access: Option<bool>) -> Option<String> {
+pub async fn guess_repo_from_url(url: &url::Url, net_access: Option<bool>) -> Option<String> {
     let net_access = net_access.unwrap_or(false);
     let path_segments = url.path_segments().unwrap().collect::<Vec<_>>();
     match url.host_str()? {
@@ -545,7 +545,7 @@ pub fn guess_repo_from_url(url: &url::Url, net_access: Option<bool>) -> Option<S
                 .to_string(),
             )
         }
-        u if is_gitlab_site(u, Some(net_access)) => {
+        u if is_gitlab_site(u, Some(net_access)).await => {
             if path_segments.is_empty() {
                 return None;
             }
@@ -584,7 +584,7 @@ pub fn guess_repo_from_url(url: &url::Url, net_access: Option<bool>) -> Option<S
         }
         _ => {
             if net_access {
-                match check_repository_url_canonical(url.clone(), None) {
+                match check_repository_url_canonical(url.clone(), None).await {
                     Ok(url) => Some(url.to_string()),
                     Err(_) => {
                         debug!("Failed to canonicalize URL: {}", url);
@@ -598,14 +598,15 @@ pub fn guess_repo_from_url(url: &url::Url, net_access: Option<bool>) -> Option<S
     }
 }
 
-#[test]
-fn test_guess_repo_url() {
+#[tokio::test]
+async fn test_guess_repo_url() {
     assert_eq!(
         Some("https://github.com/jelmer/blah".to_string()),
         guess_repo_from_url(
             &"https://github.com/jelmer/blah".parse().unwrap(),
             Some(false)
         )
+        .await
     );
 
     assert_eq!(
@@ -616,15 +617,16 @@ fn test_guess_repo_url() {
                 .unwrap(),
             Some(false)
         )
+        .await
     );
     assert_eq!(
         None,
-        guess_repo_from_url(&"https://github.com/jelmer".parse().unwrap(), Some(false))
+        guess_repo_from_url(&"https://github.com/jelmer".parse().unwrap(), Some(false)).await
     );
 
     assert_eq!(
         None,
-        guess_repo_from_url(&"https://www.jelmer.uk/".parse().unwrap(), Some(false))
+        guess_repo_from_url(&"https://www.jelmer.uk/".parse().unwrap(), Some(false)).await
     );
 
     assert_eq!(
@@ -632,7 +634,8 @@ fn test_guess_repo_url() {
         guess_repo_from_url(
             &"http://code.launchpad.net/blah".parse().unwrap(),
             Some(false)
-        ),
+        )
+        .await,
     );
 
     assert_eq!(
@@ -640,7 +643,8 @@ fn test_guess_repo_url() {
         guess_repo_from_url(
             &"http://launchpad.net/bzr/+download".parse().unwrap(),
             Some(false)
-        ),
+        )
+        .await,
     );
 
     assert_eq!(
@@ -650,7 +654,8 @@ fn test_guess_repo_url() {
                 .parse()
                 .unwrap(),
             Some(false)
-        ),
+        )
+        .await,
     );
 
     assert_eq!(
@@ -660,7 +665,8 @@ fn test_guess_repo_url() {
                 .parse()
                 .unwrap(),
             Some(false)
-        ),
+        )
+        .await,
     );
 
     assert_eq!(
@@ -670,13 +676,14 @@ fn test_guess_repo_url() {
                 .parse()
                 .unwrap(),
             Some(false)
-        ),
+        )
+        .await,
     );
 }
 
-pub fn canonical_git_repo_url(repo_url: &Url, net_access: Option<bool>) -> Option<Url> {
+pub async fn canonical_git_repo_url(repo_url: &Url, net_access: Option<bool>) -> Option<Url> {
     if let Some(hostname) = repo_url.host_str() {
-        if (is_gitlab_site(hostname, net_access) || hostname == "github.com")
+        if (is_gitlab_site(hostname, net_access).await || hostname == "github.com")
             && !repo_url.path().ends_with(".git")
         {
             let mut url = repo_url.clone();
@@ -687,7 +694,7 @@ pub fn canonical_git_repo_url(repo_url: &Url, net_access: Option<bool>) -> Optio
     None
 }
 
-pub fn browse_url_from_repo_url(
+pub async fn browse_url_from_repo_url(
     location: &VcsLocation,
     net_access: Option<bool>,
 ) -> Option<url::Url> {
@@ -793,7 +800,7 @@ pub fn browse_url_from_repo_url(
                 .unwrap(),
         )
     } else if location.url.host_str().is_some()
-        && is_gitlab_site(location.url.host_str().unwrap(), net_access)
+        && is_gitlab_site(location.url.host_str().unwrap(), net_access).await
     {
         let mut path = location.url.path().to_string();
         if path.ends_with(".git") {
@@ -811,7 +818,7 @@ pub fn browse_url_from_repo_url(
     }
 }
 
-pub fn find_public_repo_url(repo_url: &str, net_access: Option<bool>) -> Option<String> {
+pub async fn find_public_repo_url(repo_url: &str, net_access: Option<bool>) -> Option<String> {
     let parsed = match Url::parse(repo_url) {
         Ok(parsed) => parsed,
         Err(_) => {
@@ -820,7 +827,7 @@ pub fn find_public_repo_url(repo_url: &str, net_access: Option<bool>) -> Option<
                 if let Some(captures) = re.captures(repo_url) {
                     let host = captures.name("host").unwrap().as_str();
                     let path = captures.name("path").unwrap().as_str();
-                    if host == "github.com" || is_gitlab_site(host, net_access) {
+                    if host == "github.com" || is_gitlab_site(host, net_access).await {
                         return Some(format!("https://{}/{}", host, path));
                     }
                 }
@@ -843,7 +850,7 @@ pub fn find_public_repo_url(repo_url: &str, net_access: Option<bool>) -> Option<
                     .to_string(),
             );
         }
-        Some(hostname) if is_gitlab_site(hostname, net_access) => {
+        Some(hostname) if is_gitlab_site(hostname, net_access).await => {
             if ["https", "http"].contains(&parsed.scheme()) {
                 return Some(repo_url.to_string());
             }
@@ -905,7 +912,7 @@ pub fn try_open_branch(
     rev
 }
 
-pub fn find_secure_repo_url(
+pub async fn find_secure_repo_url(
     mut url: url::Url,
     branch: Option<&str>,
     net_access: Option<bool>,
@@ -916,7 +923,7 @@ pub fn find_secure_repo_url(
 
     // Sites we know to be available over https
     if let Some(hostname) = url.host_str() {
-        if is_gitlab_site(hostname, net_access)
+        if is_gitlab_site(hostname, net_access).await
             || [
                 "github.com",
                 "git.launchpad.net",
@@ -975,6 +982,18 @@ pub struct VcsLocation {
     pub subpath: Option<String>,
 }
 
+impl VcsLocation {
+    async fn from_str(url: &str) -> Self {
+        let (url, branch, subpath) = split_vcs_url(url);
+        let url = fixup_git_url(url.as_str()).await;
+        VcsLocation {
+            url: url.parse().unwrap(),
+            branch,
+            subpath,
+        }
+    }
+}
+
 impl std::fmt::Display for VcsLocation {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", unsplit_vcs_url(self))
@@ -993,18 +1012,6 @@ impl From<url::Url> for VcsLocation {
             url,
             branch: None,
             subpath: None,
-        }
-    }
-}
-
-impl From<&str> for VcsLocation {
-    fn from(url: &str) -> Self {
-        let (url, branch, subpath) = split_vcs_url(url);
-        let url = fixup_git_url(url.as_str());
-        VcsLocation {
-            url: url.parse().unwrap(),
-            branch,
-            subpath,
         }
     }
 }
@@ -1033,10 +1040,10 @@ fn fix_path_in_port(url: &str) -> Option<String> {
     }
 }
 
-fn fix_gitlab_scheme(url: &str) -> Option<String> {
+async fn fix_gitlab_scheme(url: &str) -> Option<String> {
     if let Ok(url) = url::Url::parse(url) {
         if let Some(host) = url.host_str() {
-            if is_gitlab_site(host, None) {
+            if is_gitlab_site(host, None).await {
                 return Some(derive_with_scheme(&url, "https").to_string());
             }
         }
@@ -1067,8 +1074,8 @@ fn fix_salsa_cgit_url(url: &str) -> Option<String> {
     None
 }
 
-fn fix_gitlab_tree_in_url(location: &VcsLocation) -> Option<VcsLocation> {
-    if is_gitlab_site(location.url.host_str()?, None) {
+async fn fix_gitlab_tree_in_url(location: &VcsLocation) -> Option<VcsLocation> {
+    if is_gitlab_site(location.url.host_str()?, None).await {
         let segments = location.url.path_segments().unwrap().collect::<Vec<_>>();
         if let Some(p) = segments.iter().position(|p| *p == "tree") {
             let branch = segments[(p + 1)..].join("/");
@@ -1201,35 +1208,49 @@ fn fix_freedesktop_org_url(url: &str) -> Option<String> {
     None
 }
 
-const LOCATION_FIXERS: &[fn(&VcsLocation) -> Option<VcsLocation>] =
-    &[fix_gitlab_tree_in_url, fix_branch_argument];
+type AsyncLocationFixer = for<'a> fn(
+    &'a VcsLocation,
+) -> std::pin::Pin<
+    Box<dyn std::future::Future<Output = Option<VcsLocation>> + Send + 'a>,
+>;
+
+const LOCATION_FIXERS: &[AsyncLocationFixer] = &[
+    |loc| Box::pin(async move { fix_gitlab_tree_in_url(loc).await }),
+    |loc| Box::pin(async move { fix_branch_argument(loc) }),
+];
 
 /// Attempt to fix up broken Git URLs.
-pub fn fixup_git_location(location: &VcsLocation) -> Cow<'_, VcsLocation> {
+pub async fn fixup_git_location(location: &VcsLocation) -> Cow<'_, VcsLocation> {
     let mut location = Cow::Borrowed(location);
     for cb in LOCATION_FIXERS {
-        location = cb(&location).map_or(location, Cow::Owned);
+        location = cb(&location).await.map_or(location, Cow::Owned);
     }
     location
 }
 
-const URL_FIXERS: &[fn(&str) -> Option<String>] = &[
-    fix_path_in_port,
-    fix_gitlab_scheme,
-    fix_github_scheme,
-    fix_salsa_cgit_url,
-    fix_double_slash,
-    fix_extra_colon,
-    drop_git_username,
-    fix_freedesktop_org_url,
-    fix_kde_anongit_url,
-    fix_git_gnome_org_url,
+type AsyncFixer = for<'a> fn(
+    &'a str,
+) -> std::pin::Pin<
+    Box<dyn std::future::Future<Output = Option<String>> + Send + 'a>,
+>;
+
+const URL_FIXERS: &[AsyncFixer] = &[
+    |url| Box::pin(async move { fix_path_in_port(url) }),
+    |url| Box::pin(async move { fix_gitlab_scheme(url).await }),
+    |url| Box::pin(async move { fix_github_scheme(url) }),
+    |url| Box::pin(async move { fix_salsa_cgit_url(url) }),
+    |url| Box::pin(async move { fix_double_slash(url) }),
+    |url| Box::pin(async move { fix_extra_colon(url) }),
+    |url| Box::pin(async move { drop_git_username(url) }),
+    |url| Box::pin(async move { fix_freedesktop_org_url(url) }),
+    |url| Box::pin(async move { fix_kde_anongit_url(url) }),
+    |url| Box::pin(async move { fix_git_gnome_org_url(url) }),
 ];
 
-pub fn fixup_git_url(url: &str) -> String {
+pub async fn fixup_git_url(url: &str) -> String {
     let mut url = url.to_string();
     for cb in URL_FIXERS {
-        url = cb(&url).unwrap_or(url);
+        url = cb(&url).await.unwrap_or(url);
     }
     url
 }
@@ -1243,19 +1264,42 @@ pub fn convert_cvs_list_to_str(urls: &[&str]) -> Option<String> {
     }
 }
 
-pub const SANITIZERS: &[fn(&str) -> Option<Url>] = &[
-    |url| drop_vcs_in_scheme(&url.parse().ok()?),
-    |url| Some(fixup_git_location(&VcsLocation::from(url)).url.clone()),
-    fixup_rcp_style_git_repo_url,
-    |url| find_public_repo_url(url.to_string().as_str(), None).and_then(|u| u.parse().ok()),
-    |url| canonical_git_repo_url(&url.parse().ok()?, None),
-    |url| find_secure_repo_url(url.parse().ok()?, None, Some(false)),
+type AsyncSanitizer = for<'a> fn(
+    &'a str,
+) -> std::pin::Pin<
+    Box<dyn std::future::Future<Output = Option<Url>> + Send + 'a>,
+>;
+
+pub const SANITIZERS: &[AsyncSanitizer] = &[
+    |url| Box::pin(async move { drop_vcs_in_scheme(&url.parse().ok()?) }),
+    |url| {
+        Box::pin(async move {
+            Some(
+                fixup_git_location(&VcsLocation::from_str(url).await)
+                    .await
+                    .url
+                    .clone(),
+            )
+        })
+    },
+    |url| Box::pin(async move { fixup_rcp_style_git_repo_url(url) }),
+    |url| {
+        Box::pin(async move {
+            find_public_repo_url(url.to_string().as_str(), None)
+                .await
+                .and_then(|u| u.parse().ok())
+        })
+    },
+    |url| Box::pin(async move { canonical_git_repo_url(&url.parse().ok()?, None).await }),
+    |url| Box::pin(async move { find_secure_repo_url(url.parse().ok()?, None, Some(false)).await }),
 ];
 
-pub fn sanitize_url(url: &str) -> String {
+pub async fn sanitize_url(url: &str) -> String {
     let mut url: Cow<'_, str> = Cow::Borrowed(url);
     for sanitizer in SANITIZERS {
-        url = sanitizer(url.as_ref()).map_or(url, |f| Cow::Owned(f.to_string()));
+        url = sanitizer(url.as_ref())
+            .await
+            .map_or(url, |f| Cow::Owned(f.to_string()));
     }
     url.into_owned()
 }
@@ -1264,8 +1308,10 @@ pub fn sanitize_url(url: &str) -> String {
 mod tests {
     use super::fixup_git_url;
 
-    fn fixup_git_location(url: &str) -> String {
-        super::fixup_git_location(&super::VcsLocation::from(url)).to_string()
+    async fn fixup_git_location(url: &str) -> String {
+        super::fixup_git_location(&super::VcsLocation::from_str(url).await)
+            .await
+            .to_string()
     }
 
     #[test]
@@ -1278,19 +1324,19 @@ mod tests {
         assert!(plausible_url("https://foo/blah"));
     }
 
-    #[test]
-    fn test_is_gitlab_site() {
+    #[tokio::test]
+    async fn test_is_gitlab_site() {
         use super::is_gitlab_site;
 
-        assert!(is_gitlab_site("gitlab.com", Some(false)));
-        assert!(is_gitlab_site("gitlab.example.com", Some(false)));
-        assert!(is_gitlab_site("salsa.debian.org", Some(false)));
-        assert!(!is_gitlab_site("github.com", Some(false)));
-        assert!(!is_gitlab_site("foo.example.com", Some(false)));
+        assert!(is_gitlab_site("gitlab.com", Some(false)).await);
+        assert!(is_gitlab_site("gitlab.example.com", Some(false)).await);
+        assert!(is_gitlab_site("salsa.debian.org", Some(false)).await);
+        assert!(!is_gitlab_site("github.com", Some(false)).await);
+        assert!(!is_gitlab_site("foo.example.com", Some(false)).await);
     }
 
-    #[test]
-    pub fn test_canonicalize_github() {
+    #[tokio::test]
+    async fn test_canonicalize_github() {
         use super::canonical_git_repo_url;
         use url::Url;
         assert_eq!(
@@ -1303,11 +1349,12 @@ mod tests {
                 &"https://github.com/jelmer/example".parse::<Url>().unwrap(),
                 Some(false)
             )
+            .await
         );
     }
 
-    #[test]
-    pub fn test_canonicalize_github_ssh() {
+    #[tokio::test]
+    async fn test_canonicalize_github_ssh() {
         use super::canonical_git_repo_url;
         use url::Url;
         assert_eq!(
@@ -1322,6 +1369,7 @@ mod tests {
                     .unwrap(),
                 Some(false)
             )
+            .await
         );
         assert_eq!(
             None,
@@ -1331,40 +1379,48 @@ mod tests {
                     .unwrap(),
                 Some(false)
             )
+            .await
         );
     }
 
-    #[test]
-    fn test_find_public_github() {
+    #[tokio::test]
+    async fn test_find_public_github() {
         use super::find_public_repo_url;
         assert_eq!(
             "https://github.com/jelmer/example",
-            find_public_repo_url("ssh://git@github.com/jelmer/example", Some(false)).unwrap()
+            find_public_repo_url("ssh://git@github.com/jelmer/example", Some(false))
+                .await
+                .unwrap()
         );
         assert_eq!(
             Some("https://github.com/jelmer/example"),
-            find_public_repo_url("https://github.com/jelmer/example", Some(false)).as_deref()
+            find_public_repo_url("https://github.com/jelmer/example", Some(false))
+                .await
+                .as_deref()
         );
         assert_eq!(
             "https://github.com/jelmer/example",
             find_public_repo_url("git@github.com:jelmer/example", Some(false))
+                .await
                 .unwrap()
                 .as_str()
         );
     }
 
-    #[test]
-    fn test_find_public_salsa() {
+    #[tokio::test]
+    async fn test_find_public_salsa() {
         use super::find_public_repo_url;
         assert_eq!(
             "https://salsa.debian.org/jelmer/example",
             find_public_repo_url("ssh://salsa.debian.org/jelmer/example", Some(false))
+                .await
                 .unwrap()
                 .as_str()
         );
         assert_eq!(
             "https://salsa.debian.org/jelmer/example",
             find_public_repo_url("https://salsa.debian.org/jelmer/example", Some(false))
+                .await
                 .unwrap()
                 .as_str()
         );
@@ -1401,8 +1457,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_guess_repo_url_travis_ci_org() {
+    #[tokio::test]
+    async fn test_guess_repo_url_travis_ci_org() {
         use super::guess_repo_from_url;
         assert_eq!(
             Some("https://github.com/jelmer/dulwich"),
@@ -1410,12 +1466,13 @@ mod tests {
                 &"https://travis-ci.org/jelmer/dulwich".parse().unwrap(),
                 Some(false)
             )
+            .await
             .as_deref(),
         );
     }
 
-    #[test]
-    fn test_guess_repo_url_coveralls() {
+    #[tokio::test]
+    async fn test_guess_repo_url_coveralls() {
         use super::guess_repo_from_url;
         assert_eq!(
             Some("https://github.com/jelmer/dulwich"),
@@ -1423,12 +1480,13 @@ mod tests {
                 &"https://coveralls.io/r/jelmer/dulwich".parse().unwrap(),
                 Some(false)
             )
+            .await
             .as_deref(),
         );
     }
 
-    #[test]
-    fn test_guess_repo_url_gitlab() {
+    #[tokio::test]
+    async fn test_guess_repo_url_gitlab() {
         use super::guess_repo_from_url;
         assert_eq!(
             Some("https://gitlab.com/jelmer/dulwich"),
@@ -1436,6 +1494,7 @@ mod tests {
                 &"https://gitlab.com/jelmer/dulwich".parse().unwrap(),
                 Some(false)
             )
+            .await
             .as_deref(),
         );
         assert_eq!(
@@ -1444,12 +1503,13 @@ mod tests {
                 &"https://gitlab.com/jelmer/dulwich/tags".parse().unwrap(),
                 Some(false)
             )
+            .await
             .as_deref(),
         );
     }
 
-    #[test]
-    fn test_fixup_git_location() {
+    #[tokio::test]
+    async fn test_fixup_git_location() {
         use super::{fixup_git_location, VcsLocation};
         assert_eq!(
             VcsLocation {
@@ -1462,12 +1522,13 @@ mod tests {
                 branch: None,
                 subpath: None,
             })
+            .await
             .into_owned()
         );
     }
 
-    #[test]
-    fn test_browse_url_from_repo() {
+    #[tokio::test]
+    async fn test_browse_url_from_repo() {
         use super::browse_url_from_repo_url;
         assert_eq!(
             Some("https://github.com/jelmer/dulwich".parse().unwrap()),
@@ -1478,7 +1539,8 @@ mod tests {
                     subpath: None,
                 },
                 Some(false)
-            ),
+            )
+            .await
         );
         assert_eq!(
             Some("https://github.com/jelmer/dulwich".parse().unwrap()),
@@ -1490,6 +1552,7 @@ mod tests {
                 },
                 Some(false)
             )
+            .await
         );
         assert_eq!(
             Some(
@@ -1505,6 +1568,7 @@ mod tests {
                 },
                 Some(false)
             )
+            .await
         );
         assert_eq!(
             Some(
@@ -1520,6 +1584,7 @@ mod tests {
                 },
                 Some(false)
             )
+            .await
         );
     }
 
@@ -1541,115 +1606,115 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_fixup() {
+    #[tokio::test]
+    async fn test_fixup() {
         assert_eq!(
             "https://github.com/jelmer/dulwich",
-            fixup_git_url("https://github.com:jelmer/dulwich")
+            fixup_git_url("https://github.com:jelmer/dulwich").await,
         );
         assert_eq!(
             "https://github.com/jelmer/dulwich -b blah",
-            fixup_git_location("https://github.com:jelmer/dulwich -b blah"),
+            fixup_git_location("https://github.com:jelmer/dulwich -b blah").await
         );
         assert_eq!(
             "https://github.com/jelmer/dulwich",
-            fixup_git_url("git://github.com/jelmer/dulwich"),
+            fixup_git_url("git://github.com/jelmer/dulwich").await,
         );
     }
 
-    #[test]
-    fn test_preserves() {
+    #[tokio::test]
+    async fn test_preserves() {
         assert_eq!(
             "https://github.com/jelmer/dulwich",
-            fixup_git_url("https://github.com/jelmer/dulwich"),
+            fixup_git_url("https://github.com/jelmer/dulwich").await
         );
     }
 
-    #[test]
-    fn test_salsa_not_https() {
+    #[tokio::test]
+    async fn test_salsa_not_https() {
         assert_eq!(
             "https://salsa.debian.org/jelmer/dulwich",
-            fixup_git_url("git://salsa.debian.org/jelmer/dulwich"),
+            fixup_git_url("git://salsa.debian.org/jelmer/dulwich").await
         );
     }
 
-    #[test]
-    fn test_salsa_uses_cgit() {
+    #[tokio::test]
+    async fn test_salsa_uses_cgit() {
         assert_eq!(
             "https://salsa.debian.org/jelmer/dulwich",
-            fixup_git_url("https://salsa.debian.org/cgit/jelmer/dulwich"),
+            fixup_git_url("https://salsa.debian.org/cgit/jelmer/dulwich").await
         );
     }
 
-    #[test]
-    fn test_salsa_tree_branch() {
+    #[tokio::test]
+    async fn test_salsa_tree_branch() {
         assert_eq!(
             "https://salsa.debian.org/jelmer/dulwich -b master",
-            fixup_git_location("https://salsa.debian.org/jelmer/dulwich/tree/master"),
+            fixup_git_location("https://salsa.debian.org/jelmer/dulwich/tree/master").await
         );
     }
 
-    #[test]
-    fn test_strip_extra_slash() {
+    #[tokio::test]
+    async fn test_strip_extra_slash() {
         assert_eq!(
             "https://salsa.debian.org/salve/auctex.git",
-            fixup_git_url("https://salsa.debian.org//salve/auctex.git"),
+            fixup_git_url("https://salsa.debian.org//salve/auctex.git").await
         );
     }
 
-    #[test]
-    fn test_strip_extra_colon() {
+    #[tokio::test]
+    async fn test_strip_extra_colon() {
         assert_eq!(
             "https://salsa.debian.org/mckinstry/lcov.git",
-            fixup_git_url("https://salsa.debian.org:/mckinstry/lcov.git"),
+            fixup_git_url("https://salsa.debian.org:/mckinstry/lcov.git").await
         );
     }
 
-    #[test]
-    fn test_strip_username() {
+    #[tokio::test]
+    async fn test_strip_username() {
         assert_eq!(
             "https://github.com/RPi-Distro/pgzero.git",
-            fixup_git_url("git://git@github.com:RPi-Distro/pgzero.git"),
+            fixup_git_url("git://git@github.com:RPi-Distro/pgzero.git").await
         );
         assert_eq!(
             "https://salsa.debian.org/debian-astro-team/pyavm.git",
-            fixup_git_url("https://git@salsa.debian.org:debian-astro-team/pyavm.git"),
+            fixup_git_url("https://git@salsa.debian.org:debian-astro-team/pyavm.git").await
         );
     }
 
-    #[test]
-    fn test_github_tree_url() {
+    #[tokio::test]
+    async fn test_github_tree_url() {
         assert_eq!(
             "https://github.com/blah/blah -b master",
-            fixup_git_location("https://github.com/blah/blah/tree/master"),
+            fixup_git_location("https://github.com/blah/blah/tree/master").await
         );
     }
 
-    #[test]
-    fn test_freedesktop() {
+    #[tokio::test]
+    async fn test_freedesktop() {
         assert_eq!(
             "https://gitlab.freedesktop.org/xorg/xserver",
-            fixup_git_url("git://anongit.freedesktop.org/xorg/xserver"),
+            fixup_git_url("git://anongit.freedesktop.org/xorg/xserver").await
         );
         assert_eq!(
             "https://gitlab.freedesktop.org/xorg/lib/libSM",
-            fixup_git_url("git://anongit.freedesktop.org/git/xorg/lib/libSM"),
+            fixup_git_url("git://anongit.freedesktop.org/git/xorg/lib/libSM").await
         );
     }
 
-    #[test]
-    fn test_anongit() {
+    #[tokio::test]
+    async fn test_anongit() {
         assert_eq!(
             "https://anongit.kde.org/kdev-php.git",
-            fixup_git_url("git://anongit.kde.org/kdev-php.git"),
+            fixup_git_url("git://anongit.kde.org/kdev-php.git").await
         );
     }
 
-    #[test]
-    fn test_gnome() {
+    #[tokio::test]
+    async fn test_gnome() {
         assert_eq!(
             "https://gitlab.gnome.org/GNOME/alacarte",
-            fixup_git_url("https://git.gnome.org/browse/alacarte"),
+            fixup_git_url("https://git.gnome.org/browse/alacarte").await
         );
     }
 }

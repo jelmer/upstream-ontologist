@@ -2,6 +2,7 @@ use clap::Parser;
 
 use std::io::Write;
 
+use futures::stream::StreamExt;
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
@@ -48,7 +49,8 @@ struct Args {
     consult_external_directory: bool,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = Args::parse();
 
     env_logger::builder()
@@ -66,7 +68,10 @@ fn main() {
         .init();
 
     if let Some(from_homepage) = args.from_homepage {
-        for d in upstream_ontologist::homepage::guess_from_homepage(&from_homepage).unwrap() {
+        for d in upstream_ontologist::homepage::guess_from_homepage(&from_homepage)
+            .await
+            .unwrap()
+        {
             println!(
                 "{}: {:?} - certainty {} (from {:?})",
                 d.datum.field(),
@@ -77,7 +82,10 @@ fn main() {
             );
         }
     } else if let Some(id) = args.from_repology {
-        for d in upstream_ontologist::repology::find_upstream_from_repology(&id).unwrap() {
+        for d in upstream_ontologist::repology::find_upstream_from_repology(&id)
+            .await
+            .unwrap()
+        {
             println!(
                 "{}: {:?} - certainty {} (from {:?})",
                 d.datum.field(),
@@ -88,10 +96,11 @@ fn main() {
             );
         }
     } else if args.scan {
-        for entry in upstream_ontologist::guess_upstream_info(
+        let mut stream = upstream_ontologist::upstream_metadata_stream(
             &args.path.canonicalize().unwrap(),
             Some(args.trust),
-        ) {
+        );
+        while let Some(entry) = stream.next().await {
             let entry = entry.unwrap();
             println!(
                 "{}: {:?} - certainty {}{}",
@@ -112,7 +121,9 @@ fn main() {
             Some(!args.disable_net_access),
             Some(args.consult_external_directory),
             Some(args.check),
-        ) {
+        )
+        .await
+        {
             Ok(m) => m,
             Err(upstream_ontologist::ProviderError::ParseError(e)) => {
                 eprintln!("Error parsing metadata: {}", e);

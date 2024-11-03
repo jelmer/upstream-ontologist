@@ -2,112 +2,184 @@ use crate::{
     Certainty, GuesserSettings, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata,
     UpstreamMetadata,
 };
-use log::debug;
 use serde::Deserialize;
 use std::collections::HashMap;
+
+#[derive(Deserialize)]
+struct CargoToml {
+    package: Option<CargoPackage>,
+
+    workspace: Option<CargoWorkspace>,
+}
+
+#[derive(Deserialize)]
+struct CargoWorkspace {
+    #[serde(default)]
+    package: Option<CargoPackage>,
+}
+
+/// Allow either specifying setting T directly or "workspace = true"
+pub enum DirectOrWorkspace<T> {
+    Direct(T),
+    Workspace,
+}
+
+impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for DirectOrWorkspace<T> {
+    fn deserialize<D>(deserializer: D) -> Result<DirectOrWorkspace<T>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        // Assume deserializing T, but if that fails, check for a table with "workspace = true"
+        let v: toml::value::Value = serde::Deserialize::deserialize(deserializer)?;
+        match T::deserialize(v.clone()) {
+            Ok(t) => Ok(DirectOrWorkspace::Direct(t)),
+            Err(_) => {
+                let table = v.as_table().ok_or_else(|| {
+                    serde::de::Error::custom("expected either a value or a table")
+                })?;
+                if table.get("workspace").and_then(|v| v.as_bool()) == Some(true) {
+                    Ok(DirectOrWorkspace::Workspace)
+                } else {
+                    Err(serde::de::Error::custom(
+                        "expected either a value or a table",
+                    ))
+                }
+            }
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct CargoPackage {
+    name: Option<String>,
+    #[serde(default)]
+    version: Option<DirectOrWorkspace<String>>,
+    #[serde(default)]
+    authors: Option<Vec<String>>,
+    #[serde(default)]
+    description: Option<DirectOrWorkspace<String>>,
+    #[serde(default)]
+    homepage: Option<DirectOrWorkspace<String>>,
+    #[serde(default)]
+    repository: Option<DirectOrWorkspace<String>>,
+    #[serde(default)]
+    license: Option<DirectOrWorkspace<String>>,
+}
+
+macro_rules! resolve {
+    ($workspace:expr, $package:expr, $field:ident) => {
+        match $package.$field {
+            Some(DirectOrWorkspace::Direct(ref s)) => Some(s.clone()),
+            Some(DirectOrWorkspace::Workspace) => {
+                if let Some(DirectOrWorkspace::Direct(ref s)) =
+                    $workspace.package.as_ref().and_then(|p| p.$field.as_ref())
+                {
+                    Some(s.clone())
+                } else {
+                    None
+                }
+            }
+            None => None,
+        }
+    };
+}
 
 #[cfg(feature = "cargo")]
 pub fn guess_from_cargo(
     path: &std::path::Path,
     _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
-    use toml::value::Table;
     // see https://doc.rust-lang.org/cargo/reference/manifest.html
-    let doc: Table = toml::from_str(&std::fs::read_to_string(path)?)
+    let doc: CargoToml = toml::from_str(&std::fs::read_to_string(path)?)
         .map_err(|e| ProviderError::ParseError(e.to_string()))?;
 
-    let package = match doc.get("package") {
-        Some(package) => package.as_table().ok_or_else(|| {
-            ProviderError::ParseError("[package] section in Cargo.toml is not a table".to_string())
-        })?,
+    let package = match doc.package {
+        Some(p) => p,
         None => {
-            log::debug!("No [package] section in Cargo.toml");
+            log::debug!("No package section in Cargo.toml");
             return Ok(Vec::new());
         }
     };
 
+    let workspace = match doc.workspace {
+        Some(w) => w,
+        None => CargoWorkspace { package: None },
+    };
+
     let mut results = Vec::new();
 
-    for (field, value) in package.into_iter() {
-        match field.as_str() {
-            "name" => {
-                results.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Name(value.as_str().unwrap().to_string()),
-                    certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
-                });
-                results.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::CargoCrate(value.as_str().unwrap().to_string()),
-                    certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
-                });
-            }
-            "description" => {
-                results.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Summary(value.as_str().unwrap().to_string()),
-                    certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
-                });
-            }
-            "homepage" => {
-                results.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Homepage(value.as_str().unwrap().to_string()),
-                    certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
-                });
-            }
-            "license" => {
-                let license = value.as_str().unwrap();
-                results.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::License(license.to_string()),
-                    certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
-                });
-            }
-            "repository" => {
-                let repository = value.as_str().unwrap();
-                results.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Repository(repository.to_string()),
-                    certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
-                });
-            }
-            "version" => {
-                if let Some(version) = value.as_str() {
-                    results.push(UpstreamDatumWithMetadata {
-                        datum: UpstreamDatum::Version(version.to_string()),
-                        certainty: Some(Certainty::Certain),
-                        origin: Some(path.into()),
-                    });
-                }
-            }
-            "authors" => {
-                let authors = value.as_array().unwrap();
-                let authors = authors
-                    .iter()
-                    .map(|a| Person::from(a.as_str().unwrap()))
-                    .collect();
-                results.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Author(authors),
-                    certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
-                });
-            }
-            "edition" | "default-run" => {}
-            n => {
-                debug!("Unknown Cargo.toml field: {}", n);
-            }
-        }
+    if let Some(name) = package.name {
+        results.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Name(name.clone()),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.into()),
+        });
+        results.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::CargoCrate(name),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.into()),
+        });
+    }
+
+    if let Some(description) = resolve!(workspace, package, description) {
+        results.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Summary(description),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.into()),
+        });
+    }
+
+    if let Some(homepage) = resolve!(workspace, package, homepage) {
+        results.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Homepage(homepage),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.into()),
+        });
+    }
+
+    if let Some(license) = resolve!(workspace, package, license) {
+        results.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::License(license),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.into()),
+        });
+    }
+
+    if let Some(repository) = resolve!(workspace, package, repository) {
+        results.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Repository(repository),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.into()),
+        });
+    }
+
+    if let Some(version) = resolve!(workspace, package, version) {
+        results.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Version(version),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.into()),
+        });
+    }
+
+    if let Some(authors) = package.authors {
+        let authors = authors.iter().map(|a| Person::from(a.as_str())).collect();
+        results.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Author(authors),
+            certainty: Some(Certainty::Certain),
+            origin: Some(path.into()),
+        });
     }
 
     Ok(results)
 }
 
-pub fn cargo_translate_dashes(crate_name: &str) -> Result<Option<String>, crate::HTTPJSONError> {
+pub async fn cargo_translate_dashes(
+    crate_name: &str,
+) -> Result<Option<String>, crate::HTTPJSONError> {
     let url = format!("https://crates.io/api/v1/crates?q={}", crate_name)
         .parse()
         .unwrap();
-    let json: serde_json::Value = crate::load_json_url(&url, None)?;
+    let json: serde_json::Value = crate::load_json_url(&url, None).await?;
 
     // Navigate through the JSON response to find the crate name.
     if let Some(crates) = json.get("crates").and_then(|c| c.as_array()) {
@@ -247,10 +319,10 @@ impl TryFrom<CrateInfo> for UpstreamMetadata {
     }
 }
 
-pub fn load_crate_info(cratename: &str) -> Result<Option<CrateInfo>, crate::ProviderError> {
+pub async fn load_crate_info(cratename: &str) -> Result<Option<CrateInfo>, crate::ProviderError> {
     let http_url = format!("https://crates.io/api/v1/crates/{}", cratename);
 
-    let data = crate::load_json_url(&http_url.parse().unwrap(), None)?;
+    let data = crate::load_json_url(&http_url.parse().unwrap(), None).await?;
 
     Ok(Some(serde_json::from_value(data).unwrap()))
 }
@@ -308,7 +380,7 @@ impl crate::ThirdPartyRepository for CratesIo {
     }
 
     async fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, ProviderError> {
-        let data = load_crate_info(name)?;
+        let data = load_crate_info(name).await?;
         if data.is_none() {
             return Ok(Vec::new());
         }
@@ -316,8 +388,8 @@ impl crate::ThirdPartyRepository for CratesIo {
     }
 }
 
-pub fn remote_crate_data(name: &str) -> Result<UpstreamMetadata, crate::ProviderError> {
-    let data = load_crate_info(name)?;
+pub async fn remote_crate_data(name: &str) -> Result<UpstreamMetadata, crate::ProviderError> {
+    let data = load_crate_info(name).await?;
 
     if let Some(data) = data {
         Ok(data.try_into()?)

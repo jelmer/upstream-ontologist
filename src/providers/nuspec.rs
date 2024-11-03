@@ -3,7 +3,7 @@ use crate::{Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMe
 use std::path::Path;
 
 // Documentation: https://docs.microsoft.com/en-us/nuget/reference/nuspec
-pub fn guess_from_nuspec(
+pub async fn guess_from_nuspec(
     path: &Path,
     _trust_package: bool,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
@@ -63,7 +63,8 @@ pub fn guess_from_nuspec(
     if let Some(project_url_tag) = metadata.get_child("projectUrl") {
         if let Some(project_url) = project_url_tag.get_text() {
             let repo_url =
-                crate::vcs::guess_repo_from_url(&url::Url::parse(&project_url).unwrap(), None);
+                crate::vcs::guess_repo_from_url(&url::Url::parse(&project_url).unwrap(), None)
+                    .await;
             if let Some(repo_url) = repo_url {
                 result.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Repository(repo_url),

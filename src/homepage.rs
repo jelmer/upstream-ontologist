@@ -3,13 +3,13 @@ use crate::{Certainty, Origin, ProviderError, UpstreamDatum, UpstreamDatumWithMe
 use select::document::Document;
 use select::predicate::Name;
 
-pub fn guess_from_homepage(
+pub async fn guess_from_homepage(
     url: &url::Url,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let client = crate::http::build_client().build().unwrap();
-    let response = client.get(url.clone()).send()?;
+    let response = client.get(url.clone()).send().await?;
 
-    let body = response.text()?;
+    let body = response.text().await?;
     Ok(guess_from_page(&body, url))
 }
 

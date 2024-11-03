@@ -124,7 +124,8 @@ struct Args {
     consult_external_directory: bool,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = Args::parse();
 
     env_logger::builder()
@@ -147,7 +148,7 @@ fn main() {
         Some(!args.disable_net_access),
         Some(args.consult_external_directory),
         Some(args.check),
-    )
+    ).await
     .unwrap();
 
     let codemeta = codemeta_file_from_upstream_info(upstream_info.into());

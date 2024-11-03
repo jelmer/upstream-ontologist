@@ -4,14 +4,24 @@ use log::warn;
 
 const DEFAULT_ITERATION_LIMIT: usize = 10;
 
+type ExtrapolationCallback = fn(
+    UpstreamMetadata,
+    bool,
+) -> std::pin::Pin<
+    Box<
+        dyn std::future::Future<Output = Result<Vec<UpstreamDatumWithMetadata>, ProviderError>>
+            + Send,
+    >,
+>;
+
 struct Extrapolation {
     from_fields: &'static [&'static str],
     to_fields: &'static [&'static str],
-    cb: fn(&mut UpstreamMetadata, bool) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>,
+    cb: ExtrapolationCallback,
 }
 
-fn extrapolate_repository_from_homepage(
-    upstream_metadata: &mut UpstreamMetadata,
+async fn extrapolate_repository_from_homepage(
+    upstream_metadata: &UpstreamMetadata,
     net_access: bool,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut ret = vec![];
@@ -28,7 +38,7 @@ fn extrapolate_repository_from_homepage(
         }
     };
 
-    if let Some(repo) = crate::vcs::guess_repo_from_url(&url, Some(net_access)) {
+    if let Some(repo) = crate::vcs::guess_repo_from_url(&url, Some(net_access)).await {
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Repository(repo),
             certainty: Some(
@@ -41,8 +51,8 @@ fn extrapolate_repository_from_homepage(
     Ok(ret)
 }
 
-fn extrapolate_homepage_from_repository_browse(
-    upstream_metadata: &mut UpstreamMetadata,
+async fn extrapolate_homepage_from_repository_browse(
+    upstream_metadata: &UpstreamMetadata,
     net_access: bool,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut ret = vec![];
@@ -61,7 +71,7 @@ fn extrapolate_homepage_from_repository_browse(
     // Some hosting sites are commonly used as Homepage
     // TODO(jelmer): Maybe check that there is a README file that
     // can serve as index?
-    let forge = crate::find_forge(&url, Some(net_access));
+    let forge = crate::find_forge(&url, Some(net_access)).await;
     if forge.is_some() && forge.unwrap().repository_browse_can_be_homepage() {
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Homepage(browse_url.datum.as_str().unwrap().to_string()),
@@ -75,8 +85,8 @@ fn extrapolate_homepage_from_repository_browse(
     Ok(ret)
 }
 
-fn copy_bug_db_field(
-    upstream_metadata: &mut UpstreamMetadata,
+async fn copy_bug_db_field(
+    upstream_metadata: &UpstreamMetadata,
     _net_access: bool,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut ret = vec![];
@@ -88,13 +98,12 @@ fn copy_bug_db_field(
         certainty: old_bug_db.certainty,
         origin: old_bug_db.origin.clone(),
     });
-    upstream_metadata.remove("Bugs-Database");
 
     Ok(ret)
 }
 
-fn extrapolate_repository_from_bug_db(
-    upstream_metadata: &mut UpstreamMetadata,
+async fn extrapolate_repository_from_bug_db(
+    upstream_metadata: &UpstreamMetadata,
     net_access: bool,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let old_value = upstream_metadata.get("Bug-Database").unwrap();
@@ -107,7 +116,7 @@ fn extrapolate_repository_from_bug_db(
             }
         }
     };
-    let repo = crate::vcs::guess_repo_from_url(&url, Some(net_access));
+    let repo = crate::vcs::guess_repo_from_url(&url, Some(net_access)).await;
 
     Ok(if let Some(repo) = repo {
         vec![UpstreamDatumWithMetadata {
@@ -123,8 +132,8 @@ fn extrapolate_repository_from_bug_db(
     })
 }
 
-fn extrapolate_repository_browse_from_repository(
-    upstream_metadata: &mut UpstreamMetadata,
+async fn extrapolate_repository_browse_from_repository(
+    upstream_metadata: &UpstreamMetadata,
     net_access: bool,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let old_value = upstream_metadata.get("Repository").unwrap();
@@ -144,7 +153,8 @@ fn extrapolate_repository_browse_from_repository(
             subpath: None,
         },
         Some(net_access),
-    );
+    )
+    .await;
     Ok(if let Some(browse_url) = browse_url {
         vec![UpstreamDatumWithMetadata {
             datum: UpstreamDatum::RepositoryBrowse(browse_url.to_string()),
@@ -156,8 +166,8 @@ fn extrapolate_repository_browse_from_repository(
     })
 }
 
-fn extrapolate_repository_from_repository_browse(
-    upstream_metadata: &mut UpstreamMetadata,
+async fn extrapolate_repository_from_repository_browse(
+    upstream_metadata: &UpstreamMetadata,
     net_access: bool,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let old_value = upstream_metadata.get("Repository-Browse").unwrap();
@@ -170,7 +180,7 @@ fn extrapolate_repository_from_repository_browse(
             }
         }
     };
-    let repo = crate::vcs::guess_repo_from_url(&url, Some(net_access));
+    let repo = crate::vcs::guess_repo_from_url(&url, Some(net_access)).await;
     Ok(if let Some(repo) = repo {
         vec![UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Repository(repo),
@@ -182,8 +192,8 @@ fn extrapolate_repository_from_repository_browse(
     })
 }
 
-fn extrapolate_bug_database_from_repository(
-    upstream_metadata: &mut UpstreamMetadata,
+async fn extrapolate_bug_database_from_repository(
+    upstream_metadata: &UpstreamMetadata,
     net_access: bool,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let old_value = upstream_metadata.get("Repository").unwrap();
@@ -200,7 +210,7 @@ fn extrapolate_bug_database_from_repository(
 
     Ok(
         if let Some(bug_db_url) =
-            crate::guess_bug_database_url_from_repo_url(&url, Some(net_access))
+            crate::guess_bug_database_url_from_repo_url(&url, Some(net_access)).await
         {
             vec![UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::BugDatabase(bug_db_url.to_string()),
@@ -216,8 +226,8 @@ fn extrapolate_bug_database_from_repository(
     )
 }
 
-fn extrapolate_bug_submit_from_bug_db(
-    upstream_metadata: &mut UpstreamMetadata,
+async fn extrapolate_bug_submit_from_bug_db(
+    upstream_metadata: &UpstreamMetadata,
     net_access: bool,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let old_value = upstream_metadata.get("Bug-Database").unwrap();
@@ -232,7 +242,7 @@ fn extrapolate_bug_submit_from_bug_db(
         }
     };
 
-    let bug_submit_url = crate::bug_submit_url_from_bug_database_url(&url, Some(net_access));
+    let bug_submit_url = crate::bug_submit_url_from_bug_database_url(&url, Some(net_access)).await;
 
     Ok(if let Some(bug_submit_url) = bug_submit_url {
         vec![UpstreamDatumWithMetadata {
@@ -245,8 +255,8 @@ fn extrapolate_bug_submit_from_bug_db(
     })
 }
 
-fn extrapolate_bug_db_from_bug_submit(
-    upstream_metadata: &mut UpstreamMetadata,
+async fn extrapolate_bug_db_from_bug_submit(
+    upstream_metadata: &UpstreamMetadata,
     net_access: bool,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let old_value = upstream_metadata.get("Bug-Submit").unwrap();
@@ -256,7 +266,8 @@ fn extrapolate_bug_db_from_bug_submit(
         None => return Ok(vec![]),
     };
 
-    let bug_db_url = crate::bug_database_url_from_bug_submit_url(&old_value_url, Some(net_access));
+    let bug_db_url =
+        crate::bug_database_url_from_bug_submit_url(&old_value_url, Some(net_access)).await;
 
     Ok(if let Some(bug_db_url) = bug_db_url {
         vec![UpstreamDatumWithMetadata {
@@ -269,8 +280,8 @@ fn extrapolate_bug_db_from_bug_submit(
     })
 }
 
-fn extrapolate_repository_from_download(
-    upstream_metadata: &mut UpstreamMetadata,
+async fn extrapolate_repository_from_download(
+    upstream_metadata: &UpstreamMetadata,
     net_access: bool,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let old_value = upstream_metadata.get("Download").unwrap();
@@ -285,7 +296,7 @@ fn extrapolate_repository_from_download(
         }
     };
 
-    let repo = crate::vcs::guess_repo_from_url(&url, Some(net_access));
+    let repo = crate::vcs::guess_repo_from_url(&url, Some(net_access)).await;
     Ok(if let Some(repo) = repo {
         vec![UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Repository(repo),
@@ -300,8 +311,8 @@ fn extrapolate_repository_from_download(
     })
 }
 
-fn extrapolate_name_from_repository(
-    upstream_metadata: &mut UpstreamMetadata,
+async fn extrapolate_name_from_repository(
+    upstream_metadata: &UpstreamMetadata,
     net_access: bool,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let mut ret = vec![];
@@ -315,7 +326,7 @@ fn extrapolate_name_from_repository(
             }
         }
     };
-    let repo = crate::vcs::guess_repo_from_url(&url, Some(net_access));
+    let repo = crate::vcs::guess_repo_from_url(&url, Some(net_access)).await;
     if let Some(repo) = repo {
         let parsed: url::Url = repo.parse().unwrap();
         let name = parsed.path_segments().unwrap().last().unwrap();
@@ -334,8 +345,8 @@ fn extrapolate_name_from_repository(
     Ok(ret)
 }
 
-fn extrapolate_security_contact_from_security_md(
-    upstream_metadata: &mut UpstreamMetadata,
+async fn extrapolate_security_contact_from_security_md(
+    upstream_metadata: &UpstreamMetadata,
     net_access: bool,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let repository_url = upstream_metadata.get("Repository").unwrap();
@@ -358,7 +369,8 @@ fn extrapolate_security_contact_from_security_md(
             subpath: security_md_path.datum.as_str().map(|x| x.to_string()),
         },
         Some(net_access),
-    );
+    )
+    .await;
 
     Ok(if let Some(security_url) = security_url {
         vec![UpstreamDatumWithMetadata {
@@ -371,8 +383,8 @@ fn extrapolate_security_contact_from_security_md(
     })
 }
 
-fn extrapolate_contact_from_maintainer(
-    upstream_metadata: &mut UpstreamMetadata,
+async fn extrapolate_contact_from_maintainer(
+    upstream_metadata: &UpstreamMetadata,
     _net_access: bool,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let maintainer = upstream_metadata.get("Maintainer").unwrap();
@@ -384,8 +396,8 @@ fn extrapolate_contact_from_maintainer(
     }])
 }
 
-fn consult_homepage(
-    upstream_metadata: &mut UpstreamMetadata,
+async fn consult_homepage(
+    upstream_metadata: &UpstreamMetadata,
     net_access: bool,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     if !net_access {
@@ -405,7 +417,7 @@ fn consult_homepage(
 
     let mut ret = vec![];
 
-    for mut entry in crate::homepage::guess_from_homepage(&url)? {
+    for mut entry in crate::homepage::guess_from_homepage(&url).await? {
         entry.certainty = std::cmp::min(homepage.certainty, entry.certainty);
         ret.push(entry);
     }
@@ -416,76 +428,86 @@ const EXTRAPOLATIONS: &[Extrapolation] = &[
     Extrapolation {
         from_fields: &["Homepage"],
         to_fields: &["Repository"],
-        cb: extrapolate_repository_from_homepage,
+        cb: |us, na| Box::pin(async move { extrapolate_repository_from_homepage(&us, na).await }),
     },
     Extrapolation {
         from_fields: &["Repository-Browse"],
         to_fields: &["Homepage"],
-        cb: extrapolate_homepage_from_repository_browse,
+        cb: |us, na| {
+            Box::pin(async move { extrapolate_homepage_from_repository_browse(&us, na).await })
+        },
     },
     Extrapolation {
         from_fields: &["Bugs-Database"],
         to_fields: &["Bug-Database"],
-        cb: copy_bug_db_field,
+        cb: |us, na| Box::pin(async move { copy_bug_db_field(&us, na).await }),
     },
     Extrapolation {
         from_fields: &["Bug-Database"],
         to_fields: &["Repository"],
-        cb: extrapolate_repository_from_bug_db,
+        cb: |us, na| Box::pin(async move { extrapolate_repository_from_bug_db(&us, na).await }),
     },
     Extrapolation {
         from_fields: &["Repository"],
         to_fields: &["Repository-Browse"],
-        cb: extrapolate_repository_browse_from_repository,
+        cb: |us, na| {
+            Box::pin(async move { extrapolate_repository_browse_from_repository(&us, na).await })
+        },
     },
     Extrapolation {
         from_fields: &["Repository-Browse"],
         to_fields: &["Repository"],
-        cb: extrapolate_repository_from_repository_browse,
+        cb: |us, na| {
+            Box::pin(async move { extrapolate_repository_from_repository_browse(&us, na).await })
+        },
     },
     Extrapolation {
         from_fields: &["Repository"],
         to_fields: &["Bug-Database"],
-        cb: extrapolate_bug_database_from_repository,
+        cb: |us, na| {
+            Box::pin(async move { extrapolate_bug_database_from_repository(&us, na).await })
+        },
     },
     Extrapolation {
         from_fields: &["Bug-Database"],
         to_fields: &["Bug-Submit"],
-        cb: extrapolate_bug_submit_from_bug_db,
+        cb: |us, na| Box::pin(async move { extrapolate_bug_submit_from_bug_db(&us, na).await }),
     },
     Extrapolation {
         from_fields: &["Bug-Submit"],
         to_fields: &["Bug-Database"],
-        cb: extrapolate_bug_db_from_bug_submit,
+        cb: |us, na| Box::pin(async move { extrapolate_bug_db_from_bug_submit(&us, na).await }),
     },
     Extrapolation {
         from_fields: &["Download"],
         to_fields: &["Repository"],
-        cb: extrapolate_repository_from_download,
+        cb: |us, na| Box::pin(async move { extrapolate_repository_from_download(&us, na).await }),
     },
     Extrapolation {
         from_fields: &["Repository"],
         to_fields: &["Name"],
-        cb: extrapolate_name_from_repository,
+        cb: |us, na| Box::pin(async move { extrapolate_name_from_repository(&us, na).await }),
     },
     Extrapolation {
         from_fields: &["Repository", "Security-MD"],
         to_fields: &["Security-Contact"],
-        cb: extrapolate_security_contact_from_security_md,
+        cb: |us, na| {
+            Box::pin(async move { extrapolate_security_contact_from_security_md(&us, na).await })
+        },
     },
     Extrapolation {
         from_fields: &["Maintainer"],
         to_fields: &["Contact"],
-        cb: extrapolate_contact_from_maintainer,
+        cb: |us, na| Box::pin(async move { extrapolate_contact_from_maintainer(&us, na).await }),
     },
     Extrapolation {
         from_fields: &["Homepage"],
         to_fields: &["Bug-Database", "Repository"],
-        cb: consult_homepage,
+        cb: |us, na| Box::pin(async move { consult_homepage(&us, na).await }),
     },
 ];
 
-pub fn extrapolate_fields(
+pub async fn extrapolate_fields(
     upstream_metadata: &mut UpstreamMetadata,
     net_access: bool,
     iteration_limit: Option<usize>,
@@ -561,7 +583,7 @@ pub fn extrapolate_fields(
                 continue;
             }
 
-            let extra_upstream_metadata = cb(upstream_metadata, net_access)?;
+            let extra_upstream_metadata = cb(upstream_metadata.clone(), net_access).await?;
             let changes = upstream_metadata.update(extra_upstream_metadata.into_iter());
 
             if !changes.is_empty() {

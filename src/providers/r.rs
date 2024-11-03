@@ -4,11 +4,9 @@ use crate::{
     vcs, Certainty, GuesserSettings, Person, ProviderError, UpstreamDatum,
     UpstreamDatumWithMetadata,
 };
-use log::debug;
-use url::Url;
 
 #[cfg(feature = "r-description")]
-pub fn guess_from_r_description(
+pub async fn guess_from_r_description(
     path: &std::path::Path,
     _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
@@ -16,30 +14,18 @@ pub fn guess_from_r_description(
     let contents = std::fs::read_to_string(path)?;
 
     // TODO: Use parse_relaxed
-    let msg = r_description::lossless::RDescription::from_str(&contents)
+    let msg = r_description::lossy::RDescription::from_str(&contents)
         .map_err(|e| ProviderError::ParseError(e.to_string()))?;
-
-    fn parse_url_entry(entry: &str) -> Option<(&str, Option<&str>)> {
-        let mut parts = entry.splitn(2, " (");
-        if let Some(url) = parts.next() {
-            let label = parts.next().map(|label| label.trim_end_matches(')').trim());
-            Some((url.trim(), label))
-        } else {
-            Some((entry, None))
-        }
-    }
 
     let mut results = Vec::new();
 
-    if let Some(package) = msg.package() {
-        results.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::Name(package),
-            certainty: Some(Certainty::Certain),
-            origin: Some(path.into()),
-        });
-    }
+    results.push(UpstreamDatumWithMetadata {
+        datum: UpstreamDatum::Name(msg.name),
+        certainty: Some(Certainty::Certain),
+        origin: Some(path.into()),
+    });
 
-    if let Some(repository) = msg.repository() {
+    if let Some(repository) = msg.repository {
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Archive(repository),
             certainty: Some(Certainty::Certain),
@@ -47,7 +33,7 @@ pub fn guess_from_r_description(
         });
     }
 
-    if let Some(bug_reports) = msg.bug_reports() {
+    if let Some(bug_reports) = msg.bug_reports {
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::BugDatabase(bug_reports.to_string()),
             certainty: Some(Certainty::Certain),
@@ -55,43 +41,35 @@ pub fn guess_from_r_description(
         });
     }
 
-    if let Some(version) = msg.version() {
+    results.push(UpstreamDatumWithMetadata {
+        datum: UpstreamDatum::Version(msg.version.to_string()),
+        certainty: Some(Certainty::Certain),
+        origin: Some(path.into()),
+    });
+
+    results.push(UpstreamDatumWithMetadata {
+        datum: UpstreamDatum::License(msg.license),
+        certainty: Some(Certainty::Certain),
+        origin: Some(path.into()),
+    });
+
+    results.push(UpstreamDatumWithMetadata {
+        datum: UpstreamDatum::Summary(msg.title),
+        certainty: Some(Certainty::Certain),
+        origin: Some(path.into()),
+    });
+
+    let lines: Vec<&str> = msg.description.split_inclusive('\n').collect();
+    if !lines.is_empty() {
+        let reflowed = format!("{}{}", lines[0], textwrap::dedent(&lines[1..].concat()));
         results.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::Version(version),
+            datum: UpstreamDatum::Description(reflowed),
             certainty: Some(Certainty::Certain),
             origin: Some(path.into()),
         });
     }
 
-    if let Some(license) = msg.license() {
-        results.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::License(license),
-            certainty: Some(Certainty::Certain),
-            origin: Some(path.into()),
-        });
-    }
-
-    if let Some(title) = msg.title() {
-        results.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::Summary(title),
-            certainty: Some(Certainty::Certain),
-            origin: Some(path.into()),
-        });
-    }
-
-    if let Some(desc) = msg.description() {
-        let lines: Vec<&str> = desc.split_inclusive('\n').collect();
-        if !lines.is_empty() {
-            let reflowed = format!("{}{}", lines[0], textwrap::dedent(&lines[1..].concat()));
-            results.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Description(reflowed),
-                certainty: Some(Certainty::Certain),
-                origin: Some(path.into()),
-            });
-        }
-    }
-
-    if let Some(maintainer) = msg.maintainer() {
+    if let Some(maintainer) = msg.maintainer {
         let person = Person::from(maintainer.as_str());
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Maintainer(person),
@@ -100,35 +78,18 @@ pub fn guess_from_r_description(
         });
     }
 
-    if let Some(url) = msg.url() {
-        let entries: Vec<&str> = url
-            .split_terminator(|c| c == ',' || c == '\n')
-            .map(str::trim)
-            .collect();
-        let mut urls = Vec::new();
-
-        for entry in entries {
-            if let Some((url, label)) = parse_url_entry(entry) {
-                urls.push((label, url));
-            }
-        }
-
+    if let Some(urls) = msg.url {
         if urls.len() == 1 {
             results.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Homepage(urls[0].1.to_string()),
+                datum: UpstreamDatum::Homepage(urls[0].url.to_string()),
                 certainty: Some(Certainty::Possible),
                 origin: Some(path.into()),
             });
         }
 
-        for (label, url) in urls {
-            let url = match Url::parse(url) {
-                Ok(url) => url,
-                Err(_) => {
-                    debug!("Invalid URL: {}", url);
-                    continue;
-                }
-            };
+        for entry in urls {
+            let url = &entry.url;
+            let label = entry.label.as_deref();
             if let Some(hostname) = url.host_str() {
                 if hostname == "bioconductor.org" {
                     results.push(UpstreamDatumWithMetadata {
@@ -152,7 +113,7 @@ pub fn guess_from_r_description(
                         certainty: Some(Certainty::Certain),
                         origin: Some(path.into()),
                     });
-                } else if let Some(repo_url) = vcs::guess_repo_from_url(&url, None) {
+                } else if let Some(repo_url) = vcs::guess_repo_from_url(url, None).await {
                     results.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Repository(repo_url),
                         certainty: Some(Certainty::Certain),
@@ -171,8 +132,8 @@ pub fn guess_from_r_description(
 mod description_tests {
     use super::*;
 
-    #[test]
-    fn test_read() {
+    #[tokio::test]
+    async fn test_read() {
         let td = tempfile::tempdir().unwrap();
         let path = td.path().join("DESCRIPTION");
 
@@ -217,7 +178,9 @@ Date/Publication: 2019-08-02 20:30:02 UTC
 "#,
         )
         .unwrap();
-        let ret = guess_from_r_description(&path, &GuesserSettings::default()).unwrap();
+        let ret = guess_from_r_description(&path, &GuesserSettings::default())
+            .await
+            .unwrap();
         assert_eq!(
             ret,
             vec![
@@ -285,7 +248,7 @@ interface to 'libcurl' (<https://curl.haxx.se/libcurl>)."#
                 UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Homepage("https://www.example.com/crul".to_string()),
                     certainty: Some(Certainty::Certain),
-                    origin: Some(path.into())
+                    origin: Some(path.clone().into())
                 },
             ]
         );

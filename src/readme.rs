@@ -255,7 +255,7 @@ pub fn description_from_readme_md(
     description_from_readme_html(&html_output)
 }
 
-pub fn guess_from_readme(
+pub async fn guess_from_readme(
     path: &std::path::Path,
     _trust_package: bool,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
@@ -379,8 +379,9 @@ pub fn guess_from_readme(
         }
         for m in lazy_regex::regex_find!("https://([^]/]+)/([^]\\s()\"#]+)", line) {
             let url = m.trim_end_matches('.');
-            if crate::vcs::is_gitlab_site(m, None) {
-                if let Some(repo_url) = crate::vcs::guess_repo_from_url(&url.parse().unwrap(), None)
+            if crate::vcs::is_gitlab_site(m, None).await {
+                if let Some(repo_url) =
+                    crate::vcs::guess_repo_from_url(&url.parse().unwrap(), None).await
                 {
                     ret.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Repository(repo_url),
