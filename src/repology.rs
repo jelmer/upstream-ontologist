@@ -19,18 +19,18 @@ fn perl_name_to_module(name: &str) -> String {
         .join("::")
 }
 
-pub fn find_upstream_from_repology(name: &str) -> Result<UpstreamMetadata, ProviderError> {
+pub async fn find_upstream_from_repology(name: &str) -> Result<UpstreamMetadata, ProviderError> {
     let (family, name) = parse_repology_name(name)
         .ok_or_else(|| ProviderError::Other("Invalid repology name".to_string()))?;
 
     match family {
-        "python" => crate::providers::python::remote_pypi_metadata(name),
+        "python" => crate::providers::python::remote_pypi_metadata(name).await,
         "go" => crate::providers::go::remote_go_metadata(name),
-        "ruby" => crate::providers::ruby::remote_rubygem_metadata(name),
-        "node" => crate::providers::node::remote_npm_metadata(name),
-        "perl" => crate::providers::perl::remote_cpan_data(&perl_name_to_module(name)),
-        "rust" => crate::providers::rust::remote_crate_data(name),
-        "haskell" => crate::providers::haskell::remote_hackage_data(name),
+        "ruby" => crate::providers::ruby::remote_rubygem_metadata(name).await,
+        "node" => crate::providers::node::remote_npm_metadata(name).await,
+        "perl" => crate::providers::perl::remote_cpan_data(&perl_name_to_module(name)).await,
+        "rust" => crate::providers::rust::remote_crate_data(name).await,
+        "haskell" => crate::providers::haskell::remote_hackage_data(name).await,
         "apmod" => Ok(UpstreamMetadata::new()),
         "coq" => Ok(UpstreamMetadata::new()),
         "cursors" => Ok(UpstreamMetadata::new()),

@@ -8,7 +8,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
-pub fn guess_from_gemspec(
+pub async fn guess_from_gemspec(
     path: &Path,
     _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
@@ -278,17 +278,17 @@ impl TryFrom<Rubygem> for UpstreamMetadata {
     }
 }
 
-pub fn load_rubygem(name: &str) -> Result<Option<Rubygem>, ProviderError> {
+pub async fn load_rubygem(name: &str) -> Result<Option<Rubygem>, ProviderError> {
     let url = format!("https://rubygems.org/api/v1/gems/{}.json", name)
         .parse()
         .unwrap();
-    let data = crate::load_json_url(&url, None)?;
+    let data = crate::load_json_url(&url, None).await?;
     let gem: Rubygem = serde_json::from_value(data).unwrap();
     Ok(Some(gem))
 }
 
-pub fn remote_rubygem_metadata(name: &str) -> Result<UpstreamMetadata, ProviderError> {
-    let gem = load_rubygem(name)?;
+pub async fn remote_rubygem_metadata(name: &str) -> Result<UpstreamMetadata, ProviderError> {
+    let gem = load_rubygem(name).await?;
 
     match gem {
         Some(gem) => gem.try_into(),

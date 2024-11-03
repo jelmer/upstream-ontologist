@@ -136,18 +136,18 @@ pub fn guess_from_cabal(
     )
 }
 
-pub fn remote_hackage_data(package: &str) -> Result<UpstreamMetadata, ProviderError> {
+pub async fn remote_hackage_data(package: &str) -> Result<UpstreamMetadata, ProviderError> {
     let mut ret = UpstreamMetadata::new();
-    for datum in guess_from_hackage(package)? {
+    for datum in guess_from_hackage(package).await? {
         ret.insert(datum);
     }
     Ok(ret)
 }
 
-pub fn guess_from_hackage(
+pub async fn guess_from_hackage(
     package: &str,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
-    let client = reqwest::blocking::Client::builder()
+    let client = reqwest::Client::builder()
         .user_agent(crate::USER_AGENT)
         .build()
         .unwrap();
@@ -159,9 +159,10 @@ pub fn guess_from_hackage(
     .parse()
     .unwrap();
 
-    match client.get(url).send() {
+    match client.get(url).send().await {
         Ok(response) => {
-            let reader = BufReader::new(response);
+            let bytes = response.bytes().await?;
+            let reader = BufReader::new(&bytes[..]);
             guess_from_cabal_lines(
                 reader
                     .lines()
@@ -221,7 +222,8 @@ impl crate::ThirdPartyRepository for Hackage {
     }
 
     async fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, ProviderError> {
-        Ok(guess_from_hackage(name)?
+        Ok(guess_from_hackage(name)
+            .await?
             .into_iter()
             .map(|v| v.datum)
             .collect())

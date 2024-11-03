@@ -2,10 +2,10 @@ use crate::{ProviderError, UpstreamDatum};
 use select::document::Document;
 use select::predicate::{And, Name, Predicate};
 
-pub fn guess_from_pecl_package(package: &str) -> Result<Vec<UpstreamDatum>, ProviderError> {
+pub async fn guess_from_pecl_package(package: &str) -> Result<Vec<UpstreamDatum>, ProviderError> {
     let url = format!("https://pecl.php.net/packages/{}", package);
 
-    let client = reqwest::blocking::Client::builder()
+    let client = reqwest::Client::builder()
         .user_agent(crate::USER_AGENT)
         // PECL is slow
         .timeout(std::time::Duration::from_secs(15))
@@ -15,6 +15,7 @@ pub fn guess_from_pecl_package(package: &str) -> Result<Vec<UpstreamDatum>, Prov
     let response = client
         .get(url)
         .send()
+        .await
         .map_err(|e| ProviderError::Other(e.to_string()))?;
 
     match response.status() {
@@ -29,6 +30,7 @@ pub fn guess_from_pecl_package(package: &str) -> Result<Vec<UpstreamDatum>, Prov
 
     let body = response
         .text()
+        .await
         .map_err(|e| ProviderError::Other(e.to_string()))?;
 
     guess_from_pecl_page(&body)
@@ -123,7 +125,7 @@ impl crate::ThirdPartyRepository for Pecl {
     }
 
     async fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, ProviderError> {
-        guess_from_pecl_package(name)
+        guess_from_pecl_package(name).await
     }
 }
 

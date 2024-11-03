@@ -26,11 +26,11 @@ fn generate_upstream_tests(testdata_dir: &Path, dest_path: &Path) -> std::io::Re
             let fn_name = format_ident!("test_{}", dir_name.replace(['.', '-'], "_"));
 
             let test = quote! {
-                #[test]
-                fn #fn_name() {
+                #[tokio::test]
+                async fn #fn_name() {
                     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata").join(#dir_name);
                     let expected: serde_yaml::Value = serde_yaml::from_reader(std::fs::File::open(dir.join("expected.yaml")).unwrap()).unwrap();
-                    let actual: serde_yaml::Value = serde_yaml::to_value(crate::get_upstream_info(&dir, Some(true), Some(false), Some(false), Some(false)).unwrap()).unwrap();
+                    let actual: serde_yaml::Value = serde_yaml::to_value(crate::get_upstream_info(&dir, Some(true), Some(false), Some(false), Some(false)).await.unwrap()).unwrap();
                     assert_eq!(expected, actual);
                 }
             };

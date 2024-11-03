@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 #[cfg(feature = "python-pkginfo")]
-pub fn guess_from_pkg_info(
+pub async fn guess_from_pkg_info(
     path: &Path,
     _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
@@ -436,8 +436,8 @@ fn parse_python_long_description(
     Ok(ret)
 }
 
-pub fn parse_python_url(url: &str) -> Vec<UpstreamDatumWithMetadata> {
-    let repo = vcs::guess_repo_from_url(&url::Url::parse(url).unwrap(), None);
+pub async fn parse_python_url(url: &str) -> Vec<UpstreamDatumWithMetadata> {
+    let repo = vcs::guess_repo_from_url(&url::Url::parse(url).unwrap(), None).await;
     if let Some(repo) = repo {
         return vec![UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Repository(repo),
@@ -454,7 +454,7 @@ pub fn parse_python_url(url: &str) -> Vec<UpstreamDatumWithMetadata> {
 }
 
 #[cfg(feature = "setup-cfg")]
-pub fn guess_from_setup_cfg(
+pub async fn guess_from_setup_cfg(
     path: &Path,
     _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
@@ -490,7 +490,7 @@ pub fn guess_from_setup_cfg(
                 });
             }
             "url" => {
-                ret.extend(parse_python_url(value));
+                ret.extend(parse_python_url(value).await);
             }
             "description" => {
                 ret.push(UpstreamDatumWithMetadata {
@@ -607,18 +607,19 @@ pub fn guess_from_setup_cfg(
 }
 
 #[cfg(feature = "pyo3")]
-fn guess_from_setup_py_executed(
+async fn guess_from_setup_py_executed(
     path: &Path,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     // Ensure only one thread can run this function at a time
-    static SETUP_PY_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-    let _lock = SETUP_PY_LOCK.lock().unwrap();
+    static SETUP_PY_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+    let _guard = SETUP_PY_LOCK.lock().await;
     let mut ret = Vec::new();
     // Import setuptools, just in case it replaces distutils
     //
     use pyo3::types::PyDict;
     pyo3::prepare_freethreaded_python();
     let mut long_description = None;
+    let mut urls = vec![];
     Python::with_gil(|py| {
         let _ = py.import_bound("setuptools");
 
@@ -671,7 +672,7 @@ fn guess_from_setup_py_executed(
             .call_method0("get_url")?
             .extract::<Option<String>>()?
         {
-            ret.extend(parse_python_url(&url));
+            urls.push(url);
         }
 
         if let Some(download_url) = result.call_method0("get_download_url")?.extract()? {
@@ -750,23 +751,27 @@ fn guess_from_setup_py_executed(
         )?);
     }
 
+    for url in urls {
+        ret.extend(parse_python_url(&url).await);
+    }
+
     Ok(ret)
 }
 
 #[cfg(feature = "pyo3")]
-pub fn guess_from_setup_py(
+pub async fn guess_from_setup_py(
     path: &Path,
     trust_package: bool,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     if trust_package {
-        guess_from_setup_py_executed(path)
+        guess_from_setup_py_executed(path).await
     } else {
-        guess_from_setup_py_parsed(path)
+        guess_from_setup_py_parsed(path).await
     }
 }
 
 #[cfg(feature = "pyo3")]
-fn guess_from_setup_py_parsed(
+async fn guess_from_setup_py_parsed(
     path: &Path,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     pyo3::prepare_freethreaded_python();
@@ -780,6 +785,7 @@ fn guess_from_setup_py_parsed(
 
     let mut long_description = None;
     let mut ret = Vec::new();
+    let mut urls = vec![];
 
     Python::with_gil(|py| {
         let ast = py.import_bound("ast").unwrap();
@@ -957,7 +963,7 @@ fn guess_from_setup_py_parsed(
                 }
                 "url" => {
                     if let Some(url) = get_str_from_expr(value) {
-                        ret.extend(parse_python_url(url.as_str()));
+                        urls.push(url.clone());
                     }
                 }
                 "project_urls" => {
@@ -1064,6 +1070,10 @@ fn guess_from_setup_py_parsed(
             content_type.as_deref(),
             &Origin::Path(path.into()),
         )?);
+    }
+
+    for url in urls {
+        ret.extend(parse_python_url(url.as_str()).await);
     }
 
     Ok(ret)
@@ -1284,18 +1294,18 @@ impl TryInto<UpstreamMetadata> for PypiProject {
     }
 }
 
-pub fn load_pypi_project(name: &str) -> Result<Option<PypiProject>, ProviderError> {
+pub async fn load_pypi_project(name: &str) -> Result<Option<PypiProject>, ProviderError> {
     let http_url = format!("https://pypi.org/pypi/{}/json", name)
         .parse()
         .unwrap();
-    let data = crate::load_json_url(&http_url, None)?;
+    let data = crate::load_json_url(&http_url, None).await?;
     let pypi_data: PypiProject =
         serde_json::from_value(data).map_err(|e| crate::ProviderError::Other(e.to_string()))?;
     Ok(Some(pypi_data))
 }
 
-pub fn remote_pypi_metadata(name: &str) -> Result<UpstreamMetadata, ProviderError> {
-    let pypi = load_pypi_project(name)?;
+pub async fn remote_pypi_metadata(name: &str) -> Result<UpstreamMetadata, ProviderError> {
+    let pypi = load_pypi_project(name).await?;
 
     match pypi {
         Some(pypi) => pypi.try_into(),

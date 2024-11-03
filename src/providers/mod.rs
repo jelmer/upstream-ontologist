@@ -34,7 +34,7 @@ pub mod waf;
 use crate::{Certainty, GuesserSettings, UpstreamDatum, UpstreamDatumWithMetadata};
 use std::io::BufRead;
 
-pub fn guess_from_install(
+pub async fn guess_from_install(
     path: &std::path::Path,
     _settings: &GuesserSettings,
 ) -> Result<Vec<crate::UpstreamDatumWithMetadata>, crate::ProviderError> {
@@ -104,8 +104,8 @@ pub fn guess_from_install(
         }
         for m in lazy_regex::regex!("https://([^]/]+)/([^]\\s()\"#]+)").find_iter(line) {
             let url: url::Url = m.as_str().trim_end_matches('.').trim().parse().unwrap();
-            if crate::vcs::is_gitlab_site(url.host_str().unwrap(), None) {
-                if let Some(repo_url) = crate::vcs::guess_repo_from_url(&url, None) {
+            if crate::vcs::is_gitlab_site(url.host_str().unwrap(), None).await {
+                if let Some(repo_url) = crate::vcs::guess_repo_from_url(&url, None).await {
                     ret.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Repository(repo_url),
                         certainty: Some(Certainty::Possible),

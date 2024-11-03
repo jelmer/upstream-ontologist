@@ -26,12 +26,12 @@ struct Links {
     html: url::Url,
 }
 
-pub fn guess_from_gobo(package: &str) -> Result<Vec<UpstreamDatum>, crate::ProviderError> {
+pub async fn guess_from_gobo(package: &str) -> Result<Vec<UpstreamDatum>, crate::ProviderError> {
     let packages_url = "https://api.github.com/repos/gobolinux/Recipes/contents"
         .parse()
         .unwrap();
     let contents: Vec<Contents> =
-        serde_json::from_value(crate::load_json_url(&packages_url, None)?).unwrap();
+        serde_json::from_value(crate::load_json_url(&packages_url, None).await?).unwrap();
 
     let package = match contents
         .iter()
@@ -45,7 +45,7 @@ pub fn guess_from_gobo(package: &str) -> Result<Vec<UpstreamDatum>, crate::Provi
     };
 
     let versions: Vec<Contents> =
-        serde_json::from_value(crate::load_json_url(&package.url, None)?).unwrap();
+        serde_json::from_value(crate::load_json_url(&package.url, None).await?).unwrap();
 
     let last_version = if let Some(last_version) = versions.last() {
         &last_version.name
@@ -60,16 +60,16 @@ pub fn guess_from_gobo(package: &str) -> Result<Vec<UpstreamDatum>, crate::Provi
     )
     .parse()
     .unwrap();
-    let client = reqwest::blocking::Client::builder()
+    let client = reqwest::Client::builder()
         .user_agent(crate::USER_AGENT)
         .build()
         .unwrap();
 
     let mut result = Vec::new();
     let recipe_url = base_url.join("Recipe").unwrap();
-    match client.get(recipe_url.as_ref()).send() {
+    match client.get(recipe_url.as_ref()).send().await {
         Ok(response) => {
-            let text = response.text().unwrap();
+            let text = response.text().await.unwrap();
             for line in text.lines() {
                 if let Some(url) = line.strip_prefix("url=") {
                     result.push(UpstreamDatum::Homepage(url.to_string()));
@@ -88,9 +88,9 @@ pub fn guess_from_gobo(package: &str) -> Result<Vec<UpstreamDatum>, crate::Provi
     }
 
     let description_url = base_url.join("Resources/Description").unwrap();
-    match client.get(description_url.as_ref()).send() {
+    match client.get(description_url.as_ref()).send().await {
         Ok(response) => {
-            for line in response.text().unwrap().lines() {
+            for line in response.text().await.unwrap().lines() {
                 if let Some((_, key, value)) = lazy_regex::regex_captures!("\\[(.*)\\] (.*)", line)
                 {
                     match key {
@@ -148,6 +148,6 @@ impl crate::ThirdPartyRepository for Gobo {
     }
 
     async fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, crate::ProviderError> {
-        guess_from_gobo(name)
+        guess_from_gobo(name).await
     }
 }

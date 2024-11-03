@@ -47,6 +47,8 @@ semver = { version = "1", features = ["serde"] }
 async-trait = "0.1.83"
 tokio = { version = "1.41.0", features = ["full"] }
 futures = "0.3.31"
+futures-util = "0.3.31"
+debversion = { version = "0.4.4", optional = true }
 
 [features]
 default = ["git-config", "launchpad", "opam", "dist-ini", "cargo", "r-description", "pyproject-toml", "python-pkginfo", "debian", "pyo3", "setup-cfg"]
@@ -60,9 +62,10 @@ pyproject-toml = ["dep:pyproject-toml"]
 python-pkginfo = ["dep:python-pkginfo"]
 setup-cfg = ["dep:rust-ini"]
 debcargo = ["dep:debcargo"]
-debian = ["dep:debian-watch", "dep:makefile-lossless", "dep:debian-changelog", "dep:debian-control", "dep:debian-copyright"]
+debian = ["dep:debian-watch", "dep:makefile-lossless", "dep:debian-changelog", "dep:debian-control", "dep:debian-copyright", "dep:debversion"]
 pyo3 = ["dep:pyo3"]
 cli = ["dep:clap", "dep:env_logger"]
+debversion = ["dep:debversion"]
 
 [lib]
 

@@ -5,9 +5,9 @@ use lazy_regex::regex;
 use log::{debug, error, warn};
 use reqwest::Url;
 
-pub fn get_sf_metadata(project: &str) -> Option<serde_json::Value> {
+async fn get_sf_metadata(project: &str) -> Option<serde_json::Value> {
     let url = format!("https://sourceforge.net/rest/p/{}", project);
-    match load_json_url(&Url::parse(url.as_str()).unwrap(), None) {
+    match load_json_url(&Url::parse(url.as_str()).unwrap(), None).await {
         Ok(data) => Some(data),
         Err(HTTPJSONError::Error { status, .. }) if status == reqwest::StatusCode::NOT_FOUND => {
             None
@@ -16,7 +16,7 @@ pub fn get_sf_metadata(project: &str) -> Option<serde_json::Value> {
     }
 }
 
-fn parse_sf_json(
+async fn parse_sf_json(
     data: serde_json::Value,
     project: &str,
     subproject: Option<&str>,
@@ -35,7 +35,7 @@ fn parse_sf_json(
     {
         let preferred_support_url =
             Url::parse(preferred_support_url).expect("preferred_support_url is not a valid URL");
-        match check_bug_database_canonical(&preferred_support_url, Some(true)) {
+        match check_bug_database_canonical(&preferred_support_url, Some(true)).await {
             Ok(canonical_url) => {
                 results.push(UpstreamDatum::BugDatabase(canonical_url.to_string()));
             }
@@ -147,9 +147,9 @@ fn parse_sf_json(
 
 pub async fn guess_from_sf(sf_project: &str, subproject: Option<&str>) -> Vec<UpstreamDatum> {
     let mut results = Vec::new();
-    match get_sf_metadata(sf_project) {
+    match get_sf_metadata(sf_project).await {
         Some(data) => {
-            results.extend(parse_sf_json(data, sf_project, subproject));
+            results.extend(parse_sf_json(data, sf_project, subproject).await);
         }
         None => {
             debug!("No SourceForge metadata found for {}", sf_project);
@@ -175,13 +175,13 @@ pub fn extract_sf_project_name(url: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn test_parse_sf_json_svn() {
+    #[tokio::test]
+    async fn test_parse_sf_json_svn() {
         // From https://sourceforge.net/rest/p/gtab
         let data: serde_json::Value =
             serde_json::from_str(include_str!("../testdata/gtab.json")).unwrap();
         assert_eq!(
-            parse_sf_json(data, "gtab", Some("gtab")),
+            parse_sf_json(data, "gtab", Some("gtab")).await,
             vec![
                 UpstreamDatum::Name("gtab".to_string()),
                 UpstreamDatum::Homepage("http://gtab.sourceforge.net".to_string()),
@@ -190,13 +190,13 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_parse_sf_json_git() {
+    #[tokio::test]
+    async fn test_parse_sf_json_git() {
         // From https://sourceforge.net/rest/p/zsh
         let data: serde_json::Value =
             serde_json::from_str(include_str!("../testdata/zsh.json")).unwrap();
         assert_eq!(
-            parse_sf_json(data, "zsh", Some("zsh")),
+            parse_sf_json(data, "zsh", Some("zsh")).await,
             vec![
                 UpstreamDatum::Name("zsh".to_string()),
                 UpstreamDatum::Homepage("http://zsh.sourceforge.net/".to_string()),
@@ -205,13 +205,13 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_parse_sf_json_hg_diff() {
+    #[tokio::test]
+    async fn test_parse_sf_json_hg_diff() {
         // From https://sourceforge.net/rest/p/hg-diff
         let data: serde_json::Value =
             serde_json::from_str(include_str!("../testdata/hg-diff.json")).unwrap();
         assert_eq!(
-            parse_sf_json(data, "hg-diff", Some("hg-diff")),
+            parse_sf_json(data, "hg-diff", Some("hg-diff")).await,
             vec![
                 UpstreamDatum::Name("hg-diff".to_string()),
                 UpstreamDatum::Homepage("http://hg-diff.sourceforge.net/".to_string()),
@@ -220,13 +220,13 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_parse_sf_json_docdb_v() {
+    #[tokio::test]
+    async fn test_parse_sf_json_docdb_v() {
         // From https://sourceforge.net/rest/p/docdb-v
         let data: serde_json::Value =
             serde_json::from_str(include_str!("../testdata/docdb-v.json")).unwrap();
         assert_eq!(
-            parse_sf_json(data, "docdb-v", Some("docdb-v")),
+            parse_sf_json(data, "docdb-v", Some("docdb-v")).await,
             vec![
                 UpstreamDatum::Name("DocDB".to_string()),
                 UpstreamDatum::Homepage("http://docdb-v.sourceforge.net".to_string()),

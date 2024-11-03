@@ -214,16 +214,16 @@ impl TryInto<UpstreamMetadata> for NpmPackage {
     }
 }
 
-pub fn load_npm_package(package: &str) -> Result<Option<NpmPackage>, crate::ProviderError> {
+pub async fn load_npm_package(package: &str) -> Result<Option<NpmPackage>, crate::ProviderError> {
     let http_url = format!("https://registry.npmjs.org/{}", package)
         .parse()
         .unwrap();
-    let data = crate::load_json_url(&http_url, None)?;
+    let data = crate::load_json_url(&http_url, None).await?;
     Ok(serde_json::from_value(data).unwrap())
 }
 
-pub fn remote_npm_metadata(package: &str) -> Result<UpstreamMetadata, ProviderError> {
-    let data = load_npm_package(package)?;
+pub async fn remote_npm_metadata(package: &str) -> Result<UpstreamMetadata, ProviderError> {
+    let data = load_npm_package(package).await?;
 
     match data {
         Some(data) => data.try_into(),

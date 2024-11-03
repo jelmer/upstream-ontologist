@@ -16,7 +16,7 @@ pub async fn guess_from_repology(
     repology_project: &str,
 ) -> Result<Vec<UpstreamDatum>, crate::ProviderError> {
     let metadata: Vec<Project> = serde_json::from_value(
-        if let Some(value) = crate::get_repology_metadata(repology_project, None) {
+        if let Some(value) = crate::get_repology_metadata(repology_project, None).await {
             value
         } else {
             return Ok(Vec::new());

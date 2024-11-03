@@ -75,7 +75,7 @@ pub fn parse_pkgbuild_variables(file: &str) -> HashMap<String, Vec<String>> {
     variables
 }
 
-pub fn guess_from_aur(package: &str) -> Vec<UpstreamDatum> {
+pub async fn guess_from_aur(package: &str) -> Vec<UpstreamDatum> {
     let mut variables = HashMap::new();
 
     for vcs in vcs::VCSES {
@@ -85,18 +85,18 @@ pub fn guess_from_aur(package: &str) -> Vec<UpstreamDatum> {
         );
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(reqwest::header::USER_AGENT, USER_AGENT.parse().unwrap());
-        let client = reqwest::blocking::Client::builder()
+        let client = reqwest::Client::builder()
             .default_headers(headers)
             .build()
             .unwrap();
 
         debug!("Requesting {}", url);
-        let response = client.get(&url).send();
+        let response = client.get(&url).send().await;
 
         match response {
             Ok(response) => {
                 if response.status().is_success() {
-                    let text = response.text().unwrap();
+                    let text = response.text().await.unwrap();
                     variables = parse_pkgbuild_variables(&text);
                     break;
                 } else if response.status().as_u16() != 404 {
@@ -185,6 +185,6 @@ impl crate::ThirdPartyRepository for Aur {
     }
 
     async fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, crate::ProviderError> {
-        Ok(guess_from_aur(name))
+        Ok(guess_from_aur(name).await)
     }
 }

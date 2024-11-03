@@ -10,7 +10,7 @@ use std::io::Read;
 use std::path::Path;
 use url::Url;
 
-pub fn guess_from_debian_patch(
+pub async fn guess_from_debian_patch(
     path: &Path,
     _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
@@ -42,7 +42,7 @@ pub fn guess_from_debian_patch(
                 }
             };
 
-            if let Some(bug_db) = bug_database_from_issue_url(&forwarded, net_access) {
+            if let Some(bug_db) = bug_database_from_issue_url(&forwarded, net_access).await {
                 upstream_data.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::BugDatabase(bug_db.to_string()),
                     certainty: Some(Certainty::Possible),
@@ -50,7 +50,7 @@ pub fn guess_from_debian_patch(
                 });
             }
 
-            if let Some(repo_url) = repo_url_from_merge_request_url(&forwarded, net_access) {
+            if let Some(repo_url) = repo_url_from_merge_request_url(&forwarded, net_access).await {
                 upstream_data.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Repository(repo_url.to_string()),
                     certainty: Some(Certainty::Possible),
@@ -244,10 +244,9 @@ found in the source directory into .mo files and installs them.
 }
 
 #[cfg(feature = "debian")]
-pub fn guess_from_debian_changelog(
+fn read_changelog_first_entry(
     path: &Path,
-    _settings: &GuesserSettings,
-) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+) -> Result<(String, Option<debversion::Version>, Vec<String>), ProviderError> {
     let cl = debian_changelog::ChangeLog::read_path(path).map_err(|e| {
         ProviderError::ParseError(format!(
             "Failed to parse changelog {}: {}",
@@ -255,15 +254,28 @@ pub fn guess_from_debian_changelog(
             e
         ))
     })?;
-
-    let first_entry = cl
+    let entry = cl
         .iter()
         .next()
         .ok_or_else(|| ProviderError::ParseError("Empty changelog".to_string()))?;
 
-    let package = first_entry.package().ok_or_else(|| {
+    let package = entry.package().ok_or_else(|| {
         ProviderError::ParseError(format!("Changelog {} has no package name", path.display()))
     })?;
+
+    let version = entry.version();
+
+    let change_lines = entry.change_lines().collect::<Vec<_>>();
+
+    Ok((package.to_string(), version, change_lines))
+}
+
+#[cfg(feature = "debian")]
+pub async fn guess_from_debian_changelog(
+    path: &Path,
+    _settings: &GuesserSettings,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    let (package, version, change_lines) = read_changelog_first_entry(path)?;
 
     let mut ret = Vec::new();
     ret.push(UpstreamDatumWithMetadata {
@@ -272,7 +284,7 @@ pub fn guess_from_debian_changelog(
         origin: Some(path.into()),
     });
 
-    if let Some(version) = first_entry.version() {
+    if let Some(version) = version {
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Version(version.upstream_version),
             certainty: Some(Certainty::Confident),
@@ -298,12 +310,13 @@ pub fn guess_from_debian_changelog(
 
         if crate_name.contains('-') {
             crate_name = match crate::providers::rust::cargo_translate_dashes(crate_name.as_str())
+                .await
                 .map_err(|e| {
-                ProviderError::Other(format!(
-                    "Failed to translate dashes in crate name {}: {}",
-                    crate_name, e
-                ))
-            })? {
+                    ProviderError::Other(format!(
+                        "Failed to translate dashes in crate name {}: {}",
+                        crate_name, e
+                    ))
+                })? {
                 Some(name) => name,
                 None => {
                     return Err(ProviderError::Other(format!(
@@ -326,7 +339,7 @@ pub fn guess_from_debian_changelog(
         });
     }
 
-    if let Some(itp) = find_itp(first_entry.change_lines().collect::<Vec<_>>().as_slice()) {
+    if let Some(itp) = find_itp(&change_lines) {
         ret.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::DebianITP(itp),
             certainty: Some(Certainty::Certain),
@@ -539,7 +552,7 @@ pub fn guess_from_debian_control(
 }
 
 #[cfg(feature = "debian")]
-pub fn guess_from_debian_copyright(
+pub async fn guess_from_debian_copyright(
     path: &Path,
     _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
@@ -653,7 +666,7 @@ pub fn guess_from_debian_copyright(
 
     for url in urls.into_iter() {
         if let Ok(url) = url.parse() {
-            if let Some(repo_url) = crate::vcs::guess_repo_from_url(&url, None) {
+            if let Some(repo_url) = crate::vcs::guess_repo_from_url(&url, None).await {
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Repository(repo_url),
                     certainty: Some(Certainty::Confident),
@@ -672,14 +685,8 @@ pub fn guess_from_debian_copyright(
 }
 
 #[cfg(feature = "debian")]
-pub fn guess_from_debian_watch(
-    path: &Path,
-    _settings: &GuesserSettings,
-) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
-    let mut ret = vec![];
+fn read_entries(path: &Path) -> Result<Vec<(url::Url, debian_watch::Mode)>, ProviderError> {
     use debian_changelog::ChangeLog;
-    use debian_watch::{Mode, WatchFile};
-
     let get_package_name = || -> String {
         let text = std::fs::read_to_string(path.parent().unwrap().join("changelog")).unwrap();
         let cl: ChangeLog = text.parse().unwrap();
@@ -687,15 +694,32 @@ pub fn guess_from_debian_watch(
         first_entry.package().unwrap()
     };
 
-    let w: WatchFile = std::fs::read_to_string(path)?
+    let w: debian_watch::WatchFile = std::fs::read_to_string(path)?
         .parse()
         .map_err(|e| ProviderError::ParseError(format!("Failed to parse debian/watch: {}", e)))?;
 
+    let entries = w
+        .entries()
+        .map(|e| (e.format_url(get_package_name), e.mode().unwrap_or_default()))
+        .collect::<Vec<_>>();
+
+    Ok(entries)
+}
+
+#[cfg(feature = "debian")]
+pub async fn guess_from_debian_watch(
+    path: &Path,
+    _settings: &GuesserSettings,
+) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
+    let mut ret = vec![];
+    use debian_watch::Mode;
+
+    let entries = read_entries(path)?;
+
     let origin = Origin::Path(path.into());
 
-    for entry in w.entries() {
-        let url = entry.format_url(get_package_name);
-        match entry.mode().unwrap_or_default() {
+    for (url, mode) in entries {
+        match mode {
             Mode::Git => {
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Repository(url.to_string()),
@@ -712,7 +736,8 @@ pub fn guess_from_debian_watch(
             }
             Mode::LWP => {
                 if url.scheme() == "http" || url.scheme() == "https" {
-                    if let Some(repo) = crate::vcs::guess_repo_from_url(&url, None) {
+                    let url = url.clone();
+                    if let Some(repo) = crate::vcs::guess_repo_from_url(&url, None).await {
                         ret.push(UpstreamDatumWithMetadata {
                             datum: UpstreamDatum::Repository(repo),
                             certainty: Some(Certainty::Confident),
@@ -761,8 +786,8 @@ mod watch_tests {
     use super::*;
 
     #[cfg(feature = "debian")]
-    #[test]
-    fn test_empty() {
+    #[tokio::test]
+    async fn test_empty() {
         let td = tempfile::tempdir().unwrap();
         let path = td.path().join("watch");
         std::fs::write(
@@ -773,13 +798,14 @@ mod watch_tests {
         )
         .unwrap();
         assert!(guess_from_debian_watch(&path, &GuesserSettings::default())
+            .await
             .unwrap()
             .is_empty());
     }
 
     #[cfg(feature = "debian")]
-    #[test]
-    fn test_simple() {
+    #[tokio::test]
+    async fn test_simple() {
         let td = tempfile::tempdir().unwrap();
         let path = td.path().join("watch");
         std::fs::write(
@@ -795,7 +821,9 @@ https://github.com/jelmer/dulwich/tags/dulwich-(.*).tar.gz
                 certainty: Some(Certainty::Confident),
                 origin: Some(path.clone().into())
             }],
-            guess_from_debian_watch(&path, &GuesserSettings::default()).unwrap()
+            guess_from_debian_watch(&path, &GuesserSettings::default())
+                .await
+                .unwrap()
         );
     }
 }
