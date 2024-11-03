@@ -1,3 +1,5 @@
+use futures::stream::StreamExt;
+use futures::Stream;
 use lazy_regex::regex;
 use log::{debug, warn};
 use percent_encoding::utf8_percent_encode;
@@ -10,6 +12,7 @@ use pyo3::{
 use reqwest::header::HeaderMap;
 use serde::ser::SerializeSeq;
 use std::cmp::Ordering;
+use std::pin::Pin;
 use std::str::FromStr;
 
 use std::fs::File;
@@ -2462,7 +2465,7 @@ impl From<ProviderError> for PyErr {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct GuesserSettings {
     pub trust_package: bool,
 }
@@ -2481,7 +2484,7 @@ impl std::fmt::Debug for UpstreamMetadataGuesser {
     }
 }
 
-const STATIC_GUESSERS: &[(
+const OLD_STATIC_GUESSERS: &[(
     &str,
     fn(&std::path::Path, &GuesserSettings) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>,
 )] = &[
@@ -2585,7 +2588,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
 
     let path = path.canonicalize().unwrap();
 
-    for (name, cb) in STATIC_GUESSERS {
+    for (name, cb) in OLD_STATIC_GUESSERS {
         let subpath = path.join(name);
         if subpath.exists() {
             candidates.push(Box::new(PathGuesser {
@@ -2897,11 +2900,39 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
     candidates
 }
 
+pub fn stream(
+    path: &Path,
+    config: &GuesserSettings,
+    mut guessers: Vec<Box<dyn Guesser>>,
+) -> impl Stream<Item = Result<UpstreamDatumWithMetadata, ProviderError>> {
+    // For each of the guessers, stream from the guessers in parallel (using Guesser::stream
+    // rather than Guesser::guess) and then return the results.
+    let abspath = std::env::current_dir().unwrap().join(path);
+
+    // Create streams for each of the guessers. Call stream on each one of them, manipulate
+    let streams = guessers.iter_mut().map(move |guesser| {
+        let abspath = abspath.clone();
+        let config = config.clone();
+        let stream = guesser.stream(&config);
+        let guesser_name = guesser.name().to_string();
+        stream.map(move |res| {
+            res.map({
+                let abspath = abspath.clone();
+                let guesser_name = guesser_name.clone();
+                move |mut v| {
+                    rewrite_upstream_datum(&guesser_name, &mut v, &abspath);
+                    v
+                }
+            })
+        })
+    });
+
+    // Combine the streams into a single stream.
+    futures::stream::select_all(streams)
+}
+
 pub struct UpstreamMetadataScanner {
-    path: std::path::PathBuf,
-    config: GuesserSettings,
-    pending: Vec<UpstreamDatumWithMetadata>,
-    guessers: Vec<Box<dyn Guesser>>,
+    stream: Pin<Box<dyn Stream<Item = Result<UpstreamDatumWithMetadata, ProviderError>> + Send>>,
 }
 
 impl UpstreamMetadataScanner {
@@ -2911,10 +2942,28 @@ impl UpstreamMetadataScanner {
         let guessers = find_guessers(path);
 
         Self {
-            path: path.to_path_buf(),
-            pending: Vec::new(),
-            config: GuesserSettings { trust_package },
-            guessers,
+            stream: Box::pin(stream(path, &GuesserSettings { trust_package }, guessers)),
+        }
+    }
+}
+
+fn rewrite_upstream_datum(
+    guesser_name: &str,
+    datum: &mut UpstreamDatumWithMetadata,
+    abspath: &std::path::Path,
+) {
+    log::trace!("{}: {:?}", guesser_name, datum);
+    datum.origin = datum
+        .origin
+        .clone()
+        .or(Some(Origin::Other(guesser_name.to_string())));
+    if let Some(Origin::Path(p)) = datum.origin.as_ref() {
+        if let Ok(suffix) = p.strip_prefix(abspath) {
+            if suffix.to_str().unwrap().is_empty() {
+                datum.origin = Some(Origin::Path(PathBuf::from_str(".").unwrap()));
+            } else {
+                datum.origin = Some(Origin::Path(PathBuf::from_str(".").unwrap().join(suffix)));
+            }
         }
     }
 }
@@ -2924,44 +2973,9 @@ impl Iterator for UpstreamMetadataScanner {
 
     fn next(&mut self) -> Option<Result<UpstreamDatumWithMetadata, ProviderError>> {
         let rt = tokio::runtime::Runtime::new().unwrap();
-        loop {
-            if !self.pending.is_empty() {
-                return Some(Ok(self.pending.remove(0)));
-            }
 
-            if self.guessers.is_empty() {
-                return None;
-            }
-
-            let mut guesser = self.guessers.remove(0);
-
-            let abspath = std::env::current_dir().unwrap().join(self.path.as_path());
-
-            let guess = rt.block_on(guesser.guess(&self.config));
-            match guess {
-                Ok(entries) => {
-                    self.pending.extend(entries.into_iter().map(|mut e| {
-                        log::trace!("{}: {:?}", guesser.name(), e);
-                        e.origin = e.origin.or(Some(Origin::Other(guesser.name().to_string())));
-                        if let Some(Origin::Path(p)) = e.origin.as_ref() {
-                            if let Ok(suffix) = p.strip_prefix(abspath.as_path()) {
-                                if suffix.to_str().unwrap().is_empty() {
-                                    e.origin = Some(Origin::Path(PathBuf::from_str(".").unwrap()));
-                                } else {
-                                    e.origin = Some(Origin::Path(
-                                        PathBuf::from_str(".").unwrap().join(suffix),
-                                    ));
-                                }
-                            }
-                        }
-                        e
-                    }));
-                }
-                Err(e) => {
-                    return Some(Err(e));
-                }
-            }
-        }
+        // Stream from .stream()
+        rt.block_on(self.stream.next())
     }
 }
 
@@ -3545,10 +3559,23 @@ pub fn filter_bad_guesses(
 pub(crate) trait Guesser {
     fn name(&self) -> &str;
 
+    /// Guess metadata from a given path.
     async fn guess(
         &mut self,
         settings: &GuesserSettings,
     ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>;
+
+    fn stream(
+        &mut self,
+        settings: &GuesserSettings,
+    ) -> Pin<Box<dyn Stream<Item = Result<UpstreamDatumWithMetadata, ProviderError>> + Send>> {
+        let metadata = match futures::executor::block_on(self.guess(settings)) {
+            Ok(metadata) => metadata,
+            Err(e) => return futures::stream::once(async { Err(e) }).boxed(),
+        };
+
+        Box::pin(futures::stream::iter(metadata.into_iter().map(Ok)))
+    }
 }
 
 pub struct PathGuesser {
