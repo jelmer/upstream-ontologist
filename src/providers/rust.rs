@@ -5,6 +5,7 @@ use crate::{
 use serde::Deserialize;
 use std::collections::HashMap;
 
+#[cfg(feature = "cargo")]
 #[derive(Deserialize)]
 struct CargoToml {
     package: Option<CargoPackage>,
@@ -12,18 +13,21 @@ struct CargoToml {
     workspace: Option<CargoWorkspace>,
 }
 
+#[cfg(feature = "cargo")]
 #[derive(Deserialize)]
 struct CargoWorkspace {
     #[serde(default)]
     package: Option<CargoPackage>,
 }
 
+#[cfg(feature = "cargo")]
 /// Allow either specifying setting T directly or "workspace = true"
 pub enum DirectOrWorkspace<T> {
     Direct(T),
     Workspace,
 }
 
+#[cfg(feature = "cargo")]
 impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for DirectOrWorkspace<T> {
     fn deserialize<D>(deserializer: D) -> Result<DirectOrWorkspace<T>, D::Error>
     where
@@ -49,6 +53,7 @@ impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for DirectOrWorksp
     }
 }
 
+#[cfg(feature = "cargo")]
 #[derive(Deserialize)]
 struct CargoPackage {
     name: Option<String>,
@@ -66,6 +71,7 @@ struct CargoPackage {
     license: Option<DirectOrWorkspace<String>>,
 }
 
+#[cfg(feature = "cargo")]
 macro_rules! resolve {
     ($workspace:expr, $package:expr, $field:ident) => {
         match $package.$field {
