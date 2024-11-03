@@ -198,6 +198,7 @@ impl Hackage {
     }
 }
 
+#[async_trait::async_trait]
 impl crate::ThirdPartyRepository for Hackage {
     fn name(&self) -> &'static str {
         "Hackage"
@@ -219,7 +220,7 @@ impl crate::ThirdPartyRepository for Hackage {
         ][..]
     }
 
-    fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, ProviderError> {
+    async fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, ProviderError> {
         Ok(guess_from_hackage(name)?
             .into_iter()
             .map(|v| v.datum)

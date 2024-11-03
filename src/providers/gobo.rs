@@ -133,6 +133,7 @@ impl Gobo {
     }
 }
 
+#[async_trait::async_trait]
 impl crate::ThirdPartyRepository for Gobo {
     fn name(&self) -> &'static str {
         "gobo"
@@ -146,7 +147,7 @@ impl crate::ThirdPartyRepository for Gobo {
         crate::Certainty::Possible
     }
 
-    fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, crate::ProviderError> {
+    async fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, crate::ProviderError> {
         guess_from_gobo(name)
     }
 }

@@ -145,7 +145,7 @@ fn parse_sf_json(
     results
 }
 
-pub fn guess_from_sf(sf_project: &str, subproject: Option<&str>) -> Vec<UpstreamDatum> {
+pub async fn guess_from_sf(sf_project: &str, subproject: Option<&str>) -> Vec<UpstreamDatum> {
     let mut results = Vec::new();
     match get_sf_metadata(sf_project) {
         Some(data) => {

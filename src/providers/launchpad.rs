@@ -2,7 +2,7 @@ use crate::{load_json_url, UpstreamDatum};
 use log::error;
 
 #[cfg(feature = "launchpad")]
-pub fn guess_from_launchpad(
+pub async fn guess_from_launchpad(
     package: &str,
     distribution: Option<&str>,
     suite: Option<&str>,

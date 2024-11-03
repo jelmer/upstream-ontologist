@@ -1,3 +1,5 @@
+use futures::stream::StreamExt;
+use futures::Stream;
 use lazy_regex::regex;
 use log::{debug, warn};
 use percent_encoding::utf8_percent_encode;
@@ -10,6 +12,7 @@ use pyo3::{
 use reqwest::header::HeaderMap;
 use serde::ser::SerializeSeq;
 use std::cmp::Ordering;
+use std::pin::Pin;
 use std::str::FromStr;
 
 use std::fs::File;
@@ -1363,6 +1366,7 @@ pub fn with_path_segments(url: &Url, path_segments: &[&str]) -> Result<Url, ()> 
     Ok(url)
 }
 
+#[async_trait::async_trait]
 pub trait Forge: Send + Sync {
     fn repository_browse_can_be_homepage(&self) -> bool;
 
@@ -1402,7 +1406,7 @@ pub trait Forge: Send + Sync {
         None
     }
 
-    fn extend_metadata(
+    async fn extend_metadata(
         &self,
         _metadata: &mut Vec<UpstreamDatumWithMetadata>,
         _project: &str,
@@ -1912,11 +1916,14 @@ fn possible_fields_missing(
     false
 }
 
-fn extend_from_external_guesser(
+async fn extend_from_external_guesser<
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = Vec<UpstreamDatum>>,
+>(
     metadata: &mut Vec<UpstreamDatumWithMetadata>,
     max_certainty: Option<Certainty>,
     supported_fields: &[&str],
-    new_items: impl Fn() -> Vec<UpstreamDatum>,
+    new_items: F,
 ) {
     if max_certainty.is_some()
         && !possible_fields_missing(metadata, supported_fields, max_certainty.unwrap())
@@ -1925,6 +1932,7 @@ fn extend_from_external_guesser(
     }
 
     let new_items = new_items()
+        .await
         .into_iter()
         .map(|item| UpstreamDatumWithMetadata {
             datum: item,
@@ -1949,6 +1957,7 @@ impl SourceForge {
     }
 }
 
+#[async_trait::async_trait]
 impl Forge for SourceForge {
     fn name(&self) -> &'static str {
         "SourceForge"
@@ -1969,7 +1978,7 @@ impl Forge for SourceForge {
         with_path_segments(url, &["p", project, "bugs"]).ok()
     }
 
-    fn extend_metadata(
+    async fn extend_metadata(
         &self,
         metadata: &mut Vec<UpstreamDatumWithMetadata>,
         project: &str,
@@ -1984,8 +1993,11 @@ impl Forge for SourceForge {
             metadata,
             max_certainty,
             &["Homepage", "Name", "Repository", "Bug-Database"],
-            || crate::forges::sourceforge::guess_from_sf(project, subproject.as_deref()),
+            || async {
+                crate::forges::sourceforge::guess_from_sf(project, subproject.as_deref()).await
+            },
         )
+        .await
     }
 }
 
@@ -2462,7 +2474,7 @@ impl From<ProviderError> for PyErr {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct GuesserSettings {
     pub trust_package: bool,
 }
@@ -2481,7 +2493,7 @@ impl std::fmt::Debug for UpstreamMetadataGuesser {
     }
 }
 
-const STATIC_GUESSERS: &[(
+const OLD_STATIC_GUESSERS: &[(
     &str,
     fn(&std::path::Path, &GuesserSettings) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>,
 )] = &[
@@ -2585,7 +2597,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
 
     let path = path.canonicalize().unwrap();
 
-    for (name, cb) in STATIC_GUESSERS {
+    for (name, cb) in OLD_STATIC_GUESSERS {
         let subpath = path.join(name);
         if subpath.exists() {
             candidates.push(Box::new(PathGuesser {
@@ -2897,11 +2909,39 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
     candidates
 }
 
+pub fn stream(
+    path: &Path,
+    config: &GuesserSettings,
+    mut guessers: Vec<Box<dyn Guesser>>,
+) -> impl Stream<Item = Result<UpstreamDatumWithMetadata, ProviderError>> {
+    // For each of the guessers, stream from the guessers in parallel (using Guesser::stream
+    // rather than Guesser::guess) and then return the results.
+    let abspath = std::env::current_dir().unwrap().join(path);
+
+    // Create streams for each of the guessers. Call stream on each one of them, manipulate
+    let streams = guessers.iter_mut().map(move |guesser| {
+        let abspath = abspath.clone();
+        let config = config.clone();
+        let stream = guesser.stream(&config);
+        let guesser_name = guesser.name().to_string();
+        stream.map(move |res| {
+            res.map({
+                let abspath = abspath.clone();
+                let guesser_name = guesser_name.clone();
+                move |mut v| {
+                    rewrite_upstream_datum(&guesser_name, &mut v, &abspath);
+                    v
+                }
+            })
+        })
+    });
+
+    // Combine the streams into a single stream.
+    futures::stream::select_all(streams)
+}
+
 pub struct UpstreamMetadataScanner {
-    path: std::path::PathBuf,
-    config: GuesserSettings,
-    pending: Vec<UpstreamDatumWithMetadata>,
-    guessers: Vec<Box<dyn Guesser>>,
+    stream: Pin<Box<dyn Stream<Item = Result<UpstreamDatumWithMetadata, ProviderError>> + Send>>,
 }
 
 impl UpstreamMetadataScanner {
@@ -2911,10 +2951,28 @@ impl UpstreamMetadataScanner {
         let guessers = find_guessers(path);
 
         Self {
-            path: path.to_path_buf(),
-            pending: Vec::new(),
-            config: GuesserSettings { trust_package },
-            guessers,
+            stream: Box::pin(stream(path, &GuesserSettings { trust_package }, guessers)),
+        }
+    }
+}
+
+fn rewrite_upstream_datum(
+    guesser_name: &str,
+    datum: &mut UpstreamDatumWithMetadata,
+    abspath: &std::path::Path,
+) {
+    log::trace!("{}: {:?}", guesser_name, datum);
+    datum.origin = datum
+        .origin
+        .clone()
+        .or(Some(Origin::Other(guesser_name.to_string())));
+    if let Some(Origin::Path(p)) = datum.origin.as_ref() {
+        if let Ok(suffix) = p.strip_prefix(abspath) {
+            if suffix.to_str().unwrap().is_empty() {
+                datum.origin = Some(Origin::Path(PathBuf::from_str(".").unwrap()));
+            } else {
+                datum.origin = Some(Origin::Path(PathBuf::from_str(".").unwrap().join(suffix)));
+            }
         }
     }
 }
@@ -2923,47 +2981,14 @@ impl Iterator for UpstreamMetadataScanner {
     type Item = Result<UpstreamDatumWithMetadata, ProviderError>;
 
     fn next(&mut self) -> Option<Result<UpstreamDatumWithMetadata, ProviderError>> {
-        loop {
-            if !self.pending.is_empty() {
-                return Some(Ok(self.pending.remove(0)));
-            }
+        let rt = tokio::runtime::Runtime::new().unwrap();
 
-            if self.guessers.is_empty() {
-                return None;
-            }
-
-            let mut guesser = self.guessers.remove(0);
-
-            let abspath = std::env::current_dir().unwrap().join(self.path.as_path());
-
-            let guess = guesser.guess(&self.config);
-            match guess {
-                Ok(entries) => {
-                    self.pending.extend(entries.into_iter().map(|mut e| {
-                        log::trace!("{}: {:?}", guesser.name(), e);
-                        e.origin = e.origin.or(Some(Origin::Other(guesser.name().to_string())));
-                        if let Some(Origin::Path(p)) = e.origin.as_ref() {
-                            if let Ok(suffix) = p.strip_prefix(abspath.as_path()) {
-                                if suffix.to_str().unwrap().is_empty() {
-                                    e.origin = Some(Origin::Path(PathBuf::from_str(".").unwrap()));
-                                } else {
-                                    e.origin = Some(Origin::Path(
-                                        PathBuf::from_str(".").unwrap().join(suffix),
-                                    ));
-                                }
-                            }
-                        }
-                        e
-                    }));
-                }
-                Err(e) => {
-                    return Some(Err(e));
-                }
-            }
-        }
+        // Stream from .stream()
+        rt.block_on(self.stream.next())
     }
 }
 
+#[deprecated(since = "0.1.0", note = "Please use upstream_metadata_stream instead")]
 pub fn guess_upstream_info(
     path: &std::path::Path,
     trust_package: Option<bool>,
@@ -2971,7 +2996,18 @@ pub fn guess_upstream_info(
     UpstreamMetadataScanner::from_path(path, trust_package)
 }
 
-pub fn extend_upstream_metadata(
+pub fn upstream_metadata_stream(
+    path: &std::path::Path,
+    trust_package: Option<bool>,
+) -> impl Stream<Item = Result<UpstreamDatumWithMetadata, ProviderError>> {
+    let trust_package = trust_package.unwrap_or(false);
+
+    let guessers = find_guessers(path);
+
+    stream(path, &GuesserSettings { trust_package }, guessers)
+}
+
+pub async fn extend_upstream_metadata(
     upstream_metadata: &mut UpstreamMetadata,
     path: &std::path::Path,
     minimum_certainty: Option<Certainty>,
@@ -3031,11 +3067,13 @@ pub fn extend_upstream_metadata(
             .unwrap()
             .to_string();
         let sf_certainty = archive.unwrap().certainty;
-        SourceForge::new().extend_metadata(
-            upstream_metadata.mut_items(),
-            sf_project.as_str(),
-            sf_certainty,
-        );
+        SourceForge::new()
+            .extend_metadata(
+                upstream_metadata.mut_items(),
+                sf_project.as_str(),
+                sf_certainty,
+            )
+            .await;
     }
 
     let archive = upstream_metadata.get("Archive");
@@ -3059,6 +3097,7 @@ pub fn extend_upstream_metadata(
                 hackage_package.as_str(),
                 hackage_certainty,
             )
+            .await
             .unwrap();
     }
 
@@ -3083,6 +3122,7 @@ pub fn extend_upstream_metadata(
                 cargo_crate.as_str(),
                 crates_io_certainty,
             )
+            .await
             .unwrap();
     }
 
@@ -3106,6 +3146,7 @@ pub fn extend_upstream_metadata(
                 pecl_package.as_str(),
                 pecl_certainty,
             )
+            .await
             .unwrap();
     }
 
@@ -3126,13 +3167,15 @@ pub fn extend_upstream_metadata(
                 package.as_str(),
                 None,
                 None,
-            );
+            )
+            .await;
             crate::providers::arch::Aur::new()
                 .extend_metadata(
                     upstream_metadata.mut_items(),
                     package.as_str(),
                     Some(minimum_certainty),
                 )
+                .await
                 .unwrap();
             crate::providers::gobo::Gobo::new()
                 .extend_metadata(
@@ -3140,24 +3183,27 @@ pub fn extend_upstream_metadata(
                     package.as_str(),
                     Some(minimum_certainty),
                 )
+                .await
                 .unwrap();
             extend_from_repology(
                 upstream_metadata.mut_items(),
                 minimum_certainty,
                 package.as_str(),
-            );
+            )
+            .await;
         }
     }
     crate::extrapolate::extrapolate_fields(upstream_metadata, net_access, None)?;
     Ok(())
 }
 
+#[async_trait::async_trait]
 pub trait ThirdPartyRepository {
     fn name(&self) -> &'static str;
     fn supported_fields(&self) -> &'static [&'static str];
     fn max_supported_certainty(&self) -> Certainty;
 
-    fn extend_metadata(
+    async fn extend_metadata(
         &self,
         metadata: &mut Vec<UpstreamDatumWithMetadata>,
         name: &str,
@@ -3172,17 +3218,18 @@ pub trait ThirdPartyRepository {
             metadata,
             Some(self.max_supported_certainty()),
             self.supported_fields(),
-            || self.guess_metadata(name).unwrap(),
-        );
+            || async { self.guess_metadata(name).await.unwrap() },
+        )
+        .await;
 
         Ok(())
     }
 
-    fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, ProviderError>;
+    async fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, ProviderError>;
 }
 
 #[cfg(feature = "launchpad")]
-fn extend_from_lp(
+async fn extend_from_lp(
     upstream_metadata: &mut Vec<UpstreamDatumWithMetadata>,
     minimum_certainty: Certainty,
     package: &str,
@@ -3199,12 +3246,15 @@ fn extend_from_lp(
         return;
     }
 
-    extend_from_external_guesser(upstream_metadata, Some(lp_certainty), lp_fields, || {
-        crate::providers::launchpad::guess_from_launchpad(package, distribution, suite).unwrap()
+    extend_from_external_guesser(upstream_metadata, Some(lp_certainty), lp_fields, || async {
+        crate::providers::launchpad::guess_from_launchpad(package, distribution, suite)
+            .await
+            .unwrap()
     })
+    .await
 }
 
-fn extend_from_repology(
+async fn extend_from_repology(
     upstream_metadata: &mut Vec<UpstreamDatumWithMetadata>,
     minimum_certainty: Certainty,
     source_package: &str,
@@ -3218,9 +3268,17 @@ fn extend_from_repology(
         return;
     }
 
-    extend_from_external_guesser(upstream_metadata, Some(certainty), repology_fields, || {
-        crate::providers::repology::guess_from_repology(source_package).unwrap()
-    })
+    extend_from_external_guesser(
+        upstream_metadata,
+        Some(certainty),
+        repology_fields,
+        || async {
+            crate::providers::repology::guess_from_repology(source_package)
+                .await
+                .unwrap()
+        },
+    )
+    .await
 }
 
 /// Fix existing upstream metadata.
@@ -3257,13 +3315,15 @@ pub fn summarize_upstream_metadata(
     let mut upstream_metadata = UpstreamMetadata::new();
     upstream_metadata.update(filter_bad_guesses(metadata_items));
 
-    extend_upstream_metadata(
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    rt.block_on(extend_upstream_metadata(
         &mut upstream_metadata,
         path,
         None,
         net_access,
         consult_external_directory,
-    )?;
+    ))?;
 
     if check {
         check_upstream_metadata(&mut upstream_metadata, None);
@@ -3540,13 +3600,27 @@ pub fn filter_bad_guesses(
     })
 }
 
+#[async_trait::async_trait]
 pub(crate) trait Guesser {
     fn name(&self) -> &str;
 
-    fn guess(
+    /// Guess metadata from a given path.
+    async fn guess(
         &mut self,
         settings: &GuesserSettings,
     ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>;
+
+    fn stream(
+        &mut self,
+        settings: &GuesserSettings,
+    ) -> Pin<Box<dyn Stream<Item = Result<UpstreamDatumWithMetadata, ProviderError>> + Send>> {
+        let metadata = match futures::executor::block_on(self.guess(settings)) {
+            Ok(metadata) => metadata,
+            Err(e) => return futures::stream::once(async { Err(e) }).boxed(),
+        };
+
+        Box::pin(futures::stream::iter(metadata.into_iter().map(Ok)))
+    }
 }
 
 pub struct PathGuesser {
@@ -3554,18 +3628,20 @@ pub struct PathGuesser {
     subpath: std::path::PathBuf,
     cb: Box<
         dyn FnMut(
-            &std::path::Path,
-            &GuesserSettings,
-        ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>,
+                &std::path::Path,
+                &GuesserSettings,
+            ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>
+            + Send,
     >,
 }
 
+#[async_trait::async_trait]
 impl Guesser for PathGuesser {
     fn name(&self) -> &str {
         &self.name
     }
 
-    fn guess(
+    async fn guess(
         &mut self,
         settings: &GuesserSettings,
     ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
@@ -3587,12 +3663,13 @@ impl Default for EnvironmentGuesser {
     }
 }
 
+#[async_trait::async_trait]
 impl Guesser for EnvironmentGuesser {
     fn name(&self) -> &str {
         "environment"
     }
 
-    fn guess(
+    async fn guess(
         &mut self,
         _settings: &GuesserSettings,
     ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {

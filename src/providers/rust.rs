@@ -293,6 +293,7 @@ impl CratesIo {
     }
 }
 
+#[async_trait::async_trait]
 impl crate::ThirdPartyRepository for CratesIo {
     fn name(&self) -> &'static str {
         "crates.io"
@@ -306,7 +307,7 @@ impl crate::ThirdPartyRepository for CratesIo {
         &["Homepage", "Name", "Repository", "Version", "Summary"][..]
     }
 
-    fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, ProviderError> {
+    async fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, ProviderError> {
         let data = load_crate_info(name)?;
         if data.is_none() {
             return Ok(Vec::new());
