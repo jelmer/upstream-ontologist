@@ -2979,11 +2979,23 @@ impl Iterator for UpstreamMetadataScanner {
     }
 }
 
+#[deprecated(since = "0.1.0", note = "Please use upstream_metadata_stream instead")]
 pub fn guess_upstream_info(
     path: &std::path::Path,
     trust_package: Option<bool>,
 ) -> impl Iterator<Item = Result<UpstreamDatumWithMetadata, ProviderError>> {
     UpstreamMetadataScanner::from_path(path, trust_package)
+}
+
+pub fn upstream_metadata_stream(
+    path: &std::path::Path,
+    trust_package: Option<bool>,
+) -> impl Stream<Item = Result<UpstreamDatumWithMetadata, ProviderError>> {
+    let trust_package = trust_package.unwrap_or(false);
+
+    let guessers = find_guessers(path);
+
+    stream(path, &GuesserSettings { trust_package }, guessers)
 }
 
 pub fn extend_upstream_metadata(
