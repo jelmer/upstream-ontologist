@@ -2923,6 +2923,7 @@ impl Iterator for UpstreamMetadataScanner {
     type Item = Result<UpstreamDatumWithMetadata, ProviderError>;
 
     fn next(&mut self) -> Option<Result<UpstreamDatumWithMetadata, ProviderError>> {
+        let rt = tokio::runtime::Runtime::new().unwrap();
         loop {
             if !self.pending.is_empty() {
                 return Some(Ok(self.pending.remove(0)));
@@ -2936,7 +2937,7 @@ impl Iterator for UpstreamMetadataScanner {
 
             let abspath = std::env::current_dir().unwrap().join(self.path.as_path());
 
-            let guess = guesser.guess(&self.config);
+            let guess = rt.block_on(guesser.guess(&self.config));
             match guess {
                 Ok(entries) => {
                     self.pending.extend(entries.into_iter().map(|mut e| {
@@ -3540,10 +3541,11 @@ pub fn filter_bad_guesses(
     })
 }
 
+#[async_trait::async_trait]
 pub(crate) trait Guesser {
     fn name(&self) -> &str;
 
-    fn guess(
+    async fn guess(
         &mut self,
         settings: &GuesserSettings,
     ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>;
@@ -3554,18 +3556,20 @@ pub struct PathGuesser {
     subpath: std::path::PathBuf,
     cb: Box<
         dyn FnMut(
-            &std::path::Path,
-            &GuesserSettings,
-        ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>,
+                &std::path::Path,
+                &GuesserSettings,
+            ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>
+            + Send,
     >,
 }
 
+#[async_trait::async_trait]
 impl Guesser for PathGuesser {
     fn name(&self) -> &str {
         &self.name
     }
 
-    fn guess(
+    async fn guess(
         &mut self,
         settings: &GuesserSettings,
     ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
@@ -3587,12 +3591,13 @@ impl Default for EnvironmentGuesser {
     }
 }
 
+#[async_trait::async_trait]
 impl Guesser for EnvironmentGuesser {
     fn name(&self) -> &str {
         "environment"
     }
 
-    fn guess(
+    async fn guess(
         &mut self,
         _settings: &GuesserSettings,
     ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
