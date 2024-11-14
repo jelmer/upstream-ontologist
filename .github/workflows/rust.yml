@@ -1,4 +1,3 @@
----
 name: Rust
 
 on:
@@ -18,24 +17,24 @@ jobs:
       fail-fast: false
 
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
-      - name: Install breezy
-        run: pip install breezy
-      - name: Install python3-setuptools
-        run: pip install setuptools
-      - name: Build
-        run: cargo build --verbose
-      - name: Build without default features
-        run: cargo build --verbose --no-default-features
-      - name: Run tests
-        run: cargo test --verbose
-        if: matrix.os == 'windows-latest'
-      - name: Run tests
-        run: cargo test --verbose --features=debcargo
-        if: matrix.os != 'windows-latest'
-      - name: Check formatting
-        run: cargo fmt --all -- --check
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.x"
+    - name: Install breezy
+      run: pip install breezy
+    - name: Install python3-setuptools
+      run: pip install setuptools
+    - name: Build
+      run: cargo build --verbose
+    - name: Build without default features
+      run: cargo build --verbose --no-default-features
+    - name: Run tests
+      run: cargo test --verbose
+      if: matrix.os == 'windows-latest'
+    - name: Run tests
+      run: cargo test --verbose --features=debcargo
+      if: matrix.os != 'windows-latest'
+    - name: Check formatting
+      run: cargo fmt --all -- --check
