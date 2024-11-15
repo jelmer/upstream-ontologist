@@ -127,7 +127,7 @@ pub async fn guess_from_gemspec(
             }
         } else {
             debug!(
-                "ignoring unparseable line in {}: {:?}",
+                "ignoring unparsable line in {}: {:?}",
                 path.display(),
                 line
             );

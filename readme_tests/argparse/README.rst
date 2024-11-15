@@ -163,7 +163,7 @@ Config File Syntax
 
 Only command line args that have a long version (eg. one that starts with '--')
 can be set in a config file. For example, "--color" can be set by putting
-"color=green" in a config file. The config file syntax depends on the constuctor
+"color=green" in a config file. The config file syntax depends on the constructor
 arg: :code:`config_file_parser_class` which can be set to one of the provided
 classes: :code:`DefaultConfigFileParser`, :code:`YAMLConfigFileParser`,
 :code:`ConfigparserConfigFileParser` or to your own subclass of the

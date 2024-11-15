@@ -157,7 +157,7 @@ Jaeger support
 jaeger_ supports zipkin_ span format as result it is possible to use *aiozipkin*
 with jaeger_ server. You just need to specify *jaeger* server address and it
 should work out of the box. Not need to run local zipkin server.
-For more informations see tests and jaeger_ documentation.
+For more information see tests and jaeger_ documentation.
 
 .. image:: https://raw.githubusercontent.com/aio-libs/aiozipkin/master/docs/jaeger.png
     :alt: jaeger ui animation
