@@ -126,11 +126,7 @@ pub async fn guess_from_gemspec(
                 _ => debug!("unknown field {} ({:?}) in gemspec", key, val),
             }
         } else {
-            debug!(
-                "ignoring unparseable line in {}: {:?}",
-                path.display(),
-                line
-            );
+            debug!("ignoring unparsable line in {}: {:?}", path.display(), line);
         }
     }
 
