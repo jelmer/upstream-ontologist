@@ -17,7 +17,6 @@ Provided Fields
 
 Standard fields:
 
-* ``Homepage``: homepage URL
 * ``Name``: human name of the upstream project
 * ``Contact``: contact address of some sort of the upstream
    (e-mail, mailing list URL)
@@ -43,6 +42,7 @@ Extensions for upstream-ontologist, not defined in DEP-12:
 * ``Author``: List of people who contributed to the project
 * ``Maintainer``: The maintainer of the project
 * ``Funding``: URL to more information about funding
+* ``Homepage``: homepage URL (present in ``debian/control`` in Debian packages)
 
 Supported Data Sources
 ----------------------
