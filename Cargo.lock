@@ -266,9 +266,9 @@ checksum = "fba19c552ee63cb6646b75e1166d1bdb8a6d34a6d19e319dec88c8adadff2db3"
 
 [[package]]
 name = "breezyshim"
-version = "0.1.213"
+version = "0.1.227"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a0b670c2a2a927aeef6c6b96fdff0368992b462946f6922848b232a50891dd1"
+checksum = "ffe63ba40f1cf5aed5af3577f45cc5692e69f9bbf7b12950a87dd2469b9c3183"
 dependencies = [
  "chrono",
  "ctor",
@@ -3709,9 +3709,9 @@ dependencies = [
 
 [[package]]
 name = "patchkit"
-version = "0.1.8"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1628449e4d9f7e8501e9389daf6242adfd8284c2364a3f2a87e16176756b6768"
+checksum = "31e00ed52656b51f535293e40caf6579b4cf09f25e660fc6e6936ab70e78972f"
 dependencies = [
  "chrono",
  "lazy-regex",
