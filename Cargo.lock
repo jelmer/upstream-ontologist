@@ -867,7 +867,7 @@ checksum = "be3bfa84328d2dbae01ca2775f64250b228ff78eb06e3ba1bb53f67b1e533e24"
 dependencies = [
  "deb822-derive",
  "regex",
- "rowan",
+ "rowan 0.15.16",
  "serde",
 ]
 
@@ -928,7 +928,7 @@ dependencies = [
  "debversion",
  "lazy-regex",
  "log",
- "rowan",
+ "rowan 0.15.16",
  "textwrap",
  "whoami",
 ]
@@ -943,7 +943,7 @@ dependencies = [
  "deb822-lossless",
  "debversion",
  "regex",
- "rowan",
+ "rowan 0.15.16",
  "url",
 ]
 
@@ -966,7 +966,7 @@ checksum = "506bd868882fe7b6d5dbaaeb001174aa01fb267563f019ceaa6f31a8b6e9639f"
 dependencies = [
  "debversion",
  "m_lexer",
- "rowan",
+ "rowan 0.15.16",
  "url",
 ]
 
@@ -3286,12 +3286,12 @@ dependencies = [
 
 [[package]]
 name = "makefile-lossless"
-version = "0.1.5"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65fa82a1c10484995745b2364c88f2f7337e09c13710efd872c82e201f1b9db9"
+checksum = "89d2abc0c3de4f7838c3fd8ca411030bc6d5504ea4ccda3791e496c49bd825d0"
 dependencies = [
  "log",
- "rowan",
+ "rowan 0.16.0",
 ]
 
 [[package]]
@@ -4170,7 +4170,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8ce9b776c5b0430f08ba021444cbb5868a2d8d706fd4ba987233e3729172da9"
 dependencies = [
  "deb822-lossless",
- "rowan",
+ "rowan 0.15.16",
  "url",
 ]
 
@@ -4365,6 +4365,18 @@ name = "rowan"
 version = "0.15.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0a542b0253fa46e632d27a1dc5cf7b930de4df8659dc6e720b647fc72147ae3d"
+dependencies = [
+ "countme",
+ "hashbrown 0.14.5",
+ "rustc-hash 1.1.0",
+ "text-size",
+]
+
+[[package]]
+name = "rowan"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "028acc0aeb6c46a4e4390928ef6ec0f4b7e9432f37bd4129a976e77f86f93322"
 dependencies = [
  "countme",
  "hashbrown 0.14.5",
