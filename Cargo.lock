@@ -867,7 +867,7 @@ checksum = "be3bfa84328d2dbae01ca2775f64250b228ff78eb06e3ba1bb53f67b1e533e24"
 dependencies = [
  "deb822-derive",
  "regex",
- "rowan 0.15.16",
+ "rowan 0.16.0",
  "serde",
 ]
 
@@ -943,7 +943,7 @@ dependencies = [
  "deb822-lossless",
  "debversion",
  "regex",
- "rowan 0.15.16",
+ "rowan 0.16.0",
  "url",
 ]
 
@@ -4170,7 +4170,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8ce9b776c5b0430f08ba021444cbb5868a2d8d706fd4ba987233e3729172da9"
 dependencies = [
  "deb822-lossless",
- "rowan 0.15.16",
+ "rowan 0.16.0",
  "url",
 ]
 
@@ -4589,9 +4589,9 @@ dependencies = [
 
 [[package]]
 name = "semver"
-version = "1.0.23"
+version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61697e0a1c7e512e84a621326239844a24d8207b4669b41bc18b32ea5cbf988b"
+checksum = "3cb6eb87a131f756572d7fb904f6e7b68633f09cca868c5df1c4b8d1a694bbba"
 dependencies = [
  "serde",
 ]
