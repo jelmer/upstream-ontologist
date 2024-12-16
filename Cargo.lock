@@ -519,9 +519,9 @@ dependencies = [
 
 [[package]]
 name = "chrono"
-version = "0.4.38"
+version = "0.4.39"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a21f936df1771bf62b77f047b726c4625ff2e8aa607c01ec06e5a05bd8463401"
+checksum = "7e36cc9d416881d2e24f9a963be5fb1cd90966419ac844274161d10488b3e825"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
@@ -867,7 +867,7 @@ checksum = "be3bfa84328d2dbae01ca2775f64250b228ff78eb06e3ba1bb53f67b1e533e24"
 dependencies = [
  "deb822-derive",
  "regex",
- "rowan 0.15.16",
+ "rowan 0.16.0",
  "serde",
 ]
 
@@ -943,7 +943,7 @@ dependencies = [
  "deb822-lossless",
  "debversion",
  "regex",
- "rowan 0.15.16",
+ "rowan 0.16.0",
  "url",
 ]
 
@@ -4170,7 +4170,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8ce9b776c5b0430f08ba021444cbb5868a2d8d706fd4ba987233e3729172da9"
 dependencies = [
  "deb822-lossless",
- "rowan 0.15.16",
+ "rowan 0.16.0",
  "url",
 ]
 
