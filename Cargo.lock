@@ -867,7 +867,7 @@ checksum = "be3bfa84328d2dbae01ca2775f64250b228ff78eb06e3ba1bb53f67b1e533e24"
 dependencies = [
  "deb822-derive",
  "regex",
- "rowan 0.15.16",
+ "rowan 0.16.0",
  "serde",
 ]
 
@@ -943,7 +943,7 @@ dependencies = [
  "deb822-lossless",
  "debversion",
  "regex",
- "rowan 0.15.16",
+ "rowan 0.16.0",
  "url",
 ]
 
@@ -4170,7 +4170,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8ce9b776c5b0430f08ba021444cbb5868a2d8d706fd4ba987233e3729172da9"
 dependencies = [
  "deb822-lossless",
- "rowan 0.15.16",
+ "rowan 0.16.0",
  "url",
 ]
 
@@ -4598,9 +4598,9 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.215"
+version = "1.0.216"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6513c1ad0b11a9376da888e3e0baa0077f1aed55c17f50e7b2397136129fb88f"
+checksum = "0b9781016e935a97e8beecf0c933758c97a5520d32930e460142b4cd80c6338e"
 dependencies = [
  "serde_derive",
 ]
@@ -4640,9 +4640,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.215"
+version = "1.0.216"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad1e866f866923f252f05c889987993144fb74e722403468a4ebd70c3cd756c0"
+checksum = "46f859dbbf73865c6627ed570e78961cd3ac92407a2d117204c49232485da55e"
 dependencies = [
  "proc-macro2",
  "quote",
