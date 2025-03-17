@@ -73,7 +73,7 @@ pretty_assertions = ">=1.4"
 tempfile = ">=3"
 
 [build-dependencies]
-quote = "1.0.38"
+quote = "1.0.40"
 
 [dependencies.pyo3]
 version = ">=0.22,<0.24"
