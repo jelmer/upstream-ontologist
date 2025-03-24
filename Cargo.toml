@@ -32,7 +32,7 @@ debbugs = "0.1"
 clap = { version = "4", features = ["derive", "env"], optional = true }
 maplit = "1"
 env_logger = { version = ">=0.10", optional = true }
-makefile-lossless = { version = "0.1", optional = true }
+makefile-lossless = { version = "0.2", optional = true }
 debian-copyright = { version = "0.1", optional = true }
 debian-control = { version = "0.1", optional = true }
 pulldown-cmark = ">=0.9"
