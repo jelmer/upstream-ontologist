@@ -1,3 +1,5 @@
+// pyo3 macros use a gil-refs feature
+#![allow(unexpected_cfgs)]
 use futures::stream::StreamExt;
 use futures::Stream;
 use lazy_regex::regex;
