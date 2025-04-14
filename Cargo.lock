@@ -1151,9 +1151,9 @@ dependencies = [
 
 [[package]]
 name = "document_tree"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee380fad9396cb284d9ce0aeccfe179f128ec87ae816186a073a8702b04f8879"
+checksum = "6742722dd3e6cd908bc522283cb5502e25f696d1c9904fb251ec266b6b3f9cce"
 dependencies = [
  "anyhow",
  "regex",
@@ -4507,9 +4507,9 @@ dependencies = [
 
 [[package]]
 name = "rst_renderer"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30f290036cf1302ee0732fbc8b78c2f416ebd8cbeaeccb7e0802b008553bddd0"
+checksum = "cf982408766e5055367c60382b78dcee50c83b2b731e036a8b510e0aedf1efa1"
 dependencies = [
  "anyhow",
  "document_tree",
