@@ -1102,7 +1102,7 @@ This is a test of RST to HTML conversion."#;
         let html = rst_to_html(rst);
         assert_eq!(
             html,
-            "<!doctype html><html>\n\n<section id=\"rst\">\n<h1>RST</h1>\n<p>This is a test of RST to HTML conversion.</p>\n</section>\n</html>\n"
+            "<!doctype html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"color-scheme\" content=\"dark light\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<style>\n@counter-style footnote {\n  system: symbolic;\n  symbols: '*' '†' '‡' '§' '¶' '#' '♠' '♥' '♦' '♣';\n  /*suffix: ' ';*/\n}\nli.symbol {{ list-style-type: footnote; }}\n</style>\n</head>\n<body>\n\n\n<section id=\"rst\">\n<h1>RST</h1>\n<p>This is a test of RST to HTML conversion.</p>\n</section>\n</body>\n</html>\n"
         );
     }
 
