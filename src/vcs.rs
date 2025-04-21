@@ -6,12 +6,16 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use url::Url;
 
+/// Known VCSes
 pub const VCSES: &[&str] = &["git", "bzr", "hg"];
 
+/// Hostnames for known gitlab sites
 pub const KNOWN_GITLAB_SITES: &[&str] = &["salsa.debian.org", "invent.kde.org", "0xacab.org"];
 
+/// URL schemes that are considered secure
 pub const SECURE_SCHEMES: &[&str] = &["https", "git+ssh", "bzr+ssh", "hg+ssh", "ssh", "svn+ssh"];
 
+/// Known hosting sites
 const KNOWN_HOSTING_SITES: &[&str] = &[
     "code.launchpad.net",
     "github.com",
@@ -19,10 +23,15 @@ const KNOWN_HOSTING_SITES: &[&str] = &[
     "git.openstack.org",
 ];
 
+/// Check if a string can plausibly be a URL
 pub fn plausible_url(url: &str) -> bool {
     url.contains(':')
 }
 
+/// Drop VCS prefixes from a URL
+///
+/// This function removes the VCS prefix from a URL, if it exists. For example,
+/// it will convert `git+http://example.com/repo.git` to `http://example.com/repo.git`.
 pub fn drop_vcs_in_scheme(url: &Url) -> Option<Url> {
     let scheme = url.scheme();
     match scheme {
@@ -35,6 +44,7 @@ pub fn drop_vcs_in_scheme(url: &Url) -> Option<Url> {
     }
 }
 
+/// Split a VCS URL into its components
 pub fn split_vcs_url(location: &str) -> (String, Option<String>, Option<String>) {
     let mut url = location.to_string();
     let mut branch = None;
@@ -52,6 +62,7 @@ pub fn split_vcs_url(location: &str) -> (String, Option<String>, Option<String>)
     (url, branch, subpath)
 }
 
+/// Unsplit a VCS URL
 pub fn unsplit_vcs_url(location: &VcsLocation) -> String {
     let mut url = location.url.to_string();
     if let Some(branch_name) = location.branch.as_deref() {
@@ -63,6 +74,7 @@ pub fn unsplit_vcs_url(location: &VcsLocation) -> String {
     url
 }
 
+/// Check if a URL is plausibly VCS browse URL
 pub fn plausible_browse_url(url: &str) -> bool {
     if let Ok(url) = url::Url::parse(url) {
         if url.scheme() == "https" || url.scheme() == "http" {
@@ -72,6 +84,11 @@ pub fn plausible_browse_url(url: &str) -> bool {
     false
 }
 
+/// Strip VCS prefixes from a URL
+///
+/// Note: This function is not a complete URL parser and should not be used for
+/// general URL parsing. Consider using `drop_vcs_in_scheme`
+/// instead.
 pub fn strip_vcs_prefixes(url: &str) -> &str {
     let prefixes = ["git", "hg"];
 
@@ -84,6 +101,10 @@ pub fn strip_vcs_prefixes(url: &str) -> &str {
     url
 }
 
+/// Check if the specified GitHub URL is a valid repository
+///
+/// If `version` is specified, it checks if the version is available in the
+/// repository.
 async fn probe_upstream_github_branch_url(url: &url::Url, version: Option<&str>) -> Option<bool> {
     let path = url.path();
     let path = path.strip_suffix(".git").unwrap_or(path);
@@ -171,6 +192,15 @@ fn probe_upstream_breezy_branch_url(url: &url::Url, version: Option<&str>) -> Op
     }
 }
 
+/// Probe an upstream branch URL for a repository
+///
+/// This function checks if the specified URL is a valid repository URL
+/// and if the specified version is available in the repository.
+///
+/// # Returns
+/// Some(true) if the URL is valid and the version is available,
+/// Some(false) if the URL is valid but the version is not available,
+/// None if the URL is not valid or if the probe failed.
 pub async fn probe_upstream_branch_url(url: &url::Url, version: Option<&str>) -> Option<bool> {
     if url.scheme() == "git+ssh" || url.scheme() == "ssh" || url.scheme() == "bzr+ssh" {
         // Let's not probe anything possibly non-public.
@@ -184,6 +214,7 @@ pub async fn probe_upstream_branch_url(url: &url::Url, version: Option<&str>) ->
     }
 }
 
+/// Check if a repository URL is canonical
 pub async fn check_repository_url_canonical(
     mut url: url::Url,
     version: Option<&str>,
@@ -308,6 +339,7 @@ pub async fn check_repository_url_canonical(
     ))
 }
 
+/// Check if the specified hostname contains a GitLab site
 pub async fn is_gitlab_site(hostname: &str, net_access: Option<bool>) -> bool {
     if KNOWN_GITLAB_SITES.contains(&hostname) {
         return true;
@@ -324,6 +356,7 @@ pub async fn is_gitlab_site(hostname: &str, net_access: Option<bool>) -> bool {
     }
 }
 
+/// Probe a GitLab host to check if it is a valid GitLab instance
 pub async fn probe_gitlab_host(hostname: &str) -> bool {
     let url = format!("https://{}/api/v4/version", hostname);
     match crate::load_json_url(&url::Url::parse(url.as_str()).unwrap(), None).await {
@@ -357,6 +390,7 @@ pub async fn probe_gitlab_host(hostname: &str) -> bool {
     }
 }
 
+/// Guess a repository URL from a URL
 pub async fn guess_repo_from_url(url: &url::Url, net_access: Option<bool>) -> Option<String> {
     let net_access = net_access.unwrap_or(false);
     let path_segments = url.path_segments().unwrap().collect::<Vec<_>>();
@@ -681,6 +715,7 @@ async fn test_guess_repo_url() {
     );
 }
 
+/// Canonicalize a Git repository URL
 pub async fn canonical_git_repo_url(repo_url: &Url, net_access: Option<bool>) -> Option<Url> {
     if let Some(hostname) = repo_url.host_str() {
         if (is_gitlab_site(hostname, net_access).await || hostname == "github.com")
@@ -694,6 +729,7 @@ pub async fn canonical_git_repo_url(repo_url: &Url, net_access: Option<bool>) ->
     None
 }
 
+/// Determine the browse URL from a repo URL
 pub async fn browse_url_from_repo_url(
     location: &VcsLocation,
     net_access: Option<bool>,
@@ -818,6 +854,7 @@ pub async fn browse_url_from_repo_url(
     }
 }
 
+/// Find a public repository URL from a given repository URL
 pub async fn find_public_repo_url(repo_url: &str, net_access: Option<bool>) -> Option<String> {
     let parsed = match Url::parse(repo_url) {
         Ok(parsed) => parsed,
@@ -884,10 +921,12 @@ pub async fn find_public_repo_url(repo_url: &str, net_access: Option<bool>) -> O
     revised_url
 }
 
+/// Fix up a Git URL to use the correct scheme
 pub fn fixup_rcp_style_git_repo_url(url: &str) -> Option<Url> {
     breezyshim::location::rcp_location_to_url(url).ok()
 }
 
+/// Try to open a branch from a URL
 pub fn try_open_branch(
     url: &url::Url,
     branch_name: Option<&str>,
@@ -912,6 +951,7 @@ pub fn try_open_branch(
     rev
 }
 
+/// Find a secure repository URL
 pub async fn find_secure_repo_url(
     mut url: url::Url,
     branch: Option<&str>,
@@ -976,9 +1016,15 @@ pub async fn find_secure_repo_url(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+/// A VCS location
 pub struct VcsLocation {
+    /// URL of the repository
     pub url: url::Url,
+
+    /// Name of the branch
     pub branch: Option<String>,
+
+    /// Subpath within the repository
     pub subpath: Option<String>,
 }
 
@@ -1247,6 +1293,7 @@ const URL_FIXERS: &[AsyncFixer] = &[
     |url| Box::pin(async move { fix_git_gnome_org_url(url) }),
 ];
 
+/// Fixup a Git URL
 pub async fn fixup_git_url(url: &str) -> String {
     let mut url = url.to_string();
     for cb in URL_FIXERS {
@@ -1255,6 +1302,7 @@ pub async fn fixup_git_url(url: &str) -> String {
     url
 }
 
+/// Convert a CVS URL to a Breezy URL.
 pub fn convert_cvs_list_to_str(urls: &[&str]) -> Option<String> {
     if urls[0].starts_with(":extssh:") || urls[0].starts_with(":pserver:") {
         let url = breezyshim::location::cvs_to_url(urls[0]);
@@ -1270,7 +1318,7 @@ type AsyncSanitizer = for<'a> fn(
     Box<dyn std::future::Future<Output = Option<Url>> + Send + 'a>,
 >;
 
-pub const SANITIZERS: &[AsyncSanitizer] = &[
+const SANITIZERS: &[AsyncSanitizer] = &[
     |url| Box::pin(async move { drop_vcs_in_scheme(&url.parse().ok()?) }),
     |url| {
         Box::pin(async move {
@@ -1294,6 +1342,7 @@ pub const SANITIZERS: &[AsyncSanitizer] = &[
     |url| Box::pin(async move { find_secure_repo_url(url.parse().ok()?, None, Some(false)).await }),
 ];
 
+/// Sanitize a VCS URL
 pub async fn sanitize_url(url: &str) -> String {
     let mut url: Cow<'_, str> = Cow::Borrowed(url);
     for sanitizer in SANITIZERS {

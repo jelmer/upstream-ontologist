@@ -1,4 +1,4 @@
-//! Documentation: https://maven.apache.org/pom.html
+//! Documentation: <https://maven.apache.org/pom.html>
 
 use crate::{
     vcs, Certainty, GuesserSettings, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata,

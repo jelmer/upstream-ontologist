@@ -1,4 +1,4 @@
-//! Documentation: https://opam.ocaml.org/doc/Manual.html#Package-definitions
+//! Documentation: <https://opam.ocaml.org/doc/Manual.html#Package-definitions>
 use crate::{Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use log::warn;
 use opam_file_rs::value::{OpamFileItem, OpamFileSection, ValueKind};

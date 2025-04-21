@@ -1,4 +1,4 @@
-//! See https://golang.org/doc/modules/gomod-ref
+//! See <https://golang.org/doc/modules/gomod-ref>
 use crate::{
     Certainty, GuesserSettings, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata,
     UpstreamMetadata,

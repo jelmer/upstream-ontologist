@@ -1,4 +1,4 @@
-//! See https://r-pkgs.org/description.html
+//! See <https://r-pkgs.org/description.html>
 
 use crate::{
     vcs, Certainty, GuesserSettings, Person, ProviderError, UpstreamDatum,

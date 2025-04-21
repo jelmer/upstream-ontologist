@@ -1,4 +1,4 @@
-//! See https://github.com/ewilderj/doap
+//! See <https://github.com/ewilderj/doap>
 use crate::{Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use log::error;
 use std::fs::File;
