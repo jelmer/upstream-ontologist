@@ -310,7 +310,7 @@ pub fn guess_from_meta_json(
 
 /// Guess upstream metadata from a META.yml file.
 ///
-/// See http://module-build.sourceforge.net/META-spec-v1.4.html for the
+/// See <http://module-build.sourceforge.net/META-spec-v1.4.html> for the
 /// specification of the format.
 pub fn guess_from_meta_yml(
     path: &Path,

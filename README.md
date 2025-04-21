@@ -28,6 +28,10 @@ Standard fields:
 * ``Archive``: Archive used - e.g. SourceForge
 * ``Security-Contact``: e-mail or URL with instructions for reporting security issues
 * ``Documentation``: Link to documentation on the web
+* ``Changelog``: URL to the changelog
+* ``FAQ``: URL to the FAQ
+* ``Donation``: URL to a donation page
+* ``Funding``: List of sources of funding for the project
 
 Extensions for upstream-ontologist, not defined in DEP-12:
 
@@ -41,7 +45,6 @@ Extensions for upstream-ontologist, not defined in DEP-12:
 * ``Security-MD``: URL to markdown file with security policy
 * ``Author``: List of people who contributed to the project
 * ``Maintainer``: The maintainer of the project
-* ``Funding``: URL to more information about funding
 * ``Homepage``: homepage URL (present in ``debian/control`` in Debian packages)
 
 Supported Data Sources
@@ -105,7 +108,22 @@ Summary: Python Git Library
 Bug-Submit: https://github.com/dulwich/dulwich/issues/new
 ```
 
-Alternatively, there is a Python API as part of the ``upstream_ontologist``
-Python package. There are also ``autocodemeta`` and ``autodoap`` commands that
+Alternatively, there is a Python API as part of the [upstream\_ontologist
+Python package](https://pypi.org/project/upstream-ontologist/). There are also
+``autocodemeta`` and ``autodoap`` commands that
 can generate output in the [codemeta](https://codemeta.github.io/) and
 [DOAP](https://github.com/ewilderj/doap) formats, respectively.
+
+Reporting bugs
+--------------
+
+When reporting bugs, please include the observed output of the ``guess-upstream-metadata``
+command, the version of the upstream-ontologist package you are using, what
+output you were expecting, and ideally the location of the upstream source code
+you are using (e.g. a URL to a Git repository).
+
+If there are additional metadata fields you would like to see supported, please
+let us know - either with or without a patch.
+
+Similarly, if you have a new data source you would like to see supported, please
+file a bug and we can discuss how to add it.

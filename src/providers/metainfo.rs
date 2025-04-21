@@ -1,4 +1,4 @@
-//! See https://www.freedesktop.org/software/appstream/docs/chap-Metadata.html
+//! See <https://www.freedesktop.org/software/appstream/docs/chap-Metadata.html>
 
 use crate::{Certainty, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use std::fs::File;

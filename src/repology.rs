@@ -1,5 +1,6 @@
 use crate::{ProviderError, UpstreamMetadata};
 
+/// Parse a Repology name into family and name
 pub fn parse_repology_name(name: &str) -> Option<(&str, &str)> {
     let (family, name) = name.split_once(':')?;
     Some((family, name))
@@ -19,6 +20,7 @@ fn perl_name_to_module(name: &str) -> String {
         .join("::")
 }
 
+/// Find upstream metadata for a package from Repology
 pub async fn find_upstream_from_repology(name: &str) -> Result<UpstreamMetadata, ProviderError> {
     let (family, name) = parse_repology_name(name)
         .ok_or_else(|| ProviderError::Other("Invalid repology name".to_string()))?;

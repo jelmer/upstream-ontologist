@@ -1,5 +1,4 @@
-//! https://docs.github.com/en/free-pro-team@latest/github/\
-//! managing-security-vulnerabilities/adding-a-security-policy-to-your-repository
+//! <https://docs.github.com/en/free-pro-team@latest/github/managing-security-vulnerabilities/adding-a-security-policy-to-your-repository>
 
 use crate::{Certainty, GuesserSettings, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 

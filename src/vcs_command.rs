@@ -32,6 +32,9 @@ fn parse_command_bytes(command: &[u8]) -> Option<Vec<String>> {
     }
 }
 
+/// Extract the upstream repository URL from a command line that looks like
+/// `git clone <url>`, `fossil clone <url>`, `cvs -d <cvsroot> co <module>` or
+/// `svn co <url>`.
 pub fn url_from_vcs_command(command: &[u8]) -> Option<String> {
     if let Some(url) = url_from_git_clone_command(command) {
         return Some(url);
@@ -48,6 +51,8 @@ pub fn url_from_vcs_command(command: &[u8]) -> Option<String> {
     None
 }
 
+/// Extract the upstream repository URL from a command line that looks like
+/// `git clone <url>`.
 pub fn url_from_git_clone_command(command: &[u8]) -> Option<String> {
     let mut args = parse_command_bytes(command)?;
     if args.remove(0) != "git" || args.remove(0) != "clone" {
@@ -107,6 +112,8 @@ fn test_url_from_git_clone_command() {
     assert_eq!(None, url_from_git_clone_command(b"git ls-tree"));
 }
 
+/// Get the upstream source from a command line that looks like
+/// `fossil clone <url>`.
 pub fn url_from_fossil_clone_command(command: &[u8]) -> Option<String> {
     let mut args = parse_command_bytes(command)?;
     if args.remove(0) != "fossil" || args.remove(0) != "clone" {
@@ -143,6 +150,8 @@ fn test_url_from_fossil_clone_command() {
     );
 }
 
+/// Get the upstream source from a command line that looks like
+/// `cvs -d <cvsroot> co <module>`.
 pub fn url_from_cvs_co_command(command: &[u8]) -> Option<String> {
     let mut args = parse_command_bytes(command)?;
     let i = 0;
@@ -179,6 +188,8 @@ pub fn url_from_cvs_co_command(command: &[u8]) -> Option<String> {
     None
 }
 
+/// Get the upstream source from a command line that looks like
+/// `svn co <url>`.
 pub fn url_from_svn_co_command(command: &[u8]) -> Option<String> {
     let args = parse_command_bytes(command)?;
     if args[0] != "svn" || args[1] != "co" {
@@ -192,6 +203,8 @@ pub fn url_from_svn_co_command(command: &[u8]) -> Option<String> {
     })
 }
 
+/// Guess upstream data from a Makefile or other file that contains a
+/// command to get the source code.
 pub fn guess_from_get_orig_source(
     path: &std::path::Path,
     _settings: &GuesserSettings,

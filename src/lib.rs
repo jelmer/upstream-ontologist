@@ -1,5 +1,7 @@
 // pyo3 macros use a gil-refs feature
 #![allow(unexpected_cfgs)]
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md"))]
+
 use futures::stream::StreamExt;
 use futures::Stream;
 use lazy_regex::regex;
@@ -358,82 +360,271 @@ impl FromPyObject<'_> for Person {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum UpstreamDatum {
-    /// Name of the project
+    /// Name of the project.
+    ///
+    /// This is a brief name of the project, as it would be used in a URL.
+    /// Generally speaking it would be lowercase, and may contain dashes or underscores.
+    /// It would commonly be the name of the repository.
     Name(String),
-    /// URL to project homepage
+
+    /// URL to project homepage.
+    ///
+    /// This is the URL to the project's homepage, which may be a website or a
+    /// repository. It is not a URL to a specific file or page, but rather the main
+    /// entry point for the project.
     Homepage(String),
-    /// URL to the project's source code repository
+
+    /// URL to the project's source code repository.
+    ///
+    /// This is the URL to the project's source code repository, as it would be used
+    /// in a command line tool to clone the repository. It may be a URL to a specific
+    /// branch or tag, but it is generally the URL to the main repository.
     Repository(String),
+
     /// URL to browse the project's source code repository
+    ///
+    /// This is the URL to the project's source code repository, as it would be used
+    /// in a web browser to browse the repository. It may be a URL to a specific
+    /// branch or tag, but it is generally the URL to the main repository.
     RepositoryBrowse(String),
+
     /// Long description of the project
+    ///
+    /// This is a long description of the project, which may be several paragraphs
+    /// long. It is generally a more detailed description of the project than the
+    /// summary.
     Description(String),
+
     /// Short summary of the project (one line)
+    ///
+    /// This is a short summary of the project, which is generally one line long.
+    /// It is generally a brief description of the project, and may be used in
+    /// search results or in a list of projects.
     Summary(String),
+
     /// License name or SPDX identifier
+    ///
+    /// This is the name of the license under which the project is released. It may
+    /// be a full license name, or it may be an SPDX identifier (preferred).
+    ///
+    /// See <https://spdx.org/licenses/> for a list of SPDX identifiers.
     License(String),
+
     /// List of authors
+    ///
+    /// This is a list of authors of the project, which may be a list of names,
+    /// email addresses, or URLs.
     Author(Vec<Person>),
+
     /// List of maintainers
+    ///
+    /// This is a list of maintainers of the project, which may be a list of names,
+    /// email addresses, or URLs.
     Maintainer(Person),
+
     /// URL of the project's issue tracker
+    ///
+    /// This is the URL to the project's issue tracker, which may be a bug tracker,
+    /// feature tracker, or other type of issue tracker. It is not a URL to a
+    /// specific issue, but rather the main entry point for the issue tracker.
     BugDatabase(String),
+
     /// URL to submit a new bug
+    ///
+    /// This is the URL to submit a new bug to the project's issue tracker. It
+    /// may be a URL to a specific page or form.
+    ///
+    /// It can also be an email address (mailto:...), in which case it is the email address to send
+    /// the bug report to.
     BugSubmit(String),
+
     /// URL to the project's contact page or email address
+    ///
+    /// This is the URL to the project's contact page, which may be a web page or
+    /// an email address. It is not a URL to a specific file or page, but rather
+    /// the main entry point for the contact page.
     Contact(String),
+
     /// Cargo crate name
+    ///
+    /// If the project is a Rust crate, this is the name of the crate on
+    /// crates.io. It is not a URL to the crate, but rather the name of the
+    /// crate.
     CargoCrate(String),
+
     /// Name of the security page name
+    ///
+    /// This would be the name of a markdown file in the source directory
+    /// that contains security information about the project. It is not a URL to
+    /// a specific file or page, but rather the name of the file.
     SecurityMD(String),
+
     /// URL to the security page or email address
+    ///
+    /// This is the URL to the project's security page, which may be a web page or
+    /// an email address. It is not a URL to a specific file or page, but rather
+    /// the main entry point for the security page.
+    ///
+    /// It can also be an email address (mailto:...), in which case it is the email address to send
+    /// the security report to.
     SecurityContact(String),
+
     /// Last version of the project
+    ///
+    /// This is the last version of the project, which would generally be a version string
+    ///
+    /// There is no guarantee that this is the last version of the project.
+    ///
+    /// There is no guarantee about which versioning scheme is used, e.g. it may be
+    /// a semantic version, a date-based version, or a commit hash.
     Version(String),
+
     /// List of keywords
+    ///
+    /// This is a list of keywords that describe the project. It may be a list of
+    /// words, phrases, or tags.
     Keywords(Vec<String>),
+
     /// Copyright notice
+    ///
+    /// This is the copyright notice for the project, which may be a list of
+    /// copyright holders, years, or other information.
     Copyright(String),
+
     /// URL to the project's documentation
+    ///
+    /// This is the URL to the project's documentation, which may be a web page or
+    /// a file. It is not a URL to a specific file or page, but rather the main
+    /// entry point for the documentation.
     Documentation(String),
+
     /// URL to the project's API documentation
+    ///
+    /// This is the URL to the project's API documentation, which may be a web page or
+    /// a file. It is not a URL to a specific file or page, but rather the main
+    /// entry point for the API documentation.
     APIDocumentation(String),
+
     /// Go import path
+    ///
+    /// If this is a Go project, this is the import path for the project. It is not a URL
+    /// to the project, but rather the import path.
     GoImportPath(String),
+
     /// URL to the project's download page
+    ///
+    /// This is the URL to the project's download page, which may be a web page or
+    /// a file. It is not a URL to a specific file or page, but rather the main
+    /// entry point for the download page.
     Download(String),
+
     /// URL to the project's wiki
+    ///
+    /// This is the URL to the project's wiki.
     Wiki(String),
+
     /// URL to the project's mailing list
+    ///
+    /// This is the URL to the project's mailing list, which may be a web page or
+    /// an email address. It is not a URL to a specific file or page, but rather
+    /// the main entry point for the mailing list.
+    ///
+    /// It can also be an email address (mailto:...), in which case it is the email address to send
+    /// email to to subscribe to the mailing list.
     MailingList(String),
+
     /// SourceForge project name
+    ///
+    /// This is the name of the project on SourceForge. It is not a URL to the
+    /// project, but rather the name of the project.
     SourceForgeProject(String),
+
+    /// If this project is provided by a specific archive, this is the name of the archive.
+    ///
+    /// E.g. "CRAN", "CPAN", "PyPI", "RubyGems", "NPM", etc.
     Archive(String),
+
     /// URL to a demo instance
+    ///
+    /// This is the URL to a demo instance of the project. This instance will be loaded
+    /// with sample data, and will be used to demonstrate the project. It is not
+    /// a full instance of the project - the Webservice field should be used for that.
     Demo(String),
+
     /// PHP PECL package name
+    ///
+    /// If this is a PHP project, this is the name of the package on PECL. It is not a URL
+    /// to the package, but rather the name of the package.
     PeclPackage(String),
-    /// URL to the funding page
+
+    /// Description of funding sources
+    ///
+    /// This is a description of the funding sources for the project. It may be a
+    /// URL to a page that describes the funding sources, or it may be a list of
+    /// funding sources.
+    ///
+    /// Note that this is different from the Donation field, which is a URL to a
+    /// donation page.
     Funding(String),
+
     /// URL to the changelog
+    ///
+    /// This is the URL to the project's changelog, which may be a web page or
+    /// a file. No guarantee is made about the format of the changelog, but it is
+    /// generally a file that contains a list of changes made to the project.
     Changelog(String),
+
     /// Haskell package name
+    ///
+    /// If this is a Haskell project, this is the name of the package on Hackage. It is not a URL
+    /// to the package, but rather the name of the package.
     HaskellPackage(String),
+
     /// Debian ITP (Intent To Package) bug number
+    ///
+    /// This is the bug number of the ITP bug in the Debian bug tracker. It is not a URL
+    /// to the bug, but rather the bug number.
     DebianITP(i32),
+
     /// List of URLs to screenshots
+    ///
+    /// This is a list of URLs to screenshots of the project. It will be a list of
+    /// URLs, which may be web pages or images.
     Screenshots(Vec<String>),
+
     /// Name of registry
     Registry(Vec<(String, String)>),
+
     /// Recommended way to cite the software
+    ///
+    /// This is the recommended way to cite the software, which may be a URL or a
+    /// DOI.
     CiteAs(String),
+
     /// Link for donations (e.g. Paypal, Libera, etc)
+    ///
+    /// This is a URL to a donation page, which should be a web page.
+    /// It is different from the Funding field, which describes
+    /// the funding the project has received.
     Donation(String),
+
     /// Link to a life instance of the webservice
+    ///
+    /// This is the URL to the live instance of the project. This should generally
+    /// be the canonical instance of the project.
+    ///
+    /// For demo instances, see the Demo field.
     Webservice(String),
+
     /// Name of the buildsystem used
+    ///
+    /// This is the name of the buildsystem used by the project. E.g. "make", "cmake",
+    /// "meson", etc
     BuildSystem(String),
+
     /// FAQ
+    ///
+    /// This is the URL to the project's FAQ, which may be a web page or a file.
     FAQ(String),
 }
 
