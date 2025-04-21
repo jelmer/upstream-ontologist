@@ -47,17 +47,31 @@ mod readme_tests {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
+/// Certainty levels for the data
 pub enum Certainty {
+    /// This datum is possibly correct, but it is a guess
     Possible,
+
+    /// This datum is likely to be correct, but we are not sure
     Likely,
+
+    /// We're confident about this datum, but there is a chance it is wrong
     Confident,
+
+    /// We're certain about this datum
     Certain,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// Origin of the data
 pub enum Origin {
+    /// Read from a file
     Path(PathBuf),
+
+    /// Read from a URL
     Url(url::Url),
+
+    /// Other origin; described by a string
     Other(String),
 }
 
