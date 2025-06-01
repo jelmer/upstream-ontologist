@@ -104,23 +104,31 @@ impl From<url::Url> for Origin {
 }
 
 #[cfg(feature = "pyo3")]
-impl ToPyObject for Origin {
-    fn to_object(&self, py: Python) -> PyObject {
+impl<'py> IntoPyObject<'py> for &Origin {
+    type Target = PyAny;
+    type Output = Bound<'py, Self::Target>;
+    type Error = PyErr;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
         match self {
-            Origin::Path(path) => path.to_str().unwrap().to_object(py),
-            Origin::Url(url) => url.to_string().to_object(py),
-            Origin::Other(s) => s.to_object(py),
+            Origin::Path(path) => Ok(path.to_str().unwrap().into_pyobject(py)?.into_any()),
+            Origin::Url(url) => Ok(url.to_string().into_pyobject(py)?.into_any()),
+            Origin::Other(s) => Ok(s.into_pyobject(py)?.into_any()),
         }
     }
 }
 
 #[cfg(feature = "pyo3")]
-impl IntoPy<PyObject> for Origin {
-    fn into_py(self, py: Python) -> PyObject {
+impl<'py> IntoPyObject<'py> for Origin {
+    type Target = PyAny;
+    type Output = Bound<'py, Self::Target>;
+    type Error = PyErr;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
         match self {
-            Origin::Path(path) => path.to_str().unwrap().to_object(py),
-            Origin::Url(url) => url.to_string().to_object(py),
-            Origin::Other(s) => s.to_object(py),
+            Origin::Path(path) => Ok(path.to_str().unwrap().into_pyobject(py)?.into_any()),
+            Origin::Url(url) => Ok(url.to_string().into_pyobject(py)?.into_any()),
+            Origin::Other(s) => Ok(s.into_pyobject(py)?.into_any()),
         }
     }
 }
@@ -339,14 +347,15 @@ impl From<&str> for Person {
 }
 
 #[cfg(feature = "pyo3")]
-impl ToPyObject for Person {
-    fn to_object(&self, py: Python) -> PyObject {
-        let m = PyModule::import_bound(py, "upstream_ontologist").unwrap();
-        let person_cls = m.getattr("Person").unwrap();
-        person_cls
-            .call1((self.name.as_ref(), self.email.as_ref(), self.url.as_ref()))
-            .unwrap()
-            .into_py(py)
+impl<'py> IntoPyObject<'py> for &Person {
+    type Target = PyAny;
+    type Output = Bound<'py, Self::Target>;
+    type Error = PyErr;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
+        let m = PyModule::import(py, "upstream_ontologist")?;
+        let person_cls = m.getattr("Person")?;
+        person_cls.call1((self.name.as_ref(), self.email.as_ref(), self.url.as_ref()))
     }
 }
 
@@ -1400,27 +1409,26 @@ impl serde::ser::Serialize for UpstreamMetadata {
 }
 
 #[cfg(feature = "pyo3")]
-impl ToPyObject for UpstreamDatumWithMetadata {
-    fn to_object(&self, py: Python) -> PyObject {
-        let m = PyModule::import_bound(py, "upstream_ontologist.guess").unwrap();
+impl<'py> IntoPyObject<'py> for &UpstreamDatumWithMetadata {
+    type Target = PyAny;
+    type Output = Bound<'py, Self::Target>;
+    type Error = PyErr;
 
-        let cls = m.getattr("UpstreamDatum").unwrap();
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
+        let m = PyModule::import(py, "upstream_ontologist.guess")?;
+
+        let cls = m.getattr("UpstreamDatum")?;
 
         let (field, py_datum) = self
             .datum
-            .to_object(py)
-            .extract::<(String, PyObject)>(py)
-            .unwrap();
+            .into_pyobject(py)?
+            .extract::<(String, Bound<PyAny>)>()?;
 
-        let kwargs = pyo3::types::PyDict::new_bound(py);
-        kwargs
-            .set_item("certainty", self.certainty.map(|x| x.to_string()))
-            .unwrap();
-        kwargs.set_item("origin", self.origin.as_ref()).unwrap();
+        let kwargs = pyo3::types::PyDict::new(py);
+        kwargs.set_item("certainty", self.certainty.map(|x| x.to_string()))?;
+        kwargs.set_item("origin", self.origin.as_ref())?;
 
-        let datum = cls.call((field, py_datum), Some(&kwargs)).unwrap();
-
-        datum.to_object(py)
+        cls.call((field, py_datum), Some(&kwargs))
     }
 }
 
@@ -2571,62 +2579,66 @@ impl FromPyObject<'_> for UpstreamDatum {
 }
 
 #[cfg(feature = "pyo3")]
-impl ToPyObject for UpstreamDatum {
-    fn to_object(&self, py: Python) -> PyObject {
-        (
-            self.field().to_string(),
-            match self {
-                UpstreamDatum::Name(n) => n.into_py(py),
-                UpstreamDatum::Version(v) => v.into_py(py),
-                UpstreamDatum::Contact(c) => c.into_py(py),
-                UpstreamDatum::Summary(s) => s.into_py(py),
-                UpstreamDatum::License(l) => l.into_py(py),
-                UpstreamDatum::Homepage(h) => h.into_py(py),
-                UpstreamDatum::Description(d) => d.into_py(py),
-                UpstreamDatum::BugDatabase(b) => b.into_py(py),
-                UpstreamDatum::BugSubmit(b) => b.into_py(py),
-                UpstreamDatum::Repository(r) => r.into_py(py),
-                UpstreamDatum::RepositoryBrowse(r) => r.into_py(py),
-                UpstreamDatum::SecurityMD(s) => s.into_py(py),
-                UpstreamDatum::SecurityContact(s) => s.into_py(py),
-                UpstreamDatum::CargoCrate(c) => c.into_py(py),
-                UpstreamDatum::Keywords(ks) => ks.to_object(py),
-                UpstreamDatum::Copyright(c) => c.into_py(py),
-                UpstreamDatum::Documentation(a) => a.into_py(py),
-                UpstreamDatum::APIDocumentation(a) => a.into_py(py),
-                UpstreamDatum::GoImportPath(ip) => ip.into_py(py),
-                UpstreamDatum::Archive(a) => a.into_py(py),
-                UpstreamDatum::Demo(d) => d.into_py(py),
-                UpstreamDatum::Maintainer(m) => m.to_object(py),
-                UpstreamDatum::Author(a) => a.to_object(py),
-                UpstreamDatum::Wiki(w) => w.into_py(py),
-                UpstreamDatum::Download(d) => d.into_py(py),
-                UpstreamDatum::MailingList(m) => m.into_py(py),
-                UpstreamDatum::SourceForgeProject(m) => m.into_py(py),
-                UpstreamDatum::PeclPackage(p) => p.into_py(py),
-                UpstreamDatum::Funding(p) => p.into_py(py),
-                UpstreamDatum::Changelog(c) => c.into_py(py),
-                UpstreamDatum::HaskellPackage(p) => p.into_py(py),
-                UpstreamDatum::DebianITP(i) => i.into_py(py),
-                UpstreamDatum::Screenshots(s) => s.to_object(py),
-                UpstreamDatum::CiteAs(s) => s.to_object(py),
-                UpstreamDatum::Registry(r) => r
+impl<'py> IntoPyObject<'py> for &UpstreamDatum {
+    type Target = PyAny;
+    type Output = Bound<'py, Self::Target>;
+    type Error = PyErr;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
+        let field = self.field().to_string();
+        let value: Bound<'py, PyAny> = match self {
+            UpstreamDatum::Name(n) => n.into_pyobject(py)?.into_any(),
+            UpstreamDatum::Version(v) => v.into_pyobject(py)?.into_any(),
+            UpstreamDatum::Contact(c) => c.into_pyobject(py)?.into_any(),
+            UpstreamDatum::Summary(s) => s.into_pyobject(py)?.into_any(),
+            UpstreamDatum::License(l) => l.into_pyobject(py)?.into_any(),
+            UpstreamDatum::Homepage(h) => h.into_pyobject(py)?.into_any(),
+            UpstreamDatum::Description(d) => d.into_pyobject(py)?.into_any(),
+            UpstreamDatum::BugDatabase(b) => b.into_pyobject(py)?.into_any(),
+            UpstreamDatum::BugSubmit(b) => b.into_pyobject(py)?.into_any(),
+            UpstreamDatum::Repository(r) => r.into_pyobject(py)?.into_any(),
+            UpstreamDatum::RepositoryBrowse(r) => r.into_pyobject(py)?.into_any(),
+            UpstreamDatum::SecurityMD(s) => s.into_pyobject(py)?.into_any(),
+            UpstreamDatum::SecurityContact(s) => s.into_pyobject(py)?.into_any(),
+            UpstreamDatum::CargoCrate(c) => c.into_pyobject(py)?.into_any(),
+            UpstreamDatum::Keywords(ks) => ks.into_pyobject(py)?,
+            UpstreamDatum::Copyright(c) => c.into_pyobject(py)?.into_any(),
+            UpstreamDatum::Documentation(a) => a.into_pyobject(py)?.into_any(),
+            UpstreamDatum::APIDocumentation(a) => a.into_pyobject(py)?.into_any(),
+            UpstreamDatum::GoImportPath(ip) => ip.into_pyobject(py)?.into_any(),
+            UpstreamDatum::Archive(a) => a.into_pyobject(py)?.into_any(),
+            UpstreamDatum::Demo(d) => d.into_pyobject(py)?.into_any(),
+            UpstreamDatum::Maintainer(m) => m.into_pyobject(py)?,
+            UpstreamDatum::Author(a) => a.into_pyobject(py)?,
+            UpstreamDatum::Wiki(w) => w.into_pyobject(py)?.into_any(),
+            UpstreamDatum::Download(d) => d.into_pyobject(py)?.into_any(),
+            UpstreamDatum::MailingList(m) => m.into_pyobject(py)?.into_any(),
+            UpstreamDatum::SourceForgeProject(m) => m.into_pyobject(py)?.into_any(),
+            UpstreamDatum::PeclPackage(p) => p.into_pyobject(py)?.into_any(),
+            UpstreamDatum::Funding(p) => p.into_pyobject(py)?.into_any(),
+            UpstreamDatum::Changelog(c) => c.into_pyobject(py)?.into_any(),
+            UpstreamDatum::HaskellPackage(p) => p.into_pyobject(py)?.into_any(),
+            UpstreamDatum::DebianITP(i) => i.into_pyobject(py)?.into_any(),
+            UpstreamDatum::Screenshots(s) => s.into_pyobject(py)?,
+            UpstreamDatum::CiteAs(s) => s.into_pyobject(py)?.into_any(),
+            UpstreamDatum::Registry(r) => {
+                let list: Result<Vec<_>, _> = r
                     .iter()
                     .map(|(name, entry)| {
-                        let dict = PyDict::new_bound(py);
-                        dict.set_item("Name", name).unwrap();
-                        dict.set_item("Entry", entry).unwrap();
-                        dict.into()
+                        let dict = PyDict::new(py);
+                        dict.set_item("Name", name)?;
+                        dict.set_item("Entry", entry)?;
+                        Ok::<Bound<PyAny>, PyErr>(dict.into_any())
                     })
-                    .collect::<Vec<PyObject>>()
-                    .to_object(py),
-                UpstreamDatum::Donation(d) => d.to_object(py),
-                UpstreamDatum::Webservice(w) => w.to_object(py),
-                UpstreamDatum::BuildSystem(b) => b.to_object(py),
-                UpstreamDatum::FAQ(f) => f.to_object(py),
-            },
-        )
-            .to_object(py)
+                    .collect();
+                list?.into_pyobject(py)?
+            }
+            UpstreamDatum::Donation(d) => d.into_pyobject(py)?.into_any(),
+            UpstreamDatum::Webservice(w) => w.into_pyobject(py)?.into_any(),
+            UpstreamDatum::BuildSystem(b) => b.into_pyobject(py)?.into_any(),
+            UpstreamDatum::FAQ(f) => f.into_pyobject(py)?.into_any(),
+        };
+        Ok((field, value).into_pyobject(py)?.into_any())
     }
 }
 

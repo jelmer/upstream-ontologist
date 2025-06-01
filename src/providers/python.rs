@@ -619,13 +619,13 @@ async fn guess_from_setup_py_executed(
     use pyo3::types::PyDict;
     pyo3::prepare_freethreaded_python();
     let mut long_description = None;
-    let mut urls = vec![];
+    let mut urls: Vec<String> = vec![];
     Python::with_gil(|py| {
-        let _ = py.import_bound("setuptools");
+        let _ = py.import("setuptools");
 
-        let run_setup = py.import_bound("distutils.core")?.getattr("run_setup")?;
+        let run_setup = py.import("distutils.core")?.getattr("run_setup")?;
 
-        let os = py.import_bound("os")?;
+        let os = py.import("os")?;
 
         let orig = match os.getattr("getcwd")?.call0() {
             Ok(orig) => Some(orig.extract::<String>()?),
@@ -640,7 +640,7 @@ async fn guess_from_setup_py_executed(
         os.getattr("chdir")?.call1((parent,))?;
 
         let result = || -> PyResult<_> {
-            let kwargs = PyDict::new_bound(py);
+            let kwargs = PyDict::new(py);
             kwargs.set_item("stop_after", "config")?;
 
             run_setup.call((path,), Some(&kwargs))
@@ -785,10 +785,10 @@ async fn guess_from_setup_py_parsed(
 
     let mut long_description = None;
     let mut ret = Vec::new();
-    let mut urls = vec![];
+    let mut urls: Vec<String> = vec![];
 
     Python::with_gil(|py| {
-        let ast = py.import_bound("ast").unwrap();
+        let ast = py.import("ast").unwrap();
 
         // Based on pypi.py in https://github.com/nexB/scancode-toolkit/blob/develop/src/packagedcode/pypi.py
         //
@@ -804,7 +804,7 @@ async fn guess_from_setup_py_parsed(
         let ast_assign = ast.getattr("Assign").unwrap();
         let ast_name = ast.getattr("Name").unwrap();
 
-        for statement in tree.getattr("body")?.iter()? {
+        for statement in tree.getattr("body")?.try_iter()? {
             let statement = statement?;
             // We only care about function calls or assignments to functions named
             // `setup` or `main`
@@ -824,11 +824,11 @@ async fn guess_from_setup_py_parsed(
                 let value = statement.getattr("value")?;
 
                 // Process the arguments to the setup function
-                for kw in value.getattr("keywords")?.iter()? {
+                for kw in value.getattr("keywords")?.try_iter()? {
                     let kw = kw?;
                     let arg_name = kw.getattr("arg")?.extract::<String>()?;
 
-                    setup_args.insert(arg_name, kw.getattr("value")?.to_object(py));
+                    setup_args.insert(arg_name, kw.getattr("value")?.unbind());
                 }
             }
         }
@@ -860,7 +860,7 @@ async fn guess_from_setup_py_parsed(
                 || expr.is_instance(&ast_set).ok()?
             {
                 let mut ret = Vec::new();
-                for elt in expr.getattr("elts").ok()?.iter().ok()? {
+                for elt in expr.getattr("elts").ok()?.try_iter().ok()? {
                     let elt = elt.ok()?;
                     if let Some(value) = get_str_from_expr(&elt) {
                         ret.push(value);
@@ -874,7 +874,7 @@ async fn guess_from_setup_py_parsed(
             }
         };
 
-        let ast = py.import_bound("ast").unwrap();
+        let ast = py.import("ast").unwrap();
         let ast_dict = ast.getattr("Dict").unwrap();
 
         let get_dict_from_expr = |expr: &Bound<PyAny>| -> Option<HashMap<String, String>> {
@@ -882,7 +882,7 @@ async fn guess_from_setup_py_parsed(
                 let mut ret = HashMap::new();
                 let keys = expr.getattr("keys").ok()?;
                 let values = expr.getattr("values").ok()?;
-                for (key, value) in keys.iter().ok()?.zip(values.iter().ok()?) {
+                for (key, value) in keys.try_iter().ok()?.zip(values.try_iter().ok()?) {
                     if let Some(key) = get_str_from_expr(&key.ok()?) {
                         if let Some(value) = get_str_from_expr(&value.ok()?) {
                             ret.insert(key, value);
