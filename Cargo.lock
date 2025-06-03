@@ -286,9 +286,9 @@ checksum = "66bb12751a83493ef4b8da1120451a262554e216a247f14b48cb5e8fe7ed8bdf"
 
 [[package]]
 name = "breezyshim"
-version = "0.2.1"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a341b35a913600a99319f531a356c169477a7f77714ee412339d97fa94aa4ff4"
+checksum = "cfdce0f281fa1a84f5261ff051fc5db01af60cf1347f14fc84e147a908a9292e"
 dependencies = [
  "chrono",
  "ctor",
@@ -919,9 +919,9 @@ dependencies = [
 
 [[package]]
 name = "deb822-derive"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "748a085d8df55ab7d27495f8a2873db6faea5c30d789dfe420b7debcbc1eff04"
+checksum = "7b6e5cafe61e77421a090e2a33b8a2e4e2ff1b106fd906ebade111307064d981"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -930,9 +930,9 @@ dependencies = [
 
 [[package]]
 name = "deb822-derive"
-version = "0.2.1"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c066b0ac5a5781e328e48b61d041ac68ba2bbad5f46d13db275292d9aced266c"
+checksum = "86bf2d0fa4ce2457e94bd7efb15aeadc115297f04b660bd0da706729e0d91442"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -941,20 +941,20 @@ dependencies = [
 
 [[package]]
 name = "deb822-fast"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3a661cb496c6f7b8f7208d16561954ba1bafcb946ad93ff8bedeb110ec5ac70"
+checksum = "c9ea8fe9a58604b036be1759540ab0dbc8da57474a67715459653f06a467e38c"
 dependencies = [
- "deb822-derive 0.2.1",
+ "deb822-derive 0.3.0",
 ]
 
 [[package]]
 name = "deb822-lossless"
-version = "0.1.27"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a3282376f8ff540293a247cc4b875d00c95de27ac8049e8e388bc5752659af7"
+checksum = "812bb5c8052a89edc6d45d1bc3b3400e8186dd166e9b0a9520bfa5a2bd8477ee"
 dependencies = [
- "deb822-derive 0.1.1",
+ "deb822-derive 0.2.0",
  "regex",
  "rowan 0.16.1",
  "serde",
@@ -962,9 +962,9 @@ dependencies = [
 
 [[package]]
 name = "deb822-lossless"
-version = "0.2.6"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c003a0465750eb5e1a9c8a3c01db13452efe1389831f20297bd7033752623c9"
+checksum = "f6336404073bb257d3e15c6af29c380ee78199ed03bc84e359155ef95b98ac67"
 dependencies = [
  "deb822-fast",
  "regex",
@@ -1037,13 +1037,13 @@ dependencies = [
 
 [[package]]
 name = "debian-control"
-version = "0.1.44"
+version = "0.1.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf3f538a087059fc1bcac2d3e7e930f487eecdb5c1d50b630f43f2ee868da331"
+checksum = "e5b5fa1448bc64423185de82603c928882e328f9c22bc56b733f1ab05f4873f4"
 dependencies = [
  "chrono",
  "deb822-fast",
- "deb822-lossless 0.2.6",
+ "deb822-lossless 0.3.0",
  "debversion",
  "regex",
  "rowan 0.16.1",
@@ -1052,11 +1052,11 @@ dependencies = [
 
 [[package]]
 name = "debian-copyright"
-version = "0.1.26"
+version = "0.1.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f70c67f0e99e0de82d1f48ee8123ef1b8759fb033502c596f11a13d6a7410662"
+checksum = "e893a383c33c4e2689fd3c3121d6e82193211f65e7c483463c816f6b7c29857e"
 dependencies = [
- "deb822-lossless 0.1.27",
+ "deb822-lossless 0.2.4",
  "debversion",
  "regex",
 ]
@@ -4352,13 +4352,13 @@ checksum = "640c9bd8497b02465aeef5375144c26062e0dcd5939dfcbb0f5db76cb8c17c73"
 
 [[package]]
 name = "r-description"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "176c6ad71dc5790c358698ce36bec82a85039a7eda753ca85aea557ec509866d"
+checksum = "7fe3393d9093043150fe262c2ac86d413a78266af434de1f984d9d6aa53b1177"
 dependencies = [
- "deb822-derive 0.2.1",
+ "deb822-derive 0.3.0",
  "deb822-fast",
- "deb822-lossless 0.2.6",
+ "deb822-lossless 0.3.0",
  "rowan 0.16.1",
  "url",
 ]
@@ -4474,9 +4474,9 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
 name = "reqwest"
-version = "0.12.18"
+version = "0.12.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e98ff6b0dbbe4d5a37318f433d4fc82babd21631f194d370409ceb2e40b2f0b5"
+checksum = "a2f8e5513d63f2e5b386eb5106dc67eaf3f84e95258e210489136b8b92ad6119"
 dependencies = [
  "base64",
  "bytes",
@@ -5546,9 +5546,9 @@ dependencies = [
 
 [[package]]
 name = "tower-http"
-version = "0.6.4"
+version = "0.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fdb0c213ca27a9f57ab69ddb290fd80d970922355b83ae380b395d3986b8a2e"
+checksum = "adc82fd73de2a9722ac5da747f12383d2bfdb93591ee6c58486e0097890f05f2"
 dependencies = [
  "bitflags",
  "bytes",
