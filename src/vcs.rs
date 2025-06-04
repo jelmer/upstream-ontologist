@@ -930,7 +930,8 @@ pub fn fixup_rcp_style_git_repo_url(url: &str) -> Option<Url> {
 pub fn try_open_branch(
     url: &url::Url,
     branch_name: Option<&str>,
-) -> Option<Box<dyn breezyshim::branch::Branch>> {
+) -> Option<Box<breezyshim::branch::GenericBranch>> {
+    use breezyshim::branch::Branch;
     let old_ui_factory = breezyshim::ui::get_ui_factory();
     breezyshim::ui::install_ui_factory(&breezyshim::ui::SilentUIFactory::new());
 
@@ -957,6 +958,7 @@ pub async fn find_secure_repo_url(
     branch: Option<&str>,
     net_access: Option<bool>,
 ) -> Option<url::Url> {
+    use breezyshim::branch::Branch;
     if SECURE_SCHEMES.contains(&url.scheme()) {
         return Some(url);
     }
