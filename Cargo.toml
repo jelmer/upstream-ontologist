@@ -25,7 +25,7 @@ html5ever = ">=0.26"
 chrono = "0.4"
 textwrap = ">=0.16"
 lazy-regex = ">=2"
-breezyshim = { version = "0.5.0", default-features = false, features = ["auto-initialize"] }
+breezyshim = { version = "0.5.6", default-features = false, features = ["auto-initialize"] }
 debian-watch = { version = "0.2", optional = true }
 debian-changelog = { version = "0.2", optional = true }
 debbugs = "0.1"
