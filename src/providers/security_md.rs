@@ -8,12 +8,11 @@ pub fn guess_from_security_md(
     _settings: &GuesserSettings,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let path = path.strip_prefix("./").unwrap_or(path);
-    let mut results = Vec::new();
     // TODO(jelmer): scan SECURITY.md for email addresses/URLs with instructions
-    results.push(UpstreamDatumWithMetadata {
+    let results = vec![UpstreamDatumWithMetadata {
         datum: UpstreamDatum::SecurityMD(name.to_string()),
         certainty: Some(Certainty::Certain),
         origin: Some(path.into()),
-    });
+    }];
     Ok(results)
 }

@@ -587,7 +587,7 @@ pub async fn guess_from_debian_copyright(
                 if source.contains(' ') {
                     urls.extend(
                         source
-                            .split(|c| c == ' ' || c == '\n' || c == ',')
+                            .split([' ', '\n', ','])
                             .filter(|s| !s.is_empty())
                             .map(|s| s.to_string()),
                     );
@@ -768,8 +768,7 @@ pub fn debian_is_native(path: &Path) -> std::io::Result<Option<bool>> {
     let changelog_file = path.join("changelog");
     match File::open(changelog_file) {
         Ok(mut file) => {
-            let cl = debian_changelog::ChangeLog::read(&mut file)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            let cl = debian_changelog::ChangeLog::read(&mut file).map_err(std::io::Error::other)?;
             let first_entry = cl.iter().next().unwrap();
             let version = first_entry.version().unwrap();
             return Ok(Some(version.debian_revision.is_none()));

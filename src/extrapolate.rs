@@ -329,7 +329,7 @@ async fn extrapolate_name_from_repository(
     let repo = crate::vcs::guess_repo_from_url(&url, Some(net_access)).await;
     if let Some(repo) = repo {
         let parsed: url::Url = repo.parse().unwrap();
-        let name = parsed.path_segments().unwrap().last().unwrap();
+        let name = parsed.path_segments().unwrap().next_back().unwrap();
         let name = name.strip_suffix(".git").unwrap_or(name);
         if !name.is_empty() {
             ret.push(UpstreamDatumWithMetadata {

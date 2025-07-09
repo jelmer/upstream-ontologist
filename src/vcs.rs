@@ -1072,10 +1072,7 @@ fn derive_with_scheme(url: &url::Url, scheme: &str) -> url::Url {
 
 fn fix_path_in_port(url: &str) -> Option<String> {
     let (_, scheme, host, port, rest) =
-        match lazy_regex::regex_captures!(r"^([^:]+)://([^:]+):([^/]+)(/.*)$", url) {
-            Some(c) => c,
-            None => return None,
-        };
+        lazy_regex::regex_captures!(r"^([^:]+)://([^:]+):([^/]+)(/.*)$", url)?;
 
     if port.ends_with(']') {
         return None;

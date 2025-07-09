@@ -67,7 +67,7 @@ pub fn guess_from_pom_xml(
             for license_tag in licenses_tag
                 .children
                 .iter()
-                .filter(|c| c.as_element().map_or(false, |e| e.name == "license"))
+                .filter(|c| c.as_element().is_some_and(|e| e.name == "license"))
             {
                 if let Some(license_tag) = license_tag.as_element() {
                     if let Some(name_tag) = license_tag.get_child("name") {
@@ -86,7 +86,7 @@ pub fn guess_from_pom_xml(
         for scm_tag in root
             .children
             .iter()
-            .filter(|c| c.as_element().map_or(false, |e| e.name == "scm"))
+            .filter(|c| c.as_element().is_some_and(|e| e.name == "scm"))
         {
             if let Some(scm_tag) = scm_tag.as_element() {
                 if let Some(url_tag) = scm_tag.get_child("url") {
@@ -128,10 +128,11 @@ pub fn guess_from_pom_xml(
             }
         }
 
-        for issue_mgmt_tag in root.children.iter().filter(|c| {
-            c.as_element()
-                .map_or(false, |e| e.name == "issueManagement")
-        }) {
+        for issue_mgmt_tag in root
+            .children
+            .iter()
+            .filter(|c| c.as_element().is_some_and(|e| e.name == "issueManagement"))
+        {
             if let Some(issue_mgmt_tag) = issue_mgmt_tag.as_element() {
                 if let Some(url_tag) = issue_mgmt_tag.get_child("url") {
                     if let Some(url) = url_tag.get_text() {

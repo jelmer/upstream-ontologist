@@ -93,7 +93,7 @@ pub fn guess_from_configure(
                     Some(Certainty::Possible)
                 } else {
                     let parsed_url = Url::parse(value).expect("Failed to parse URL");
-                    if parsed_url.path().trim_end_matches('/') != "" {
+                    if !parsed_url.path().trim_end_matches('/').is_empty() {
                         Some(Certainty::Certain)
                     } else {
                         // It seems unlikely that the bug submit URL lives at

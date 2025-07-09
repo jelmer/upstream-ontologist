@@ -19,7 +19,7 @@ Standard fields:
 
 * ``Name``: human name of the upstream project
 * ``Contact``: contact address of some sort of the upstream
-   (e-mail, mailing list URL)
+  (e-mail, mailing list URL)
 * ``Repository``: VCS URL
 * ``Repository-Browse``: Web URL for viewing the VCS
 * ``Bug-Database``: Bug database URL (for web viewing, generally)
@@ -74,7 +74,7 @@ data sources:
 * [OPAM files](https://opam.ocaml.org/doc/Manual.html#Package-definitions)
 * Debian packaging metadata
   (debian/watch, debian/control, debian/rules, debian/get-orig-source.sh,
-   debian/copyright, debian/patches)
+  debian/copyright, debian/patches)
 * Dart's [pubspec.yaml](https://dart.dev/tools/pub/pubspec)
 * meson.build
 

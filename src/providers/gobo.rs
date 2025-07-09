@@ -35,7 +35,7 @@ pub async fn guess_from_gobo(package: &str) -> Result<Vec<UpstreamDatum>, crate:
 
     let package = match contents
         .iter()
-        .find(|p| p.name.to_ascii_lowercase() == package.to_ascii_lowercase())
+        .find(|p| p.name.eq_ignore_ascii_case(package))
     {
         Some(p) => p,
         None => {

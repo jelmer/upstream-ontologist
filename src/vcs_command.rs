@@ -3,7 +3,7 @@ use crate::GuesserSettings;
 use log::warn;
 
 fn parse_command_bytes(command: &[u8]) -> Option<Vec<String>> {
-    if command.ends_with(&[b'\\']) {
+    if command.ends_with(b"\\") {
         warn!(
             "Ignoring command with line break: {}",
             String::from_utf8_lossy(command)

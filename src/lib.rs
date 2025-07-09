@@ -16,11 +16,11 @@ use pyo3::{
 use reqwest::header::HeaderMap;
 use serde::ser::SerializeSeq;
 use std::cmp::Ordering;
+use std::fs::File;
+use std::io::Read;
 use std::pin::Pin;
 use std::str::FromStr;
 
-use std::fs::File;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 use url::Url;
 
@@ -902,7 +902,7 @@ impl UpstreamDatum {
                     return true;
                 }
             }
-            _ => {}
+            _ => (),
         }
         false
     }
@@ -1455,7 +1455,7 @@ pub enum HTTPJSONError {
     Error {
         url: reqwest::Url,
         status: u16,
-        response: reqwest::Response,
+        response: Box<reqwest::Response>,
     },
 }
 
@@ -1514,7 +1514,7 @@ pub async fn load_json_url(
         return Err(HTTPJSONError::Error {
             url: response.url().clone(),
             status: response.status().as_u16(),
-            response,
+            response: Box::new(response),
         });
     }
 
@@ -1556,6 +1556,9 @@ pub enum CanonicalizeError {
     RateLimited(Url),
 }
 
+#[derive(Debug)]
+pub struct PathSegmentError;
+
 pub async fn check_url_canonical(url: &Url) -> Result<Url, CanonicalizeError> {
     if url.scheme() != "http" && url.scheme() != "https" {
         return Err(CanonicalizeError::Unverifiable(
@@ -1593,9 +1596,10 @@ pub async fn check_url_canonical(url: &Url) -> Result<Url, CanonicalizeError> {
     }
 }
 
-pub fn with_path_segments(url: &Url, path_segments: &[&str]) -> Result<Url, ()> {
+pub fn with_path_segments(url: &Url, path_segments: &[&str]) -> Result<Url, PathSegmentError> {
     let mut url = url.clone();
-    url.path_segments_mut()?
+    url.path_segments_mut()
+        .map_err(|_| PathSegmentError)?
         .clear()
         .extend(path_segments.iter());
     Ok(url)
@@ -2037,7 +2041,7 @@ impl Forge for GitLab {
         let last = url
             .path_segments()
             .expect("valid segments")
-            .last()
+            .next_back()
             .unwrap()
             .to_string();
         url.path_segments_mut()
@@ -2666,7 +2670,7 @@ pub enum ProviderError {
     ParseError(String),
     IoError(std::io::Error),
     Other(String),
-    HttpJsonError(HTTPJSONError),
+    HttpJsonError(Box<HTTPJSONError>),
     ExtrapolationLimitExceeded(usize),
 }
 
@@ -2688,7 +2692,7 @@ impl std::error::Error for ProviderError {}
 
 impl From<HTTPJSONError> for ProviderError {
     fn from(e: HTTPJSONError) -> Self {
-        ProviderError::HttpJsonError(e)
+        ProviderError::HttpJsonError(Box::new(e))
     }
 }
 
@@ -2731,10 +2735,12 @@ pub struct GuesserSettings {
     pub trust_package: bool,
 }
 
+type GuesserFunction =
+    Box<dyn FnOnce(&GuesserSettings) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>>;
+
 pub struct UpstreamMetadataGuesser {
     pub name: std::path::PathBuf,
-    pub guess:
-        Box<dyn FnOnce(&GuesserSettings) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>>,
+    pub guess: GuesserFunction,
 }
 
 impl std::fmt::Debug for UpstreamMetadataGuesser {
@@ -3958,21 +3964,23 @@ pub(crate) trait Guesser {
     }
 }
 
+type AsyncGuesserFunction = Box<
+    dyn FnMut(
+            PathBuf,
+            GuesserSettings,
+        ) -> Pin<
+            Box<
+                dyn std::future::Future<
+                        Output = Result<Vec<UpstreamDatumWithMetadata>, ProviderError>,
+                    > + Send,
+            >,
+        > + Send,
+>;
+
 pub struct PathGuesser {
     name: String,
     subpath: std::path::PathBuf,
-    cb: Box<
-        dyn FnMut(
-                PathBuf,
-                GuesserSettings,
-            ) -> Pin<
-                Box<
-                    dyn std::future::Future<
-                            Output = Result<Vec<UpstreamDatumWithMetadata>, ProviderError>,
-                        > + Send,
-                >,
-            > + Send,
-    >,
+    cb: AsyncGuesserFunction,
 }
 
 #[async_trait::async_trait]

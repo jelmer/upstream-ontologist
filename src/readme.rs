@@ -267,12 +267,8 @@ pub async fn guess_from_readme(
 
     let mut line_iter = reader.lines();
 
-    loop {
-        let line = if let Some(line) = line_iter.next() {
-            line?
-        } else {
-            break;
-        };
+    while let Some(line) = line_iter.next() {
+        let line = line?;
 
         let line = line.trim();
 
@@ -711,8 +707,7 @@ fn skip_paragraph_block(para: &Node) -> (bool, Vec<UpstreamDatumWithMetadata>) {
                         }
                     }
                     name => {
-                        let re = Regex::new(r"(.*) License").unwrap();
-                        if let Some(caps) = re.captures(name) {
+                        if let Some(caps) = regex!(r"(.*) License").captures(name) {
                             extra_metadata.push(UpstreamDatumWithMetadata {
                                 datum: UpstreamDatum::License(caps[1].to_string()),
                                 certainty: Some(Certainty::Likely),
@@ -890,20 +885,21 @@ fn parse_field(name: &str, body: &NodeOrText) -> Vec<UpstreamDatumWithMetadata> 
         match body {
             NodeOrText::Node(body) => {
                 if let Some(a) = body.find(Name("a")).next() {
-                    return Some(a.attr("href").unwrap().to_string());
+                    Some(a.attr("href").unwrap().to_string())
                 } else if body.is(Name("a")) {
-                    return Some(body.attr("href").unwrap().to_string());
-                } else if let Some(text) = body.as_text().filter(|u| Url::parse(u).is_ok()) {
-                    return Some(text.to_string());
+                    Some(body.attr("href").unwrap().to_string())
                 } else {
-                    return None;
+                    body.as_text()
+                        .filter(|u| Url::parse(u).is_ok())
+                        .map(|text| text.to_string())
                 }
             }
             NodeOrText::Text(text) => {
                 if let Ok(url) = Url::parse(text) {
-                    return Some(url.to_string());
+                    Some(url.to_string())
+                } else {
+                    None
                 }
-                None
             }
         }
     };
