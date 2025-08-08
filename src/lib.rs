@@ -1667,7 +1667,7 @@ pub async fn check_url_canonical(url: &Url) -> Result<Url, CanonicalizeError> {
         .map_err(|e| CanonicalizeError::Unverifiable(url.clone(), format!("HTTP error {}", e)))?;
 
     let response =
-        client.get(url.clone()).send().await.map_err(|e| {
+        client.get(url.as_str()).send().await.map_err(|e| {
             CanonicalizeError::Unverifiable(url.clone(), format!("HTTP error {}", e))
         })?;
 
@@ -1697,7 +1697,7 @@ pub fn with_path_segments(url: &Url, path_segments: &[&str]) -> Result<Url, Path
     url.path_segments_mut()
         .map_err(|_| PathSegmentError)?
         .clear()
-        .extend(path_segments.iter());
+        .extend(path_segments.iter().copied());
     Ok(url)
 }
 

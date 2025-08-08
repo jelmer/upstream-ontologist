@@ -46,20 +46,25 @@ pub fn drop_vcs_in_scheme(url: &Url) -> Option<Url> {
 
 /// Split a VCS URL into its components
 pub fn split_vcs_url(location: &str) -> (String, Option<String>, Option<String>) {
-    let mut url = location.to_string();
+    let mut url = location;
     let mut branch = None;
     let mut subpath = None;
+
+    // Check for subpath in brackets
     if let Some(idx) = url.find('[') {
         if let Some(idx2) = url.find(']') {
             subpath = Some(url[idx + 1..idx2].to_string());
-            url = url[..idx].to_string();
+            url = &url[..idx];
         }
     }
+
+    // Check for branch specification
     if let Some(idx) = url.find(" -b ") {
         branch = Some(url[idx + 4..].to_string());
-        url = url[..idx].to_string();
+        url = &url[..idx];
     }
-    (url, branch, subpath)
+
+    (url.to_string(), branch, subpath)
 }
 
 /// Unsplit a VCS URL

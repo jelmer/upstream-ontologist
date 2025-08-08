@@ -182,8 +182,9 @@ impl TryInto<UpstreamMetadata> for NpmPackage {
     fn try_into(self) -> Result<UpstreamMetadata, Self::Error> {
         let mut metadata = UpstreamMetadata::default();
 
+        let package_name = self.name.clone();
         metadata.insert(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::Name(self.name.clone()),
+            datum: UpstreamDatum::Name(self.name),
             certainty: None,
             origin: None,
         });
@@ -246,7 +247,7 @@ impl TryInto<UpstreamMetadata> for NpmPackage {
         if let Some(latest_version) = self.dist_tags.get("latest") {
             if let Some(version) = self.versions.get(latest_version) {
                 metadata.insert(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Version(version.version.clone()),
+                    datum: UpstreamDatum::Version(version.version.to_string()),
                     certainty: None,
                     origin: None,
                 });
@@ -256,14 +257,14 @@ impl TryInto<UpstreamMetadata> for NpmPackage {
                 || {
                     Err(ProviderError::Other(format!(
                         "Could not find version {} in package {}",
-                        latest_version, &self.name
+                        latest_version, &package_name
                     )))
                 },
                 Ok,
             )?;
 
             metadata.insert(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Download(version_data.dist.tarball.clone()),
+                datum: UpstreamDatum::Download(version_data.dist.tarball.to_string()),
                 certainty: None,
                 origin: None,
             });
