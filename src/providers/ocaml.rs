@@ -7,6 +7,7 @@ use std::io::Read;
 use std::path::Path;
 
 #[cfg(feature = "opam")]
+/// Extracts upstream metadata from OPAM file
 pub fn guess_from_opam(
     path: &Path,
     _trust_package: bool,

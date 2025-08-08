@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
+/// Parses lines from a Cabal file
 pub fn parse_cabal_lines(
     lines: impl Iterator<Item = String>,
 ) -> Vec<(Option<String>, String, String)> {
@@ -48,6 +49,7 @@ pub fn parse_cabal_lines(
     ret
 }
 
+/// Extracts upstream metadata from parsed Cabal file lines
 pub fn guess_from_cabal_lines(
     lines: impl Iterator<Item = String>,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
@@ -122,6 +124,7 @@ pub fn guess_from_cabal_lines(
         .collect())
 }
 
+/// Extracts upstream metadata from a .cabal file
 pub fn guess_from_cabal(
     path: &Path,
     _trust_package: bool,
@@ -136,6 +139,7 @@ pub fn guess_from_cabal(
     )
 }
 
+/// Fetches upstream metadata for a package from Hackage
 pub async fn remote_hackage_data(package: &str) -> Result<UpstreamMetadata, ProviderError> {
     let mut ret = UpstreamMetadata::new();
     for datum in guess_from_hackage(package).await? {
@@ -144,6 +148,7 @@ pub async fn remote_hackage_data(package: &str) -> Result<UpstreamMetadata, Prov
     Ok(ret)
 }
 
+/// Extracts upstream metadata from Hackage for a specific package
 pub async fn guess_from_hackage(
     package: &str,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
@@ -185,6 +190,7 @@ pub async fn guess_from_hackage(
     }
 }
 
+/// Hackage (Haskell package repository) metadata provider
 pub struct Hackage;
 
 impl Default for Hackage {
@@ -194,6 +200,7 @@ impl Default for Hackage {
 }
 
 impl Hackage {
+    /// Creates a new Hackage metadata provider
     pub fn new() -> Self {
         Self
     }

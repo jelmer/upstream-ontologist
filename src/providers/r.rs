@@ -6,6 +6,10 @@ use crate::{
 };
 
 #[cfg(feature = "r-description")]
+/// Parse upstream metadata from an R package DESCRIPTION file
+///
+/// Extracts package information from an R DESCRIPTION file including name, version,
+/// description, maintainer, repository URLs, and other metadata fields.
 pub async fn guess_from_r_description(
     path: &std::path::Path,
     _settings: &GuesserSettings,

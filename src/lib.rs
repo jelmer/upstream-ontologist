@@ -1,5 +1,6 @@
 // pyo3 macros use a gil-refs feature
 #![allow(unexpected_cfgs)]
+#![deny(missing_docs)]
 #![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md"))]
 
 use futures::stream::StreamExt;
@@ -26,14 +27,23 @@ use url::Url;
 
 static USER_AGENT: &str = concat!("upstream-ontologist/", env!("CARGO_PKG_VERSION"));
 
+/// Functionality for extrapolating upstream metadata from various sources
 pub mod extrapolate;
+/// Support for various code forges (GitHub, GitLab, etc.)
 pub mod forges;
+/// Homepage URL detection and validation
 pub mod homepage;
+/// HTTP utilities for fetching remote resources
 pub mod http;
+/// Various metadata providers for different programming languages and ecosystems
 pub mod providers;
+/// README file parsing and metadata extraction
 pub mod readme;
+/// Integration with Repology package repository aggregator
 pub mod repology;
+/// Version control system utilities and URL handling
 pub mod vcs;
+/// Command-line interface for version control operations
 pub mod vcs_command;
 
 #[cfg(test)]
@@ -178,10 +188,14 @@ impl FromPyObject<'_> for Certainty {
     }
 }
 
+/// Represents a person (author, maintainer, etc.) with optional contact information
 #[derive(Default, Clone, Debug, PartialEq, Eq)]
 pub struct Person {
+    /// The person's name
     pub name: Option<String>,
+    /// The person's email address
     pub email: Option<String>,
+    /// The person's URL (e.g., personal website, profile)
     pub url: Option<String>,
 }
 
@@ -381,6 +395,7 @@ impl FromPyObject<'_> for Person {
     }
 }
 
+/// Represents various types of upstream metadata for a software project
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum UpstreamDatum {
     /// Name of the project.
@@ -651,10 +666,14 @@ pub enum UpstreamDatum {
     FAQ(String),
 }
 
+/// Upstream datum with additional metadata about its origin and certainty
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct UpstreamDatumWithMetadata {
+    /// The upstream datum itself
     pub datum: UpstreamDatum,
+    /// Where this datum was obtained from
     pub origin: Option<Origin>,
+    /// How certain we are about this datum
     pub certainty: Option<Certainty>,
 }
 
@@ -666,6 +685,7 @@ fn known_bad_url(value: &str) -> bool {
 }
 
 impl UpstreamDatum {
+    /// Returns the field name for this datum type
     pub fn field(&self) -> &'static str {
         match self {
             UpstreamDatum::Summary(..) => "Summary",
@@ -710,6 +730,7 @@ impl UpstreamDatum {
         }
     }
 
+    /// Returns the string value if this datum contains a simple string
     pub fn as_str(&self) -> Option<&str> {
         match self {
             UpstreamDatum::Name(s) => Some(s),
@@ -754,6 +775,7 @@ impl UpstreamDatum {
         }
     }
 
+    /// Converts the datum to a URL if applicable
     pub fn to_url(&self) -> Option<url::Url> {
         match self {
             UpstreamDatum::Name(..) => None,
@@ -798,6 +820,7 @@ impl UpstreamDatum {
         }
     }
 
+    /// Returns the person if this datum contains person information
     pub fn as_person(&self) -> Option<&Person> {
         match self {
             UpstreamDatum::Maintainer(p) => Some(p),
@@ -805,6 +828,7 @@ impl UpstreamDatum {
         }
     }
 
+    /// Checks if this datum is known to be a bad guess based on common patterns
     pub fn known_bad_guess(&self) -> bool {
         match self {
             UpstreamDatum::BugDatabase(s) | UpstreamDatum::BugSubmit(s) => {
@@ -1084,62 +1108,77 @@ impl serde::ser::Serialize for UpstreamDatum {
     }
 }
 
+/// Collection of upstream metadata with convenience methods for accessing specific fields
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct UpstreamMetadata(Vec<UpstreamDatumWithMetadata>);
 
 impl UpstreamMetadata {
+    /// Creates a new empty UpstreamMetadata instance
     pub fn new() -> Self {
         UpstreamMetadata(Vec::new())
     }
 
+    /// Returns true if the metadata collection is empty
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
+    /// Returns the number of metadata items
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
+    /// Sorts the metadata items by field name
     pub fn sort(&mut self) {
         self.0.sort_by(|a, b| a.datum.field().cmp(b.datum.field()));
     }
 
+    /// Creates a new UpstreamMetadata from a vector of data
     pub fn from_data(data: Vec<UpstreamDatumWithMetadata>) -> Self {
         Self(data)
     }
 
+    /// Returns a mutable reference to the underlying data vector
     pub fn mut_items(&mut self) -> &mut Vec<UpstreamDatumWithMetadata> {
         &mut self.0
     }
 
+    /// Returns an iterator over the metadata items
     pub fn iter(&self) -> impl Iterator<Item = &UpstreamDatumWithMetadata> {
         self.0.iter()
     }
 
+    /// Returns a mutable iterator over the metadata items
     pub fn mut_iter(&mut self) -> impl Iterator<Item = &mut UpstreamDatumWithMetadata> {
         self.0.iter_mut()
     }
 
+    /// Gets a metadata item by field name
     pub fn get(&self, field: &str) -> Option<&UpstreamDatumWithMetadata> {
         self.0.iter().find(|d| d.datum.field() == field)
     }
 
+    /// Gets a mutable reference to a metadata item by field name
     pub fn get_mut(&mut self, field: &str) -> Option<&mut UpstreamDatumWithMetadata> {
         self.0.iter_mut().find(|d| d.datum.field() == field)
     }
 
+    /// Inserts a new metadata item
     pub fn insert(&mut self, datum: UpstreamDatumWithMetadata) {
         self.0.push(datum);
     }
 
+    /// Checks if a field exists in the metadata
     pub fn contains_key(&self, field: &str) -> bool {
         self.get(field).is_some()
     }
 
+    /// Removes metadata items that are known to be bad guesses
     pub fn discard_known_bad(&mut self) {
         self.0.retain(|d| !d.datum.known_bad_guess());
     }
 
+    /// Updates the metadata with new items, returning the replaced items
     pub fn update(
         &mut self,
         new_items: impl Iterator<Item = UpstreamDatumWithMetadata>,
@@ -1147,39 +1186,48 @@ impl UpstreamMetadata {
         update_from_guesses(&mut self.0, new_items)
     }
 
+    /// Removes and returns a metadata item by field name
     pub fn remove(&mut self, field: &str) -> Option<UpstreamDatumWithMetadata> {
         let index = self.0.iter().position(|d| d.datum.field() == field)?;
         Some(self.0.remove(index))
     }
 
+    /// Gets the project name
     pub fn name(&self) -> Option<&str> {
         self.get("Name").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the project homepage URL
     pub fn homepage(&self) -> Option<&str> {
         self.get("Homepage").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the repository URL
     pub fn repository(&self) -> Option<&str> {
         self.get("Repository").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the repository browse URL
     pub fn repository_browse(&self) -> Option<&str> {
         self.get("Repository-Browse").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the project description
     pub fn description(&self) -> Option<&str> {
         self.get("Description").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the project summary
     pub fn summary(&self) -> Option<&str> {
         self.get("Summary").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the project license
     pub fn license(&self) -> Option<&str> {
         self.get("License").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the list of authors
     pub fn author(&self) -> Option<&Vec<Person>> {
         self.get("Author").map(|d| match &d.datum {
             UpstreamDatum::Author(authors) => authors,
@@ -1187,6 +1235,7 @@ impl UpstreamMetadata {
         })
     }
 
+    /// Gets the maintainer information
     pub fn maintainer(&self) -> Option<&Person> {
         self.get("Maintainer").map(|d| match &d.datum {
             UpstreamDatum::Maintainer(maintainer) => maintainer,
@@ -1194,34 +1243,42 @@ impl UpstreamMetadata {
         })
     }
 
+    /// Gets the bug database URL
     pub fn bug_database(&self) -> Option<&str> {
         self.get("Bug-Database").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the bug submission URL or email
     pub fn bug_submit(&self) -> Option<&str> {
         self.get("Bug-Submit").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the contact information
     pub fn contact(&self) -> Option<&str> {
         self.get("Contact").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the Cargo crate name
     pub fn cargo_crate(&self) -> Option<&str> {
         self.get("Cargo-Crate").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the security markdown file name
     pub fn security_md(&self) -> Option<&str> {
         self.get("Security-MD").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the security contact information
     pub fn security_contact(&self) -> Option<&str> {
         self.get("Security-Contact").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the project version
     pub fn version(&self) -> Option<&str> {
         self.get("Version").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the list of keywords
     pub fn keywords(&self) -> Option<&Vec<String>> {
         self.get("Keywords").map(|d| match &d.datum {
             UpstreamDatum::Keywords(keywords) => keywords,
@@ -1229,59 +1286,73 @@ impl UpstreamMetadata {
         })
     }
 
+    /// Gets the documentation URL
     pub fn documentation(&self) -> Option<&str> {
         self.get("Documentation").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the API documentation URL
     pub fn api_documentation(&self) -> Option<&str> {
         self.get("API-Documentation").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the Go import path
     pub fn go_import_path(&self) -> Option<&str> {
         self.get("Go-Import-Path").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the download URL
     pub fn download(&self) -> Option<&str> {
         self.get("Download").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the wiki URL
     pub fn wiki(&self) -> Option<&str> {
         self.get("Wiki").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the mailing list URL or email
     pub fn mailing_list(&self) -> Option<&str> {
         self.get("MailingList").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the SourceForge project name
     pub fn sourceforge_project(&self) -> Option<&str> {
         self.get("SourceForge-Project")
             .and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the archive name (e.g., CRAN, PyPI)
     pub fn archive(&self) -> Option<&str> {
         self.get("Archive").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the demo URL
     pub fn demo(&self) -> Option<&str> {
         self.get("Demo").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the PECL package name
     pub fn pecl_package(&self) -> Option<&str> {
         self.get("Pecl-Package").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the Haskell package name
     pub fn haskell_package(&self) -> Option<&str> {
         self.get("Haskell-Package").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets funding information
     pub fn funding(&self) -> Option<&str> {
         self.get("Funding").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the changelog URL
     pub fn changelog(&self) -> Option<&str> {
         self.get("Changelog").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the Debian ITP bug number
     pub fn debian_itp(&self) -> Option<i32> {
         self.get("Debian-ITP").and_then(|d| match &d.datum {
             UpstreamDatum::DebianITP(itp) => Some(*itp),
@@ -1289,6 +1360,7 @@ impl UpstreamMetadata {
         })
     }
 
+    /// Gets the list of screenshot URLs
     pub fn screenshots(&self) -> Option<&Vec<String>> {
         self.get("Screenshots").map(|d| match &d.datum {
             UpstreamDatum::Screenshots(screenshots) => screenshots,
@@ -1296,14 +1368,17 @@ impl UpstreamMetadata {
         })
     }
 
+    /// Gets the donation URL
     pub fn donation(&self) -> Option<&str> {
         self.get("Donation").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the citation information
     pub fn cite_as(&self) -> Option<&str> {
         self.get("Cite-As").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the registry entries
     pub fn registry(&self) -> Option<&Vec<(String, String)>> {
         self.get("Registry").map(|d| match &d.datum {
             UpstreamDatum::Registry(registry) => registry,
@@ -1311,18 +1386,22 @@ impl UpstreamMetadata {
         })
     }
 
+    /// Gets the webservice URL
     pub fn webservice(&self) -> Option<&str> {
         self.get("Webservice").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the build system name
     pub fn buildsystem(&self) -> Option<&str> {
         self.get("BuildSystem").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the copyright information
     pub fn copyright(&self) -> Option<&str> {
         self.get("Copyright").and_then(|d| d.datum.as_str())
     }
 
+    /// Gets the FAQ URL
     pub fn faq(&self) -> Option<&str> {
         self.get("FAQ").and_then(|d| d.datum.as_str())
     }
@@ -1441,20 +1520,29 @@ impl serde::ser::Serialize for UpstreamDatumWithMetadata {
     }
 }
 
+/// Trait for providing upstream metadata
 pub trait UpstreamDataProvider {
+    /// Provides upstream metadata from a given path
     fn provide(
         path: &std::path::Path,
         trust_package: bool,
     ) -> dyn Iterator<Item = (UpstreamDatum, Certainty)>;
 }
 
+/// Errors that can occur when loading JSON from HTTP
 #[derive(Debug)]
 pub enum HTTPJSONError {
+    /// HTTP request error
     HTTPError(reqwest::Error),
+    /// Request timed out
     Timeout(tokio::time::Duration),
+    /// HTTP error response
     Error {
+        /// The URL that failed
         url: reqwest::Url,
+        /// HTTP status code
         status: u16,
+        /// The response object
         response: Box<reqwest::Response>,
     },
 }
@@ -1473,6 +1561,7 @@ impl std::fmt::Display for HTTPJSONError {
     }
 }
 
+/// Loads JSON data from a URL with optional timeout
 pub async fn load_json_url(
     http_url: &Url,
     timeout: Option<std::time::Duration>,
@@ -1550,15 +1639,21 @@ fn simplify_namespaces(element: &mut xmltree::Element, namespaces: &[String]) {
     }
 }
 
+/// Errors that can occur when canonicalizing URLs
 pub enum CanonicalizeError {
+    /// URL is invalid with reason
     InvalidUrl(Url, String),
+    /// URL cannot be verified with reason
     Unverifiable(Url, String),
+    /// Request was rate limited
     RateLimited(Url),
 }
 
 #[derive(Debug)]
+/// Error when manipulating URL path segments
 pub struct PathSegmentError;
 
+/// Checks if a URL is canonical by following redirects
 pub async fn check_url_canonical(url: &Url) -> Result<Url, CanonicalizeError> {
     if url.scheme() != "http" && url.scheme() != "https" {
         return Err(CanonicalizeError::Unverifiable(
@@ -1596,6 +1691,7 @@ pub async fn check_url_canonical(url: &Url) -> Result<Url, CanonicalizeError> {
     }
 }
 
+/// Creates a new URL with the specified path segments
 pub fn with_path_segments(url: &Url, path_segments: &[&str]) -> Result<Url, PathSegmentError> {
     let mut url = url.clone();
     url.path_segments_mut()
@@ -1605,20 +1701,26 @@ pub fn with_path_segments(url: &Url, path_segments: &[&str]) -> Result<Url, Path
     Ok(url)
 }
 
+/// Trait for different code forges (GitHub, GitLab, etc.)
 #[async_trait::async_trait]
 pub trait Forge: Send + Sync {
+    /// Whether the repository browse URL can be used as homepage
     fn repository_browse_can_be_homepage(&self) -> bool;
 
+    /// Returns the name of the forge
     fn name(&self) -> &'static str;
 
+    /// Derives the bug database URL from a bug submission URL
     fn bug_database_url_from_bug_submit_url(&self, _url: &Url) -> Option<Url> {
         None
     }
 
+    /// Derives the bug submission URL from a bug database URL
     fn bug_submit_url_from_bug_database_url(&self, _url: &Url) -> Option<Url> {
         None
     }
 
+    /// Checks if a bug database URL is canonical
     async fn check_bug_database_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError> {
         Err(CanonicalizeError::Unverifiable(
             url.clone(),
@@ -1626,6 +1728,7 @@ pub trait Forge: Send + Sync {
         ))
     }
 
+    /// Checks if a bug submission URL is canonical
     async fn check_bug_submit_url_canonical(&self, url: &Url) -> Result<Url, CanonicalizeError> {
         Err(CanonicalizeError::Unverifiable(
             url.clone(),
@@ -1633,18 +1736,22 @@ pub trait Forge: Send + Sync {
         ))
     }
 
+    /// Gets the bug database URL from an issue URL
     fn bug_database_from_issue_url(&self, _url: &Url) -> Option<Url> {
         None
     }
 
+    /// Gets the bug database URL from a repository URL
     fn bug_database_url_from_repo_url(&self, _url: &Url) -> Option<Url> {
         None
     }
 
+    /// Gets the repository URL from a merge request URL
     fn repo_url_from_merge_request_url(&self, _url: &Url) -> Option<Url> {
         None
     }
 
+    /// Extends metadata with forge-specific information
     async fn extend_metadata(
         &self,
         _metadata: &mut Vec<UpstreamDatumWithMetadata>,
@@ -1654,6 +1761,7 @@ pub trait Forge: Send + Sync {
     }
 }
 
+/// GitHub forge implementation
 pub struct GitHub;
 
 impl Default for GitHub {
@@ -1663,6 +1771,7 @@ impl Default for GitHub {
 }
 
 impl GitHub {
+    /// Creates a new GitHub forge instance
     pub fn new() -> Self {
         Self
     }
@@ -1861,6 +1970,7 @@ static DEFAULT_ASCII_SET: percent_encoding::AsciiSet = percent_encoding::CONTROL
     .add(b'#')
     .add(b'%');
 
+/// GitLab forge implementation
 pub struct GitLab;
 
 impl Default for GitLab {
@@ -1870,6 +1980,7 @@ impl Default for GitLab {
 }
 
 impl GitLab {
+    /// Creates a new GitLab forge instance
     pub fn new() -> Self {
         Self
     }
@@ -2069,6 +2180,7 @@ impl Forge for GitLab {
     }
 }
 
+/// Extracts upstream metadata from a Travis CI configuration file
 pub fn guess_from_travis_yml(
     path: &Path,
     _settings: &GuesserSettings,
@@ -2096,6 +2208,7 @@ pub fn guess_from_travis_yml(
     Ok(ret)
 }
 
+/// Extracts upstream metadata from environment variables
 pub fn guess_from_environment() -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError>
 {
     let mut results = Vec::new();
@@ -2127,6 +2240,7 @@ fn set_datum(metadata: &mut Vec<UpstreamDatumWithMetadata>, datum: UpstreamDatum
     }
 }
 
+/// Updates metadata collection with new guesses based on certainty levels
 pub fn update_from_guesses(
     metadata: &mut Vec<UpstreamDatumWithMetadata>,
     new_items: impl Iterator<Item = UpstreamDatumWithMetadata>,
@@ -2184,6 +2298,7 @@ async fn extend_from_external_guesser<
     update_from_guesses(metadata, new_items);
 }
 
+/// SourceForge forge implementation
 pub struct SourceForge;
 
 impl Default for SourceForge {
@@ -2193,6 +2308,7 @@ impl Default for SourceForge {
 }
 
 impl SourceForge {
+    /// Creates a new SourceForge forge instance
     pub fn new() -> Self {
         Self
     }
@@ -2242,6 +2358,7 @@ impl Forge for SourceForge {
     }
 }
 
+/// Launchpad forge implementation
 pub struct Launchpad;
 
 impl Default for Launchpad {
@@ -2251,6 +2368,7 @@ impl Default for Launchpad {
 }
 
 impl Launchpad {
+    /// Creates a new Launchpad forge instance
     pub fn new() -> Self {
         Self
     }
@@ -2287,6 +2405,7 @@ impl Forge for Launchpad {
     }
 }
 
+/// Determines which forge a URL belongs to
 pub async fn find_forge(url: &Url, net_access: Option<bool>) -> Option<Box<dyn Forge>> {
     if url.host_str()? == "sourceforge.net" {
         return Some(Box::new(SourceForge::new()));
@@ -2307,6 +2426,7 @@ pub async fn find_forge(url: &Url, net_access: Option<bool>) -> Option<Box<dyn F
     None
 }
 
+/// Checks if a bug database URL is canonical
 pub async fn check_bug_database_canonical(
     url: &Url,
     net_access: Option<bool>,
@@ -2326,6 +2446,7 @@ pub async fn check_bug_database_canonical(
     }
 }
 
+/// Derives a bug submission URL from a bug database URL
 pub async fn bug_submit_url_from_bug_database_url(
     url: &Url,
     net_access: Option<bool>,
@@ -2337,6 +2458,7 @@ pub async fn bug_submit_url_from_bug_database_url(
     }
 }
 
+/// Derives a bug database URL from a bug submission URL
 pub async fn bug_database_url_from_bug_submit_url(
     url: &Url,
     net_access: Option<bool>,
@@ -2348,6 +2470,7 @@ pub async fn bug_database_url_from_bug_submit_url(
     }
 }
 
+/// Guesses the bug database URL from a repository URL
 pub async fn guess_bug_database_url_from_repo_url(
     url: &Url,
     net_access: Option<bool>,
@@ -2359,6 +2482,7 @@ pub async fn guess_bug_database_url_from_repo_url(
     }
 }
 
+/// Extracts the repository URL from a merge request URL
 pub async fn repo_url_from_merge_request_url(url: &Url, net_access: Option<bool>) -> Option<Url> {
     if let Some(forge) = find_forge(url, net_access).await {
         forge.repo_url_from_merge_request_url(url)
@@ -2367,6 +2491,7 @@ pub async fn repo_url_from_merge_request_url(url: &Url, net_access: Option<bool>
     }
 }
 
+/// Extracts the bug database URL from an issue URL
 pub async fn bug_database_from_issue_url(url: &Url, net_access: Option<bool>) -> Option<Url> {
     if let Some(forge) = find_forge(url, net_access).await {
         forge.bug_database_from_issue_url(url)
@@ -2375,6 +2500,7 @@ pub async fn bug_database_from_issue_url(url: &Url, net_access: Option<bool>) ->
     }
 }
 
+/// Checks if a bug submission URL is canonical
 pub async fn check_bug_submit_url_canonical(
     url: &Url,
     net_access: Option<bool>,
@@ -2394,6 +2520,7 @@ pub async fn check_bug_submit_url_canonical(
     }
 }
 
+/// Extracts the PECL package name from a URL
 pub fn extract_pecl_package_name(url: &str) -> Option<String> {
     let pecl_regex = regex!(r"https?://pecl\.php\.net/package/(.*)");
     if let Some(captures) = pecl_regex.captures(url) {
@@ -2402,6 +2529,7 @@ pub fn extract_pecl_package_name(url: &str) -> Option<String> {
     None
 }
 
+/// Extracts the Hackage package name from a URL
 pub fn extract_hackage_package(url: &str) -> Option<String> {
     let hackage_regex = regex!(r"https?://hackage\.haskell\.org/package/([^/]+)/.*");
     if let Some(captures) = hackage_regex.captures(url) {
@@ -2454,6 +2582,7 @@ pub fn metadata_from_url(url: &str, origin: &Origin) -> Vec<UpstreamDatumWithMet
     results
 }
 
+/// Fetches metadata from the Repology API for a given source package
 pub async fn get_repology_metadata(srcname: &str, repo: Option<&str>) -> Option<serde_json::Value> {
     let repo = repo.unwrap_or("debian_unstable");
     let url = format!(
@@ -2472,6 +2601,7 @@ pub async fn get_repology_metadata(srcname: &str, repo: Option<&str>) -> Option<
     }
 }
 
+/// Guesses upstream metadata from a file or directory path
 pub fn guess_from_path(
     path: &Path,
     _settings: &GuesserSettings,
@@ -2665,12 +2795,18 @@ impl FromPyObject<'_> for UpstreamDatumWithMetadata {
     }
 }
 
+/// Errors that can occur when fetching metadata from providers
 #[derive(Debug)]
 pub enum ProviderError {
+    /// Parse error with description
     ParseError(String),
+    /// I/O error
     IoError(std::io::Error),
+    /// Other error with description
     Other(String),
+    /// HTTP JSON fetching error
     HttpJsonError(Box<HTTPJSONError>),
+    /// Extrapolation limit exceeded with limit value
     ExtrapolationLimitExceeded(usize),
 }
 
@@ -2709,11 +2845,16 @@ impl From<reqwest::Error> for ProviderError {
 }
 
 #[cfg(feature = "pyo3")]
-pyo3::create_exception!(
-    upstream_ontologist,
-    ParseError,
-    pyo3::exceptions::PyException
-);
+mod py_exceptions {
+    #![allow(missing_docs)]
+    pyo3::create_exception!(
+        upstream_ontologist,
+        ParseError,
+        pyo3::exceptions::PyException
+    );
+}
+#[cfg(feature = "pyo3")]
+pub use py_exceptions::ParseError;
 
 #[cfg(feature = "pyo3")]
 impl From<ProviderError> for PyErr {
@@ -2730,16 +2871,21 @@ impl From<ProviderError> for PyErr {
     }
 }
 
+/// Settings for upstream metadata guessers
 #[derive(Debug, Default, Clone)]
 pub struct GuesserSettings {
+    /// Whether to trust the package contents and run executables
     pub trust_package: bool,
 }
 
 type GuesserFunction =
     Box<dyn FnOnce(&GuesserSettings) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>>;
 
+/// A guesser that can extract upstream metadata from a specific file
 pub struct UpstreamMetadataGuesser {
+    /// Name/path of the guesser
     pub name: std::path::PathBuf,
+    /// Function that performs the guessing
     pub guess: GuesserFunction,
 }
 
@@ -3315,6 +3461,7 @@ fn rewrite_upstream_datum(
     }
 }
 
+/// Creates a stream of upstream metadata by running all applicable guessers
 pub fn upstream_metadata_stream(
     path: &std::path::Path,
     trust_package: Option<bool>,
@@ -3326,6 +3473,7 @@ pub fn upstream_metadata_stream(
     stream(path, &GuesserSettings { trust_package }, guessers)
 }
 
+/// Extends upstream metadata with additional information from external sources
 pub async fn extend_upstream_metadata(
     upstream_metadata: &mut UpstreamMetadata,
     path: &std::path::Path,
@@ -3516,12 +3664,17 @@ pub async fn extend_upstream_metadata(
     Ok(())
 }
 
+/// Trait for third-party repositories that can provide upstream metadata
 #[async_trait::async_trait]
 pub trait ThirdPartyRepository {
+    /// Returns the name of the repository
     fn name(&self) -> &'static str;
+    /// Returns the list of fields this repository can provide
     fn supported_fields(&self) -> &'static [&'static str];
+    /// Returns the maximum certainty level this repository can provide
     fn max_supported_certainty(&self) -> Certainty;
 
+    /// Extends metadata with information from this repository
     async fn extend_metadata(
         &self,
         metadata: &mut Vec<UpstreamDatumWithMetadata>,
@@ -3544,6 +3697,7 @@ pub trait ThirdPartyRepository {
         Ok(())
     }
 
+    /// Guesses metadata for a given package name
     async fn guess_metadata(&self, name: &str) -> Result<Vec<UpstreamDatum>, ProviderError>;
 }
 
@@ -3703,6 +3857,7 @@ pub fn guess_upstream_metadata_items(
     })
 }
 
+/// Gets upstream information for a project
 pub async fn get_upstream_info(
     path: &std::path::Path,
     trust_package: Option<bool>,
@@ -3767,6 +3922,7 @@ pub async fn guess_upstream_metadata(
     .await
 }
 
+/// Verifies that screenshot URLs are accessible
 pub async fn verify_screenshots(urls: &[&str]) -> Vec<(String, Option<bool>)> {
     let mut ret = Vec::new();
     for url in urls {
@@ -3977,6 +4133,7 @@ type AsyncGuesserFunction = Box<
         > + Send,
 >;
 
+/// Guesser that extracts metadata from a specific file path
 pub struct PathGuesser {
     name: String,
     subpath: std::path::PathBuf,
@@ -3997,9 +4154,11 @@ impl Guesser for PathGuesser {
     }
 }
 
+/// Guesser that extracts metadata from environment variables
 pub struct EnvironmentGuesser;
 
 impl EnvironmentGuesser {
+    /// Creates a new EnvironmentGuesser
     pub fn new() -> Self {
         Self
     }

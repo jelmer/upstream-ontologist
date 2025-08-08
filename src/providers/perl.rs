@@ -11,6 +11,7 @@ use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+/// Extracts upstream metadata from Perl POD documentation
 pub fn guess_from_pod(
     contents: &str,
     origin: &Origin,
@@ -77,6 +78,7 @@ pub fn guess_from_pod(
     Ok(upstream_data)
 }
 
+/// Extracts upstream metadata from a Perl module file
 pub fn guess_from_perl_module(
     path: &Path,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
@@ -92,6 +94,7 @@ pub fn guess_from_perl_module(
     }
 }
 
+/// Guesses upstream metadata based on Perl distribution name
 pub fn guess_from_perl_dist_name(
     path: &Path,
     dist_name: &str,
@@ -113,6 +116,7 @@ pub fn guess_from_perl_dist_name(
 }
 
 #[cfg(feature = "dist-ini")]
+/// Extracts upstream metadata from Dist::Zilla dist.ini file
 pub fn guess_from_dist_ini(
     path: &Path,
     _settings: &GuesserSettings,
@@ -214,6 +218,7 @@ pub fn guess_from_dist_ini(
     Ok(upstream_data)
 }
 
+/// Extracts upstream metadata from Perl META.json file
 pub fn guess_from_meta_json(
     path: &Path,
     _settings: &GuesserSettings,
@@ -400,6 +405,7 @@ pub fn guess_from_meta_yml(
     Ok(upstream_data)
 }
 
+/// Extracts upstream metadata from Makefile.PL
 pub fn guess_from_makefile_pl(
     path: &Path,
     _settings: &GuesserSettings,
@@ -438,49 +444,86 @@ pub fn guess_from_makefile_pl(
     Ok(results)
 }
 
+/// CPAN module information
 #[derive(Deserialize)]
 pub struct Module {
+    /// Numeric version representation
     pub version_numified: f64,
+    /// Version string
     pub version: String,
+    /// Whether the module is authorized
     pub authorized: bool,
+    /// Module name
     pub name: String,
+    /// Whether the module is indexed
     pub indexed: bool,
 }
 
+/// File statistics for a CPAN module
 #[derive(Deserialize)]
 pub struct Stat {
+    /// User ID
     pub uid: isize,
+    /// Modification time
     pub mtime: isize,
+    /// File size in bytes
     pub size: isize,
+    /// File mode
     pub mode: isize,
+    /// Group ID
     pub gid: isize,
 }
 
+/// Complete CPAN module metadata
 #[derive(Deserialize)]
 pub struct CpanModule {
+    /// Module maturity level
     pub maturity: String,
+    /// Release identifier
     pub release: String,
+    /// Author name
     pub author: String,
+    /// Source lines of Perl code
     pub slop: isize,
+    /// Download URL for the module
     pub download_url: url::Url,
+    /// List of modules in this release
     pub module: Vec<Module>,
+    /// POD documentation lines
     pub pod_lines: Vec<String>,
+    /// Module version
     pub version: String,
+    /// Whether the module is deprecated
     pub deprecated: bool,
+    /// Nesting level
     pub level: isize,
+    /// MIME type of the file
     pub mime: String,
+    /// Release date
     pub date: String,
+    /// File path within the distribution
     pub path: String,
+    /// Distribution name
     pub distribution: String,
+    /// POD documentation content
     pub pod: String,
+    /// Module name
     pub name: String,
+    /// Source lines of code
     pub sloc: isize,
+    /// File statistics
     pub stat: Stat,
+    /// Numeric version representation
     pub version_numified: f64,
+    /// Whether the file is binary
     pub binary: bool,
+    /// Unique identifier
     pub id: String,
+    /// Whether this is a directory
     pub directory: bool,
+    /// Whether the module is indexed
     pub indexed: bool,
+    /// Whether the module is authorized
     pub authorized: bool,
 }
 
@@ -524,6 +567,7 @@ impl TryFrom<CpanModule> for UpstreamMetadata {
     }
 }
 
+/// Loads CPAN module data from the MetaCPAN API
 pub async fn load_cpan_data(module: &str) -> Result<Option<CpanModule>, crate::ProviderError> {
     let url = format!("https://fastapi.metacpan.org/v1/release/{}", module)
         .parse()
@@ -534,6 +578,7 @@ pub async fn load_cpan_data(module: &str) -> Result<Option<CpanModule>, crate::P
     Ok(Some(serde_json::from_value(data).unwrap()))
 }
 
+/// Retrieves upstream metadata for a Perl module from CPAN
 pub async fn remote_cpan_data(module: &str) -> Result<UpstreamMetadata, crate::ProviderError> {
     let data = load_cpan_data(module).await?;
 

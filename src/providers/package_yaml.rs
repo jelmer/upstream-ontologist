@@ -3,6 +3,7 @@ use crate::{
 };
 use std::path::Path;
 
+/// Extracts upstream metadata from Haskell package.yaml file
 pub fn guess_from_package_yaml(
     path: &Path,
     _settings: &GuesserSettings,

@@ -2,6 +2,7 @@
 
 use crate::{Certainty, GuesserSettings, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 
+/// Extracts metadata from SECURITY.md files
 pub fn guess_from_security_md(
     name: &str,
     path: &std::path::Path,

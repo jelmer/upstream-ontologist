@@ -145,6 +145,7 @@ async fn parse_sf_json(
     results
 }
 
+/// Guesses upstream metadata from SourceForge project information
 pub async fn guess_from_sf(sf_project: &str, subproject: Option<&str>) -> Vec<UpstreamDatum> {
     let mut results = Vec::new();
     match get_sf_metadata(sf_project).await {
@@ -158,6 +159,7 @@ pub async fn guess_from_sf(sf_project: &str, subproject: Option<&str>) -> Vec<Up
     results
 }
 
+/// Extracts the SourceForge project name from a URL
 pub fn extract_sf_project_name(url: &str) -> Option<String> {
     let projects_regex = regex!(r"https?://sourceforge\.net/(projects|p)/([^/]+)");
     if let Some(captures) = projects_regex.captures(url) {

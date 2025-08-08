@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io::BufRead;
 use std::path::Path;
 
+/// Extracts author information from AUTHORS file
 pub fn guess_from_authors(
     path: &Path,
     _settings: &GuesserSettings,

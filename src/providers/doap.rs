@@ -4,6 +4,7 @@ use log::error;
 use std::fs::File;
 use std::path::Path;
 
+/// Extracts upstream metadata from DOAP (Description of a Project) files
 pub fn guess_from_doap(
     path: &Path,
     _trust_package: bool,

@@ -10,6 +10,7 @@ use std::io::Read;
 use std::path::Path;
 use url::Url;
 
+/// Extracts upstream metadata from Debian patch files
 pub async fn guess_from_debian_patch(
     path: &Path,
     _settings: &GuesserSettings,
@@ -63,6 +64,7 @@ pub async fn guess_from_debian_patch(
     Ok(upstream_data)
 }
 
+/// Extracts metadata from Debian ITP bug body text
 pub fn metadata_from_itp_bug_body(
     body: &str,
     origin: Option<Origin>,
@@ -271,6 +273,7 @@ fn read_changelog_first_entry(
 }
 
 #[cfg(feature = "debian")]
+/// Extracts upstream metadata from Debian changelog file
 pub async fn guess_from_debian_changelog(
     path: &Path,
     _settings: &GuesserSettings,
@@ -352,6 +355,7 @@ pub async fn guess_from_debian_changelog(
     Ok(ret)
 }
 
+/// Finds ITP bug number from debian changelog entries
 pub fn find_itp(changes: &[String]) -> Option<i32> {
     for line in changes {
         if let Some((_, itp)) = regex_captures!(r"\* Initial release. \(?Closes: #(\d+)\)?", line) {
@@ -361,6 +365,7 @@ pub fn find_itp(changes: &[String]) -> Option<i32> {
     None
 }
 
+/// Extracts upstream metadata from Debian ITP bug
 pub fn guess_from_itp_bug(
     bugno: i32,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
@@ -399,6 +404,7 @@ pub fn parse_debcargo_source_name(
 }
 
 #[cfg(feature = "debian")]
+/// Extracts upstream metadata from debian/rules file
 pub fn guess_from_debian_rules(
     path: &Path,
     _settings: &GuesserSettings,
@@ -439,6 +445,7 @@ pub fn guess_from_debian_rules(
 }
 
 #[cfg(feature = "debian")]
+/// Extracts upstream metadata from debian/control file
 pub fn guess_from_debian_control(
     path: &Path,
     _settings: &GuesserSettings,
@@ -552,6 +559,7 @@ pub fn guess_from_debian_control(
 }
 
 #[cfg(feature = "debian")]
+/// Extracts upstream metadata from debian/copyright file
 pub async fn guess_from_debian_copyright(
     path: &Path,
     _settings: &GuesserSettings,
@@ -707,6 +715,7 @@ fn read_entries(path: &Path) -> Result<Vec<(url::Url, debian_watch::Mode)>, Prov
 }
 
 #[cfg(feature = "debian")]
+/// Extracts upstream metadata from debian/watch file
 pub async fn guess_from_debian_watch(
     path: &Path,
     _settings: &GuesserSettings,
@@ -753,6 +762,7 @@ pub async fn guess_from_debian_watch(
 }
 
 #[cfg(feature = "debian")]
+/// Checks if a Debian package is native (no upstream)
 pub fn debian_is_native(path: &Path) -> std::io::Result<Option<bool>> {
     let format_file_path = path.join("source/format");
     match File::open(format_file_path) {

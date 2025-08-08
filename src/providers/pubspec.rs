@@ -14,6 +14,7 @@ struct Pubspec {
     issue_tracker: Option<String>,
 }
 
+/// Extracts upstream metadata from Dart/Flutter pubspec.yaml file
 pub fn guess_from_pubspec_yaml(
     path: &Path,
     _settings: &GuesserSettings,

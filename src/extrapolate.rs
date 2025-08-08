@@ -507,6 +507,7 @@ const EXTRAPOLATIONS: &[Extrapolation] = &[
     },
 ];
 
+/// Extrapolates missing fields from existing upstream metadata
 pub async fn extrapolate_fields(
     upstream_metadata: &mut UpstreamMetadata,
     net_access: bool,

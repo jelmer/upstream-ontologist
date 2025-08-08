@@ -3,6 +3,10 @@ use crate::{Certainty, Person, ProviderError, UpstreamDatum, UpstreamDatumWithMe
 use std::path::Path;
 
 // Documentation: https://docs.microsoft.com/en-us/nuget/reference/nuspec
+/// Parse upstream metadata from a NuGet package specification (.nuspec) file
+///
+/// Extracts package information like version, description, authors, and URLs from
+/// a NuSpec XML file following the NuGet package specification format.
 pub async fn guess_from_nuspec(
     path: &Path,
     _trust_package: bool,

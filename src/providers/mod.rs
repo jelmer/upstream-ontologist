@@ -1,39 +1,71 @@
+/// Arch Linux package metadata provider
 pub mod arch;
+/// Authors file metadata provider
 pub mod authors;
+/// Autoconf configure script metadata provider
 pub mod autoconf;
+/// PHP Composer metadata provider
 pub mod composer_json;
+/// Debian package metadata provider
 pub mod debian;
+/// DOAP (Description of a Project) metadata provider
 pub mod doap;
+/// Git configuration metadata provider
 pub mod git;
+/// Go module metadata provider
 pub mod go;
+/// GoboLinux metadata provider
 pub mod gobo;
+/// Haskell package metadata provider
 pub mod haskell;
+/// Launchpad metadata provider
 pub mod launchpad;
+/// Maven POM metadata provider
 pub mod maven;
+/// Meson build system metadata provider
 pub mod meson;
+/// Generic metadata.json provider
 pub mod metadata_json;
+/// AppStream metainfo metadata provider
 pub mod metainfo;
+/// Node.js metadata provider
 pub mod node;
+/// NuGet package specification metadata provider
 pub mod nuspec;
+/// OCaml OPAM metadata provider
 #[cfg(feature = "opam")]
 pub mod ocaml;
+/// NPM package.json metadata provider
 pub mod package_json;
+/// PEAR package.xml metadata provider
 pub mod package_xml;
+/// Haskell package.yaml metadata provider
 pub mod package_yaml;
+/// Perl module metadata provider
 pub mod perl;
+/// PHP package metadata provider
 pub mod php;
+/// Dart/Flutter pubspec metadata provider
 pub mod pubspec;
+/// Python package metadata provider
 pub mod python;
+/// R package metadata provider
 pub mod r;
+/// Repology metadata provider
 pub mod repology;
+/// Ruby gem metadata provider
 pub mod ruby;
+/// Rust crate metadata provider
 pub mod rust;
+/// Security.md file metadata provider
 pub mod security_md;
+/// Waf build system metadata provider
 pub mod waf;
 
 use crate::{Certainty, GuesserSettings, UpstreamDatum, UpstreamDatumWithMetadata};
 use std::io::BufRead;
 
+/// Guesses upstream metadata from INSTALL file
 pub async fn guess_from_install(
     path: &std::path::Path,
     _settings: &GuesserSettings,

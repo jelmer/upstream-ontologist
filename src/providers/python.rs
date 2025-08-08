@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 #[cfg(feature = "python-pkginfo")]
+/// Extracts upstream metadata from Python PKG-INFO file
 pub async fn guess_from_pkg_info(
     path: &Path,
     _settings: &GuesserSettings,
@@ -118,6 +119,7 @@ pub async fn guess_from_pkg_info(
     Ok(ret)
 }
 
+/// Extracts upstream metadata from Python pyproject.toml file
 #[cfg(feature = "pyproject-toml")]
 pub fn guess_from_pyproject_toml(
     path: &Path,
@@ -436,6 +438,7 @@ fn parse_python_long_description(
     Ok(ret)
 }
 
+/// Parses a Python URL to extract upstream metadata
 pub async fn parse_python_url(url: &str) -> Vec<UpstreamDatumWithMetadata> {
     let repo = vcs::guess_repo_from_url(&url::Url::parse(url).unwrap(), None).await;
     if let Some(repo) = repo {
@@ -454,6 +457,7 @@ pub async fn parse_python_url(url: &str) -> Vec<UpstreamDatumWithMetadata> {
 }
 
 #[cfg(feature = "setup-cfg")]
+/// Extracts upstream metadata from Python setup.cfg file
 pub async fn guess_from_setup_cfg(
     path: &Path,
     _settings: &GuesserSettings,
@@ -759,6 +763,7 @@ async fn guess_from_setup_py_executed(
 }
 
 #[cfg(feature = "pyo3")]
+/// Extracts upstream metadata from Python setup.py file
 pub async fn guess_from_setup_py(
     path: &Path,
     trust_package: bool,
@@ -1110,87 +1115,156 @@ fn parse_python_classifiers<'a>(
     })
 }
 
+/// PyPI project information from the PyPI API
 #[derive(Deserialize)]
 pub struct PypiProjectInfo {
+    /// Package author name
     pub author: Option<String>,
+    /// Package author email
     pub author_email: Option<String>,
+    /// Bug tracker URL
     pub bugtrack_url: Option<String>,
+    /// PyPI trove classifiers
     pub classifiers: Vec<String>,
+    /// Package description
     pub description: String,
+    /// Content type of the description (e.g., text/markdown)
     pub description_content_type: Option<String>,
+    /// Documentation URL
     pub docs_url: Option<String>,
+    /// Package download URL
     pub download_url: Option<String>,
+    /// Download statistics
     pub downloads: HashMap<String, isize>,
+    /// Whether the project uses dynamic metadata
     pub dynamic: Option<bool>,
+    /// Project homepage URL
     pub home_page: Option<String>,
+    /// Package keywords
     pub keywords: Option<String>,
+    /// Package license
     pub license: Option<String>,
+    /// Package maintainer name
     pub maintainer: Option<String>,
+    /// Package maintainer email
     pub maintainer_email: Option<String>,
+    /// Package name
     pub name: String,
+    /// PyPI package URL
     pub package_url: String,
+    /// Target platform
     pub platform: Option<String>,
+    /// PyPI project URL
     pub project_url: String,
+    /// Additional project URLs
     pub project_urls: Option<HashMap<String, String>>,
+    /// Whether the package provides extras
     pub provides_extra: Option<bool>,
+    /// Current release URL
     pub release_url: String,
+    /// Distribution requirements
     pub requires_dist: Option<Vec<String>>,
+    /// Required Python version
     pub requires_python: Option<String>,
+    /// Package summary
     pub summary: String,
+    /// Package version
     pub version: String,
+    /// Whether the release is yanked
     pub yanked: Option<bool>,
+    /// Reason for yanking the release
     pub yanked_reason: Option<String>,
 }
 
+/// Cryptographic digests for a PyPI release
 #[derive(Deserialize)]
 pub struct Digests {
+    /// MD5 hash digest
     pub md5: String,
+    /// SHA256 hash digest
     pub sha256: String,
+    /// BLAKE2b-256 hash digest
     pub blake2b_256: String,
 }
 
+/// Information about a specific PyPI release
 #[derive(Deserialize)]
 pub struct PypiRelease {
+    /// Release comment text
     pub comment_text: String,
+    /// Cryptographic digests for this release
     pub digests: Digests,
+    /// Number of downloads
     pub downloads: isize,
+    /// Release filename
     pub filename: String,
+    /// Whether the release has a signature
     pub has_sig: bool,
+    /// MD5 digest of the release file
     pub md5_digest: String,
+    /// Package type (e.g., sdist, bdist_wheel)
     pub packagetype: String,
+    /// Target Python version
     pub python_version: String,
+    /// Required Python version for this release
     pub requires_python: Option<String>,
+    /// File size in bytes
     pub size: isize,
+    /// Upload timestamp
     pub upload_time: String,
+    /// Upload timestamp in ISO 8601 format
     pub upload_time_iso_8601: String,
+    /// Download URL for this release
     pub url: String,
+    /// Whether this release is yanked
     pub yanked: bool,
+    /// Reason for yanking this release
     pub yanked_reason: Option<String>,
 }
 
+/// PyPI URL information for a release artifact
 #[derive(Deserialize)]
 pub struct PypiUrl {
+    /// Comment text for this URL
     pub comment_text: String,
+    /// Cryptographic digests for this URL
     pub digests: Digests,
+    /// Filename for this URL
     pub filename: String,
+    /// Whether this URL has a signature
     pub has_sig: bool,
+    /// Package type for this URL
     pub packagetype: String,
+    /// Target Python version for this URL
     pub python_version: String,
+    /// Required Python version for this URL
     pub requires_python: Option<String>,
+    /// File size in bytes for this URL
     pub size: isize,
+    /// Upload timestamp for this URL
     pub upload_time: String,
+    /// Upload timestamp in ISO 8601 format for this URL
     pub upload_time_iso_8601: String,
+    /// The actual download URL
     pub url: String,
+    /// Whether this URL release is yanked
     pub yanked: bool,
+    /// Reason for yanking this URL release
     pub yanked_reason: Option<String>,
 }
 
+/// Complete PyPI project metadata
 #[derive(Deserialize)]
 pub struct PypiProject {
+    /// Project information
     pub info: PypiProjectInfo,
+    /// Last serial number for the project
     pub last_serial: isize,
+    /// All releases for this project
     pub releases: HashMap<String, Vec<PypiRelease>>,
+    /// URLs for the current release
     pub urls: Vec<PypiUrl>,
+    /// Known security vulnerabilities
     pub vulnerabilities: Vec<String>,
 }
 
@@ -1294,6 +1368,7 @@ impl TryInto<UpstreamMetadata> for PypiProject {
     }
 }
 
+/// Loads PyPI project data from the PyPI JSON API
 pub async fn load_pypi_project(name: &str) -> Result<Option<PypiProject>, ProviderError> {
     let http_url = format!("https://pypi.org/pypi/{}/json", name)
         .parse()
@@ -1304,6 +1379,7 @@ pub async fn load_pypi_project(name: &str) -> Result<Option<PypiProject>, Provid
     Ok(Some(pypi_data))
 }
 
+/// Retrieves upstream metadata for a Python package from PyPI
 pub async fn remote_pypi_metadata(name: &str) -> Result<UpstreamMetadata, ProviderError> {
     let pypi = load_pypi_project(name).await?;
 

@@ -7,6 +7,7 @@ use log::warn;
 use std::fs::File;
 use std::path::Path;
 
+/// Extracts upstream metadata from Maven pom.xml file
 pub fn guess_from_pom_xml(
     path: &Path,
     _settings: &GuesserSettings,

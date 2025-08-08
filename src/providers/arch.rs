@@ -3,6 +3,7 @@ use log::{debug, error};
 use std::collections::HashMap;
 use std::io::BufRead;
 
+/// Parses variables from a PKGBUILD file
 pub fn parse_pkgbuild_variables(file: &str) -> HashMap<String, Vec<String>> {
     let reader = std::io::Cursor::new(file);
 
@@ -75,6 +76,7 @@ pub fn parse_pkgbuild_variables(file: &str) -> HashMap<String, Vec<String>> {
     variables
 }
 
+/// Fetches upstream metadata from the Arch User Repository (AUR)
 pub async fn guess_from_aur(package: &str) -> Vec<UpstreamDatum> {
     let mut variables = HashMap::new();
 
@@ -156,6 +158,7 @@ pub async fn guess_from_aur(package: &str) -> Vec<UpstreamDatum> {
     results
 }
 
+/// Arch User Repository (AUR) metadata provider
 pub struct Aur;
 
 impl Default for Aur {
@@ -165,6 +168,7 @@ impl Default for Aur {
 }
 
 impl Aur {
+    /// Creates a new AUR metadata provider
     pub fn new() -> Self {
         Self
     }

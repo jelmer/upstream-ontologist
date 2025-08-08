@@ -5,6 +5,7 @@ use log::error;
 use std::path::Path;
 use url::Url;
 
+/// Extracts upstream metadata from NPM package.json file
 pub fn guess_from_package_json(
     path: &Path,
     _settings: &GuesserSettings,

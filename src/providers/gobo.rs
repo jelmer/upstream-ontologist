@@ -26,6 +26,7 @@ struct Links {
     html: url::Url,
 }
 
+/// Fetches upstream metadata from GoboLinux repository
 pub async fn guess_from_gobo(package: &str) -> Result<Vec<UpstreamDatum>, crate::ProviderError> {
     let packages_url = "https://api.github.com/repos/gobolinux/Recipes/contents"
         .parse()
@@ -119,6 +120,7 @@ pub async fn guess_from_gobo(package: &str) -> Result<Vec<UpstreamDatum>, crate:
     Ok(result)
 }
 
+/// GoboLinux metadata provider
 pub struct Gobo;
 
 impl Default for Gobo {
@@ -128,6 +130,7 @@ impl Default for Gobo {
 }
 
 impl Gobo {
+    /// Creates a new Gobo metadata provider
     pub fn new() -> Self {
         Self
     }

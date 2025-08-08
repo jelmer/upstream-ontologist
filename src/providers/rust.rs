@@ -23,7 +23,9 @@ struct CargoWorkspace {
 #[cfg(feature = "cargo")]
 /// Allow either specifying setting T directly or "workspace = true"
 pub enum DirectOrWorkspace<T> {
+    /// Direct value specification
     Direct(T),
+    /// Workspace inheritance
     Workspace,
 }
 
@@ -90,6 +92,7 @@ macro_rules! resolve {
     };
 }
 
+/// Extracts upstream metadata from Cargo.toml file
 #[cfg(feature = "cargo")]
 pub fn guess_from_cargo(
     path: &std::path::Path,
@@ -179,6 +182,7 @@ pub fn guess_from_cargo(
     Ok(results)
 }
 
+/// Translates crate names with dashes to their canonical form on crates.io
 pub async fn cargo_translate_dashes(
     crate_name: &str,
 ) -> Result<Option<String>, crate::HTTPJSONError> {
@@ -199,75 +203,129 @@ pub async fn cargo_translate_dashes(
     Ok(None)
 }
 
+/// Crate metadata from crates.io
 #[derive(Deserialize)]
 pub struct Crate {
+    /// Crate badges
     pub badges: Vec<String>,
+    /// Creation timestamp
     pub created_at: String,
+    /// Crate description
     pub description: Option<String>,
+    /// Documentation URL
     pub documentation: Option<String>,
+    /// Total downloads
     pub downloads: i64,
+    /// Homepage URL
     pub homepage: Option<String>,
+    /// Crate identifier
     pub id: String,
+    /// Keywords
     pub keywords: Vec<String>,
+    /// License identifier
     pub license: Option<String>,
+    /// Various links
     pub links: HashMap<String, Option<String>>,
+    /// Maximum stable version
     pub max_stable_version: semver::Version,
+    /// Maximum version
     pub max_version: semver::Version,
+    /// Crate name
     pub name: String,
+    /// Newest version
     pub newest_version: semver::Version,
+    /// Recent downloads
     pub recent_downloads: i64,
+    /// Repository URL
     pub repository: Option<String>,
+    /// Last update timestamp
     pub updated_at: String,
+    /// Version IDs
     pub versions: Option<Vec<i32>>,
 }
 
+/// User information from crates.io
 #[derive(Deserialize)]
 pub struct User {
+    /// User avatar URL
     pub avatar: String,
+    /// User ID
     pub id: i32,
+    /// User login name
     pub login: String,
+    /// User display name
     pub name: String,
+    /// User profile URL
     pub url: String,
 }
 
+/// Audit action information
 #[derive(Deserialize)]
 pub struct AuditAction {
+    /// Action type
     pub action: String,
+    /// Timestamp of the action
     pub time: String,
+    /// User who performed the action
     pub user: User,
 }
 
+/// Information about a specific version of a crate
 #[derive(Deserialize)]
 pub struct CrateVersion {
+    /// Audit actions for this version
     pub audit_actions: Vec<AuditAction>,
+    /// Names of binary targets
     pub bin_names: Vec<String>,
+    /// Checksum of the crate
     pub checksum: String,
+    /// Name of the crate
     #[serde(rename = "crate")]
     pub crate_: String,
+    /// Size of the crate in bytes
     pub crate_size: i64,
+    /// Creation timestamp
     pub created_at: String,
+    /// Download path
     pub dl_path: String,
+    /// Number of downloads
     pub downloads: i64,
+    /// Feature flags
     pub features: HashMap<String, Vec<String>>,
+    /// Whether the crate has a library
     pub has_lib: bool,
+    /// Version ID
     pub id: i32,
+    /// Library links
     pub lib_links: Option<HashMap<String, String>>,
+    /// License identifier
     pub license: Option<String>,
+    /// Various links
     pub links: HashMap<String, Option<String>>,
+    /// Version number
     pub num: semver::Version,
+    /// User who published this version
     pub published_by: Option<User>,
+    /// Path to README file
     pub readme_path: String,
+    /// Minimum Rust version required
     pub rust_version: Option<String>,
+    /// Last update timestamp
     pub updated_at: String,
+    /// Whether this version is yanked
     pub yanked: bool,
 }
 
+/// Information about a crate from crates.io
 #[derive(Deserialize)]
 pub struct CrateInfo {
+    /// Categories the crate belongs to
     pub categories: Vec<String>,
     #[serde(rename = "crate")]
     crate_: Crate,
+    /// Keywords associated with the crate
     pub keywords: Vec<String>,
+    /// All versions of the crate
     pub versions: Vec<CrateVersion>,
 }
 
@@ -325,6 +383,7 @@ impl TryFrom<CrateInfo> for UpstreamMetadata {
     }
 }
 
+/// Loads crate information from crates.io API
 pub async fn load_crate_info(cratename: &str) -> Result<Option<CrateInfo>, crate::ProviderError> {
     let http_url = format!("https://crates.io/api/v1/crates/{}", cratename);
 
@@ -357,6 +416,7 @@ fn parse_crates_io(data: &CrateInfo) -> Vec<UpstreamDatum> {
     results
 }
 
+/// Crates.io metadata provider
 pub struct CratesIo;
 
 impl Default for CratesIo {
@@ -366,6 +426,7 @@ impl Default for CratesIo {
 }
 
 impl CratesIo {
+    /// Creates a new CratesIo provider
     pub fn new() -> Self {
         Self
     }
@@ -394,6 +455,7 @@ impl crate::ThirdPartyRepository for CratesIo {
     }
 }
 
+/// Fetches upstream metadata for a crate from crates.io
 pub async fn remote_crate_data(name: &str) -> Result<UpstreamMetadata, crate::ProviderError> {
     let data = load_crate_info(name).await?;
 

@@ -4,6 +4,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
+/// Extracts metadata from Waf wscript files
 pub fn guess_from_wscript(
     path: &Path,
     _settings: &GuesserSettings,

@@ -2,6 +2,7 @@ use crate::{Certainty, GuesserSettings, ProviderError, UpstreamDatum, UpstreamDa
 use log::error;
 use std::path::Path;
 
+/// Extracts upstream metadata from PHP composer.json file
 pub fn guess_from_composer_json(
     path: &Path,
     _settings: &GuesserSettings,

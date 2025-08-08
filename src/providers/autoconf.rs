@@ -16,6 +16,7 @@ fn is_email_address(email: &str) -> bool {
     false
 }
 
+/// Extracts upstream metadata from autoconf configure script
 pub fn guess_from_configure(
     path: &std::path::Path,
     _settings: &GuesserSettings,

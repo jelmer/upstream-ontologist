@@ -2,6 +2,7 @@ use crate::{Certainty, GuesserSettings, ProviderError, UpstreamDatum, UpstreamDa
 
 use std::process::Command;
 
+/// Extracts upstream metadata from meson.build file using meson introspect
 pub fn guess_from_meson(
     path: &std::path::Path,
     _settings: &GuesserSettings,

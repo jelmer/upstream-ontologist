@@ -8,6 +8,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
+/// Extracts upstream metadata from Ruby gemspec file
 pub async fn guess_from_gemspec(
     path: &Path,
     _settings: &GuesserSettings,
@@ -133,49 +134,83 @@ pub async fn guess_from_gemspec(
     Ok(results)
 }
 
+/// Ruby gem metadata URIs
 #[derive(Deserialize)]
 pub struct RubygemMetadata {
+    /// Changelog URI
     pub changelog_uri: Option<url::Url>,
+    /// Source code URI
     pub source_code_uri: Option<url::Url>,
 }
 
+/// Ruby gem dependency information
 #[derive(Deserialize)]
 pub struct RubygemDependency {
+    /// Dependency name
     pub name: String,
+    /// Version requirements
     pub requirements: String,
 }
 
+/// Ruby gem dependencies collection
 #[derive(Deserialize)]
 pub struct RubygemDependencies {
+    /// Development dependencies
     pub development: Vec<RubygemDependency>,
+    /// Runtime dependencies
     pub runtime: Vec<RubygemDependency>,
 }
 
+/// Complete Ruby gem metadata
 #[derive(Deserialize)]
 pub struct Rubygem {
+    /// Gem name
     pub name: String,
+    /// Total downloads
     pub downloads: usize,
+    /// Version number
     pub version: String,
+    /// Version creation timestamp
     pub version_created_at: String,
+    /// Downloads for this version
     pub version_downloads: usize,
+    /// Target platform
     pub platform: String,
+    /// Authors
     pub authors: String,
+    /// Gem description
     pub info: String,
+    /// License information
     pub licenses: Vec<String>,
+    /// Additional metadata URIs
     pub metadata: RubygemMetadata,
+    /// Whether version is yanked
     pub yanked: bool,
+    /// SHA hash
     pub sha: String,
+    /// Spec SHA hash
     pub spec_sha: String,
+    /// Project URI
     pub project_uri: url::Url,
+    /// Gem download URI
     pub gem_uri: url::Url,
+    /// Homepage URI
     pub homepage_uri: Option<url::Url>,
+    /// Wiki URI
     pub wiki_uri: Option<url::Url>,
+    /// Documentation URI
     pub documentation_uri: Option<url::Url>,
+    /// Mailing list URI
     pub mailing_list_uri: Option<url::Url>,
+    /// Source code URI
     pub source_code_uri: Option<url::Url>,
+    /// Bug tracker URI
     pub bug_tracker_uri: Option<url::Url>,
+    /// Changelog URI
     pub changelog_uri: Option<url::Url>,
+    /// Funding URI
     pub funding_uri: Option<url::Url>,
+    /// Dependencies
     pub dependencies: RubygemDependencies,
 }
 
@@ -274,6 +309,7 @@ impl TryFrom<Rubygem> for UpstreamMetadata {
     }
 }
 
+/// Loads Ruby gem data from the RubyGems API
 pub async fn load_rubygem(name: &str) -> Result<Option<Rubygem>, ProviderError> {
     let url = format!("https://rubygems.org/api/v1/gems/{}.json", name)
         .parse()
@@ -283,6 +319,7 @@ pub async fn load_rubygem(name: &str) -> Result<Option<Rubygem>, ProviderError> 
     Ok(Some(gem))
 }
 
+/// Retrieves upstream metadata for a Ruby gem from RubyGems
 pub async fn remote_rubygem_metadata(name: &str) -> Result<UpstreamMetadata, ProviderError> {
     let gem = load_rubygem(name).await?;
 

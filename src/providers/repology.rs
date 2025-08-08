@@ -12,6 +12,10 @@ struct Project {
     pub downloads: Vec<String>,
 }
 
+/// Fetch upstream metadata from Repology project database
+///
+/// Retrieves package information from Repology by aggregating data from multiple
+/// distributions and selecting the most reliable values based on package status.
 pub async fn guess_from_repology(
     repology_project: &str,
 ) -> Result<Vec<UpstreamDatum>, crate::ProviderError> {

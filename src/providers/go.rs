@@ -8,6 +8,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
+/// Extracts upstream metadata from go.mod file
 pub fn guess_from_go_mod(
     path: &Path,
     _settings: &GuesserSettings,
@@ -36,6 +37,7 @@ pub fn guess_from_go_mod(
     Ok(results)
 }
 
+/// Fetches upstream metadata for a Go package from pkg.go.dev
 pub fn remote_go_metadata(package: &str) -> Result<UpstreamMetadata, ProviderError> {
     let mut ret = UpstreamMetadata::default();
     if package.starts_with("github.com/") {

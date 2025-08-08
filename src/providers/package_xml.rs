@@ -5,6 +5,7 @@ use crate::{
 use log::error;
 use std::path::Path;
 
+/// Extracts upstream metadata from PEAR package.xml file
 pub fn guess_from_package_xml(
     path: &Path,
     _settings: &GuesserSettings,

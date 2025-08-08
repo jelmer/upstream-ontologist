@@ -1,6 +1,7 @@
 use crate::{load_json_url, UpstreamDatum};
 use log::error;
 
+/// Fetches upstream metadata from Launchpad
 #[cfg(feature = "launchpad")]
 pub async fn guess_from_launchpad(
     package: &str,

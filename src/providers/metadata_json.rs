@@ -6,6 +6,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
+/// Extracts upstream metadata from metadata.json file
 pub fn guess_from_metadata_json(
     path: &Path,
     _settings: &GuesserSettings,

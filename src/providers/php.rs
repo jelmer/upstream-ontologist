@@ -2,6 +2,10 @@ use crate::{ProviderError, UpstreamDatum};
 use select::document::Document;
 use select::predicate::{And, Name, Predicate};
 
+/// Fetch upstream metadata for a PECL package
+///
+/// Retrieves package information from the PECL website by scraping the package page
+/// and extracting homepage, repository, and bug database URLs.
 pub async fn guess_from_pecl_package(package: &str) -> Result<Vec<UpstreamDatum>, ProviderError> {
     let url = format!("https://pecl.php.net/packages/{}", package);
 
@@ -96,6 +100,7 @@ fn guess_from_pecl_page(body: &str) -> Result<Vec<UpstreamDatum>, ProviderError>
     Ok(ret)
 }
 
+/// PECL (PHP Extension Community Library) third-party repository provider
 pub struct Pecl;
 
 impl Default for Pecl {
@@ -105,6 +110,7 @@ impl Default for Pecl {
 }
 
 impl Pecl {
+    /// Create a new PECL provider instance
     pub fn new() -> Self {
         Self
     }

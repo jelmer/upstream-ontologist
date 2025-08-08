@@ -4,6 +4,7 @@ use crate::{Certainty, ProviderError, UpstreamDatum, UpstreamDatumWithMetadata};
 use std::fs::File;
 use std::path::Path;
 
+/// Extracts upstream metadata from AppStream metainfo XML files
 pub fn guess_from_metainfo(
     path: &Path,
     _trust_package: bool,

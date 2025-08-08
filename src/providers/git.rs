@@ -2,6 +2,7 @@ use crate::{Certainty, GuesserSettings, ProviderError, UpstreamDatum, UpstreamDa
 use std::path::Path;
 
 #[cfg(feature = "git-config")]
+/// Extracts upstream metadata from .git/config file
 pub fn guess_from_git_config(
     path: &Path,
     settings: &GuesserSettings,

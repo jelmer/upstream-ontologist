@@ -3,6 +3,7 @@ use crate::{Certainty, Origin, ProviderError, UpstreamDatum, UpstreamDatumWithMe
 use select::document::Document;
 use select::predicate::Name;
 
+/// Guesses upstream metadata by analyzing a project's homepage
 pub async fn guess_from_homepage(
     url: &url::Url,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {

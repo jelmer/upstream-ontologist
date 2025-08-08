@@ -8,6 +8,7 @@ use std::io::BufRead;
 use std::iter::Iterator;
 use url::Url;
 
+/// Determines if a paragraph should be skipped and extracts any metadata from it
 pub fn skip_paragraph(para: &str) -> (bool, Vec<UpstreamDatumWithMetadata>) {
     let mut ret = Vec::<UpstreamDatumWithMetadata>::new();
     let re = regex!(r"(?ms)^See .* for more (details|information)\.");
@@ -196,6 +197,7 @@ pub fn skip_paragraph(para: &str) -> (bool, Vec<UpstreamDatumWithMetadata>) {
     (false, ret)
 }
 
+/// Extracts description and metadata from reStructuredText README content
 pub fn description_from_readme_rst(
     long_description: &str,
 ) -> Result<(Option<String>, Vec<UpstreamDatumWithMetadata>), ProviderError> {
@@ -244,6 +246,7 @@ pub fn description_from_readme_rst(
     Ok((description, md))
 }
 
+/// Extracts description and metadata from Markdown README content
 pub fn description_from_readme_md(
     long_description: &str,
 ) -> Result<(Option<String>, Vec<UpstreamDatumWithMetadata>), ProviderError> {
@@ -255,6 +258,7 @@ pub fn description_from_readme_md(
     description_from_readme_html(&html_output)
 }
 
+/// Guesses upstream metadata from README files
 pub async fn guess_from_readme(
     path: &std::path::Path,
     _trust_package: bool,
@@ -443,6 +447,7 @@ pub async fn guess_from_readme(
     Ok(ret)
 }
 
+/// Parses the first header from text to extract name, tagline, and rest
 pub fn parse_first_header_text(text: &str) -> (Option<&str>, Option<&str>, Option<&str>) {
     if let Some((_, name, version)) = lazy_regex::regex_captures!(r"^([A-Za-z]+) ([0-9.]+)$", text)
     {
@@ -481,6 +486,7 @@ fn test_parse_first_header_text() {
     );
 }
 
+/// Extracts description and metadata from plain text README content
 pub fn description_from_readme_plain(
     text: &str,
 ) -> Result<(Option<String>, Vec<UpstreamDatumWithMetadata>), ProviderError> {
@@ -1067,6 +1073,7 @@ fn description_from_basic_soup(
     (None, metadata)
 }
 
+/// Extracts description and metadata from HTML README content
 pub fn description_from_readme_html(
     html_text: &str,
 ) -> Result<(Option<String>, Vec<UpstreamDatumWithMetadata>), ProviderError> {
