@@ -3412,32 +3412,52 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
 pub(crate) fn stream(
     path: &Path,
     config: &GuesserSettings,
-    mut guessers: Vec<Box<dyn Guesser>>,
+    guessers: Vec<Box<dyn Guesser>>,
 ) -> impl Stream<Item = Result<UpstreamDatumWithMetadata, ProviderError>> {
-    // For each of the guessers, stream from the guessers in parallel (using Guesser::stream
-    // rather than Guesser::guess) and then return the results.
+    // For each of the guessers, create concurrent tasks that run the guessers in parallel
     let abspath = std::env::current_dir().unwrap().join(path);
 
-    // Create streams for each of the guessers. Call stream on each one of them, manipulate
-    let streams = guessers.iter_mut().map(move |guesser| {
-        let abspath = abspath.clone();
-        let config = config.clone();
-        let stream = guesser.stream(&config);
-        let guesser_name = guesser.name().to_string();
-        stream.map(move |res| {
-            res.map({
-                let abspath = abspath.clone();
-                let guesser_name = guesser_name.clone();
-                move |mut v| {
-                    rewrite_upstream_datum(&guesser_name, &mut v, &abspath);
-                    v
-                }
+    // Create concurrent tasks for each guesser
+    let tasks = guessers
+        .into_iter()
+        .map(move |mut guesser| {
+            let abspath = abspath.clone();
+            let config = config.clone();
+            let guesser_name = guesser.name().to_string();
+
+            tokio::spawn(async move {
+                let results = match guesser.guess(&config).await {
+                    Ok(results) => results,
+                    Err(e) => return vec![Err(e)],
+                };
+
+                results
+                    .into_iter()
+                    .map(move |mut datum| {
+                        rewrite_upstream_datum(&guesser_name, &mut datum, &abspath);
+                        Ok(datum)
+                    })
+                    .collect::<Vec<_>>()
             })
         })
-    });
+        .collect::<Vec<_>>();
 
-    // Combine the streams into a single stream.
-    futures::stream::select_all(streams)
+    // Create a stream from all the concurrent tasks
+    futures::stream::iter(tasks)
+        .then(|task| async move {
+            match task.await {
+                Ok(results) => futures::stream::iter(results).boxed(),
+                Err(e) => {
+                    log::error!("Task error: {}", e);
+                    futures::stream::iter(vec![Err(ProviderError::Other(format!(
+                        "Task error: {}",
+                        e
+                    )))])
+                    .boxed()
+                }
+            }
+        })
+        .flatten()
 }
 
 fn rewrite_upstream_datum(
@@ -4098,7 +4118,7 @@ pub async fn check_upstream_metadata(
 }
 
 #[async_trait::async_trait]
-pub(crate) trait Guesser {
+pub(crate) trait Guesser: Send {
     fn name(&self) -> &str;
 
     /// Guess metadata from a given path.
@@ -4106,18 +4126,6 @@ pub(crate) trait Guesser {
         &mut self,
         settings: &GuesserSettings,
     ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError>;
-
-    fn stream(
-        &mut self,
-        settings: &GuesserSettings,
-    ) -> Pin<Box<dyn Stream<Item = Result<UpstreamDatumWithMetadata, ProviderError>> + Send>> {
-        let metadata = match futures::executor::block_on(self.guess(settings)) {
-            Ok(metadata) => metadata,
-            Err(e) => return futures::stream::once(async { Err(e) }).boxed(),
-        };
-
-        Box::pin(futures::stream::iter(metadata.into_iter().map(Ok)))
-    }
 }
 
 type AsyncGuesserFunction = Box<
