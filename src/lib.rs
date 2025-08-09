@@ -4263,5 +4263,99 @@ mod tests {
                 url: None
             }
         );
+        // Test person with just email (no name) - parseaddr returns empty name
+        assert_eq!(
+            Person::from("<foo@example.com>"),
+            Person {
+                name: Some("".to_string()),
+                email: Some("foo@example.com".to_string()),
+                url: None
+            }
+        );
+    }
+
+    #[test]
+    fn test_upstream_metadata_accessors() {
+        let mut metadata = UpstreamMetadata::default();
+        
+        // Test empty metadata
+        assert_eq!(metadata.version(), None);
+        assert_eq!(metadata.description(), None);
+        assert_eq!(metadata.wiki(), None);
+        assert_eq!(metadata.download(), None);
+        assert_eq!(metadata.security_contact(), None);
+        assert_eq!(metadata.donation(), None);
+        assert_eq!(metadata.cite_as(), None);
+        assert_eq!(metadata.webservice(), None);
+        assert_eq!(metadata.copyright(), None);
+        assert_eq!(metadata.sourceforge_project(), None);
+        assert_eq!(metadata.pecl_package(), None);
+        
+        // Add some data and test again
+        metadata.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Version("1.0.0".to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+        assert_eq!(metadata.version(), Some("1.0.0"));
+        
+        metadata.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Description("Test description".to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+        assert_eq!(metadata.description(), Some("Test description"));
+    }
+
+    #[test]
+    fn test_upstream_metadata_iterators() {
+        let mut metadata = UpstreamMetadata::default();
+        
+        // Test empty iterator
+        assert_eq!(metadata.iter().count(), 0);
+        assert_eq!(metadata.mut_iter().count(), 0);
+        
+        // Add data and test again
+        metadata.insert(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Name("test".to_string()),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+        
+        assert_eq!(metadata.iter().count(), 1);
+        assert_eq!(metadata.mut_iter().count(), 1);
+    }
+
+    #[test]
+    fn test_extract_pecl_package_name() {
+        use super::extract_pecl_package_name;
+        
+        assert_eq!(
+            extract_pecl_package_name("https://pecl.php.net/package/redis"),
+            Some("redis".to_string())
+        );
+        assert_eq!(
+            extract_pecl_package_name("https://pecl.php.net/package/xdebug/2.9.0"),
+            Some("xdebug/2.9.0".to_string())
+        );
+        assert_eq!(
+            extract_pecl_package_name("https://example.com/something"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_forge_names() {
+        let github = GitHub;
+        assert_eq!(github.name(), "GitHub");
+        
+        let gitlab = GitLab;
+        assert_eq!(gitlab.name(), "GitLab");
+        
+        let sourceforge = SourceForge;
+        assert_eq!(sourceforge.name(), "SourceForge");
+        
+        let launchpad = Launchpad;
+        assert_eq!(launchpad.name(), "launchpad");
     }
 }
