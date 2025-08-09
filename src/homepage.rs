@@ -8,7 +8,7 @@ pub async fn guess_from_homepage(
     url: &url::Url,
 ) -> Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let client = crate::http::build_client().build().unwrap();
-    let response = client.get(url.clone()).send().await?;
+    let response = client.get(url.as_str()).send().await?;
 
     let body = response.text().await?;
     Ok(guess_from_page(&body, url))
@@ -18,6 +18,7 @@ fn guess_from_page(text: &str, basehref: &url::Url) -> Vec<UpstreamDatumWithMeta
     let fragment = Document::from(text);
 
     let mut result = Vec::new();
+    let origin = Some(Origin::Url(basehref.clone()));
 
     for element in fragment.find(Name("a")) {
         if let Some(href) = element.attr("href") {
@@ -29,7 +30,7 @@ fn guess_from_page(text: &str, basehref: &url::Url) -> Vec<UpstreamDatumWithMeta
                 match label.to_lowercase().as_str() {
                     "github" | "git" | "repository" | "github repository" => {
                         result.push(UpstreamDatumWithMetadata {
-                            origin: Some(Origin::Url(basehref.clone())),
+                            origin: origin.clone(),
                             datum: UpstreamDatum::Repository(
                                 basehref.join(href).unwrap().to_string(),
                             ),
@@ -38,7 +39,7 @@ fn guess_from_page(text: &str, basehref: &url::Url) -> Vec<UpstreamDatumWithMeta
                     }
                     "github bug tracking" | "bug tracker" => {
                         result.push(UpstreamDatumWithMetadata {
-                            origin: Some(Origin::Url(basehref.clone())),
+                            origin: origin.clone(),
                             datum: UpstreamDatum::BugDatabase(
                                 basehref.join(href).unwrap().to_string(),
                             ),
