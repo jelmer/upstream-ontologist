@@ -4277,7 +4277,7 @@ mod tests {
     #[test]
     fn test_upstream_metadata_accessors() {
         let mut metadata = UpstreamMetadata::default();
-        
+
         // Test empty metadata
         assert_eq!(metadata.version(), None);
         assert_eq!(metadata.description(), None);
@@ -4290,7 +4290,7 @@ mod tests {
         assert_eq!(metadata.copyright(), None);
         assert_eq!(metadata.sourceforge_project(), None);
         assert_eq!(metadata.pecl_package(), None);
-        
+
         // Add some data and test again
         metadata.insert(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Version("1.0.0".to_string()),
@@ -4298,7 +4298,7 @@ mod tests {
             origin: None,
         });
         assert_eq!(metadata.version(), Some("1.0.0"));
-        
+
         metadata.insert(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Description("Test description".to_string()),
             certainty: Some(Certainty::Certain),
@@ -4310,18 +4310,18 @@ mod tests {
     #[test]
     fn test_upstream_metadata_iterators() {
         let mut metadata = UpstreamMetadata::default();
-        
+
         // Test empty iterator
         assert_eq!(metadata.iter().count(), 0);
         assert_eq!(metadata.mut_iter().count(), 0);
-        
+
         // Add data and test again
         metadata.insert(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Name("test".to_string()),
             certainty: Some(Certainty::Certain),
             origin: None,
         });
-        
+
         assert_eq!(metadata.iter().count(), 1);
         assert_eq!(metadata.mut_iter().count(), 1);
     }
@@ -4329,7 +4329,7 @@ mod tests {
     #[test]
     fn test_extract_pecl_package_name() {
         use super::extract_pecl_package_name;
-        
+
         assert_eq!(
             extract_pecl_package_name("https://pecl.php.net/package/redis"),
             Some("redis".to_string())
@@ -4348,13 +4348,13 @@ mod tests {
     fn test_forge_names() {
         let github = GitHub;
         assert_eq!(github.name(), "GitHub");
-        
+
         let gitlab = GitLab;
         assert_eq!(gitlab.name(), "GitLab");
-        
+
         let sourceforge = SourceForge;
         assert_eq!(sourceforge.name(), "SourceForge");
-        
+
         let launchpad = Launchpad;
         assert_eq!(launchpad.name(), "launchpad");
     }
