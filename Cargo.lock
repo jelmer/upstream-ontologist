@@ -919,17 +919,6 @@ dependencies = [
 
 [[package]]
 name = "deb822-derive"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b6e5cafe61e77421a090e2a33b8a2e4e2ff1b106fd906ebade111307064d981"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.104",
-]
-
-[[package]]
-name = "deb822-derive"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "86bf2d0fa4ce2457e94bd7efb15aeadc115297f04b660bd0da706729e0d91442"
@@ -945,19 +934,7 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c9ea8fe9a58604b036be1759540ab0dbc8da57474a67715459653f06a467e38c"
 dependencies = [
- "deb822-derive 0.3.0",
-]
-
-[[package]]
-name = "deb822-lossless"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "812bb5c8052a89edc6d45d1bc3b3400e8186dd166e9b0a9520bfa5a2bd8477ee"
-dependencies = [
- "deb822-derive 0.2.0",
- "regex",
- "rowan",
- "serde",
+ "deb822-derive",
 ]
 
 [[package]]
@@ -1043,7 +1020,7 @@ checksum = "e5b5fa1448bc64423185de82603c928882e328f9c22bc56b733f1ab05f4873f4"
 dependencies = [
  "chrono",
  "deb822-fast",
- "deb822-lossless 0.3.0",
+ "deb822-lossless",
  "debversion",
  "regex",
  "rowan",
@@ -1052,11 +1029,12 @@ dependencies = [
 
 [[package]]
 name = "debian-copyright"
-version = "0.1.27"
+version = "0.1.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e893a383c33c4e2689fd3c3121d6e82193211f65e7c483463c816f6b7c29857e"
+checksum = "1876995240a97d1c53a7cec3014e3599dc8c98af78e1b14961cdcdb4bdade404"
 dependencies = [
- "deb822-lossless 0.2.4",
+ "deb822-fast",
+ "deb822-lossless",
  "debversion",
  "regex",
 ]
@@ -4418,9 +4396,9 @@ version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7fe3393d9093043150fe262c2ac86d413a78266af434de1f984d9d6aa53b1177"
 dependencies = [
- "deb822-derive 0.3.0",
+ "deb822-derive",
  "deb822-fast",
- "deb822-lossless 0.3.0",
+ "deb822-lossless",
  "rowan",
  "url",
 ]
