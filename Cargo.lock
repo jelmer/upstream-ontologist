@@ -990,9 +990,9 @@ dependencies = [
 
 [[package]]
 name = "debcargo"
-version = "2.7.8"
+version = "2.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47e23d67bc35dce555979a021e12d0e0fa1351a70a9f120405c19acebcd92b64"
+checksum = "bcf15ba3bfde71bdebb390d9a85fe349183ba4cf7874aa100bd15cc79348646f"
 dependencies = [
  "ansi_term",
  "anyhow",
