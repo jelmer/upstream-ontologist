@@ -4272,6 +4272,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
 
 [[package]]
+name = "pretty_assertions"
+version = "1.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ae130e2f271fbc2ac3a40fb1d07180839cdbbe443c7a27e1e3c13c5cac0116d"
+dependencies = [
+ "diff",
+ "yansi",
+]
+
+[[package]]
 name = "primeorder"
 version = "0.13.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5954,6 +5964,7 @@ dependencies = [
  "opam-file-rs",
  "openssl",
  "percent-encoding",
+ "pretty_assertions",
  "pulldown-cmark",
  "pyo3",
  "pyo3-filelike",
@@ -5972,6 +5983,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "shlex",
+ "tempfile",
  "tendril",
  "textwrap",
  "tokio",
@@ -6529,6 +6541,12 @@ checksum = "b619f8c85654798007fb10afa5125590b43b088c225a25fc2fec100a9fad0fc6"
 dependencies = [
  "xml-rs",
 ]
+
+[[package]]
+name = "yansi"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cfe53a6657fd280eaa890a3bc59152892ffa3e30101319d168b781ed6529b049"
 
 [[package]]
 name = "yoke"

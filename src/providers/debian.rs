@@ -603,10 +603,10 @@ pub async fn guess_from_debian_copyright(
                     urls.push(source.clone());
                 }
 
-                for (m, _, _) in
-                    lazy_regex::regex_captures!(r"(http|https)://([^ ,]+)", source.as_str())
+                for captures in
+                    lazy_regex::regex!(r"(http|https)://([^ ,]+)").captures_iter(source.as_str())
                 {
-                    urls.push(m.to_string());
+                    urls.push(captures[0].to_string());
                 }
             }
 
