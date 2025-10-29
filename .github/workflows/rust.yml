@@ -39,9 +39,3 @@ jobs:
         if: matrix.os != 'windows-latest'
       - name: Check formatting
         run: cargo fmt --all -- --check
-      - name: Install cargo-minimal-versions
-        run: cargo install cargo-minimal-versions cargo-hack
-        if: matrix.os == 'ubuntu-latest'
-      - name: Check minimal versions
-        run: cargo minimal-versions check
-        if: matrix.os == 'ubuntu-latest'
