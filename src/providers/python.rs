@@ -621,10 +621,10 @@ async fn guess_from_setup_py_executed(
     // Import setuptools, just in case it replaces distutils
     //
     use pyo3::types::PyDict;
-    pyo3::prepare_freethreaded_python();
+    Python::initialize();
     let mut long_description = None;
     let mut urls: Vec<String> = vec![];
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let _ = py.import("setuptools");
 
         let run_setup = py.import("distutils.core")?.getattr("run_setup")?;
@@ -779,7 +779,7 @@ pub async fn guess_from_setup_py(
 async fn guess_from_setup_py_parsed(
     path: &Path,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
-    pyo3::prepare_freethreaded_python();
+    Python::initialize();
     let code = match std::fs::read_to_string(path) {
         Ok(setup_text) => setup_text,
         Err(e) => {
@@ -792,7 +792,7 @@ async fn guess_from_setup_py_parsed(
     let mut ret = Vec::new();
     let mut urls: Vec<String> = vec![];
 
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let ast = py.import("ast").unwrap();
 
         // Based on pypi.py in https://github.com/nexB/scancode-toolkit/blob/develop/src/packagedcode/pypi.py
@@ -802,7 +802,7 @@ async fn guess_from_setup_py_parsed(
         // SPDX-License-Identifier: Apache-2.0
 
         let tree = ast.call_method1("parse", (code,))?;
-        let mut setup_args: HashMap<String, PyObject> = HashMap::new();
+        let mut setup_args: HashMap<String, Py<PyAny>> = HashMap::new();
 
         let ast_expr = ast.getattr("Expr").unwrap();
         let ast_call = ast.getattr("Call").unwrap();
@@ -1058,7 +1058,7 @@ async fn guess_from_setup_py_parsed(
         }
         Ok::<(), PyErr>(())
     }).map_err(|e: PyErr| {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
         if e.is_instance_of::<pyo3::exceptions::PySyntaxError>(py) {
                 warn!("Syntax error while parsing setup.py: {}", e);
                 ProviderError::Other(e.to_string())

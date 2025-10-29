@@ -377,9 +377,9 @@ pub async fn guess_from_readme(
                 origin: Some(path.into()),
             });
         }
-        for m in lazy_regex::regex_find!("https://([^]/]+)/([^]\\s()\"#]+)", line) {
-            let url = m.trim_end_matches('.');
-            if crate::vcs::is_gitlab_site(m, None).await {
+        for m in lazy_regex::regex!("https://([^]/]+)/([^]\\s()\"#]+)").find_iter(line) {
+            let url = m.as_str().trim_end_matches('.');
+            if crate::vcs::is_gitlab_site(m.as_str(), None).await {
                 if let Some(repo_url) =
                     crate::vcs::guess_repo_from_url(&url.parse().unwrap(), None).await
                 {
@@ -1190,7 +1190,7 @@ This is a test of RST to HTML conversion."#;
         }
     }
 
-    fn root(doc: &Document) -> Node {
+    fn root(doc: &Document) -> Node<'_> {
         let root = doc.find(Root).next().unwrap();
         assert_eq!(root.name(), Some("html"));
         root.find(Name("body"))

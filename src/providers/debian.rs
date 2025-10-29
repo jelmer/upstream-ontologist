@@ -265,7 +265,11 @@ fn read_changelog_first_entry(
         ProviderError::ParseError(format!("Changelog {} has no package name", path.display()))
     })?;
 
-    let version = entry.version();
+    let version = entry.version().map(|v| {
+        v.to_string()
+            .parse()
+            .expect("debversion parse should not fail")
+    });
 
     let change_lines = entry.change_lines().collect::<Vec<_>>();
 
@@ -603,10 +607,10 @@ pub async fn guess_from_debian_copyright(
                     urls.push(source.clone());
                 }
 
-                for (m, _, _) in
-                    lazy_regex::regex_captures!(r"(http|https)://([^ ,]+)", source.as_str())
+                for captures in
+                    lazy_regex::regex!(r"(http|https)://([^ ,]+)").captures_iter(source.as_str())
                 {
-                    urls.push(m.to_string());
+                    urls.push(captures[0].to_string());
                 }
             }
 
