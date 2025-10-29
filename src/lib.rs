@@ -144,8 +144,10 @@ impl<'py> IntoPyObject<'py> for Origin {
 }
 
 #[cfg(feature = "pyo3")]
-impl FromPyObject<'_> for Origin {
-    fn extract_bound(ob: &Bound<PyAny>) -> PyResult<Self> {
+impl<'py> FromPyObject<'_, 'py> for Origin {
+    type Error = PyErr;
+
+    fn extract(ob: pyo3::Borrowed<'_, 'py, PyAny>) -> PyResult<Self> {
         if let Ok(path) = ob.extract::<PathBuf>() {
             Ok(Origin::Path(path))
         } else if let Ok(s) = ob.extract::<String>() {
@@ -181,8 +183,10 @@ impl std::fmt::Display for Certainty {
 }
 
 #[cfg(feature = "pyo3")]
-impl FromPyObject<'_> for Certainty {
-    fn extract_bound(ob: &Bound<PyAny>) -> PyResult<Self> {
+impl<'py> FromPyObject<'_, 'py> for Certainty {
+    type Error = PyErr;
+
+    fn extract(ob: pyo3::Borrowed<'_, 'py, PyAny>) -> PyResult<Self> {
         let o: String = ob.extract::<String>()?;
         o.parse().map_err(PyValueError::new_err)
     }
@@ -386,8 +390,10 @@ fn parseaddr(text: &str) -> Option<(String, String)> {
 }
 
 #[cfg(feature = "pyo3")]
-impl FromPyObject<'_> for Person {
-    fn extract_bound(ob: &Bound<PyAny>) -> PyResult<Self> {
+impl<'py> FromPyObject<'_, 'py> for Person {
+    type Error = PyErr;
+
+    fn extract(ob: pyo3::Borrowed<'_, 'py, PyAny>) -> PyResult<Self> {
         let name = ob.getattr("name")?.extract::<Option<String>>()?;
         let email = ob.getattr("email")?.extract::<Option<String>>()?;
         let url = ob.getattr("url")?.extract::<Option<String>>()?;
@@ -2637,10 +2643,12 @@ pub fn guess_from_path(
 }
 
 #[cfg(feature = "pyo3")]
-impl FromPyObject<'_> for UpstreamDatum {
-    fn extract_bound(obj: &Bound<PyAny>) -> PyResult<Self> {
-        let (field, val): (String, Bound<PyAny>) = if let Ok((field, val)) =
-            obj.extract::<(String, Bound<PyAny>)>()
+impl<'py> FromPyObject<'_, 'py> for UpstreamDatum {
+    type Error = PyErr;
+
+    fn extract(obj: pyo3::Borrowed<'_, 'py, PyAny>) -> PyResult<Self> {
+        let (field, val): (String, Bound<'py, PyAny>) = if let Ok((field, val)) =
+            obj.extract::<(String, Bound<'py, PyAny>)>()
         {
             (field, val)
         } else if let Ok(datum) = obj.getattr("datum") {
@@ -2694,7 +2702,7 @@ impl FromPyObject<'_> for UpstreamDatum {
             "Screenshots" => Ok(UpstreamDatum::Screenshots(val.extract::<Vec<String>>()?)),
             "Cite-As" => Ok(UpstreamDatum::CiteAs(val.extract::<String>()?)),
             "Registry" => {
-                let v = val.extract::<Vec<Bound<PyAny>>>()?;
+                let v = val.extract::<Vec<Bound<'py, PyAny>>>()?;
                 let mut registry = Vec::new();
                 for item in v {
                     let name = item.get_item("Name")?.extract::<String>()?;
@@ -2777,8 +2785,10 @@ impl<'py> IntoPyObject<'py> for &UpstreamDatum {
 }
 
 #[cfg(feature = "pyo3")]
-impl FromPyObject<'_> for UpstreamDatumWithMetadata {
-    fn extract_bound(obj: &Bound<PyAny>) -> PyResult<Self> {
+impl<'py> FromPyObject<'_, 'py> for UpstreamDatumWithMetadata {
+    type Error = PyErr;
+
+    fn extract(obj: pyo3::Borrowed<'_, 'py, PyAny>) -> PyResult<Self> {
         let certainty = obj.getattr("certainty")?.extract::<Option<String>>()?;
         let origin = obj.getattr("origin")?.extract::<Option<Origin>>()?;
         let datum = if obj.hasattr("datum")? {

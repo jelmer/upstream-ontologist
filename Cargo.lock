@@ -305,9 +305,9 @@ checksum = "36f64beae40a84da1b4b26ff2761a5b895c12adc41dc25aaee1c4f2bbfe97a6e"
 
 [[package]]
 name = "breezyshim"
-version = "0.6.5"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fcb5a72aa85643f8325d5166c0f0f8dbc1456dce4ddc320591889abb5a31c67"
+checksum = "7eeb2440dd16306bae02f42bb1e772f29c7de9e8ff1020b19c0dd212f3bfb5bf"
 dependencies = [
  "chrono",
  "ctor",
@@ -318,9 +318,11 @@ dependencies = [
  "percent-encoding",
  "pyo3",
  "pyo3-filelike",
+ "regex",
  "serde",
  "tempfile",
  "url",
+ "whoami",
 ]
 
 [[package]]
@@ -988,7 +990,7 @@ version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6f8df1ed3ad28bd8380c05e317dcff67cd84957a334ccd713bfa81f9631f5dc"
 dependencies = [
- "debversion",
+ "debversion 0.4.8",
  "lazy-regex",
  "log",
  "mailparse 0.15.0",
@@ -1032,12 +1034,12 @@ dependencies = [
 
 [[package]]
 name = "debian-changelog"
-version = "0.2.1"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6e87a6b3bb320a4b1ee979720c1a531e32cd7ae3615d375759ac66768958bc9"
+checksum = "eda50dbfa5cb29cb722fffc73d3154a71546dc5772f1612512be0239fc4c74f6"
 dependencies = [
  "chrono",
- "debversion",
+ "debversion 0.5.0",
  "lazy-regex",
  "log",
  "rowan",
@@ -1054,7 +1056,7 @@ dependencies = [
  "chrono",
  "deb822-fast",
  "deb822-lossless",
- "debversion",
+ "debversion 0.5.0",
  "regex",
  "rowan",
  "url",
@@ -1068,7 +1070,7 @@ checksum = "1876995240a97d1c53a7cec3014e3599dc8c98af78e1b14961cdcdb4bdade404"
 dependencies = [
  "deb822-fast",
  "deb822-lossless",
- "debversion",
+ "debversion 0.4.8",
  "regex",
 ]
 
@@ -1078,7 +1080,7 @@ version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f692668701f5382bea79960cad4798f97689de3e22af638ee43552887c180f4f"
 dependencies = [
- "debversion",
+ "debversion 0.5.0",
  "m_lexer",
  "rowan",
  "url",
@@ -1089,6 +1091,17 @@ name = "debversion"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94b3734b1da78d7dd8b45634007e53d8b2b42cbe7bf1898f6d9f7600dfd6c320"
+dependencies = [
+ "chrono",
+ "lazy-regex",
+ "num-bigint",
+]
+
+[[package]]
+name = "debversion"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4f5cc9ce1d5067bee8060dd75208525dd0133ffea0b2960fef64ab85d58c4c5"
 dependencies = [
  "chrono",
  "lazy-regex",
@@ -3989,15 +4002,17 @@ dependencies = [
 
 [[package]]
 name = "patchkit"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31e00ed52656b51f535293e40caf6579b4cf09f25e660fc6e6936ab70e78972f"
+checksum = "f21e87e02a475262c3166d32fea34710510448b37117cc448c1be03975816baf"
 dependencies = [
  "chrono",
  "lazy-regex",
  "lazy_static",
  "once_cell",
+ "proc-macro2",
  "regex",
+ "rowan",
 ]
 
 [[package]]
@@ -4349,9 +4364,9 @@ checksum = "007d8adb5ddab6f8e3f491ac63566a7d5002cc7ed73901f72057943fa71ae1ae"
 
 [[package]]
 name = "pyo3"
-version = "0.25.1"
+version = "0.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8970a78afe0628a3e3430376fc5fd76b6b45c4d43360ffd6cdd40bdde72b682a"
+checksum = "37a6df7eab65fc7bee654a421404947e10a0f7085b6951bf2ea395f4659fb0cf"
 dependencies = [
  "chrono",
  "indoc",
@@ -4368,19 +4383,18 @@ dependencies = [
 
 [[package]]
 name = "pyo3-build-config"
-version = "0.25.1"
+version = "0.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "458eb0c55e7ece017adeba38f2248ff3ac615e53660d7c71a238d7d2a01c7598"
+checksum = "f77d387774f6f6eec64a004eac0ed525aab7fa1966d94b42f743797b3e395afb"
 dependencies = [
- "once_cell",
  "target-lexicon",
 ]
 
 [[package]]
 name = "pyo3-ffi"
-version = "0.25.1"
+version = "0.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7114fe5457c61b276ab77c5055f206295b812608083644a5c5b2640c3102565c"
+checksum = "2dd13844a4242793e02df3e2ec093f540d948299a6a77ea9ce7afd8623f542be"
 dependencies = [
  "libc",
  "pyo3-build-config",
@@ -4388,18 +4402,18 @@ dependencies = [
 
 [[package]]
 name = "pyo3-filelike"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e09e283dc7f80e7deb37d06829a3e0e9e12ea4105f10388ebdd6178021567b62"
+checksum = "57429f455b9811f2a8af73d8bae91e028fbf6f62ad4011073c2248bb028a2288"
 dependencies = [
  "pyo3",
 ]
 
 [[package]]
 name = "pyo3-macros"
-version = "0.25.1"
+version = "0.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8725c0a622b374d6cb051d11a0983786448f7785336139c3c94f5aa6bef7e50"
+checksum = "eaf8f9f1108270b90d3676b8679586385430e5c0bb78bb5f043f95499c821a71"
 dependencies = [
  "proc-macro2",
  "pyo3-macros-backend",
@@ -4409,9 +4423,9 @@ dependencies = [
 
 [[package]]
 name = "pyo3-macros-backend"
-version = "0.25.1"
+version = "0.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4109984c22491085343c05b0dbc54ddc405c3cf7b4374fc533f5c3313a572ccc"
+checksum = "70a3b2274450ba5288bc9b8c1b69ff569d1d61189d4bff38f8d22e03d17f932b"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -5949,7 +5963,7 @@ dependencies = [
  "debian-control",
  "debian-copyright",
  "debian-watch",
- "debversion",
+ "debversion 0.5.0",
  "distro-info",
  "env_logger",
  "futures",
@@ -5963,6 +5977,7 @@ dependencies = [
  "maplit",
  "opam-file-rs",
  "openssl",
+ "patchkit",
  "percent-encoding",
  "pretty_assertions",
  "pulldown-cmark",
@@ -6184,6 +6199,7 @@ checksum = "5d4a4db5077702ca3015d3d02d74974948aba2ad9e12ab7df718ee64ccd7e97d"
 dependencies = [
  "libredox",
  "wasite",
+ "web-sys",
 ]
 
 [[package]]

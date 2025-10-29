@@ -1190,7 +1190,7 @@ This is a test of RST to HTML conversion."#;
         }
     }
 
-    fn root(doc: &Document) -> Node {
+    fn root(doc: &Document) -> Node<'_> {
         let root = doc.find(Root).next().unwrap();
         assert_eq!(root.name(), Some("html"));
         root.find(Name("body"))

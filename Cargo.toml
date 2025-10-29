@@ -27,7 +27,7 @@ textwrap = ">=0.16.2"
 lazy-regex = ">=2"
 breezyshim = { version = ">=0.6.5", default-features = false, features = ["auto-initialize"] }
 debian-watch = { version = ">=0.2.8", optional = true }
-debian-changelog = { version = ">=0.2.1", optional = true }
+debian-changelog = { version = ">=0.2.3", optional = true }
 debbugs = ">=0.1.5"
 clap = { version = ">=4.5.48", features = ["derive", "env"], optional = true }
 maplit = ">=1.0.2"
@@ -49,16 +49,18 @@ bit-set = ">=0.5.3, <0.9"
 openssl = ">=0.10.64, <0.11"
 # Note: ahash, chumsky, rfc2047-decoder, hashbrown are added to work around
 # minimal-versions build failures in python-pkginfo's transitive dependencies
+# patchkit is added to work around minimal-versions build failures in breezyshim's transitive dependencies
 ahash = ">=0.8.11, <0.9"
 chumsky = ">=0.9.3, <2"
 rfc2047-decoder = ">=1.0.6, <2"
 hashbrown = ">=0.14.3, <0.17"
-pyo3-filelike = ">=0.5.0, <0.6"
+pyo3-filelike = ">=0.5.1, <0.6"
+patchkit = ">=0.2.1, <0.3"
 semver = { version = ">=1.0.27", features = ["serde"] }
 async-trait = ">=0.1.89"
 tokio = { version = ">=1.47.1", features = ["full"] }
 futures = ">=0.3.31"
-debversion = { version = "0.4", optional = true }
+debversion = { version = "0.5", optional = true }
 
 [features]
 default = ["git-config", "launchpad", "opam", "dist-ini", "cargo", "r-description", "pyproject-toml", "python-pkginfo", "debian", "pyo3", "setup-cfg"]

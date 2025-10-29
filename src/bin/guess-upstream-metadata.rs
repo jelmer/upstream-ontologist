@@ -96,10 +96,11 @@ async fn main() {
             );
         }
     } else if args.scan {
-        let mut stream = upstream_ontologist::upstream_metadata_stream(
+        let stream = upstream_ontologist::upstream_metadata_stream(
             &args.path.canonicalize().unwrap(),
             Some(args.trust),
         );
+        tokio::pin!(stream);
         while let Some(entry) = stream.next().await {
             let entry = entry.unwrap();
             println!(

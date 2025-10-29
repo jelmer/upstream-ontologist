@@ -265,7 +265,11 @@ fn read_changelog_first_entry(
         ProviderError::ParseError(format!("Changelog {} has no package name", path.display()))
     })?;
 
-    let version = entry.version();
+    let version = entry.version().map(|v| {
+        v.to_string()
+            .parse()
+            .expect("debversion parse should not fail")
+    });
 
     let change_lines = entry.change_lines().collect::<Vec<_>>();
 
