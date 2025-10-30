@@ -39,7 +39,7 @@ pulldown-cmark = ">=0.13.0, <0.14"
 debcargo = { version = ">=2.7.10, <3", optional = true }
 # See https://github.com/flying-sheep/rust-rst/issues/56
 uo_rst_parser = ">=0.4.3, <0.5"
-rst_renderer = ">=0.4.1, <0.5"
+rst_renderer = ">=0.4.2, <0.5"
 #rst_parser = { git = "https://github.com/flying-sheep/rust-rst" }
 #rst_renderer = { git = "https://github.com/flying-sheep/rust-rst" }
 select = ">=0.6.0, <0.7"
