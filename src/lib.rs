@@ -3426,47 +3426,29 @@ pub(crate) fn stream(
 ) -> impl Stream<Item = Result<UpstreamDatumWithMetadata, ProviderError>> {
     // For each of the guessers, create concurrent tasks that run the guessers in parallel
     let abspath = std::env::current_dir().unwrap().join(path);
+    let config = config.clone();
 
-    // Create concurrent tasks for each guesser
-    let tasks = guessers
-        .into_iter()
+    // Run guessers concurrently using buffered (no tokio::spawn required)
+    futures::stream::iter(guessers)
         .map(move |mut guesser| {
             let abspath = abspath.clone();
             let config = config.clone();
             let guesser_name = guesser.name().to_string();
 
-            tokio::spawn(async move {
+            async move {
                 let results = match guesser.guess(&config).await {
                     Ok(results) => results,
-                    Err(e) => return vec![Err(e)],
+                    Err(e) => return futures::stream::iter(vec![Err(e)]).boxed(),
                 };
 
-                results
-                    .into_iter()
-                    .map(move |mut datum| {
-                        rewrite_upstream_datum(&guesser_name, &mut datum, &abspath);
-                        Ok(datum)
-                    })
-                    .collect::<Vec<_>>()
-            })
-        })
-        .collect::<Vec<_>>();
-
-    // Create a stream from all the concurrent tasks
-    futures::stream::iter(tasks)
-        .then(|task| async move {
-            match task.await {
-                Ok(results) => futures::stream::iter(results).boxed(),
-                Err(e) => {
-                    log::error!("Task error: {}", e);
-                    futures::stream::iter(vec![Err(ProviderError::Other(format!(
-                        "Task error: {}",
-                        e
-                    )))])
-                    .boxed()
-                }
+                futures::stream::iter(results.into_iter().map(move |mut datum| {
+                    rewrite_upstream_datum(&guesser_name, &mut datum, &abspath);
+                    Ok(datum)
+                }))
+                .boxed()
             }
         })
+        .buffered(10) // Run up to 10 guessers concurrently while preserving order
         .flatten()
 }
 
