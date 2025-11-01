@@ -305,9 +305,9 @@ checksum = "36f64beae40a84da1b4b26ff2761a5b895c12adc41dc25aaee1c4f2bbfe97a6e"
 
 [[package]]
 name = "breezyshim"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7eeb2440dd16306bae02f42bb1e772f29c7de9e8ff1020b19c0dd212f3bfb5bf"
+checksum = "413d705a41333cf8cec70dac2fff2a201faef6a75b3fba3915670cd5c16b57ce"
 dependencies = [
  "chrono",
  "ctor",
@@ -974,18 +974,6 @@ dependencies = [
 
 [[package]]
 name = "deb822-lossless"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5951cecf7d07d18215a0acb204cfa3de9b060245fe6f2e691de4f89fcd18a3d"
-dependencies = [
- "deb822-fast",
- "regex",
- "rowan",
- "serde",
-]
-
-[[package]]
-name = "deb822-lossless"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5f75405879b25a0763e61bf9b4d29e1de0a512e70c616c27a305e7e54d9e185"
@@ -1001,7 +989,7 @@ version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b36dd7d7098ea92d5a789d4b83fade23d79014527ae71f079faea9bdaf1914e7"
 dependencies = [
- "debversion 0.5.0",
+ "debversion",
  "lazy-regex",
  "log",
  "mailparse",
@@ -1050,7 +1038,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eda50dbfa5cb29cb722fffc73d3154a71546dc5772f1612512be0239fc4c74f6"
 dependencies = [
  "chrono",
- "debversion 0.5.0",
+ "debversion",
  "lazy-regex",
  "log",
  "rowan",
@@ -1066,8 +1054,8 @@ checksum = "4c6767abf628dd8eb77b0043208a3c3a2236dc508c4938885c890d3cd6344216"
 dependencies = [
  "chrono",
  "deb822-fast",
- "deb822-lossless 0.4.0",
- "debversion 0.5.0",
+ "deb822-lossless",
+ "debversion",
  "regex",
  "rowan",
  "url",
@@ -1075,13 +1063,13 @@ dependencies = [
 
 [[package]]
 name = "debian-copyright"
-version = "0.1.28"
+version = "0.1.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1876995240a97d1c53a7cec3014e3599dc8c98af78e1b14961cdcdb4bdade404"
+checksum = "98826529cf8a9eaf61ecc286f936922ca496553a289e3b2bcfa200dc6b1c866b"
 dependencies = [
  "deb822-fast",
- "deb822-lossless 0.4.0",
- "debversion 0.4.8",
+ "deb822-lossless",
+ "debversion",
  "regex",
 ]
 
@@ -1091,21 +1079,10 @@ version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f692668701f5382bea79960cad4798f97689de3e22af638ee43552887c180f4f"
 dependencies = [
- "debversion 0.5.0",
+ "debversion",
  "m_lexer",
  "rowan",
  "url",
-]
-
-[[package]]
-name = "debversion"
-version = "0.4.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94b3734b1da78d7dd8b45634007e53d8b2b42cbe7bf1898f6d9f7600dfd6c320"
-dependencies = [
- "chrono",
- "lazy-regex",
- "num-bigint",
 ]
 
 [[package]]
@@ -4484,13 +4461,13 @@ checksum = "640c9bd8497b02465aeef5375144c26062e0dcd5939dfcbb0f5db76cb8c17c73"
 
 [[package]]
 name = "r-description"
-version = "0.3.5"
+version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fe3393d9093043150fe262c2ac86d413a78266af434de1f984d9d6aa53b1177"
+checksum = "ba0825e068a114feed9aeba80f0e97f3d747fde0cf3f60e394c6fb181ef23893"
 dependencies = [
  "deb822-derive",
  "deb822-fast",
- "deb822-lossless 0.3.2",
+ "deb822-lossless",
  "rowan",
  "url",
 ]
@@ -5958,7 +5935,7 @@ dependencies = [
  "debian-control",
  "debian-copyright",
  "debian-watch",
- "debversion 0.5.0",
+ "debversion",
  "distro-info",
  "env_logger",
  "futures",
