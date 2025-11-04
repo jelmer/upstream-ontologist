@@ -1,4 +1,5 @@
-on:
+---
+"on":
   push:
     tags:
       - 'v*'           # Push events to every tag not containing /
