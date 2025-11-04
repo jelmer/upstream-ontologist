@@ -37,25 +37,14 @@ debian-copyright = { version = ">=0.1.28, <0.2", optional = true }
 debian-control = { version = ">=0.1.48, <0.3", optional = true }
 pulldown-cmark = ">=0.13.0, <0.14"
 debcargo = { version = ">=2.7.10, <3", optional = true }
-# See https://github.com/flying-sheep/rust-rst/issues/56
-uo_rst_parser = ">=0.4.3, <0.5"
+rst_parser = ">=0.4.2, <0.5"
 rst_renderer = ">=0.4.2, <0.5"
-#rst_parser = { git = "https://github.com/flying-sheep/rust-rst" }
-#rst_renderer = { git = "https://github.com/flying-sheep/rust-rst" }
 select = ">=0.6.0, <0.7"
 tendril = ">=0.4.3, <0.5"
 bit-vec = ">=0.6.3, <0.9"
 bit-set = ">=0.5.3, <0.9"
 openssl = ">=0.10.64, <0.11"
-# Note: ahash, chumsky, rfc2047-decoder, hashbrown are added to work around
-# minimal-versions build failures in python-pkginfo's transitive dependencies
-# patchkit is added to work around minimal-versions build failures in breezyshim's transitive dependencies
-ahash = ">=0.8.11, <0.9"
-chumsky = ">=0.9.3, <2"
-rfc2047-decoder = ">=1.0.6, <2"
-hashbrown = ">=0.14.3, <0.17"
 pyo3-filelike = ">=0.5.1, <0.6"
-patchkit = ">=0.2.2, <0.3"
 semver = { version = ">=1.0.26, <2", features = ["serde"] }
 async-trait = ">=0.1.89, <0.2"
 tokio = { version = ">=1.47.1, <2", features = ["full"] }

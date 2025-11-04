@@ -4688,6 +4688,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "rst_parser"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f3029872a42c0be67d86e3e88bf8c1e73d1da3d714da00b9c29f60a4605bfb1"
+dependencies = [
+ "anyhow",
+ "document_tree",
+ "pest",
+ "pest_derive",
+]
+
+[[package]]
 name = "rst_renderer"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5905,18 +5917,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
-name = "uo_rst_parser"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80277544afabbdd7ddd9117d7b5b2d61dba3819609f8810c619e590d8d1d8cdb"
-dependencies = [
- "anyhow",
- "document_tree",
- "pest",
- "pest_derive",
-]
-
-[[package]]
 name = "upstream-ontologist"
 version = "0.3.1"
 dependencies = [
@@ -5962,6 +5962,7 @@ dependencies = [
  "regex",
  "reqwest",
  "rfc2047-decoder",
+ "rst_parser",
  "rst_renderer",
  "rust-ini",
  "select",
@@ -5975,7 +5976,6 @@ dependencies = [
  "textwrap",
  "tokio",
  "toml 0.9.8",
- "uo_rst_parser",
  "url",
  "xmltree",
 ]
