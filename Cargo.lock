@@ -5852,7 +5852,7 @@ checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
 name = "upstream-ontologist"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "async-trait",
  "bit-set 0.8.0",
