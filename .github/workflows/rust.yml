@@ -39,3 +39,23 @@ jobs:
         if: matrix.os != 'windows-latest'
       - name: Check formatting
         run: cargo fmt --all -- --check
+
+  minimal-versions:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+      - name: Install breezy
+        run: pip install breezy
+      - name: Install python3-setuptools
+        run: pip install setuptools
+      - name: Install cargo-minimal-versions
+        run: cargo install cargo-minimal-versions
+      - name: Install cargo-hack
+        run: cargo install cargo-hack
+      - name: Test with minimal versions
+        run: cargo minimal-versions --direct test
