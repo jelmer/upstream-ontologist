@@ -1082,8 +1082,8 @@ pub fn description_from_readme_html(
 }
 
 fn rst_to_html(rst_text: &str) -> String {
-    use rst_renderer::render_html;
     use rst_parser::parse;
+    use rst_renderer::render_html;
     let document = parse(rst_text).unwrap();
     let mut output = Vec::new();
     render_html(&document, &mut std::io::Cursor::new(&mut output), true).unwrap();
