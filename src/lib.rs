@@ -3769,15 +3769,18 @@ async fn extend_from_repology(
 /// Fix existing upstream metadata.
 pub async fn fix_upstream_metadata(upstream_metadata: &mut UpstreamMetadata) {
     if let Some(repository) = upstream_metadata.get_mut("Repository") {
-        let url = crate::vcs::sanitize_url(repository.datum.as_str().unwrap()).await;
-        repository.datum = UpstreamDatum::Repository(url.to_string());
+        if let Some(repo_str) = repository.datum.as_str() {
+            let url = crate::vcs::sanitize_url(repo_str).await;
+            repository.datum = UpstreamDatum::Repository(url.to_string());
+        }
     }
 
     if let Some(summary) = upstream_metadata.get_mut("Summary") {
-        let s = summary.datum.as_str().unwrap();
-        let s = s.split_once(". ").map_or(s, |(a, _)| a);
-        let s = s.trim_end().trim_end_matches('.');
-        summary.datum = UpstreamDatum::Summary(s.to_string());
+        if let Some(s) = summary.datum.as_str() {
+            let s = s.split_once(". ").map_or(s, |(a, _)| a);
+            let s = s.trim_end().trim_end_matches('.');
+            summary.datum = UpstreamDatum::Summary(s.to_string());
+        }
     }
 }
 
@@ -3974,109 +3977,132 @@ pub async fn check_upstream_metadata(
 ) {
     let repository = upstream_metadata.get_mut("Repository");
     if let Some(repository) = repository {
-        match vcs::check_repository_url_canonical(repository.datum.to_url().unwrap(), version).await
-        {
-            Ok(canonical_url) => {
-                repository.datum = UpstreamDatum::Repository(canonical_url.to_string());
-                if repository.certainty == Some(Certainty::Confident) {
-                    repository.certainty = Some(Certainty::Certain);
+        if let Some(repo_url) = repository.datum.to_url() {
+            match vcs::check_repository_url_canonical(repo_url, version).await {
+                Ok(canonical_url) => {
+                    repository.datum = UpstreamDatum::Repository(canonical_url.to_string());
+                    if repository.certainty == Some(Certainty::Confident) {
+                        repository.certainty = Some(Certainty::Certain);
+                    }
+                    if let Some(url) = repository.datum.to_url() {
+                        let derived_browse_url = vcs::browse_url_from_repo_url(
+                            &vcs::VcsLocation {
+                                url,
+                                branch: None,
+                                subpath: None,
+                            },
+                            Some(true),
+                        )
+                        .await;
+                        let certainty = repository.certainty;
+                        if let Some(browse_repo) = upstream_metadata.get_mut("Repository-Browse") {
+                            if derived_browse_url == browse_repo.datum.to_url() {
+                                browse_repo.certainty = certainty;
+                            }
+                        }
+                    }
                 }
-                let derived_browse_url = vcs::browse_url_from_repo_url(
-                    &vcs::VcsLocation {
-                        url: repository.datum.to_url().unwrap(),
-                        branch: None,
-                        subpath: None,
-                    },
-                    Some(true),
-                )
-                .await;
-                let certainty = repository.certainty;
-                let browse_repo = upstream_metadata.get_mut("Repository-Browse");
-                if browse_repo.is_some()
-                    && derived_browse_url == browse_repo.as_ref().and_then(|u| u.datum.to_url())
-                {
-                    browse_repo.unwrap().certainty = certainty;
+                Err(CanonicalizeError::Unverifiable(u, _))
+                | Err(CanonicalizeError::RateLimited(u)) => {
+                    log::debug!("Unverifiable URL: {}", u);
+                }
+                Err(CanonicalizeError::InvalidUrl(u, e)) => {
+                    log::debug!("Deleting invalid Repository URL {}: {}", u, e);
+                    upstream_metadata.remove("Repository");
                 }
             }
-            Err(CanonicalizeError::Unverifiable(u, _)) | Err(CanonicalizeError::RateLimited(u)) => {
-                log::debug!("Unverifiable URL: {}", u);
-            }
-            Err(CanonicalizeError::InvalidUrl(u, e)) => {
-                log::debug!("Deleting invalid Repository URL {}: {}", u, e);
-                upstream_metadata.remove("Repository");
-            }
+        } else {
+            log::debug!("Repository field is not a valid URL, skipping check");
         }
     }
     let homepage = upstream_metadata.get_mut("Homepage");
     if let Some(homepage) = homepage {
-        match check_url_canonical(&homepage.datum.to_url().unwrap()).await {
-            Ok(canonical_url) => {
-                homepage.datum = UpstreamDatum::Homepage(canonical_url.to_string());
-                if homepage.certainty >= Some(Certainty::Likely) {
-                    homepage.certainty = Some(Certainty::Certain);
+        if let Some(homepage_url) = homepage.datum.to_url() {
+            match check_url_canonical(&homepage_url).await {
+                Ok(canonical_url) => {
+                    homepage.datum = UpstreamDatum::Homepage(canonical_url.to_string());
+                    if homepage.certainty >= Some(Certainty::Likely) {
+                        homepage.certainty = Some(Certainty::Certain);
+                    }
+                }
+                Err(CanonicalizeError::Unverifiable(u, _))
+                | Err(CanonicalizeError::RateLimited(u)) => {
+                    log::debug!("Unverifiable URL: {}", u);
+                }
+                Err(CanonicalizeError::InvalidUrl(u, e)) => {
+                    log::debug!("Deleting invalid Homepage URL {}: {}", u, e);
+                    upstream_metadata.remove("Homepage");
                 }
             }
-            Err(CanonicalizeError::Unverifiable(u, _)) | Err(CanonicalizeError::RateLimited(u)) => {
-                log::debug!("Unverifiable URL: {}", u);
-            }
-            Err(CanonicalizeError::InvalidUrl(u, e)) => {
-                log::debug!("Deleting invalid Homepage URL {}: {}", u, e);
-                upstream_metadata.remove("Homepage");
-            }
+        } else {
+            log::debug!("Homepage field is not a valid URL, skipping check");
         }
     }
     if let Some(repository_browse) = upstream_metadata.get_mut("Repository-Browse") {
-        match check_url_canonical(&repository_browse.datum.to_url().unwrap()).await {
-            Ok(u) => {
-                repository_browse.datum = UpstreamDatum::RepositoryBrowse(u.to_string());
-                if repository_browse.certainty >= Some(Certainty::Likely) {
-                    repository_browse.certainty = Some(Certainty::Certain);
+        if let Some(browse_url) = repository_browse.datum.to_url() {
+            match check_url_canonical(&browse_url).await {
+                Ok(u) => {
+                    repository_browse.datum = UpstreamDatum::RepositoryBrowse(u.to_string());
+                    if repository_browse.certainty >= Some(Certainty::Likely) {
+                        repository_browse.certainty = Some(Certainty::Certain);
+                    }
+                }
+                Err(CanonicalizeError::InvalidUrl(u, e)) => {
+                    log::debug!("Deleting invalid Repository-Browse URL {}: {}", u, e);
+                    upstream_metadata.remove("Repository-Browse");
+                }
+                Err(CanonicalizeError::Unverifiable(u, _))
+                | Err(CanonicalizeError::RateLimited(u)) => {
+                    log::debug!("Unable to verify Repository-Browse URL {}", u);
                 }
             }
-            Err(CanonicalizeError::InvalidUrl(u, e)) => {
-                log::debug!("Deleting invalid Repository-Browse URL {}: {}", u, e);
-                upstream_metadata.remove("Repository-Browse");
-            }
-            Err(CanonicalizeError::Unverifiable(u, _)) | Err(CanonicalizeError::RateLimited(u)) => {
-                log::debug!("Unable to verify Repository-Browse URL {}", u);
-            }
+        } else {
+            log::debug!("Repository-Browse field is not a valid URL, skipping check");
         }
     }
     if let Some(bug_database) = upstream_metadata.get_mut("Bug-Database") {
-        match check_bug_database_canonical(&bug_database.datum.to_url().unwrap(), Some(true)).await
-        {
-            Ok(u) => {
-                bug_database.datum = UpstreamDatum::BugDatabase(u.to_string());
-                if bug_database.certainty >= Some(Certainty::Likely) {
-                    bug_database.certainty = Some(Certainty::Certain);
+        if let Some(bug_db_url) = bug_database.datum.to_url() {
+            match check_bug_database_canonical(&bug_db_url, Some(true)).await {
+                Ok(u) => {
+                    bug_database.datum = UpstreamDatum::BugDatabase(u.to_string());
+                    if bug_database.certainty >= Some(Certainty::Likely) {
+                        bug_database.certainty = Some(Certainty::Certain);
+                    }
+                }
+                Err(CanonicalizeError::InvalidUrl(u, e)) => {
+                    log::debug!("Deleting invalid Bug-Database URL {}: {}", u, e);
+                    upstream_metadata.remove("Bug-Database");
+                }
+                Err(CanonicalizeError::Unverifiable(u, _))
+                | Err(CanonicalizeError::RateLimited(u)) => {
+                    log::debug!("Unable to verify Bug-Database URL {}", u);
                 }
             }
-            Err(CanonicalizeError::InvalidUrl(u, e)) => {
-                log::debug!("Deleting invalid Bug-Database URL {}: {}", u, e);
-                upstream_metadata.remove("Bug-Database");
-            }
-            Err(CanonicalizeError::Unverifiable(u, _)) | Err(CanonicalizeError::RateLimited(u)) => {
-                log::debug!("Unable to verify Bug-Database URL {}", u);
-            }
+        } else {
+            log::debug!("Bug-Database field is not a valid URL, skipping check");
         }
     }
     let bug_submit = upstream_metadata.get_mut("Bug-Submit");
     if let Some(bug_submit) = bug_submit {
-        match check_bug_submit_url_canonical(&bug_submit.datum.to_url().unwrap(), Some(true)).await
-        {
-            Ok(u) => {
-                bug_submit.datum = UpstreamDatum::BugSubmit(u.to_string());
-                if bug_submit.certainty >= Some(Certainty::Likely) {
-                    bug_submit.certainty = Some(Certainty::Certain);
+        if let Some(bug_submit_url) = bug_submit.datum.to_url() {
+            match check_bug_submit_url_canonical(&bug_submit_url, Some(true)).await {
+                Ok(u) => {
+                    bug_submit.datum = UpstreamDatum::BugSubmit(u.to_string());
+                    if bug_submit.certainty >= Some(Certainty::Likely) {
+                        bug_submit.certainty = Some(Certainty::Certain);
+                    }
+                }
+                Err(CanonicalizeError::InvalidUrl(u, e)) => {
+                    log::debug!("Deleting invalid Bug-Submit URL {}: {}", u, e);
+                    upstream_metadata.remove("Bug-Submit");
+                }
+                Err(CanonicalizeError::Unverifiable(u, _))
+                | Err(CanonicalizeError::RateLimited(u)) => {
+                    log::debug!("Unable to verify Bug-Submit URL {}", u);
                 }
             }
-            Err(CanonicalizeError::InvalidUrl(u, e)) => {
-                log::debug!("Deleting invalid Bug-Submit URL {}: {}", u, e);
-                upstream_metadata.remove("Bug-Submit");
-            }
-            Err(CanonicalizeError::Unverifiable(u, _)) | Err(CanonicalizeError::RateLimited(u)) => {
-                log::debug!("Unable to verify Bug-Submit URL {}", u);
-            }
+        } else {
+            log::debug!("Bug-Submit field is not a valid URL, skipping check");
         }
     }
     let mut screenshots = upstream_metadata.get_mut("Screenshots");
