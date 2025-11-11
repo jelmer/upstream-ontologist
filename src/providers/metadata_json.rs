@@ -78,6 +78,24 @@ pub fn guess_from_metadata_json(
                         certainty: Some(Certainty::Certain),
                         origin: Some(path.into()),
                     });
+                } else if let Some(array) = value.as_array() {
+                    // Handle Repository as array (e.g., CVS format: ["cvs_root", "module"])
+                    let strings: Vec<&str> = array.iter().filter_map(|v| v.as_str()).collect();
+
+                    if strings.len() >= 2 {
+                        // Try to convert CVS array format
+                        if let Some(repo_url) = crate::vcs::convert_cvs_list_to_str(&strings) {
+                            upstream_data.push(UpstreamDatumWithMetadata {
+                                datum: UpstreamDatum::Repository(repo_url),
+                                certainty: Some(Certainty::Certain),
+                                origin: Some(path.into()),
+                            });
+                        } else {
+                            warn!("Repository array format not recognized: {:?}", strings);
+                        }
+                    } else {
+                        warn!("Repository array has insufficient elements: {:?}", array);
+                    }
                 }
             }
             "summary" => {
@@ -148,4 +166,51 @@ pub fn guess_from_metadata_json(
     }
 
     Ok(upstream_data)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_cvs_repository_array() {
+        let json_content = r#"{
+  "name": "yep",
+  "source": [
+    ":extssh:_anoncvs@anoncvs.example.org:/cvs",
+    "yep"
+  ]
+}"#;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(json_content.as_bytes()).unwrap();
+        temp_file.flush().unwrap();
+
+        let settings = GuesserSettings {
+            trust_package: false,
+        };
+        let result = guess_from_metadata_json(temp_file.path(), &settings).unwrap();
+
+        // Find the Repository datum
+        let repo = result
+            .iter()
+            .find(|d| matches!(d.datum, UpstreamDatum::Repository(_)))
+            .expect("Should have Repository datum");
+
+        if let UpstreamDatum::Repository(url) = &repo.datum {
+            println!("Converted CVS URL: {}", url);
+            // The URL should be converted from CVS array format
+            assert!(
+                url.contains("anoncvs.example.org"),
+                "URL should contain the host"
+            );
+            assert!(url.contains("yep"), "URL should contain the module name");
+        } else {
+            panic!("Expected Repository datum");
+        }
+
+        assert_eq!(repo.certainty, Some(Certainty::Certain));
+    }
 }

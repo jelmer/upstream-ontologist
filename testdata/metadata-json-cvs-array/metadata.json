@@ -1,0 +1,7 @@
+{
+  "name": "yep",
+  "source": [
+    ":extssh:_anoncvs@anoncvs.example.org:/cvs",
+    "yep"
+  ]
+}
