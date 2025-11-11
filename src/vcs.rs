@@ -1036,14 +1036,14 @@ pub struct VcsLocation {
 }
 
 impl VcsLocation {
-    async fn from_str(url: &str) -> Self {
+    async fn from_str(url: &str) -> Result<Self, url::ParseError> {
         let (url, branch, subpath) = split_vcs_url(url);
         let url = fixup_git_url(url.as_str()).await;
-        VcsLocation {
-            url: url.parse().unwrap(),
+        Ok(VcsLocation {
+            url: url.parse()?,
             branch,
             subpath,
-        }
+        })
     }
 }
 
@@ -1326,12 +1326,8 @@ const SANITIZERS: &[AsyncSanitizer] = &[
     |url| Box::pin(async move { drop_vcs_in_scheme(&url.parse().ok()?) }),
     |url| {
         Box::pin(async move {
-            Some(
-                fixup_git_location(&VcsLocation::from_str(url).await)
-                    .await
-                    .url
-                    .clone(),
-            )
+            let location = VcsLocation::from_str(url).await.ok()?;
+            Some(fixup_git_location(&location).await.url.clone())
         })
     },
     |url| Box::pin(async move { fixup_rcp_style_git_repo_url(url) }),
@@ -1362,9 +1358,10 @@ mod tests {
     use super::fixup_git_url;
 
     async fn fixup_git_location(url: &str) -> String {
-        super::fixup_git_location(&super::VcsLocation::from_str(url).await)
+        let location = super::VcsLocation::from_str(url)
             .await
-            .to_string()
+            .expect("Failed to parse URL in test");
+        super::fixup_git_location(&location).await.to_string()
     }
 
     #[test]
@@ -1769,5 +1766,32 @@ mod tests {
             "https://gitlab.gnome.org/GNOME/alacarte",
             fixup_git_url("https://git.gnome.org/browse/alacarte").await
         );
+    }
+
+    #[tokio::test]
+    async fn test_cvs_url_parsing_error() {
+        // Test that CVS URLs that aren't valid HTTP URLs return an error instead of panicking
+        // This was the bug reported in upstream-ontologist-cvs-array-panic.md
+        let cvs_url = ":extssh:_anoncvs@anoncvs.example.org:/cvs";
+        let result = super::VcsLocation::from_str(cvs_url).await;
+        assert!(result.is_err(), "CVS URL should return an error, not panic");
+    }
+
+    #[tokio::test]
+    async fn test_sanitize_url_with_cvs() {
+        // Test that sanitize_url handles CVS URLs gracefully without panicking
+        let cvs_url = ":extssh:_anoncvs@anoncvs.example.org:/cvs";
+        let result = super::sanitize_url(cvs_url).await;
+        // The URL should be returned as-is since none of the sanitizers can process it
+        assert_eq!(result, cvs_url);
+    }
+
+    #[tokio::test]
+    async fn test_sanitize_url_with_invalid_url() {
+        // Test that other invalid URLs are also handled gracefully
+        let invalid_url = "not a valid url at all";
+        let result = super::sanitize_url(invalid_url).await;
+        // Should not panic, and should return the original string
+        assert_eq!(result, invalid_url);
     }
 }
