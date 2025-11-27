@@ -51,8 +51,13 @@ pub fn guess_from_configure(
         }
 
         if value.starts_with('\'') && value.ends_with('\'') {
-            value = &value[1..value.len() - 1];
-            if value.is_empty() {
+            if value.len() >= 2 {
+                value = &value[1..value.len() - 1];
+                if value.is_empty() {
+                    continue;
+                }
+            } else {
+                // Single quote character, skip it
                 continue;
             }
         }
@@ -124,4 +129,56 @@ pub fn guess_from_configure(
         }
     }
     Ok(results)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_single_quote_value() {
+        // Test that a single quote character doesn't cause a panic
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "PACKAGE_NAME='").unwrap();
+
+        let settings = GuesserSettings::default();
+        let result = guess_from_configure(file.path(), &settings);
+
+        assert!(result.is_ok());
+        let data = result.unwrap();
+        // Single quote should be skipped, so no results
+        assert_eq!(data.len(), 0);
+    }
+
+    #[test]
+    fn test_empty_quoted_value() {
+        // Test that empty quoted strings are skipped
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "PACKAGE_NAME=''").unwrap();
+
+        let settings = GuesserSettings::default();
+        let result = guess_from_configure(file.path(), &settings);
+
+        assert!(result.is_ok());
+        let data = result.unwrap();
+        // Empty quoted value should be skipped
+        assert_eq!(data.len(), 0);
+    }
+
+    #[test]
+    fn test_valid_quoted_value() {
+        // Test that properly quoted values are extracted
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "PACKAGE_NAME='my-package'").unwrap();
+
+        let settings = GuesserSettings::default();
+        let result = guess_from_configure(file.path(), &settings);
+
+        assert!(result.is_ok());
+        let data = result.unwrap();
+        assert_eq!(data.len(), 1);
+        assert!(matches!(data[0].datum, UpstreamDatum::Name(ref name) if name == "my-package"));
+    }
 }
