@@ -313,9 +313,9 @@ checksum = "36f64beae40a84da1b4b26ff2761a5b895c12adc41dc25aaee1c4f2bbfe97a6e"
 
 [[package]]
 name = "breezyshim"
-version = "0.7.4"
+version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78e47836b430bb72f9011c99311cc2d8f2c0b55ef3c9624ba93e81b582c854bf"
+checksum = "8efc483b715372b682e6094ddebdb0d6687e1c6f5ff922155495e7bfb2ae3d1d"
 dependencies = [
  "chrono",
  "ctor",
@@ -890,9 +890,9 @@ checksum = "9b10589d1a5e400d61f9f38f12f884cfd080ff345de8f17efda36fe0e4a02aa8"
 
 [[package]]
 name = "ctor"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ffc71fcdcdb40d6f087edddf7f8f1f8f79e6cf922f555a9ee8779752d4819bd"
+checksum = "eb230974aaf0aca4d71665bed0aca156cf43b764fcb9583b69c6c3e686f35e72"
 dependencies = [
  "ctor-proc-macro",
  "dtor",
@@ -974,9 +974,9 @@ dependencies = [
 
 [[package]]
 name = "deb822-lossless"
-version = "0.4.6"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b36d018a7c9d608cab492509ad67019bea0d8df4aeb40299d99b51c18b6f9f81"
+checksum = "cdcadf12851ddb37dc938e724beeb50e83bfe1a1fda3c15b997dc1105ec49e3d"
 dependencies = [
  "regex",
  "rowan",
@@ -1048,9 +1048,9 @@ dependencies = [
 
 [[package]]
 name = "debian-control"
-version = "0.2.5"
+version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6c17148ce965fcac53d4b06fbeefc3a77dfdcae1feb2d3b181021c1be2830b7"
+checksum = "bfc2596d8356567e2fdd8653210d94dd06ca8c4ab9679ec6edf443f9efaeb9c3"
 dependencies = [
  "chrono",
  "deb822-fast",
@@ -1063,9 +1063,9 @@ dependencies = [
 
 [[package]]
 name = "debian-copyright"
-version = "0.1.32"
+version = "0.1.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c9d22a57524d9a5b2756289ac67700ca76c02621c15a6130af54a72523648a1"
+checksum = "8820cd2195ca3f8159d6488419c02c1cca83535050ed60bbf00e5e54e89586c5"
 dependencies = [
  "deb822-fast",
  "deb822-lossless",
@@ -3356,9 +3356,9 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
 name = "libc"
-version = "0.2.177"
+version = "0.2.178"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2874a2af47a2325c2001a6e6fad9b16a53b802102b528163885171cf92b15976"
+checksum = "37c93d8daa9d8a012fd8ab92f088405fb202ea0b6ab73ee2482ae66af4f42091"
 
 [[package]]
 name = "libdbus-sys"
@@ -3490,9 +3490,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.28"
+version = "0.4.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34080505efa8e45a4b816c349525ebe327ceaa8559756f0356cba97ef3bf7432"
+checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
 name = "m_lexer"
@@ -3522,9 +3522,9 @@ dependencies = [
 
 [[package]]
 name = "makefile-lossless"
-version = "0.3.8"
+version = "0.3.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8412097b17a60f7c16358237f1f1f8f46c2e348074e918acbe10b0ca5cc59cf8"
+checksum = "7a4db5908bb68ae2e0afc45301a4cb9aaceb364a06865a08efe28324a60f9217"
 dependencies = [
  "log",
  "rowan",
@@ -4601,9 +4601,9 @@ checksum = "640c9bd8497b02465aeef5375144c26062e0dcd5939dfcbb0f5db76cb8c17c73"
 
 [[package]]
 name = "r-description"
-version = "0.3.6"
+version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba0825e068a114feed9aeba80f0e97f3d747fde0cf3f60e394c6fb181ef23893"
+checksum = "f97b1f65f8b0a2687d665c2d16e866f69c5c2f0486ccf905b776badacb3ebb53"
 dependencies = [
  "deb822-derive",
  "deb822-fast",
@@ -6060,7 +6060,7 @@ checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
 name = "upstream-ontologist"
-version = "0.3.5"
+version = "0.3.6"
 dependencies = [
  "async-trait",
  "bit-set 0.8.0",

@@ -674,6 +674,12 @@ pub async fn guess_from_debian_copyright(
                 }
             }
         }
+        Err(Error::InvalidValue(e)) => {
+            return Err(ProviderError::ParseError(format!(
+                "Invalid value in debian/copyright: {}",
+                e
+            )));
+        }
     }
 
     for url in urls.into_iter() {
