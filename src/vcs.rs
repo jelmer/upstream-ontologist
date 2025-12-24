@@ -984,8 +984,15 @@ pub async fn find_secure_repo_url(
     }
 
     if url.scheme() == "lp" {
+        // lp: URLs like "lp:test-package" are parsed with the package name as the path
+        // We need to preserve this path when converting to https://code.launchpad.net/test-package
+        let original_path = url.path().to_string();
         url = derive_with_scheme(&url, "https");
         url.set_host(Some("code.launchpad.net")).unwrap();
+        // Ensure the path starts with /
+        if !original_path.starts_with('/') {
+            url.set_path(&format!("/{}", original_path));
+        }
     }
 
     if let Some(host) = url.host_str() {
@@ -1793,5 +1800,27 @@ mod tests {
         let result = super::sanitize_url(invalid_url).await;
         // Should not panic, and should return the original string
         assert_eq!(result, invalid_url);
+    }
+
+    #[tokio::test]
+    async fn test_find_secure_repo_url_lp() {
+        use super::find_secure_repo_url;
+        use url::Url;
+
+        // Test basic lp: URL conversion
+        let url = Url::parse("lp:test-package").unwrap();
+        let result = find_secure_repo_url(url, None, Some(false)).await;
+        assert_eq!(
+            result,
+            Some(Url::parse("https://code.launchpad.net/test-package").unwrap())
+        );
+
+        // Test lp: URL with path
+        let url = Url::parse("lp:ubuntu/test-package").unwrap();
+        let result = find_secure_repo_url(url, None, Some(false)).await;
+        assert_eq!(
+            result,
+            Some(Url::parse("https://code.launchpad.net/ubuntu/test-package").unwrap())
+        );
     }
 }

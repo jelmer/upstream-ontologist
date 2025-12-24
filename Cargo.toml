@@ -33,7 +33,7 @@ clap = { version = ">=4.5.48, <5", features = ["derive", "env"], optional = true
 maplit = ">=1.0.2, <2"
 env_logger = { version = ">=0.11.8, <0.12", optional = true }
 makefile-lossless = { version = ">=0.2.1, <0.4", optional = true }
-debian-copyright = { version = ">=0.1.28, <0.2", optional = true }
+debian-copyright = { version = ">=0.1.34, <0.2", optional = true }
 debian-control = { version = ">=0.1.48, <0.3", optional = true }
 pulldown-cmark = ">=0.13.0, <0.14"
 debcargo = { version = ">=2.7.10, <3", optional = true }
