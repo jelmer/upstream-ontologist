@@ -78,7 +78,7 @@ tempfile = "3.20"
 quote = ">=1.0.40, <2"
 
 [dependencies.pyo3]
-version = ">=0.27.0, <0.28"
+version = ">=0.27.0, <0.29"
 optional = true
 
 [dependencies.reqwest]
