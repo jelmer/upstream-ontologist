@@ -712,14 +712,23 @@ fn read_entries(path: &Path) -> Result<Vec<(url::Url, debian_watch::Mode)>, Prov
         first_entry.package().unwrap()
     };
 
-    let w: debian_watch::WatchFile = std::fs::read_to_string(path)?
-        .parse()
+    let text = std::fs::read_to_string(path)?;
+    let w = debian_watch::parse::parse(&text)
         .map_err(|e| ProviderError::ParseError(format!("Failed to parse debian/watch: {}", e)))?;
 
-    let entries = w
+    let entries: Vec<(url::Url, debian_watch::Mode)> = w
         .entries()
-        .map(|e| (e.format_url(get_package_name), e.mode().unwrap_or_default()))
-        .collect::<Vec<_>>();
+        .filter_map(|e| {
+            let url = e.format_url(get_package_name).ok()?;
+            let mode = match &e {
+                debian_watch::parse::ParsedEntry::LineBased(entry) => entry.mode().ok(),
+                debian_watch::parse::ParsedEntry::Deb822(entry) => {
+                    entry.get_option("mode").and_then(|s| s.parse().ok())
+                }
+            };
+            Some((url, mode.unwrap_or_default()))
+        })
+        .collect();
 
     Ok(entries)
 }
