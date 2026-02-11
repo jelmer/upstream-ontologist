@@ -179,7 +179,8 @@ fn version_in_tags(version: &str, tag_names: &[&str]) -> bool {
 fn probe_upstream_breezy_branch_url(url: &url::Url, version: Option<&str>) -> Option<bool> {
     let tags: HashMap<String, breezyshim::RevisionId> = breezyshim::ui::with_silent_ui_factory(
         || -> Result<HashMap<String, breezyshim::RevisionId>, breezyshim::error::Error> {
-            let branch = breezyshim::branch::open(url)?;
+            use breezyshim::branch::Branch;
+            let branch = breezyshim::branch::open_as_generic(url)?;
             branch.tags()?.get_tag_dict()
         },
     )
