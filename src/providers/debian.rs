@@ -719,7 +719,7 @@ fn read_entries(path: &Path) -> Result<Vec<(url::Url, debian_watch::Mode)>, Prov
     let entries: Vec<(url::Url, debian_watch::Mode)> = w
         .entries()
         .filter_map(|e| {
-            let url = e.format_url(get_package_name).ok()?;
+            let url = e.format_url(get_package_name, String::new).ok()?;
             let mode = match &e {
                 debian_watch::parse::ParsedEntry::LineBased(entry) => entry.mode().ok(),
                 debian_watch::parse::ParsedEntry::Deb822(entry) => {
