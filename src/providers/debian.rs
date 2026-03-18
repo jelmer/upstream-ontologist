@@ -460,7 +460,10 @@ pub fn guess_from_debian_control(
     let control = debian_control::Control::from_str(&std::fs::read_to_string(path)?)
         .map_err(|e| ProviderError::ParseError(format!("Failed to parse debian/control: {}", e)))?;
 
-    let source = control.source().unwrap();
+    let source = match control.source() {
+        Some(source) => source,
+        None => return Ok(ret),
+    };
 
     let is_native = debian_is_native(path.parent().unwrap()).map_err(|e| {
         ProviderError::ParseError(format!("Failed to parse debian/source/format: {}", e))
@@ -807,6 +810,28 @@ pub fn debian_is_native(path: &Path) -> std::io::Result<Option<bool>> {
     }
 
     Ok(None)
+}
+
+#[cfg(test)]
+#[cfg(feature = "debian")]
+mod control_tests {
+    use super::*;
+
+    #[test]
+    fn test_no_source_stanza() {
+        let td = tempfile::tempdir().unwrap();
+        let debian_dir = td.path().join("debian");
+        std::fs::create_dir(&debian_dir).unwrap();
+        let path = debian_dir.join("control");
+        std::fs::write(
+            &path,
+            "Package: test-binary\nArchitecture: any\nDescription: A test package\n",
+        )
+        .unwrap();
+        let result =
+            guess_from_debian_control(&path, &GuesserSettings::default()).unwrap();
+        assert_eq!(result, vec![]);
+    }
 }
 
 #[cfg(test)]
