@@ -83,47 +83,43 @@ pub async fn guess_from_gemspec(
             };
 
             match key {
-                "name" => results.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Name(val.as_str().unwrap().to_string()),
-                    certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
-                }),
-                "version" => results.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Version(val.as_str().unwrap().to_string()),
-                    certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
-                }),
-                "homepage" => results.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Homepage(val.as_str().unwrap().to_string()),
-                    certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
-                }),
-                "summary" => results.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Summary(val.as_str().unwrap().to_string()),
-                    certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
-                }),
-                "description" => results.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Description(val.as_str().unwrap().to_string()),
-                    certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
-                }),
-                "license" => results.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::License(val.as_str().unwrap().to_string()),
-                    certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
-                }),
-                "authors" => results.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Author(
-                        val.as_array()
-                            .unwrap()
+                "name" | "version" | "homepage" | "summary" | "description" | "license" => {
+                    if let Some(s) = val.as_str() {
+                        let datum = match key {
+                            "name" => UpstreamDatum::Name(s.to_string()),
+                            "version" => UpstreamDatum::Version(s.to_string()),
+                            "homepage" => UpstreamDatum::Homepage(s.to_string()),
+                            "summary" => UpstreamDatum::Summary(s.to_string()),
+                            "description" => UpstreamDatum::Description(s.to_string()),
+                            "license" => UpstreamDatum::License(s.to_string()),
+                            _ => unreachable!(),
+                        };
+                        results.push(UpstreamDatumWithMetadata {
+                            datum,
+                            certainty: Some(Certainty::Certain),
+                            origin: Some(path.into()),
+                        });
+                    } else {
+                        debug!("gemspec: expected string for '{}', got {:?}", key, val);
+                    }
+                }
+                "authors" => {
+                    if let Some(arr) = val.as_array() {
+                        let persons: Vec<Person> = arr
                             .iter()
-                            .map(|p| Person::from(p.as_str().unwrap()))
-                            .collect(),
-                    ),
-                    certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
-                }),
+                            .filter_map(|p| p.as_str().map(Person::from))
+                            .collect();
+                        if !persons.is_empty() {
+                            results.push(UpstreamDatumWithMetadata {
+                                datum: UpstreamDatum::Author(persons),
+                                certainty: Some(Certainty::Certain),
+                                origin: Some(path.into()),
+                            });
+                        }
+                    } else {
+                        debug!("gemspec: expected array for 'authors', got {:?}", val);
+                    }
+                }
                 _ => debug!("unknown field {} ({:?}) in gemspec", key, val),
             }
         } else {
@@ -311,11 +307,12 @@ impl TryFrom<Rubygem> for UpstreamMetadata {
 
 /// Loads Ruby gem data from the RubyGems API
 pub async fn load_rubygem(name: &str) -> Result<Option<Rubygem>, ProviderError> {
-    let url = format!("https://rubygems.org/api/v1/gems/{}.json", name)
+    let url: url::Url = format!("https://rubygems.org/api/v1/gems/{}.json", name)
         .parse()
-        .unwrap();
+        .map_err(|e: url::ParseError| ProviderError::Other(e.to_string()))?;
     let data = crate::load_json_url(&url, None).await?;
-    let gem: Rubygem = serde_json::from_value(data).unwrap();
+    let gem: Rubygem = serde_json::from_value(data)
+        .map_err(|e| ProviderError::ParseError(format!("Failed to parse rubygem data: {}", e)))?;
     Ok(Some(gem))
 }
 
@@ -331,6 +328,35 @@ pub async fn remote_rubygem_metadata(name: &str) -> Result<UpstreamMetadata, Pro
 
 #[cfg(test)]
 mod tests {
+    #[tokio::test]
+    async fn test_gemspec_array_where_string_expected() {
+        let td = tempfile::tempdir().unwrap();
+        let path = td.path().join("test.gemspec");
+        std::fs::write(
+            &path,
+            r#"Gem::Specification.new do |s|
+  s.name = ['not', 'a', 'string']
+  s.version = '1.0'
+  s.authors = ['Alice', 'Bob']
+end
+"#,
+        )
+        .unwrap();
+        let result = super::guess_from_gemspec(&path, &super::GuesserSettings::default())
+            .await
+            .unwrap();
+        // name should be skipped (array, not string), version and authors should parse
+        assert!(!result
+            .iter()
+            .any(|d| matches!(&d.datum, super::UpstreamDatum::Name(_))));
+        assert!(result
+            .iter()
+            .any(|d| matches!(&d.datum, super::UpstreamDatum::Version(v) if v == "1.0")));
+        assert!(result
+            .iter()
+            .any(|d| matches!(&d.datum, super::UpstreamDatum::Author(_))));
+    }
+
     #[test]
     fn test_parse_gem() {
         let gemspec = include_str!("../testdata/rubygem.json");
