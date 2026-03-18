@@ -28,11 +28,13 @@ struct Links {
 
 /// Fetches upstream metadata from GoboLinux repository
 pub async fn guess_from_gobo(package: &str) -> Result<Vec<UpstreamDatum>, crate::ProviderError> {
-    let packages_url = "https://api.github.com/repos/gobolinux/Recipes/contents"
+    let packages_url: url::Url = "https://api.github.com/repos/gobolinux/Recipes/contents"
         .parse()
-        .unwrap();
+        .map_err(|e: url::ParseError| crate::ProviderError::Other(e.to_string()))?;
     let contents: Vec<Contents> =
-        serde_json::from_value(crate::load_json_url(&packages_url, None).await?).unwrap();
+        serde_json::from_value(crate::load_json_url(&packages_url, None).await?).map_err(|e| {
+            crate::ProviderError::ParseError(format!("Failed to parse gobo packages: {}", e))
+        })?;
 
     let package = match contents
         .iter()
@@ -46,7 +48,9 @@ pub async fn guess_from_gobo(package: &str) -> Result<Vec<UpstreamDatum>, crate:
     };
 
     let versions: Vec<Contents> =
-        serde_json::from_value(crate::load_json_url(&package.url, None).await?).unwrap();
+        serde_json::from_value(crate::load_json_url(&package.url, None).await?).map_err(|e| {
+            crate::ProviderError::ParseError(format!("Failed to parse gobo versions: {}", e))
+        })?;
 
     let last_version = if let Some(last_version) = versions.last() {
         &last_version.name
@@ -60,17 +64,22 @@ pub async fn guess_from_gobo(package: &str) -> Result<Vec<UpstreamDatum>, crate:
         package.name, last_version
     )
     .parse()
-    .unwrap();
+    .map_err(|e: url::ParseError| crate::ProviderError::Other(e.to_string()))?;
     let client = reqwest::Client::builder()
         .user_agent(crate::USER_AGENT)
         .build()
-        .unwrap();
+        .map_err(|e| crate::ProviderError::Other(e.to_string()))?;
 
     let mut result = Vec::new();
-    let recipe_url = base_url.join("Recipe").unwrap();
+    let recipe_url = base_url
+        .join("Recipe")
+        .map_err(|e| crate::ProviderError::Other(e.to_string()))?;
     match client.get(recipe_url.as_ref()).send().await {
         Ok(response) => {
-            let text = response.text().await.unwrap();
+            let text = response
+                .text()
+                .await
+                .map_err(|e| crate::ProviderError::Other(e.to_string()))?;
             for line in text.lines() {
                 if let Some(url) = line.strip_prefix("url=") {
                     result.push(UpstreamDatum::Homepage(url.to_string()));
@@ -88,10 +97,16 @@ pub async fn guess_from_gobo(package: &str) -> Result<Vec<UpstreamDatum>, crate:
         }
     }
 
-    let description_url = base_url.join("Resources/Description").unwrap();
+    let description_url = base_url
+        .join("Resources/Description")
+        .map_err(|e| crate::ProviderError::Other(e.to_string()))?;
     match client.get(description_url.as_ref()).send().await {
         Ok(response) => {
-            for line in response.text().await.unwrap().lines() {
+            let text = response
+                .text()
+                .await
+                .map_err(|e| crate::ProviderError::Other(e.to_string()))?;
+            for line in text.lines() {
                 if let Some((_, key, value)) = lazy_regex::regex_captures!("\\[(.*)\\] (.*)", line)
                 {
                     match key {
