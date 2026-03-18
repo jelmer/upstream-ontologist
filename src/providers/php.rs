@@ -67,9 +67,9 @@ fn guess_from_pecl_page(body: &str) -> Result<Vec<UpstreamDatum>, ProviderError>
         .next();
 
     if let Some(node) = browse_source_selector {
-        ret.push(UpstreamDatum::RepositoryBrowse(
-            node.attr("href").unwrap().to_string(),
-        ));
+        if let Some(href) = node.attr("href") {
+            ret.push(UpstreamDatum::RepositoryBrowse(href.to_string()));
+        }
     }
 
     let package_bugs_selector = find_tags_by_text(&document, "a", "Package Bugs")
@@ -77,24 +77,21 @@ fn guess_from_pecl_page(body: &str) -> Result<Vec<UpstreamDatum>, ProviderError>
         .next();
 
     if let Some(node) = package_bugs_selector {
-        ret.push(UpstreamDatum::BugDatabase(
-            node.attr("href").unwrap().to_string(),
-        ));
+        if let Some(href) = node.attr("href") {
+            ret.push(UpstreamDatum::BugDatabase(href.to_string()));
+        }
     }
 
     let homepage_selector = find_tags_by_text(&document, "th", "Homepage")
         .into_iter()
         .next()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .find(Name("td").descendant(Name("a")))
-        .next();
+        .and_then(|n| n.parent())
+        .and_then(|n| n.find(Name("td").descendant(Name("a"))).next());
 
     if let Some(node) = homepage_selector {
-        ret.push(UpstreamDatum::Homepage(
-            node.attr("href").unwrap().to_string(),
-        ));
+        if let Some(href) = node.attr("href") {
+            ret.push(UpstreamDatum::Homepage(href.to_string()));
+        }
     }
 
     Ok(ret)
@@ -138,6 +135,18 @@ impl crate::ThirdPartyRepository for Pecl {
 #[cfg(test)]
 mod pecl_tests {
     use super::*;
+
+    #[test]
+    fn test_guess_from_empty_page() {
+        let result = guess_from_pecl_page("<html><body></body></html>").unwrap();
+        assert_eq!(result, vec![]);
+    }
+
+    #[test]
+    fn test_guess_from_malformed_page() {
+        let result = guess_from_pecl_page("this is not html at all").unwrap();
+        assert_eq!(result, vec![]);
+    }
 
     #[test]
     fn test_guess_from_pecl_page() {
