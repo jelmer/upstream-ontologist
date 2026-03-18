@@ -379,8 +379,18 @@ pub fn guess_from_itp_bug(
         ProviderError::ParseError(format!("Failed to get bug log for bug {}: {}", bugno, e))
     })?;
 
+    let first_entry = match log.first() {
+        Some(entry) => entry,
+        None => {
+            return Err(ProviderError::ParseError(format!(
+                "Bug log for bug {} is empty",
+                bugno
+            )));
+        }
+    };
+
     metadata_from_itp_bug_body(
-        log[0].body.as_str(),
+        first_entry.body.as_str(),
         Some(Origin::Other(format!("Debian bug #{}", bugno))),
     )
 }
@@ -397,7 +407,7 @@ pub fn parse_debcargo_source_name(
     source_name: &str,
     semver_suffix: bool,
 ) -> (String, Option<String>) {
-    let mut crate_name = source_name.strip_prefix("rust-").unwrap();
+    let mut crate_name = source_name.strip_prefix("rust-").unwrap_or(source_name);
     match crate_name.rsplitn(2, '-').collect::<Vec<&str>>().as_slice() {
         [semver, new_crate_name] if semver_suffix => {
             crate_name = new_crate_name;
@@ -577,7 +587,16 @@ pub async fn guess_from_debian_copyright(
     let mut urls = vec![];
     match Copyright::from_str_relaxed(text) {
         Ok((c, _)) => {
-            let header = c.header().unwrap();
+            let header = match c.header() {
+                Some(header) => header,
+                None => {
+                    log::warn!(
+                        "debian/copyright: no header paragraph found in {}",
+                        path.display()
+                    );
+                    return Ok(ret);
+                }
+            };
             if let Some(upstream_name) = header.upstream_name() {
                 ret.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Name(upstream_name.to_string()),
@@ -828,8 +847,7 @@ mod control_tests {
             "Package: test-binary\nArchitecture: any\nDescription: A test package\n",
         )
         .unwrap();
-        let result =
-            guess_from_debian_control(&path, &GuesserSettings::default()).unwrap();
+        let result = guess_from_debian_control(&path, &GuesserSettings::default()).unwrap();
         assert_eq!(result, vec![]);
     }
 }
