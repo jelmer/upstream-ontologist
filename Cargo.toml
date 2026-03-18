@@ -1,6 +1,6 @@
 [package]
 name = "upstream-ontologist"
-version = "0.3.12"
+version = "0.3.13"
 authors = [ "Jelmer Vernooĳ <jelmer@jelmer.uk>",]
 edition = "2021"
 license = "GPL-2.0+"
@@ -21,7 +21,7 @@ xmltree = ">=0.10.3, <0.13"
 configparser = ">=3.0.3, <4"
 serde_yaml = ">=0.9.34, <0.10"
 percent-encoding = ">=2.3.2, <3"
-html5ever = ">=0.26, <0.39"
+html5ever = ">=0.26, <0.40"
 chrono = ">=0.4.42, <0.5"
 textwrap = ">=0.16.2, <0.17"
 lazy-regex = ">=3.4, <4"
