@@ -10,8 +10,8 @@ pub fn guess_from_doap(
     _trust_package: bool,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     use xmltree::Element;
-    let file = File::open(path).expect("Failed to open file");
-    let doc = Element::parse(file).expect("Failed to parse XML");
+    let file = File::open(path)?;
+    let doc = Element::parse(file).map_err(|e| ProviderError::ParseError(e.to_string()))?;
     let mut root = &doc;
 
     let mut results: Vec<UpstreamDatumWithMetadata> = Vec::new();
@@ -248,4 +248,40 @@ pub fn guess_from_doap(
     }
 
     Ok(results)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn write_xml(td: &tempfile::TempDir, content: &str) -> std::path::PathBuf {
+        let path = td.path().join("test.doap");
+        std::fs::write(&path, content).unwrap();
+        path
+    }
+
+    #[test]
+    fn test_invalid_xml() {
+        let td = tempfile::tempdir().unwrap();
+        let path = write_xml(&td, "<<<not xml");
+        let result = guess_from_doap(&path, false);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_wrong_root_element() {
+        let td = tempfile::tempdir().unwrap();
+        let path = write_xml(
+            &td,
+            r#"<html xmlns="http://www.w3.org/1999/xhtml"><body/></html>"#,
+        );
+        let result = guess_from_doap(&path, false);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_missing_file() {
+        let result = guess_from_doap(std::path::Path::new("/nonexistent/doap.xml"), false);
+        assert!(result.is_err());
+    }
 }
