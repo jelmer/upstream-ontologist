@@ -42,7 +42,7 @@ pub fn guess_from_authors(
             let parts: Vec<&str> = m.split(" for ").collect();
             m = parts[0].to_string();
         }
-        if !m.chars().next().unwrap().is_alphabetic() {
+        if !m.starts_with(|c: char| c.is_alphabetic()) {
             continue;
         }
         if !m.contains('<') && line.as_bytes().starts_with(b"\t") {
