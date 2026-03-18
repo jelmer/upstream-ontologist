@@ -279,11 +279,12 @@ impl TryInto<UpstreamMetadata> for NpmPackage {
 /// Fetches package information from the NPM registry API for the specified package name.
 /// Returns the parsed package metadata or None if the package doesn't exist.
 pub async fn load_npm_package(package: &str) -> Result<Option<NpmPackage>, crate::ProviderError> {
-    let http_url = format!("https://registry.npmjs.org/{}", package)
+    let http_url: url::Url = format!("https://registry.npmjs.org/{}", package)
         .parse()
-        .unwrap();
+        .map_err(|e: url::ParseError| crate::ProviderError::Other(e.to_string()))?;
     let data = crate::load_json_url(&http_url, None).await?;
-    Ok(serde_json::from_value(data).unwrap())
+    serde_json::from_value(data)
+        .map_err(|e| crate::ProviderError::ParseError(format!("Failed to parse npm data: {}", e)))
 }
 
 /// Get upstream metadata for an NPM package

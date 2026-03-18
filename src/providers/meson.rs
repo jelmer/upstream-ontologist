@@ -19,8 +19,8 @@ pub fn guess_from_meson(
     })?;
     if !output.status.success() {
         return Err(ProviderError::Other(format!(
-            "meson failed to run; exited with code {}",
-            output.status.code().unwrap()
+            "meson failed to run; exited with code {:?}",
+            output.status.code()
         )));
     }
     let project_info: serde_json::Value = serde_json::from_slice(&output.stdout)

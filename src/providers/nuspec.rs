@@ -22,14 +22,20 @@ pub async fn guess_from_nuspec(
         }
     };
 
-    assert_eq!(root.name, "package", "root tag is {}", root.name);
-    let metadata = root.get_child("metadata");
-    if metadata.is_none() {
-        return Err(ProviderError::ParseError(
-            "Unable to find metadata tag".to_string(),
-        ));
+    if root.name != "package" {
+        return Err(ProviderError::ParseError(format!(
+            "Expected 'package' root tag, got {:?}",
+            root.name
+        )));
     }
-    let metadata = metadata.unwrap();
+    let metadata = match root.get_child("metadata") {
+        Some(metadata) => metadata,
+        None => {
+            return Err(ProviderError::ParseError(
+                "Unable to find metadata tag".to_string(),
+            ));
+        }
+    };
 
     let mut result = Vec::new();
 
@@ -66,9 +72,22 @@ pub async fn guess_from_nuspec(
 
     if let Some(project_url_tag) = metadata.get_child("projectUrl") {
         if let Some(project_url) = project_url_tag.get_text() {
-            let repo_url =
-                crate::vcs::guess_repo_from_url(&url::Url::parse(&project_url).unwrap(), None)
-                    .await;
+            let parsed_url = match url::Url::parse(&project_url) {
+                Ok(url) => Some(url),
+                Err(e) => {
+                    log::warn!(
+                        "nuspec: failed to parse projectUrl {:?}: {}",
+                        project_url,
+                        e
+                    );
+                    None
+                }
+            };
+            let repo_url = if let Some(parsed_url) = &parsed_url {
+                crate::vcs::guess_repo_from_url(parsed_url, None).await
+            } else {
+                None
+            };
             if let Some(repo_url) = repo_url {
                 result.push(UpstreamDatumWithMetadata {
                     datum: UpstreamDatum::Repository(repo_url),
@@ -126,20 +145,88 @@ pub async fn guess_from_nuspec(
 
     if let Some(repository_tag) = metadata.get_child("repository") {
         if let Some(repo_url) = repository_tag.attributes.get("url") {
-            let branch = repository_tag.attributes.get("branch");
-            result.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Repository(crate::vcs::unsplit_vcs_url(
-                    &crate::vcs::VcsLocation {
-                        url: repo_url.parse().unwrap(),
-                        branch: branch.cloned(),
-                        subpath: None,
-                    },
-                )),
-                certainty: Some(Certainty::Certain),
-                origin: Some(path.into()),
-            });
+            match repo_url.parse() {
+                Ok(url) => {
+                    let branch = repository_tag.attributes.get("branch");
+                    result.push(UpstreamDatumWithMetadata {
+                        datum: UpstreamDatum::Repository(crate::vcs::unsplit_vcs_url(
+                            &crate::vcs::VcsLocation {
+                                url,
+                                branch: branch.cloned(),
+                                subpath: None,
+                            },
+                        )),
+                        certainty: Some(Certainty::Certain),
+                        origin: Some(path.into()),
+                    });
+                }
+                Err(e) => {
+                    log::warn!(
+                        "nuspec: failed to parse repository URL {:?}: {}",
+                        repo_url,
+                        e
+                    );
+                }
+            }
         }
     }
 
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn write_nuspec(td: &tempfile::TempDir, content: &str) -> std::path::PathBuf {
+        let path = td.path().join("test.nuspec");
+        std::fs::write(&path, content).unwrap();
+        path
+    }
+
+    #[tokio::test]
+    async fn test_wrong_root_element() {
+        let td = tempfile::tempdir().unwrap();
+        let path = write_nuspec(&td, r#"<project><metadata/></project>"#);
+        let result = guess_from_nuspec(&path, false).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_no_metadata_element() {
+        let td = tempfile::tempdir().unwrap();
+        let path = write_nuspec(&td, r#"<package><files/></package>"#);
+        let result = guess_from_nuspec(&path, false).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_invalid_project_url() {
+        let td = tempfile::tempdir().unwrap();
+        let path = write_nuspec(
+            &td,
+            r#"<package><metadata>
+  <projectUrl>not a valid url at all</projectUrl>
+</metadata></package>"#,
+        );
+        let result = guess_from_nuspec(&path, false).await.unwrap();
+        // Should still produce a Homepage datum even if URL parsing fails
+        assert!(result
+            .iter()
+            .any(|d| matches!(&d.datum, UpstreamDatum::Homepage(_))));
+    }
+
+    #[tokio::test]
+    async fn test_invalid_repository_url() {
+        let td = tempfile::tempdir().unwrap();
+        let path = write_nuspec(
+            &td,
+            r#"<package><metadata>
+  <repository url=":::invalid"/>
+</metadata></package>"#,
+        );
+        let result = guess_from_nuspec(&path, false).await.unwrap();
+        // Should not panic, just skip the invalid URL
+        assert!(result.is_empty());
+    }
 }

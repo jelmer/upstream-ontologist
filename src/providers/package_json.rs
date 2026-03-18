@@ -29,46 +29,82 @@ pub fn guess_from_package_json(
     for (field, value) in package {
         match field.as_str() {
             "name" => {
-                upstream_data.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Name(value.as_str().unwrap().to_string()),
-                    certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
-                });
+                if let Some(s) = value.as_str() {
+                    upstream_data.push(UpstreamDatumWithMetadata {
+                        datum: UpstreamDatum::Name(s.to_string()),
+                        certainty: Some(Certainty::Certain),
+                        origin: Some(path.into()),
+                    });
+                } else {
+                    log::warn!("package.json: expected string for 'name', got {:?}", value);
+                }
             }
             "homepage" => {
-                upstream_data.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Homepage(value.as_str().unwrap().to_string()),
-                    certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
-                });
+                if let Some(s) = value.as_str() {
+                    upstream_data.push(UpstreamDatumWithMetadata {
+                        datum: UpstreamDatum::Homepage(s.to_string()),
+                        certainty: Some(Certainty::Certain),
+                        origin: Some(path.into()),
+                    });
+                } else {
+                    log::warn!(
+                        "package.json: expected string for 'homepage', got {:?}",
+                        value
+                    );
+                }
             }
             "description" => {
-                upstream_data.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Summary(value.as_str().unwrap().to_string()),
-                    certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
-                });
+                if let Some(s) = value.as_str() {
+                    upstream_data.push(UpstreamDatumWithMetadata {
+                        datum: UpstreamDatum::Summary(s.to_string()),
+                        certainty: Some(Certainty::Certain),
+                        origin: Some(path.into()),
+                    });
+                } else {
+                    log::warn!(
+                        "package.json: expected string for 'description', got {:?}",
+                        value
+                    );
+                }
             }
             "license" => {
-                upstream_data.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::License(value.as_str().unwrap().to_string()),
-                    certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
-                });
+                if let Some(s) = value.as_str() {
+                    upstream_data.push(UpstreamDatumWithMetadata {
+                        datum: UpstreamDatum::License(s.to_string()),
+                        certainty: Some(Certainty::Certain),
+                        origin: Some(path.into()),
+                    });
+                } else {
+                    log::warn!(
+                        "package.json: expected string for 'license', got {:?}",
+                        value
+                    );
+                }
             }
             "demo" => {
-                upstream_data.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Demo(value.as_str().unwrap().to_string()),
-                    certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
-                });
+                if let Some(s) = value.as_str() {
+                    upstream_data.push(UpstreamDatumWithMetadata {
+                        datum: UpstreamDatum::Demo(s.to_string()),
+                        certainty: Some(Certainty::Certain),
+                        origin: Some(path.into()),
+                    });
+                } else {
+                    log::warn!("package.json: expected string for 'demo', got {:?}", value);
+                }
             }
             "version" => {
-                upstream_data.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Version(value.as_str().unwrap().to_string()),
-                    certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
-                });
+                if let Some(s) = value.as_str() {
+                    upstream_data.push(UpstreamDatumWithMetadata {
+                        datum: UpstreamDatum::Version(s.to_string()),
+                        certainty: Some(Certainty::Certain),
+                        origin: Some(path.into()),
+                    });
+                } else {
+                    log::warn!(
+                        "package.json: expected string for 'version', got {:?}",
+                        value
+                    );
+                }
             }
             "repository" => {
                 let repo_url = if let Some(repo_url) = value.as_str() {
@@ -111,7 +147,11 @@ pub fn guess_from_package_json(
                             });
                         }
                         Err(e) => {
-                            panic!("Failed to parse repository URL: {}", e);
+                            log::warn!(
+                                "package.json: failed to parse repository URL {:?}: {}",
+                                repo_url,
+                                e
+                            );
                         }
                     }
                 }
@@ -192,6 +232,43 @@ pub fn guess_from_package_json(
 #[cfg(test)]
 mod package_json_tests {
     use super::*;
+
+    fn write_json(td: &tempfile::TempDir, content: &str) -> std::path::PathBuf {
+        let path = td.path().join("package.json");
+        std::fs::write(&path, content).unwrap();
+        path
+    }
+
+    #[test]
+    fn test_wrong_field_types() {
+        let td = tempfile::tempdir().unwrap();
+        let path = write_json(
+            &td,
+            r#"{"name": 42, "homepage": [], "license": {}, "version": null}"#,
+        );
+        let result = guess_from_package_json(&path, &GuesserSettings::default()).unwrap();
+        assert_eq!(result, vec![]);
+    }
+
+    #[test]
+    fn test_relative_repository_url_guesses_github() {
+        let td = tempfile::tempdir().unwrap();
+        let path = write_json(&td, r#"{"repository": "user/repo"}"#);
+        let result = guess_from_package_json(&path, &GuesserSettings::default()).unwrap();
+        assert_eq!(result.len(), 1);
+        assert!(matches!(
+            &result[0].datum,
+            UpstreamDatum::Repository(url) if url == "https://github.com/user/repo"
+        ));
+    }
+
+    #[test]
+    fn test_not_an_object() {
+        let td = tempfile::tempdir().unwrap();
+        let path = write_json(&td, r#"[1, 2, 3]"#);
+        let result = guess_from_package_json(&path, &GuesserSettings::default());
+        assert!(result.is_err());
+    }
 
     #[test]
     fn test_dummy() {

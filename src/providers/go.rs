@@ -13,7 +13,7 @@ pub fn guess_from_go_mod(
     path: &Path,
     _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
-    let file = File::open(path).expect("Failed to open file");
+    let file = File::open(path)?;
     let reader = BufReader::new(file);
     let mut results = Vec::new();
 
@@ -55,4 +55,36 @@ pub fn remote_go_metadata(package: &str) -> Result<UpstreamMetadata, ProviderErr
         });
     }
     Ok(ret)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_missing_file() {
+        let result = guess_from_go_mod(
+            std::path::Path::new("/nonexistent/go.mod"),
+            &GuesserSettings::default(),
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_empty_file() {
+        let td = tempfile::tempdir().unwrap();
+        let path = td.path().join("go.mod");
+        std::fs::write(&path, "").unwrap();
+        let result = guess_from_go_mod(&path, &GuesserSettings::default()).unwrap();
+        assert_eq!(result, vec![]);
+    }
+
+    #[test]
+    fn test_truncated_module_line() {
+        let td = tempfile::tempdir().unwrap();
+        let path = td.path().join("go.mod");
+        std::fs::write(&path, "module").unwrap();
+        let result = guess_from_go_mod(&path, &GuesserSettings::default()).unwrap();
+        assert_eq!(result, vec![]);
+    }
 }

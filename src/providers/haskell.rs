@@ -96,7 +96,7 @@ pub fn guess_from_cabal_lines(
             (Some("source-repository head"), "location") => repo_url = Some(value.to_owned()),
             (Some("source-repository head"), "branch") => repo_branch = Some(value.to_owned()),
             (Some("source-repository head"), "subdir") => repo_subpath = Some(value.to_owned()),
-            (s, _) if s.is_some() && s.unwrap().starts_with("executable ") => {}
+            (Some(s), _) if s.starts_with("executable ") => {}
             _ => {
                 log::debug!("Unknown field {:?} in section {:?}", key, section);
             }
@@ -104,14 +104,23 @@ pub fn guess_from_cabal_lines(
     }
 
     if let Some(repo_url) = repo_url {
-        results.push((
-            UpstreamDatum::Repository(crate::vcs::unsplit_vcs_url(&crate::vcs::VcsLocation {
-                url: repo_url.parse().unwrap(),
-                branch: repo_branch,
-                subpath: repo_subpath,
-            })),
-            Certainty::Certain,
-        ));
+        match repo_url.parse() {
+            Ok(url) => {
+                results.push((
+                    UpstreamDatum::Repository(crate::vcs::unsplit_vcs_url(
+                        &crate::vcs::VcsLocation {
+                            url,
+                            branch: repo_branch,
+                            subpath: repo_subpath,
+                        },
+                    )),
+                    Certainty::Certain,
+                ));
+            }
+            Err(e) => {
+                log::warn!("Failed to parse cabal repository URL {:?}: {}", repo_url, e);
+            }
+        }
     }
 
     Ok(results
@@ -132,11 +141,7 @@ pub fn guess_from_cabal(
     let file = File::open(path)?;
     let reader = BufReader::new(file);
 
-    guess_from_cabal_lines(
-        reader
-            .lines()
-            .map(|line| line.expect("Failed to read line")),
-    )
+    guess_from_cabal_lines(reader.lines().map_while(Result::ok))
 }
 
 /// Fetches upstream metadata for a package from Hackage
@@ -168,11 +173,7 @@ pub async fn guess_from_hackage(
         Ok(response) => {
             let bytes = response.bytes().await?;
             let reader = BufReader::new(&bytes[..]);
-            guess_from_cabal_lines(
-                reader
-                    .lines()
-                    .map(|line| line.expect("Failed to read line")),
-            )
+            guess_from_cabal_lines(reader.lines().map_while(Result::ok))
         }
         Err(e) => match e.status() {
             Some(reqwest::StatusCode::NOT_FOUND) => {
@@ -240,6 +241,25 @@ impl crate::ThirdPartyRepository for Hackage {
 #[cfg(test)]
 mod parse_tests {
     use super::*;
+
+    #[test]
+    fn test_invalid_repo_url() {
+        let lines = r#"Name: foo
+
+source-repository head
+  type: git
+  location: not a valid url at all
+"#;
+        let result = guess_from_cabal_lines(lines.lines().map(|s| s.to_owned())).unwrap();
+        // Should not contain a Repository datum since the URL is invalid
+        assert!(!result
+            .iter()
+            .any(|d| matches!(&d.datum, UpstreamDatum::Repository(_))));
+        // But should still parse the name
+        assert!(result
+            .iter()
+            .any(|d| matches!(&d.datum, UpstreamDatum::Name(n) if n == "foo")));
+    }
 
     #[test]
     fn test_parse_cabal_lines() {

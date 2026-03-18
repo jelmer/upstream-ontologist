@@ -84,8 +84,13 @@ pub async fn guess_from_install(
         let mut cmdline = line.trim().trim_start_matches('$').trim().to_string();
         if cmdline.starts_with("git clone ") || cmdline.starts_with("fossil clone ") {
             while cmdline.ends_with('\\') {
-                cmdline.push_str(lines.next().unwrap()?.trim());
-                cmdline = cmdline.trim().to_string();
+                match lines.next() {
+                    Some(Ok(next_line)) => {
+                        cmdline.push_str(next_line.trim());
+                        cmdline = cmdline.trim().to_string();
+                    }
+                    _ => break,
+                }
             }
             if let Some(url) = if cmdline.starts_with("git clone ") {
                 crate::vcs_command::url_from_git_clone_command(cmdline.as_bytes())
@@ -135,8 +140,15 @@ pub async fn guess_from_install(
             });
         }
         for m in lazy_regex::regex!("https://([^]/]+)/([^]\\s()\"#]+)").find_iter(line) {
-            let url: url::Url = m.as_str().trim_end_matches('.').trim().parse().unwrap();
-            if crate::vcs::is_gitlab_site(url.host_str().unwrap(), None).await {
+            let url: url::Url = match m.as_str().trim_end_matches('.').trim().parse() {
+                Ok(url) => url,
+                Err(_) => continue,
+            };
+            let host = match url.host_str() {
+                Some(host) => host,
+                None => continue,
+            };
+            if crate::vcs::is_gitlab_site(host, None).await {
                 if let Some(repo_url) = crate::vcs::guess_repo_from_url(&url, None).await {
                     ret.push(UpstreamDatumWithMetadata {
                         datum: UpstreamDatum::Repository(repo_url),

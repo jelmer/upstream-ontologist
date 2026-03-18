@@ -98,7 +98,13 @@ pub async fn guess_from_aur(package: &str) -> Vec<UpstreamDatum> {
         match response {
             Ok(response) => {
                 if response.status().is_success() {
-                    let text = response.text().await.unwrap();
+                    let text = match response.text().await {
+                        Ok(text) => text,
+                        Err(e) => {
+                            error!("Error reading AUR response: {}", e);
+                            return Vec::new();
+                        }
+                    };
                     variables = parse_pkgbuild_variables(&text);
                     break;
                 } else if response.status().as_u16() != 404 {

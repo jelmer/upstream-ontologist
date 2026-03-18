@@ -362,35 +362,40 @@ pub fn guess_from_meta_yml(
     }
 
     if let Some(resources) = data.get("resources") {
-        if let Some(bugtracker) = resources.get("bugtracker") {
+        if let Some(bugtracker) = resources.get("bugtracker").and_then(|v| v.as_str()) {
             upstream_data.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::BugDatabase(bugtracker.as_str().unwrap().to_string()),
+                datum: UpstreamDatum::BugDatabase(bugtracker.to_string()),
                 certainty: Some(Certainty::Certain),
                 origin: Some(path.into()),
             });
         }
 
-        if let Some(homepage) = resources.get("homepage") {
+        if let Some(homepage) = resources.get("homepage").and_then(|v| v.as_str()) {
             upstream_data.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Homepage(homepage.as_str().unwrap().to_string()),
+                datum: UpstreamDatum::Homepage(homepage.to_string()),
                 certainty: Some(Certainty::Certain),
                 origin: Some(path.into()),
             });
         }
 
         if let Some(repository) = resources.get("repository") {
-            if let Some(url) = repository.get("url") {
+            if let Some(url) = repository.get("url").and_then(|v| v.as_str()) {
                 upstream_data.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Repository(url.as_str().unwrap().to_string()),
+                    datum: UpstreamDatum::Repository(url.to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(path.into()),
+                });
+            } else if let Some(url) = repository.as_str() {
+                upstream_data.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Repository(url.to_string()),
                     certainty: Some(Certainty::Certain),
                     origin: Some(path.into()),
                 });
             } else {
-                upstream_data.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Repository(repository.as_str().unwrap().to_string()),
-                    certainty: Some(Certainty::Certain),
-                    origin: Some(path.into()),
-                });
+                log::warn!(
+                    "META.yml: unexpected type for 'repository': {:?}",
+                    repository
+                );
             }
         }
     }
@@ -569,13 +574,16 @@ impl TryFrom<CpanModule> for UpstreamMetadata {
 
 /// Loads CPAN module data from the MetaCPAN API
 pub async fn load_cpan_data(module: &str) -> Result<Option<CpanModule>, crate::ProviderError> {
-    let url = format!("https://fastapi.metacpan.org/v1/release/{}", module)
+    let url: url::Url = format!("https://fastapi.metacpan.org/v1/release/{}", module)
         .parse()
-        .unwrap();
+        .map_err(|e: url::ParseError| crate::ProviderError::Other(e.to_string()))?;
 
     let data = crate::load_json_url(&url, None).await?;
 
-    Ok(Some(serde_json::from_value(data).unwrap()))
+    let cpan_module: CpanModule = serde_json::from_value(data).map_err(|e| {
+        crate::ProviderError::ParseError(format!("Failed to parse CPAN data: {}", e))
+    })?;
+    Ok(Some(cpan_module))
 }
 
 /// Retrieves upstream metadata for a Perl module from CPAN
@@ -591,6 +599,40 @@ pub async fn remote_cpan_data(module: &str) -> Result<UpstreamMetadata, crate::P
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_meta_yml_resources_wrong_types() {
+        let td = tempfile::tempdir().unwrap();
+        let path = td.path().join("META.yml");
+        std::fs::write(
+            &path,
+            r#"---
+name: Test-Module
+resources:
+  bugtracker: 123
+  homepage: true
+  repository:
+    - not
+    - a
+    - string
+"#,
+        )
+        .unwrap();
+        let result = super::guess_from_meta_yml(&path, &super::GuesserSettings::default()).unwrap();
+        // Name should parse, resources with wrong types should be skipped
+        assert!(result
+            .iter()
+            .any(|d| matches!(&d.datum, super::UpstreamDatum::Name(n) if n == "Test-Module")));
+        assert!(!result
+            .iter()
+            .any(|d| matches!(&d.datum, super::UpstreamDatum::BugDatabase(_))));
+        assert!(!result
+            .iter()
+            .any(|d| matches!(&d.datum, super::UpstreamDatum::Homepage(_))));
+        assert!(!result
+            .iter()
+            .any(|d| matches!(&d.datum, super::UpstreamDatum::Repository(_))));
+    }
 
     #[test]
     fn test_load_from_json() {

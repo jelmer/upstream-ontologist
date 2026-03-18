@@ -186,9 +186,9 @@ pub fn guess_from_cargo(
 pub async fn cargo_translate_dashes(
     crate_name: &str,
 ) -> Result<Option<String>, crate::HTTPJSONError> {
-    let url = format!("https://crates.io/api/v1/crates?q={}", crate_name)
+    let url: url::Url = format!("https://crates.io/api/v1/crates?q={}", crate_name)
         .parse()
-        .unwrap();
+        .expect("static crates.io URL template should always be valid");
     let json: serde_json::Value = crate::load_json_url(&url, None).await?;
 
     // Navigate through the JSON response to find the crate name.
@@ -385,11 +385,15 @@ impl TryFrom<CrateInfo> for UpstreamMetadata {
 
 /// Loads crate information from crates.io API
 pub async fn load_crate_info(cratename: &str) -> Result<Option<CrateInfo>, crate::ProviderError> {
-    let http_url = format!("https://crates.io/api/v1/crates/{}", cratename);
+    let http_url: url::Url = format!("https://crates.io/api/v1/crates/{}", cratename)
+        .parse()
+        .map_err(|e: url::ParseError| crate::ProviderError::Other(e.to_string()))?;
 
-    let data = crate::load_json_url(&http_url.parse().unwrap(), None).await?;
+    let data = crate::load_json_url(&http_url, None).await?;
 
-    Ok(Some(serde_json::from_value(data).unwrap()))
+    serde_json::from_value(data)
+        .map(Some)
+        .map_err(|e| crate::ProviderError::ParseError(format!("Failed to parse crate data: {}", e)))
 }
 
 // TODO: dedupe with TryFrom implementation above

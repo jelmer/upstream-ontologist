@@ -19,7 +19,12 @@ pub fn guess_from_package_xml(
     let root = xmlparse_simplify_namespaces(path, NAMESPACES)
         .ok_or_else(|| ProviderError::ParseError("Unable to parse package.xml".to_string()))?;
 
-    assert_eq!(root.name, "package", "root tag is {:?}", root.name);
+    if root.name != "package" {
+        return Err(ProviderError::ParseError(format!(
+            "Expected 'package' root tag, got {:?}",
+            root.name
+        )));
+    }
 
     let mut upstream_data: Vec<UpstreamDatumWithMetadata> = Vec::new();
     let mut leads: Vec<&Element> = Vec::new();
@@ -30,64 +35,72 @@ pub fn guess_from_package_xml(
         if let XMLNode::Element(ref element) = child_element {
             match element.name.as_str() {
                 "name" => {
-                    upstream_data.push(UpstreamDatumWithMetadata {
-                        datum: UpstreamDatum::Name(element.get_text().unwrap().to_string()),
-                        certainty: Some(Certainty::Certain),
-                        origin: Some(path.into()),
-                    });
-                }
-                "summary" => {
-                    upstream_data.push(UpstreamDatumWithMetadata {
-                        datum: UpstreamDatum::Summary(element.get_text().unwrap().to_string()),
-                        certainty: Some(Certainty::Certain),
-                        origin: Some(path.into()),
-                    });
-                }
-                "description" => {
-                    upstream_data.push(UpstreamDatumWithMetadata {
-                        datum: UpstreamDatum::Description(element.get_text().unwrap().to_string()),
-                        certainty: Some(Certainty::Certain),
-                        origin: Some(path.into()),
-                    });
-                }
-                "version" => {
-                    if let Some(release_tag) = element.get_child("release") {
+                    if let Some(text) = element.get_text() {
                         upstream_data.push(UpstreamDatumWithMetadata {
-                            datum: UpstreamDatum::Version(
-                                release_tag.get_text().unwrap().to_string(),
-                            ),
+                            datum: UpstreamDatum::Name(text.to_string()),
                             certainty: Some(Certainty::Certain),
                             origin: Some(path.into()),
                         });
                     }
                 }
+                "summary" => {
+                    if let Some(text) = element.get_text() {
+                        upstream_data.push(UpstreamDatumWithMetadata {
+                            datum: UpstreamDatum::Summary(text.to_string()),
+                            certainty: Some(Certainty::Certain),
+                            origin: Some(path.into()),
+                        });
+                    }
+                }
+                "description" => {
+                    if let Some(text) = element.get_text() {
+                        upstream_data.push(UpstreamDatumWithMetadata {
+                            datum: UpstreamDatum::Description(text.to_string()),
+                            certainty: Some(Certainty::Certain),
+                            origin: Some(path.into()),
+                        });
+                    }
+                }
+                "version" => {
+                    if let Some(release_tag) = element.get_child("release") {
+                        if let Some(text) = release_tag.get_text() {
+                            upstream_data.push(UpstreamDatumWithMetadata {
+                                datum: UpstreamDatum::Version(text.to_string()),
+                                certainty: Some(Certainty::Certain),
+                                origin: Some(path.into()),
+                            });
+                        }
+                    }
+                }
                 "license" => {
-                    upstream_data.push(UpstreamDatumWithMetadata {
-                        datum: UpstreamDatum::License(element.get_text().unwrap().to_string()),
-                        certainty: Some(Certainty::Certain),
-                        origin: Some(path.into()),
-                    });
+                    if let Some(text) = element.get_text() {
+                        upstream_data.push(UpstreamDatumWithMetadata {
+                            datum: UpstreamDatum::License(text.to_string()),
+                            certainty: Some(Certainty::Certain),
+                            origin: Some(path.into()),
+                        });
+                    }
                 }
                 "url" => {
                     if let Some(url_type) = element.attributes.get("type") {
                         match url_type.as_str() {
                             "repository" => {
-                                upstream_data.push(UpstreamDatumWithMetadata {
-                                    datum: UpstreamDatum::Repository(
-                                        element.get_text().unwrap().to_string(),
-                                    ),
-                                    certainty: Some(Certainty::Certain),
-                                    origin: Some(path.into()),
-                                });
+                                if let Some(text) = element.get_text() {
+                                    upstream_data.push(UpstreamDatumWithMetadata {
+                                        datum: UpstreamDatum::Repository(text.to_string()),
+                                        certainty: Some(Certainty::Certain),
+                                        origin: Some(path.into()),
+                                    });
+                                }
                             }
                             "bugtracker" => {
-                                upstream_data.push(UpstreamDatumWithMetadata {
-                                    datum: UpstreamDatum::BugDatabase(
-                                        element.get_text().unwrap().to_string(),
-                                    ),
-                                    certainty: Some(Certainty::Certain),
-                                    origin: Some(path.into()),
-                                });
+                                if let Some(text) = element.get_text() {
+                                    upstream_data.push(UpstreamDatumWithMetadata {
+                                        datum: UpstreamDatum::BugDatabase(text.to_string()),
+                                        certainty: Some(Certainty::Certain),
+                                        origin: Some(path.into()),
+                                    });
+                                }
                             }
                             _ => {}
                         }
@@ -115,13 +128,9 @@ pub fn guess_from_package_xml(
     }
 
     for lead_element in leads.iter().take(1) {
-        let name_el = lead_element.get_child("name").unwrap().get_text();
-        let email_el = lead_element
-            .get_child("email")
-            .map(|s| s.get_text().unwrap());
-        let active_el = lead_element
-            .get_child("active")
-            .map(|s| s.get_text().unwrap());
+        let name_el = lead_element.get_child("name").and_then(|s| s.get_text());
+        let email_el = lead_element.get_child("email").and_then(|s| s.get_text());
+        let active_el = lead_element.get_child("active").and_then(|s| s.get_text());
         if let Some(active_el) = active_el {
             if active_el != "yes" {
                 continue;
@@ -158,22 +167,93 @@ pub fn guess_from_package_xml(
     if !authors.is_empty() {
         let persons = authors
             .iter()
-            .map(|author_element| {
-                let name_el = author_element.get_text().unwrap().into_owned();
+            .filter_map(|author_element| {
+                let name_el = author_element.get_text()?.into_owned();
                 let email_el = author_element.attributes.get("email");
-                Person {
+                Some(Person {
                     name: Some(name_el),
                     email: email_el.map(|s| s.to_string()),
                     ..Default::default()
-                }
+                })
             })
-            .collect();
-        upstream_data.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::Author(persons),
-            certainty: Some(Certainty::Confident),
-            origin: Some(path.into()),
-        });
+            .collect::<Vec<_>>();
+        if !persons.is_empty() {
+            upstream_data.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Author(persons),
+                certainty: Some(Certainty::Confident),
+                origin: Some(path.into()),
+            });
+        }
     }
 
     Ok(upstream_data)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn write_xml(td: &tempfile::TempDir, content: &str) -> std::path::PathBuf {
+        let path = td.path().join("package.xml");
+        std::fs::write(&path, content).unwrap();
+        path
+    }
+
+    #[test]
+    fn test_wrong_root_element() {
+        let td = tempfile::tempdir().unwrap();
+        let path = write_xml(&td, r#"<project><name>foo</name></project>"#);
+        let result = guess_from_package_xml(&path, &GuesserSettings::default());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_empty_text_elements() {
+        let td = tempfile::tempdir().unwrap();
+        let path = write_xml(
+            &td,
+            r#"<package>
+  <name/>
+  <summary/>
+  <license/>
+  <description/>
+</package>"#,
+        );
+        let result = guess_from_package_xml(&path, &GuesserSettings::default()).unwrap();
+        assert_eq!(result, vec![]);
+    }
+
+    #[test]
+    fn test_lead_without_name_child() {
+        let td = tempfile::tempdir().unwrap();
+        let path = write_xml(
+            &td,
+            r#"<package>
+  <lead>
+    <active>yes</active>
+  </lead>
+</package>"#,
+        );
+        let result = guess_from_package_xml(&path, &GuesserSettings::default()).unwrap();
+        // Should produce a Maintainer with name=None, not panic
+        assert_eq!(result.len(), 1);
+        assert!(matches!(
+            &result[0].datum,
+            UpstreamDatum::Maintainer(p) if p.name.is_none()
+        ));
+    }
+
+    #[test]
+    fn test_author_without_text() {
+        let td = tempfile::tempdir().unwrap();
+        let path = write_xml(
+            &td,
+            r#"<package>
+  <author email="test@example.com"/>
+</package>"#,
+        );
+        let result = guess_from_package_xml(&path, &GuesserSettings::default()).unwrap();
+        // Author element with no text should be skipped
+        assert_eq!(result, vec![]);
+    }
 }

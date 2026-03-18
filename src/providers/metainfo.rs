@@ -22,58 +22,122 @@ pub fn guess_from_metainfo(
             continue;
         };
         if child.name == "id" {
-            results.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Name(child.get_text().unwrap().to_string()),
-                certainty: Some(Certainty::Certain),
-                origin: Some(path.into()),
-            });
+            if let Some(text) = child.get_text() {
+                results.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Name(text.to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(path.into()),
+                });
+            }
         }
         if child.name == "project_license" {
-            results.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::License(child.get_text().unwrap().to_string()),
-                certainty: Some(Certainty::Certain),
-                origin: Some(path.into()),
-            });
+            if let Some(text) = child.get_text() {
+                results.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::License(text.to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(path.into()),
+                });
+            }
         }
         if child.name == "url" {
             if let Some(urltype) = child.attributes.get("type") {
                 if urltype == "homepage" {
-                    results.push(UpstreamDatumWithMetadata {
-                        datum: UpstreamDatum::Homepage(child.get_text().unwrap().to_string()),
-                        certainty: Some(Certainty::Certain),
-                        origin: Some(path.into()),
-                    });
+                    if let Some(text) = child.get_text() {
+                        results.push(UpstreamDatumWithMetadata {
+                            datum: UpstreamDatum::Homepage(text.to_string()),
+                            certainty: Some(Certainty::Certain),
+                            origin: Some(path.into()),
+                        });
+                    }
                 } else if urltype == "bugtracker" {
-                    results.push(UpstreamDatumWithMetadata {
-                        datum: UpstreamDatum::BugDatabase(child.get_text().unwrap().to_string()),
-                        certainty: Some(Certainty::Certain),
-                        origin: Some(path.into()),
-                    });
+                    if let Some(text) = child.get_text() {
+                        results.push(UpstreamDatumWithMetadata {
+                            datum: UpstreamDatum::BugDatabase(text.to_string()),
+                            certainty: Some(Certainty::Certain),
+                            origin: Some(path.into()),
+                        });
+                    }
                 }
             }
         }
         if child.name == "description" {
-            results.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Description(child.get_text().unwrap().to_string()),
-                certainty: Some(Certainty::Certain),
-                origin: Some(path.into()),
-            });
+            if let Some(text) = child.get_text() {
+                results.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Description(text.to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(path.into()),
+                });
+            }
         }
         if child.name == "summary" {
-            results.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Summary(child.get_text().unwrap().to_string()),
-                certainty: Some(Certainty::Certain),
-                origin: Some(path.into()),
-            });
+            if let Some(text) = child.get_text() {
+                results.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Summary(text.to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(path.into()),
+                });
+            }
         }
         if child.name == "name" {
-            results.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Name(child.get_text().unwrap().to_string()),
-                certainty: Some(Certainty::Certain),
-                origin: Some(path.into()),
-            });
+            if let Some(text) = child.get_text() {
+                results.push(UpstreamDatumWithMetadata {
+                    datum: UpstreamDatum::Name(text.to_string()),
+                    certainty: Some(Certainty::Certain),
+                    origin: Some(path.into()),
+                });
+            }
         }
     }
 
     Ok(results)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn write_xml(td: &tempfile::TempDir, content: &str) -> std::path::PathBuf {
+        let path = td.path().join("test.metainfo.xml");
+        std::fs::write(&path, content).unwrap();
+        path
+    }
+
+    #[test]
+    fn test_empty_elements() {
+        let td = tempfile::tempdir().unwrap();
+        let path = write_xml(
+            &td,
+            r#"<component>
+  <id></id>
+  <name></name>
+  <summary></summary>
+  <description></description>
+</component>"#,
+        );
+        let result = guess_from_metainfo(&path, false).unwrap();
+        assert_eq!(result, vec![]);
+    }
+
+    #[test]
+    fn test_self_closing_elements() {
+        let td = tempfile::tempdir().unwrap();
+        let path = write_xml(
+            &td,
+            r#"<component>
+  <id/>
+  <name/>
+  <url type="homepage"/>
+</component>"#,
+        );
+        let result = guess_from_metainfo(&path, false).unwrap();
+        assert_eq!(result, vec![]);
+    }
+
+    #[test]
+    fn test_invalid_xml() {
+        let td = tempfile::tempdir().unwrap();
+        let path = write_xml(&td, "this is not xml at all");
+        let result = guess_from_metainfo(&path, false);
+        assert!(result.is_err());
+    }
 }
