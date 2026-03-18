@@ -62,7 +62,7 @@ pub async fn guess_from_pkg_info(
     ret.extend(parse_python_project_urls(
         dist.project_urls
             .iter()
-            .map(|k| k.split_once(", ").unwrap())
+            .filter_map(|k| k.split_once(", "))
             .map(|(k, v)| (k.to_string(), v.to_string())),
         &Origin::Path(path.to_path_buf()),
     ));
@@ -440,7 +440,14 @@ fn parse_python_long_description(
 
 /// Parses a Python URL to extract upstream metadata
 pub async fn parse_python_url(url: &str) -> Vec<UpstreamDatumWithMetadata> {
-    let repo = vcs::guess_repo_from_url(&url::Url::parse(url).unwrap(), None).await;
+    let parsed_url = match url::Url::parse(url) {
+        Ok(url) => url,
+        Err(e) => {
+            log::warn!("Failed to parse Python URL {:?}: {}", url, e);
+            return vec![];
+        }
+    };
+    let repo = vcs::guess_repo_from_url(&parsed_url, None).await;
     if let Some(repo) = repo {
         return vec![UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Repository(repo),
