@@ -13,7 +13,7 @@ pub fn guess_from_pom_xml(
     _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     use xmltree::Element;
-    let file = File::open(path).expect("Failed to open file");
+    let file = File::open(path)?;
 
     let file = std::io::BufReader::new(file);
 
@@ -161,4 +161,41 @@ pub fn guess_from_pom_xml(
     }
 
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn write_xml(td: &tempfile::TempDir, content: &str) -> std::path::PathBuf {
+        let path = td.path().join("pom.xml");
+        std::fs::write(&path, content).unwrap();
+        path
+    }
+
+    #[test]
+    fn test_missing_file() {
+        let result = guess_from_pom_xml(
+            std::path::Path::new("/nonexistent/pom.xml"),
+            &GuesserSettings::default(),
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_invalid_xml() {
+        let td = tempfile::tempdir().unwrap();
+        let path = write_xml(&td, "not xml");
+        let result = guess_from_pom_xml(&path, &GuesserSettings::default());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_wrong_root_element() {
+        let td = tempfile::tempdir().unwrap();
+        let path = write_xml(&td, "<html/>");
+        let result = guess_from_pom_xml(&path, &GuesserSettings::default()).unwrap();
+        // Non-"project" root is simply ignored, returns empty
+        assert_eq!(result, vec![]);
+    }
 }
