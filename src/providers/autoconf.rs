@@ -37,9 +37,24 @@ pub fn guess_from_configure(
         } else {
             continue;
         };
-        let key = String::from_utf8(key.to_vec()).expect("Failed to parse UTF-8");
+        let key = match String::from_utf8(key.to_vec()) {
+            Ok(key) => key,
+            Err(_) => {
+                log::debug!("Skipping non-UTF-8 key in configure script");
+                continue;
+            }
+        };
         let key = key.trim();
-        let value = String::from_utf8(value.to_vec()).expect("Failed to parse UTF-8");
+        let value = match String::from_utf8(value.to_vec()) {
+            Ok(value) => value,
+            Err(_) => {
+                log::debug!(
+                    "Skipping non-UTF-8 value for key {} in configure script",
+                    key
+                );
+                continue;
+            }
+        };
         let mut value = value.trim();
 
         if key.contains(' ') {
@@ -98,7 +113,13 @@ pub fn guess_from_configure(
                     // it contains a mailing list
                     Some(Certainty::Possible)
                 } else {
-                    let parsed_url = Url::parse(value).expect("Failed to parse URL");
+                    let parsed_url = match Url::parse(value) {
+                        Ok(url) => url,
+                        Err(e) => {
+                            log::warn!("Failed to parse PACKAGE_BUGREPORT URL {:?}: {}", value, e);
+                            continue;
+                        }
+                    };
                     if !parsed_url.path().trim_end_matches('/').is_empty() {
                         Some(Certainty::Certain)
                     } else {
@@ -164,6 +185,33 @@ mod tests {
         assert!(result.is_ok());
         let data = result.unwrap();
         // Empty quoted value should be skipped
+        assert_eq!(data.len(), 0);
+    }
+
+    #[test]
+    fn test_non_utf8_value() {
+        let mut file = NamedTempFile::new().unwrap();
+        // Write a key=value where the value contains invalid UTF-8
+        file.write_all(b"PACKAGE_NAME=\xff\xfe").unwrap();
+
+        let settings = GuesserSettings::default();
+        let result = guess_from_configure(file.path(), &settings);
+
+        assert!(result.is_ok());
+        let data = result.unwrap();
+        assert_eq!(data.len(), 0);
+    }
+
+    #[test]
+    fn test_invalid_bugreport_url() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "PACKAGE_BUGREPORT='not a valid url'").unwrap();
+
+        let settings = GuesserSettings::default();
+        let result = guess_from_configure(file.path(), &settings);
+
+        assert!(result.is_ok());
+        let data = result.unwrap();
         assert_eq!(data.len(), 0);
     }
 
