@@ -57,9 +57,9 @@ git-config = ["dep:gix-config"]
 launchpad = ["dep:distro-info"]
 opam = ["dep:opam-file-rs"]
 dist-ini = ["dep:rust-ini"]
-cargo = ["dep:toml"]
+cargo = ["dep:cargo_toml"]
 r-description = ["dep:r-description"]
-pyproject-toml = ["dep:pyproject-toml"]
+pyproject-toml = ["dep:pyproject-toml", "dep:toml"]
 python-pkginfo = ["dep:python-pkginfo"]
 setup-cfg = ["dep:rust-ini"]
 debcargo = ["dep:debcargo"]
@@ -104,6 +104,10 @@ optional = true
 
 [dependencies.distro-info]
 version = ">=0.4, <0.5"
+optional = true
+
+[dependencies.cargo_toml]
+version = ">=0.22.0, <0.23"
 optional = true
 
 [dependencies.toml]
