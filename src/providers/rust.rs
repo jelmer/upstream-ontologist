@@ -5,93 +5,6 @@ use crate::{
 use serde::Deserialize;
 use std::collections::HashMap;
 
-#[cfg(feature = "cargo")]
-#[derive(Deserialize)]
-struct CargoToml {
-    package: Option<CargoPackage>,
-
-    workspace: Option<CargoWorkspace>,
-}
-
-#[cfg(feature = "cargo")]
-#[derive(Deserialize)]
-struct CargoWorkspace {
-    #[serde(default)]
-    package: Option<CargoPackage>,
-}
-
-#[cfg(feature = "cargo")]
-/// Allow either specifying setting T directly or "workspace = true"
-pub enum DirectOrWorkspace<T> {
-    /// Direct value specification
-    Direct(T),
-    /// Workspace inheritance
-    Workspace,
-}
-
-#[cfg(feature = "cargo")]
-impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for DirectOrWorkspace<T> {
-    fn deserialize<D>(deserializer: D) -> Result<DirectOrWorkspace<T>, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        // Assume deserializing T, but if that fails, check for a table with "workspace = true"
-        let v: toml::value::Value = serde::Deserialize::deserialize(deserializer)?;
-        match T::deserialize(v.clone()) {
-            Ok(t) => Ok(DirectOrWorkspace::Direct(t)),
-            Err(_) => {
-                let table = v.as_table().ok_or_else(|| {
-                    serde::de::Error::custom("expected either a value or a table")
-                })?;
-                if table.get("workspace").and_then(|v| v.as_bool()) == Some(true) {
-                    Ok(DirectOrWorkspace::Workspace)
-                } else {
-                    Err(serde::de::Error::custom(
-                        "expected either a value or a table",
-                    ))
-                }
-            }
-        }
-    }
-}
-
-#[cfg(feature = "cargo")]
-#[derive(Deserialize)]
-struct CargoPackage {
-    name: Option<String>,
-    #[serde(default)]
-    version: Option<DirectOrWorkspace<String>>,
-    #[serde(default)]
-    authors: Option<Vec<String>>,
-    #[serde(default)]
-    description: Option<DirectOrWorkspace<String>>,
-    #[serde(default)]
-    homepage: Option<DirectOrWorkspace<String>>,
-    #[serde(default)]
-    repository: Option<DirectOrWorkspace<String>>,
-    #[serde(default)]
-    license: Option<DirectOrWorkspace<String>>,
-}
-
-#[cfg(feature = "cargo")]
-macro_rules! resolve {
-    ($workspace:expr, $package:expr, $field:ident) => {
-        match $package.$field {
-            Some(DirectOrWorkspace::Direct(ref s)) => Some(s.clone()),
-            Some(DirectOrWorkspace::Workspace) => {
-                if let Some(DirectOrWorkspace::Direct(ref s)) =
-                    $workspace.package.as_ref().and_then(|p| p.$field.as_ref())
-                {
-                    Some(s.clone())
-                } else {
-                    None
-                }
-            }
-            None => None,
-        }
-    };
-}
-
 /// Extracts upstream metadata from Cargo.toml file
 #[cfg(feature = "cargo")]
 pub fn guess_from_cargo(
@@ -99,78 +12,87 @@ pub fn guess_from_cargo(
     _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     // see https://doc.rust-lang.org/cargo/reference/manifest.html
-    let doc: CargoToml = toml::from_str(&std::fs::read_to_string(path)?)
+    let mut manifest = cargo_toml::Manifest::from_path(path)
         .map_err(|e| ProviderError::ParseError(e.to_string()))?;
 
-    let package = match doc.package {
-        Some(p) => p,
+    // Try to resolve workspace inheritance from a parent workspace
+    if manifest.needs_workspace_inheritance() {
+        if let Some(workspace_path) = path.parent().and_then(|p| p.parent()) {
+            let workspace_toml = workspace_path.join("Cargo.toml");
+            if workspace_toml.exists() {
+                if let Ok(workspace_manifest) = cargo_toml::Manifest::from_path(&workspace_toml) {
+                    let _ = manifest.complete_from_path_and_workspace(
+                        path,
+                        Some((&workspace_manifest, workspace_path)),
+                    );
+                }
+            }
+        }
+    }
+
+    let package = match manifest.package {
+        Some(ref p) => p,
         None => {
             log::debug!("No package section in Cargo.toml");
             return Ok(Vec::new());
         }
     };
 
-    let workspace = match doc.workspace {
-        Some(w) => w,
-        None => CargoWorkspace { package: None },
-    };
-
     let mut results = Vec::new();
 
-    if let Some(name) = package.name {
+    let name = &package.name;
+    results.push(UpstreamDatumWithMetadata {
+        datum: UpstreamDatum::Name(name.clone()),
+        certainty: Some(Certainty::Certain),
+        origin: Some(path.into()),
+    });
+    results.push(UpstreamDatumWithMetadata {
+        datum: UpstreamDatum::CargoCrate(name.clone()),
+        certainty: Some(Certainty::Certain),
+        origin: Some(path.into()),
+    });
+
+    if let Some(description) = package.description() {
         results.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::Name(name.clone()),
-            certainty: Some(Certainty::Certain),
-            origin: Some(path.into()),
-        });
-        results.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::CargoCrate(name),
+            datum: UpstreamDatum::Summary(description.to_string()),
             certainty: Some(Certainty::Certain),
             origin: Some(path.into()),
         });
     }
 
-    if let Some(description) = resolve!(workspace, package, description) {
+    if let Some(homepage) = package.homepage() {
         results.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::Summary(description),
+            datum: UpstreamDatum::Homepage(homepage.to_string()),
             certainty: Some(Certainty::Certain),
             origin: Some(path.into()),
         });
     }
 
-    if let Some(homepage) = resolve!(workspace, package, homepage) {
+    if let Some(license) = package.license() {
         results.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::Homepage(homepage),
+            datum: UpstreamDatum::License(license.to_string()),
             certainty: Some(Certainty::Certain),
             origin: Some(path.into()),
         });
     }
 
-    if let Some(license) = resolve!(workspace, package, license) {
+    if let Some(repository) = package.repository() {
         results.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::License(license),
+            datum: UpstreamDatum::Repository(repository.to_string()),
             certainty: Some(Certainty::Certain),
             origin: Some(path.into()),
         });
     }
 
-    if let Some(repository) = resolve!(workspace, package, repository) {
-        results.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::Repository(repository),
-            certainty: Some(Certainty::Certain),
-            origin: Some(path.into()),
-        });
-    }
+    let version = package.version();
+    results.push(UpstreamDatumWithMetadata {
+        datum: UpstreamDatum::Version(version.to_string()),
+        certainty: Some(Certainty::Certain),
+        origin: Some(path.into()),
+    });
 
-    if let Some(version) = resolve!(workspace, package, version) {
-        results.push(UpstreamDatumWithMetadata {
-            datum: UpstreamDatum::Version(version),
-            certainty: Some(Certainty::Certain),
-            origin: Some(path.into()),
-        });
-    }
-
-    if let Some(authors) = package.authors {
+    let authors = package.authors();
+    if !authors.is_empty() {
         let authors = authors.iter().map(|a| Person::from(a.as_str())).collect();
         results.push(UpstreamDatumWithMetadata {
             datum: UpstreamDatum::Author(authors),
@@ -316,15 +238,33 @@ pub struct CrateVersion {
     pub yanked: bool,
 }
 
+/// Category information from crates.io
+#[derive(Deserialize)]
+pub struct Category {
+    /// Category identifier
+    pub id: String,
+    /// Category display name
+    pub category: String,
+}
+
+/// Keyword information from crates.io
+#[derive(Deserialize)]
+pub struct Keyword {
+    /// Keyword identifier
+    pub id: String,
+    /// Keyword text
+    pub keyword: String,
+}
+
 /// Information about a crate from crates.io
 #[derive(Deserialize)]
 pub struct CrateInfo {
     /// Categories the crate belongs to
-    pub categories: Vec<String>,
+    pub categories: Vec<Category>,
     #[serde(rename = "crate")]
     crate_: Crate,
     /// Keywords associated with the crate
-    pub keywords: Vec<String>,
+    pub keywords: Vec<Keyword>,
     /// All versions of the crate
     pub versions: Vec<CrateVersion>,
 }
