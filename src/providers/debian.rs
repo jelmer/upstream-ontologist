@@ -727,12 +727,24 @@ pub async fn guess_from_debian_copyright(
 #[cfg(feature = "debian")]
 fn read_entries(path: &Path) -> Result<Vec<(url::Url, debian_watch::Mode)>, ProviderError> {
     use debian_changelog::ChangeLog;
-    let get_package_name = || -> String {
-        let text = std::fs::read_to_string(path.parent().unwrap().join("changelog")).unwrap();
-        let cl: ChangeLog = text.parse().unwrap();
-        let first_entry = cl.iter().next().unwrap();
-        first_entry.package().unwrap()
-    };
+    let debian_dir = path.parent().unwrap();
+
+    // Try debian/changelog first (using relaxed parser to tolerate syntax errors),
+    // then fall back to debian/control.
+    let package_name = std::fs::read_to_string(debian_dir.join("changelog"))
+        .ok()
+        .and_then(|text| {
+            let cl = ChangeLog::read_relaxed(text.as_bytes()).ok()?;
+            let name = cl.iter().next()?.package();
+            name
+        })
+        .or_else(|| {
+            let text = std::fs::read_to_string(debian_dir.join("control")).ok()?;
+            let control: debian_control::lossless::Control = text.parse().ok()?;
+            control.source()?.name()
+        })
+        .unwrap_or_default();
+    let get_package_name = || -> String { package_name.clone() };
 
     let text = std::fs::read_to_string(path)?;
     let w = debian_watch::parse::parse(&text)
