@@ -353,7 +353,7 @@ pub async fn guess_from_debian_changelog(
             origin: Some(path.into()),
         });
 
-        ret.extend(guess_from_itp_bug(itp)?);
+        ret.extend(guess_from_itp_bug(itp).await?);
     }
 
     Ok(ret)
@@ -370,12 +370,12 @@ pub fn find_itp(changes: &[String]) -> Option<i32> {
 }
 
 /// Extracts upstream metadata from Debian ITP bug
-pub fn guess_from_itp_bug(
+pub async fn guess_from_itp_bug(
     bugno: i32,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
-    let debbugs = debbugs::blocking::Debbugs::default();
+    let debbugs = debbugs::Debbugs::default();
 
-    let log = debbugs.get_bug_log(bugno).map_err(|e| {
+    let log = debbugs.get_bug_log(bugno).await.map_err(|e| {
         ProviderError::ParseError(format!("Failed to get bug log for bug {}: {}", bugno, e))
     })?;
 
