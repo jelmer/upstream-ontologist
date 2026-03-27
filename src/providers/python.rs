@@ -494,11 +494,15 @@ pub async fn guess_from_setup_cfg(
                 });
             }
             "version" => {
-                ret.push(UpstreamDatumWithMetadata {
-                    datum: UpstreamDatum::Version(value.to_string()),
-                    certainty: Some(Certainty::Certain),
-                    origin: Some(origin.clone()),
-                });
+                // Skip setuptools dynamic version directives like
+                // "attr:package.__version__" or "file:VERSION"
+                if !value.starts_with("attr:") && !value.starts_with("file:") {
+                    ret.push(UpstreamDatumWithMetadata {
+                        datum: UpstreamDatum::Version(value.to_string()),
+                        certainty: Some(Certainty::Certain),
+                        origin: Some(origin.clone()),
+                    });
+                }
             }
             "url" => {
                 ret.extend(parse_python_url(value).await);
@@ -1407,5 +1411,46 @@ mod pypi_tests {
         let pypi_data: PypiProject = serde_json::from_str(data).unwrap();
 
         assert_eq!(pypi_data.info.name, "merge3");
+    }
+}
+
+#[cfg(test)]
+mod setup_cfg_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_setup_cfg_attr_version_skipped() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("setup.cfg");
+        std::fs::write(
+            &path,
+            "[metadata]\nname = aiohttp-openmetrics\nversion = attr:aiohttp_openmetrics.__version__\n",
+        )
+        .unwrap();
+        let settings = GuesserSettings::default();
+        let results = guess_from_setup_cfg(&path, &settings).await.unwrap();
+        assert!(
+            results
+                .iter()
+                .all(|r| !matches!(&r.datum, UpstreamDatum::Version(_))),
+            "attr: version directive should not be reported as a version"
+        );
+        assert!(results
+            .iter()
+            .any(|r| matches!(&r.datum, UpstreamDatum::Name(_))));
+    }
+
+    #[tokio::test]
+    async fn test_setup_cfg_static_version() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("setup.cfg");
+        std::fs::write(&path, "[metadata]\nname = mypackage\nversion = 1.2.3\n").unwrap();
+        let settings = GuesserSettings::default();
+        let results = guess_from_setup_cfg(&path, &settings).await.unwrap();
+        let version = results.iter().find_map(|r| match &r.datum {
+            UpstreamDatum::Version(v) => Some(v.clone()),
+            _ => None,
+        });
+        assert_eq!(version, Some("1.2.3".to_string()));
     }
 }
