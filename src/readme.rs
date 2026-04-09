@@ -235,7 +235,7 @@ pub fn description_from_readme_rst(
         .join("\n")
         + "\n";
 
-    let html = rst_to_html(&long_description);
+    let html = rst_to_html(&long_description)?;
 
     let (description, mut md) = description_from_readme_html(&html)?;
 
@@ -1081,13 +1081,15 @@ pub fn description_from_readme_html(
     Ok(description_from_basic_soup(&soup))
 }
 
-fn rst_to_html(rst_text: &str) -> String {
+fn rst_to_html(rst_text: &str) -> Result<String, ProviderError> {
     use rst_parser::parse;
     use rst_renderer::render_html;
-    let document = parse(rst_text).unwrap();
+    let document = parse(rst_text)
+        .map_err(|e| ProviderError::ParseError(format!("RST parse error: {}", e)))?;
     let mut output = Vec::new();
-    render_html(&document, &mut std::io::Cursor::new(&mut output), true).unwrap();
-    String::from_utf8(output).unwrap()
+    render_html(&document, &mut std::io::Cursor::new(&mut output), true)
+        .map_err(|e| ProviderError::Other(format!("RST render error: {}", e)))?;
+    Ok(String::from_utf8(output).map_err(|e| ProviderError::ParseError(e.to_string()))?)
 }
 
 #[cfg(test)]
@@ -1102,11 +1104,17 @@ RST
 ===
 
 This is a test of RST to HTML conversion."#;
-        let html = rst_to_html(rst);
+        let html = rst_to_html(rst).unwrap();
         assert_eq!(
             html,
             "<!doctype html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"color-scheme\" content=\"dark light\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<style>\n@counter-style footnote {\n  system: symbolic;\n  symbols: '*' '†' '‡' '§' '¶' '#' '♠' '♥' '♦' '♣';\n  /*suffix: ' ';*/\n}\nli.symbol {{ list-style-type: footnote; }}\n</style>\n</head>\n<body>\n\n\n<section id=\"rst\">\n<h1>RST</h1>\n<p>This is a test of RST to HTML conversion.</p>\n</section>\n</body>\n</html>\n"
         );
+    }
+
+    #[test]
+    fn test_rst_to_html_invalid() {
+        let rst = ".. image:: foo.png\n   :align: center\n";
+        assert!(rst_to_html(rst).is_err());
     }
 
     #[test]
