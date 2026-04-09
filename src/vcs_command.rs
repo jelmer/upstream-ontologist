@@ -179,6 +179,9 @@ pub fn url_from_cvs_co_command(command: &[u8]) -> Option<String> {
         args.remove(i);
     }
     if let Some(cvsroot) = cvsroot {
+        if breezyshim::try_init().is_err() {
+            return None;
+        }
         let url = breezyshim::location::cvs_to_url(&cvsroot);
         if let Some(module) = module {
             return Some(url.join(module.as_str()).unwrap().to_string());

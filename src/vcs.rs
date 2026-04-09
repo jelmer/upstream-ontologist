@@ -177,6 +177,10 @@ fn version_in_tags(version: &str, tag_names: &[&str]) -> bool {
 }
 
 fn probe_upstream_breezy_branch_url(url: &url::Url, version: Option<&str>) -> Option<bool> {
+    if let Err(e) = breezyshim::try_init() {
+        debug!("breezy not available, skipping branch probe: {}", e);
+        return None;
+    }
     let tags: HashMap<String, breezyshim::RevisionId> = breezyshim::ui::with_silent_ui_factory(
         || -> Result<HashMap<String, breezyshim::RevisionId>, breezyshim::error::Error> {
             use breezyshim::branch::Branch;
@@ -929,6 +933,9 @@ pub async fn find_public_repo_url(repo_url: &str, net_access: Option<bool>) -> O
 
 /// Fix up a Git URL to use the correct scheme
 pub fn fixup_rcp_style_git_repo_url(url: &str) -> Option<Url> {
+    if breezyshim::try_init().is_err() {
+        return None;
+    }
     breezyshim::location::rcp_location_to_url(url).ok()
 }
 
@@ -937,6 +944,10 @@ pub fn try_open_branch(
     url: &url::Url,
     branch_name: Option<&str>,
 ) -> Option<Box<breezyshim::branch::GenericBranch>> {
+    if let Err(e) = breezyshim::try_init() {
+        debug!("breezy not available, skipping branch open: {}", e);
+        return None;
+    }
     use breezyshim::branch::Branch;
     let old_ui_factory = breezyshim::ui::get_ui_factory();
     breezyshim::ui::install_ui_factory(&breezyshim::ui::SilentUIFactory::new());
@@ -1317,6 +1328,9 @@ pub async fn fixup_git_url(url: &str) -> String {
 /// Convert a CVS URL to a Breezy URL.
 pub fn convert_cvs_list_to_str(urls: &[&str]) -> Option<String> {
     if urls[0].starts_with(":extssh:") || urls[0].starts_with(":pserver:") {
+        if breezyshim::try_init().is_err() {
+            return None;
+        }
         let url = breezyshim::location::cvs_to_url(urls[0]);
         Some(format!("{}#{}", url, urls[1]))
     } else {
