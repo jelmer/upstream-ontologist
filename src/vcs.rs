@@ -176,6 +176,7 @@ fn version_in_tags(version: &str, tag_names: &[&str]) -> bool {
     false
 }
 
+#[cfg(feature = "breezy")]
 fn probe_upstream_breezy_branch_url(url: &url::Url, version: Option<&str>) -> Option<bool> {
     if let Err(e) = breezyshim::try_init() {
         debug!("breezy not available, skipping branch probe: {}", e);
@@ -220,7 +221,14 @@ pub async fn probe_upstream_branch_url(url: &url::Url, version: Option<&str>) ->
     if url.host() == Some(url::Host::Domain("github.com")) {
         probe_upstream_github_branch_url(url, version).await
     } else {
-        probe_upstream_breezy_branch_url(url, version)
+        #[cfg(feature = "breezy")]
+        {
+            return probe_upstream_breezy_branch_url(url, version);
+        }
+        #[cfg(not(feature = "breezy"))]
+        {
+            None
+        }
     }
 }
 
@@ -932,6 +940,7 @@ pub async fn find_public_repo_url(repo_url: &str, net_access: Option<bool>) -> O
 }
 
 /// Fix up a Git URL to use the correct scheme
+#[cfg(feature = "breezy")]
 pub fn fixup_rcp_style_git_repo_url(url: &str) -> Option<Url> {
     if breezyshim::try_init().is_err() {
         return None;
@@ -940,6 +949,7 @@ pub fn fixup_rcp_style_git_repo_url(url: &str) -> Option<Url> {
 }
 
 /// Try to open a branch from a URL
+#[cfg(feature = "breezy")]
 pub fn try_open_branch(
     url: &url::Url,
     branch_name: Option<&str>,
@@ -975,7 +985,6 @@ pub async fn find_secure_repo_url(
     branch: Option<&str>,
     net_access: Option<bool>,
 ) -> Option<url::Url> {
-    use breezyshim::branch::Branch;
     if SECURE_SCHEMES.contains(&url.scheme()) {
         return Some(url);
     }
@@ -1020,7 +1029,9 @@ pub async fn find_secure_repo_url(
         return None;
     }
 
+    #[cfg(feature = "breezy")]
     if net_access.unwrap_or(true) {
+        use breezyshim::branch::Branch;
         let secure_repo_url = derive_with_scheme(&url, "https");
         let insecure_branch = try_open_branch(&url, branch);
         let secure_branch = try_open_branch(&secure_repo_url, branch);
@@ -1326,6 +1337,7 @@ pub async fn fixup_git_url(url: &str) -> String {
 }
 
 /// Convert a CVS URL to a Breezy URL.
+#[cfg(feature = "breezy")]
 pub fn convert_cvs_list_to_str(urls: &[&str]) -> Option<String> {
     if urls[0].starts_with(":extssh:") || urls[0].starts_with(":pserver:") {
         if breezyshim::try_init().is_err() {
@@ -1352,6 +1364,7 @@ const SANITIZERS: &[AsyncSanitizer] = &[
             Some(fixup_git_location(&location).await.url.clone())
         })
     },
+    #[cfg(feature = "breezy")]
     |url| Box::pin(async move { fixup_rcp_style_git_repo_url(url) }),
     |url| {
         Box::pin(async move {
@@ -1497,6 +1510,7 @@ mod tests {
                 .as_str()
         );
     }
+    #[cfg(feature = "breezy")]
     #[test]
     fn test_fixup_rcp_style() {
         use super::fixup_rcp_style_git_repo_url;
@@ -1516,6 +1530,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "breezy")]
     #[test]
     fn test_fixup_rcp_leave() {
         use super::fixup_rcp_style_git_repo_url;

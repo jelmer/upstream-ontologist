@@ -300,6 +300,7 @@ pub async fn guess_from_readme(
                 urls.push(url.parse().unwrap());
             }
         }
+        #[cfg(feature = "breezy")]
         if let Some(m) = lazy_regex::regex_find!(r"cvs.*-d\s*:pserver:.*", line) {
             if let Some(url) = crate::vcs_command::url_from_cvs_co_command(m.as_bytes()) {
                 urls.push(url.parse().unwrap());

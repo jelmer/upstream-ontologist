@@ -42,6 +42,7 @@ pub fn url_from_vcs_command(command: &[u8]) -> Option<String> {
     if let Some(url) = url_from_fossil_clone_command(command) {
         return Some(url);
     }
+    #[cfg(feature = "breezy")]
     if let Some(url) = url_from_cvs_co_command(command) {
         return Some(url);
     }
@@ -152,6 +153,7 @@ fn test_url_from_fossil_clone_command() {
 
 /// Get the upstream source from a command line that looks like
 /// `cvs -d <cvsroot> co <module>`.
+#[cfg(feature = "breezy")]
 pub fn url_from_cvs_co_command(command: &[u8]) -> Option<String> {
     let mut args = parse_command_bytes(command)?;
     let i = 0;
