@@ -25,7 +25,24 @@ fn generate_upstream_tests(testdata_dir: &Path, dest_path: &Path) -> std::io::Re
             let dir_name = path.file_name().unwrap().to_str().unwrap();
             let fn_name = format_ident!("test_{}", dir_name.replace(['.', '-'], "_"));
 
+            let required_features_path = path.join("required-features");
+            let cfg_attrs = if required_features_path.exists() {
+                let content = fs::read_to_string(&required_features_path).unwrap();
+                let attrs: Vec<_> = content
+                    .lines()
+                    .filter(|l| !l.trim().is_empty())
+                    .map(|f| {
+                        let f = f.trim();
+                        quote! { #[cfg(feature = #f)] }
+                    })
+                    .collect();
+                quote! { #(#attrs)* }
+            } else {
+                quote! {}
+            };
+
             let test = quote! {
+                #cfg_attrs
                 #[tokio::test]
                 async fn #fn_name() {
                     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata").join(#dir_name);

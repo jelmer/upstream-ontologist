@@ -84,6 +84,7 @@ pub fn guess_from_metadata_json(
 
                     if strings.len() >= 2 {
                         // Try to convert CVS array format
+                        #[cfg(feature = "breezy")]
                         if let Some(repo_url) = crate::vcs::convert_cvs_list_to_str(&strings) {
                             upstream_data.push(UpstreamDatumWithMetadata {
                                 datum: UpstreamDatum::Repository(repo_url),
@@ -93,6 +94,11 @@ pub fn guess_from_metadata_json(
                         } else {
                             warn!("Repository array format not recognized: {:?}", strings);
                         }
+                        #[cfg(not(feature = "breezy"))]
+                        warn!(
+                            "Repository array format not supported without breezy feature: {:?}",
+                            strings
+                        );
                     } else {
                         warn!("Repository array has insufficient elements: {:?}", array);
                     }
@@ -175,6 +181,7 @@ mod tests {
     use tempfile::NamedTempFile;
 
     #[test]
+    #[cfg(feature = "breezy")]
     fn test_cvs_repository_array() {
         let json_content = r#"{
   "name": "yep",
