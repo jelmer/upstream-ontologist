@@ -1059,7 +1059,7 @@ async fn guess_from_setup_py_parsed(
                 // Handled above
                 "author_email" | "maintainer_email" => {},
                 // Irrelevant
-                "rust_extensions" | "data_files" | "packages" | "package_dir" | "entry_points" => {},
+                "rust_extensions" | "data_files" | "packages" | "package_dir" | "entry_points" | "package_data" => {},
                 // Irrelevant: dependencies
                 t if t.ends_with("_requires") || t.ends_with("_require") => {},
                 _ => {
