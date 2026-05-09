@@ -203,6 +203,42 @@ pub struct Person {
     pub url: Option<String>,
 }
 
+/// A bug tracker for an upstream project.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BugTracker {
+    /// GitHub issue tracker.
+    GitHub {
+        /// GitHub repository owner.
+        owner: String,
+        /// GitHub repository name.
+        repo: String,
+    },
+    /// GitLab issue tracker.
+    GitLab {
+        /// Base URL of the GitLab instance.
+        base_url: String,
+        /// Path to the project on the GitLab instance.
+        path: String,
+    },
+    /// Launchpad bug tracker.
+    Launchpad {
+        /// Launchpad project name.
+        project: String,
+    },
+    /// SourceForge bug tracker.
+    SourceForge {
+        /// SourceForge project name.
+        project: String,
+    },
+    /// Other bug tracker.
+    Other {
+        /// URL to browse/query bugs.
+        database_url: String,
+        /// URL to submit new bugs.
+        submit_url: Option<String>,
+    },
+}
+
 impl serde::ser::Serialize for Person {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -3093,6 +3129,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
         }
     }
 
+    #[cfg(any(feature = "python-pkginfo", feature = "pyo3"))]
     let mut found_pkg_info = path.join("PKG-INFO").exists();
     #[cfg(feature = "python-pkginfo")]
     for entry in std::fs::read_dir(&path).unwrap() {
