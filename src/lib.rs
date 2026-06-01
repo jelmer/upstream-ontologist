@@ -31,6 +31,8 @@ static USER_AGENT: &str = concat!("upstream-ontologist/", env!("CARGO_PKG_VERSIO
 pub mod extrapolate;
 /// Support for various code forges (GitHub, GitLab, etc.)
 pub mod forges;
+/// GitHub API and raw file access helpers
+pub mod github;
 /// Homepage URL detection and validation
 pub mod homepage;
 /// HTTP utilities for fetching remote resources
@@ -1611,17 +1613,6 @@ pub async fn load_json_url(
     let mut headers = HeaderMap::new();
     headers.insert(reqwest::header::ACCEPT, "application/json".parse().unwrap());
 
-    if let Some(hostname) = http_url.host_str() {
-        if hostname == "github.com" || hostname == "raw.githubusercontent.com" {
-            if let Ok(token) = std::env::var("GITHUB_TOKEN") {
-                headers.insert(
-                    reqwest::header::WWW_AUTHENTICATE,
-                    format!("Bearer {}", token).parse().unwrap(),
-                );
-            }
-        }
-    }
-
     let client = crate::http::build_client()
         .default_headers(headers)
         .build()
@@ -1881,23 +1872,19 @@ impl Forge for GitHub {
             ));
         }
 
-        let api_url = Url::parse(&format!(
-            "https://api.github.com/repos/{}/{}",
-            path_elements[0], path_elements[1]
-        ))
-        .unwrap();
+        let api_path = format!("repos/{}/{}", path_elements[0], path_elements[1]);
 
-        let response = match reqwest::get(api_url).await {
-            Ok(response) => response,
-            Err(e) if e.status() == Some(reqwest::StatusCode::NOT_FOUND) => {
+        let data = match crate::github::load_github_json(&api_path).await {
+            Ok(data) => data,
+            Err(HTTPJSONError::Error { status: 404, .. }) => {
                 return Err(CanonicalizeError::InvalidUrl(
                     url.clone(),
-                    format!("Project does not exist {}", e),
+                    "Project does not exist".to_string(),
                 ));
             }
-            Err(e) if e.status() == Some(reqwest::StatusCode::FORBIDDEN) => {
+            Err(HTTPJSONError::Error { status: 403, .. }) => {
                 // Probably rate limited
-                warn!("Unable to verify bug database URL {}: {}", url, e);
+                warn!("Unable to verify bug database URL {}: rate limited", url);
                 return Err(CanonicalizeError::RateLimited(url.clone()));
             }
             Err(e) => {
@@ -1907,12 +1894,6 @@ impl Forge for GitHub {
                 ));
             }
         };
-        let data = response.json::<serde_json::Value>().await.map_err(|e| {
-            CanonicalizeError::Unverifiable(
-                url.clone(),
-                format!("Unable to verify bug database URL: {}", e),
-            )
-        })?;
 
         if data["has_issues"].as_bool() != Some(true) {
             return Err(CanonicalizeError::InvalidUrl(

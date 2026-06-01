@@ -113,15 +113,8 @@ pub fn strip_vcs_prefixes(url: &str) -> &str {
 async fn probe_upstream_github_branch_url(url: &url::Url, version: Option<&str>) -> Option<bool> {
     let path = url.path();
     let path = path.strip_suffix(".git").unwrap_or(path);
-    let api_url = url::Url::parse(
-        format!(
-            "https://api.github.com/repos/{}/tags",
-            path.trim_start_matches('/')
-        )
-        .as_str(),
-    )
-    .unwrap();
-    match crate::load_json_url(&api_url, None).await {
+    let api_path = format!("repos/{}/tags", path.trim_start_matches('/'));
+    match crate::github::load_github_json(&api_path).await {
         Ok(json) => {
             if let Some(version) = version {
                 let tags = json.as_array()?;
@@ -254,11 +247,8 @@ pub async fn check_repository_url_canonical(
         }
 
         segments[1] = segments[1].trim_end_matches(".git");
-        let api_url = format!(
-            "https://api.github.com/repos/{}/{}",
-            segments[0], segments[1]
-        );
-        url = match crate::load_json_url(&url::Url::parse(api_url.as_str()).unwrap(), None).await {
+        let api_path = format!("repos/{}/{}", segments[0], segments[1]);
+        url = match crate::github::load_github_json(&api_path).await {
             Ok(data) => {
                 if data["archived"].as_bool().unwrap_or(false) {
                     return Err(crate::CanonicalizeError::InvalidUrl(
