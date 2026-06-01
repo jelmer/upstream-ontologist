@@ -5922,6 +5922,7 @@ name = "upstream-ontologist"
 version = "0.3.18"
 dependencies = [
  "async-trait",
+ "base64",
  "bit-set",
  "bit-vec",
  "breezyshim",

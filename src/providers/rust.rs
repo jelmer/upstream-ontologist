@@ -336,6 +336,133 @@ pub async fn load_crate_info(cratename: &str) -> Result<Option<CrateInfo>, crate
         .map_err(|e| crate::ProviderError::ParseError(format!("Failed to parse crate data: {}", e)))
 }
 
+/// A dependency of a crate version, as recorded in the registry index.
+///
+/// See <https://doc.rust-lang.org/cargo/reference/registry-index.html>.
+#[derive(Deserialize, Debug, Clone)]
+pub struct IndexDependency {
+    /// Name of the dependency (the renamed name if it was renamed).
+    pub name: String,
+    /// SemVer requirement for this dependency.
+    pub req: String,
+    /// Features enabled for this dependency.
+    #[serde(default)]
+    pub features: Vec<String>,
+    /// Whether this is an optional dependency.
+    #[serde(default)]
+    pub optional: bool,
+    /// Whether the dependency's default features are enabled.
+    #[serde(default = "default_true")]
+    pub default_features: bool,
+    /// Target platform expression this dependency applies to, if any.
+    #[serde(default)]
+    pub target: Option<String>,
+    /// Dependency kind: `normal`, `dev` or `build`.
+    #[serde(default)]
+    pub kind: Option<String>,
+    /// Registry index URL, or `None` for the current registry.
+    #[serde(default)]
+    pub registry: Option<String>,
+    /// Original package name if the dependency was renamed.
+    #[serde(default)]
+    pub package: Option<String>,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+/// A single crate version entry from the crates.io sparse index.
+///
+/// The sparse index only carries the data needed for dependency resolution
+/// (name, version, dependencies, features, checksum). It does not include the
+/// rich metadata served by the crates.io REST API such as the homepage,
+/// repository, description or license; use [`load_crate_info`] for those.
+#[derive(Deserialize, Debug, Clone)]
+pub struct IndexEntry {
+    /// Name of the crate.
+    pub name: String,
+    /// Version of this entry.
+    pub vers: semver::Version,
+    /// Dependencies of this version.
+    pub deps: Vec<IndexDependency>,
+    /// SHA256 checksum of the `.crate` file.
+    pub cksum: String,
+    /// Map of feature names to the features or dependencies they enable.
+    #[serde(default)]
+    pub features: HashMap<String, Vec<String>>,
+    /// Map of features using the 1.60+ extended syntax, if present.
+    #[serde(default)]
+    pub features2: Option<HashMap<String, Vec<String>>>,
+    /// Whether this version has been yanked.
+    #[serde(default)]
+    pub yanked: bool,
+    /// The `links` value from the manifest, if any.
+    #[serde(default)]
+    pub links: Option<String>,
+    /// Schema version of this entry, defaulting to 1.
+    #[serde(default)]
+    pub v: Option<u32>,
+    /// Minimum supported Rust version, if declared.
+    #[serde(default)]
+    pub rust_version: Option<String>,
+}
+
+/// Computes the registry index path for a crate name, per RFC 2789.
+///
+/// The same layout is used by the sparse index and the `crates.io-index` git
+/// mirror. Names are lower-cased and bucketed by length: 1-3 character names
+/// use dedicated prefixes, longer names are split into two-character
+/// directories.
+fn index_path(name: &str) -> String {
+    let lower = name.to_lowercase();
+    match lower.len() {
+        1 => format!("1/{}", lower),
+        2 => format!("2/{}", lower),
+        3 => format!("3/{}/{}", &lower[..1], lower),
+        _ => format!("{}/{}/{}", &lower[..2], &lower[2..4], lower),
+    }
+}
+
+/// Loads all version entries for a crate from the crates.io registry index.
+///
+/// The index data is fetched from the `rust-lang/crates.io-index` repository on
+/// GitHub, which mirrors the same per-crate metadata as the sparse index at
+/// [`index.crates.io`](https://index.crates.io/).
+///
+/// Returns `None` if the crate is not present in the index. The entries are
+/// returned in the order they appear in the index, which is publication order
+/// (oldest first).
+pub async fn load_index_info(
+    cratename: &str,
+) -> Result<Option<Vec<IndexEntry>>, crate::ProviderError> {
+    let body = match crate::github::download_raw_file(
+        "rust-lang",
+        "crates.io-index",
+        "master",
+        &index_path(cratename),
+    )
+    .await
+    {
+        Ok(body) => body,
+        Err(crate::HTTPJSONError::Error { status: 404, .. }) => return Ok(None),
+        Err(e) => return Err(e.into()),
+    };
+
+    let mut entries = Vec::new();
+    for line in body.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let entry: IndexEntry = serde_json::from_str(line).map_err(|e| {
+            crate::ProviderError::ParseError(format!("Failed to parse index entry: {}", e))
+        })?;
+        entries.push(entry);
+    }
+
+    Ok(Some(entries))
+}
+
 // TODO: dedupe with TryFrom implementation above
 fn parse_crates_io(data: &CrateInfo) -> Vec<UpstreamDatum> {
     let crate_data = &data.crate_;
@@ -421,5 +548,29 @@ mod crates_io_tests {
         let crate_info: CrateInfo = serde_json::from_str(data).unwrap();
 
         assert_eq!(crate_info.crate_.name, "breezy");
+    }
+
+    #[test]
+    fn test_index_path() {
+        assert_eq!(index_path("a"), "1/a");
+        assert_eq!(index_path("ab"), "2/ab");
+        assert_eq!(index_path("abc"), "3/a/abc");
+        assert_eq!(index_path("serde"), "se/rd/serde");
+        assert_eq!(index_path("Inflector"), "in/fl/inflector");
+        assert_eq!(index_path("cargo-edit"), "ca/rg/cargo-edit");
+    }
+
+    #[test]
+    fn test_parse_index_entry() {
+        let line = r#"{"name":"serde","vers":"1.0.0","deps":[{"name":"serde_derive","req":"^1.0","features":[],"optional":true,"default_features":true,"target":null,"kind":"normal"}],"cksum":"00000000000000000000000000000000000000000000000000000000000000aa","features":{"derive":["serde_derive"],"default":["std"]},"yanked":false}"#;
+
+        let entry: IndexEntry = serde_json::from_str(line).unwrap();
+
+        assert_eq!(entry.name, "serde");
+        assert_eq!(entry.vers, semver::Version::new(1, 0, 0));
+        assert_eq!(entry.deps.len(), 1);
+        assert_eq!(entry.deps[0].name, "serde_derive");
+        assert!(entry.deps[0].optional);
+        assert!(!entry.yanked);
     }
 }
