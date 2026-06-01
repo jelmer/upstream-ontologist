@@ -336,9 +336,6 @@ pub async fn load_crate_info(cratename: &str) -> Result<Option<CrateInfo>, crate
         .map_err(|e| crate::ProviderError::ParseError(format!("Failed to parse crate data: {}", e)))
 }
 
-/// Base URL of the crates.io sparse registry index (RFC 2789).
-const SPARSE_INDEX_URL: &str = "https://index.crates.io/";
-
 /// A dependency of a crate version, as recorded in the registry index.
 ///
 /// See <https://doc.rust-lang.org/cargo/reference/registry-index.html>.
@@ -411,10 +408,12 @@ pub struct IndexEntry {
     pub rust_version: Option<String>,
 }
 
-/// Computes the sparse index path for a crate name, per RFC 2789.
+/// Computes the registry index path for a crate name, per RFC 2789.
 ///
-/// Names are lower-cased and bucketed by length: 1-3 character names use
-/// dedicated prefixes, longer names are split into two-character directories.
+/// The same layout is used by the sparse index and the `crates.io-index` git
+/// mirror. Names are lower-cased and bucketed by length: 1-3 character names
+/// use dedicated prefixes, longer names are split into two-character
+/// directories.
 fn index_path(name: &str) -> String {
     let lower = name.to_lowercase();
     match lower.len() {
@@ -425,7 +424,11 @@ fn index_path(name: &str) -> String {
     }
 }
 
-/// Loads all version entries for a crate from the crates.io sparse index.
+/// Loads all version entries for a crate from the crates.io registry index.
+///
+/// The index data is fetched from the `rust-lang/crates.io-index` repository on
+/// GitHub, which mirrors the same per-crate metadata as the sparse index at
+/// [`index.crates.io`](https://index.crates.io/).
 ///
 /// Returns `None` if the crate is not present in the index. The entries are
 /// returned in the order they appear in the index, which is publication order
@@ -433,30 +436,18 @@ fn index_path(name: &str) -> String {
 pub async fn load_index_info(
     cratename: &str,
 ) -> Result<Option<Vec<IndexEntry>>, crate::ProviderError> {
-    let url = format!("{}{}", SPARSE_INDEX_URL, index_path(cratename));
-
-    let client = crate::http::build_client()
-        .build()
-        .map_err(|e| crate::ProviderError::Other(e.to_string()))?;
-
-    let response = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| crate::ProviderError::Other(e.to_string()))?;
-
-    if response.status() == reqwest::StatusCode::NOT_FOUND {
-        return Ok(None);
-    }
-
-    let response = response
-        .error_for_status()
-        .map_err(|e| crate::ProviderError::Other(e.to_string()))?;
-
-    let body = response
-        .text()
-        .await
-        .map_err(|e| crate::ProviderError::Other(e.to_string()))?;
+    let body = match crate::github::download_raw_file(
+        "rust-lang",
+        "crates.io-index",
+        "master",
+        &index_path(cratename),
+    )
+    .await
+    {
+        Ok(body) => body,
+        Err(crate::HTTPJSONError::Error { status: 404, .. }) => return Ok(None),
+        Err(e) => return Err(e.into()),
+    };
 
     let mut entries = Vec::new();
     for line in body.lines() {
