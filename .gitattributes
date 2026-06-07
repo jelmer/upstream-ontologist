@@ -1,0 +1,5 @@
+# Test fixtures are compared byte-for-byte, so keep them LF on all
+# platforms. Without this, Windows checkouts get CRLF and the
+# readme_tests/upstream_tests assertions fail.
+readme_tests/** text eol=lf
+testdata/** text eol=lf
