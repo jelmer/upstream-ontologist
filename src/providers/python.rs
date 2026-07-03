@@ -851,13 +851,10 @@ async fn guess_from_setup_py_parsed(
 
         // End code from https://github.com/nexB/scancode-toolkit/blob/develop/src/packagedcode/pypi.py
 
-        let ast_str = ast.getattr("Str").unwrap();
         let ast_constant = ast.getattr("Constant").unwrap();
 
         let get_str_from_expr = |expr: &Bound<PyAny>| -> Option<String> {
-            if expr.is_instance(&ast_str).ok()? {
-                Some(expr.getattr("s").ok()?.extract::<String>().ok()?)
-            } else if expr.is_instance(&ast_constant).ok()? {
+            if expr.is_instance(&ast_constant).ok()? {
                 Some(expr.getattr("value").ok()?.extract::<String>().ok()?)
             } else {
                 None
@@ -1447,6 +1444,39 @@ mod setup_cfg_tests {
         std::fs::write(&path, "[metadata]\nname = mypackage\nversion = 1.2.3\n").unwrap();
         let settings = GuesserSettings::default();
         let results = guess_from_setup_cfg(&path, &settings).await.unwrap();
+        let version = results.iter().find_map(|r| match &r.datum {
+            UpstreamDatum::Version(v) => Some(v.clone()),
+            _ => None,
+        });
+        assert_eq!(version, Some("1.2.3".to_string()));
+    }
+}
+
+#[cfg(all(test, feature = "pyo3"))]
+mod setup_py_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_setup_py_parsed_basic() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("setup.py");
+        std::fs::write(
+            &path,
+            "from setuptools import setup\n\
+             setup(\n\
+             \x20   name='mypackage',\n\
+             \x20   version='1.2.3',\n\
+             \x20   description='A test package',\n\
+             \x20   url='https://example.com/mypackage',\n\
+             )\n",
+        )
+        .unwrap();
+        let results = guess_from_setup_py(&path, false).await.unwrap();
+        let name = results.iter().find_map(|r| match &r.datum {
+            UpstreamDatum::Name(v) => Some(v.clone()),
+            _ => None,
+        });
+        assert_eq!(name, Some("mypackage".to_string()));
         let version = results.iter().find_map(|r| match &r.datum {
             UpstreamDatum::Version(v) => Some(v.clone()),
             _ => None,
