@@ -148,10 +148,10 @@ async fn main() {
             }
         };
 
-        let out = serde_yaml::to_value(&metadata).unwrap();
+        let out = serde_norway::to_value(&metadata).unwrap();
 
         std::io::stdout()
-            .write_all(serde_yaml::to_string(&out).unwrap().as_bytes())
+            .write_all(serde_norway::to_string(&out).unwrap().as_bytes())
             .unwrap();
     }
 }

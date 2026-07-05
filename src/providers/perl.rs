@@ -326,7 +326,7 @@ pub fn guess_from_meta_yml(
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
 
-    let data: serde_yaml::Value = serde_yaml::from_str(&contents)
+    let data: serde_norway::Value = serde_norway::from_str(&contents)
         .map_err(|e| ProviderError::ParseError(format!("Error parsing META.yml: {}", e)))?;
 
     let mut upstream_data = Vec::new();

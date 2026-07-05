@@ -22,7 +22,7 @@ pub fn guess_from_pubspec_yaml(
     let file = File::open(path)?;
 
     let pubspec: Pubspec =
-        serde_yaml::from_reader(file).map_err(|e| ProviderError::ParseError(e.to_string()))?;
+        serde_norway::from_reader(file).map_err(|e| ProviderError::ParseError(e.to_string()))?;
 
     let mut upstream_data: Vec<UpstreamDatumWithMetadata> = Vec::new();
 
