@@ -246,28 +246,28 @@ impl serde::ser::Serialize for Person {
     where
         S: serde::ser::Serializer,
     {
-        let mut map = serde_yaml::Mapping::new();
+        let mut map = serde_norway::Mapping::new();
         if let Some(name) = &self.name {
             map.insert(
-                serde_yaml::Value::String("name".to_string()),
-                serde_yaml::Value::String(name.to_string()),
+                serde_norway::Value::String("name".to_string()),
+                serde_norway::Value::String(name.to_string()),
             );
         }
         if let Some(email) = &self.email {
             map.insert(
-                serde_yaml::Value::String("email".to_string()),
-                serde_yaml::Value::String(email.to_string()),
+                serde_norway::Value::String("email".to_string()),
+                serde_norway::Value::String(email.to_string()),
             );
         }
         if let Some(url) = &self.url {
             map.insert(
-                serde_yaml::Value::String("url".to_string()),
-                serde_yaml::Value::String(url.to_string()),
+                serde_norway::Value::String("url".to_string()),
+                serde_norway::Value::String(url.to_string()),
             );
         }
-        let tag = serde_yaml::value::TaggedValue {
-            tag: serde_yaml::value::Tag::new("!Person"),
-            value: serde_yaml::Value::Mapping(map),
+        let tag = serde_norway::value::TaggedValue {
+            tag: serde_norway::value::Tag::new("!Person"),
+            value: serde_norway::Value::Mapping(map),
         };
         tag.serialize(serializer)
     }
@@ -278,26 +278,26 @@ impl<'a> serde::de::Deserialize<'a> for Person {
     where
         D: serde::de::Deserializer<'a>,
     {
-        let value = serde_yaml::Value::deserialize(deserializer)?;
-        if let serde_yaml::Value::Mapping(map) = value {
+        let value = serde_norway::Value::deserialize(deserializer)?;
+        if let serde_norway::Value::Mapping(map) = value {
             let mut name = None;
             let mut email = None;
             let mut url = None;
             for (k, v) in map {
                 match k {
-                    serde_yaml::Value::String(k) => match k.as_str() {
+                    serde_norway::Value::String(k) => match k.as_str() {
                         "name" => {
-                            if let serde_yaml::Value::String(s) = v {
+                            if let serde_norway::Value::String(s) = v {
                                 name = Some(s);
                             }
                         }
                         "email" => {
-                            if let serde_yaml::Value::String(s) = v {
+                            if let serde_norway::Value::String(s) = v {
                                 email = Some(s);
                             }
                         }
                         "url" => {
-                            if let serde_yaml::Value::String(s) = v {
+                            if let serde_norway::Value::String(s) = v {
                                 url = Some(s);
                             }
                         }
@@ -1131,14 +1131,14 @@ impl serde::ser::Serialize for UpstreamDatum {
             UpstreamDatum::Registry(r) => {
                 let mut l = serializer.serialize_seq(Some(r.len()))?;
                 for (k, v) in r {
-                    let mut m = serde_yaml::Mapping::new();
+                    let mut m = serde_norway::Mapping::new();
                     m.insert(
-                        serde_yaml::Value::String("Name".to_string()),
-                        serde_yaml::to_value(k).unwrap(),
+                        serde_norway::Value::String("Name".to_string()),
+                        serde_norway::to_value(k).unwrap(),
                     );
                     m.insert(
-                        serde_yaml::Value::String("Entry".to_string()),
-                        serde_yaml::to_value(v).unwrap(),
+                        serde_norway::Value::String("Entry".to_string()),
+                        serde_norway::to_value(v).unwrap(),
                     );
                     l.serialize_element(&m)?;
                 }
@@ -1520,11 +1520,11 @@ impl serde::ser::Serialize for UpstreamMetadata {
     where
         S: serde::ser::Serializer,
     {
-        let mut map = serde_yaml::Mapping::new();
+        let mut map = serde_norway::Mapping::new();
         for datum in &self.0 {
             map.insert(
-                serde_yaml::Value::String(datum.datum.field().to_string()),
-                serde_yaml::to_value(datum).unwrap(),
+                serde_norway::Value::String(datum.datum.field().to_string()),
+                serde_norway::to_value(datum).unwrap(),
             );
         }
         map.serialize(serializer)
@@ -2213,8 +2213,8 @@ pub fn guess_from_travis_yml(
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
 
-    let data: serde_yaml::Value =
-        serde_yaml::from_str(&contents).map_err(|e| ProviderError::ParseError(e.to_string()))?;
+    let data: serde_norway::Value =
+        serde_norway::from_str(&contents).map_err(|e| ProviderError::ParseError(e.to_string()))?;
 
     let mut ret = Vec::new();
 

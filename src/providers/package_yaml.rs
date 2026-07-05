@@ -9,8 +9,8 @@ pub fn guess_from_package_yaml(
     _settings: &GuesserSettings,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     let reader = std::fs::File::open(path)?;
-    let data: serde_yaml::Value =
-        serde_yaml::from_reader(reader).map_err(|e| ProviderError::ParseError(e.to_string()))?;
+    let data: serde_norway::Value =
+        serde_norway::from_reader(reader).map_err(|e| ProviderError::ParseError(e.to_string()))?;
 
     let mut ret = Vec::new();
 
