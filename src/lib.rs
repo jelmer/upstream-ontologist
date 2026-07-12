@@ -1734,6 +1734,17 @@ pub fn with_path_segments(url: &Url, path_segments: &[&str]) -> Result<Url, Path
     Ok(url)
 }
 
+/// Return `url` rewritten to use the https scheme.
+///
+/// `Url::set_scheme` refuses to change a non-special scheme such as `ssh`
+/// into a special one such as `https`, so the URL is rebuilt from its parts
+/// instead. Userinfo, query and fragment are dropped.
+fn to_https_url(url: &Url) -> Option<Url> {
+    let host = url.host_str()?;
+    let port = url.port().map(|p| format!(":{}", p)).unwrap_or_default();
+    Url::parse(&format!("https://{}{}{}", host, port, url.path())).ok()
+}
+
 /// Trait for different code forges (GitHub, GitLab, etc.)
 #[async_trait::async_trait]
 pub trait Forge: Send + Sync {
@@ -1831,9 +1842,7 @@ impl Forge for GitHub {
             return None;
         }
 
-        let mut url = url.clone();
-
-        url.set_scheme("https").expect("valid scheme");
+        let url = to_https_url(url)?;
 
         Some(with_path_segments(&url, &path_elements[0..3]).unwrap())
     }
@@ -1849,8 +1858,7 @@ impl Forge for GitHub {
             return None;
         }
 
-        let mut url = url.clone();
-        url.set_scheme("https").expect("valid scheme");
+        let mut url = to_https_url(url)?;
         url.path_segments_mut().unwrap().push("new");
         Some(url)
     }
@@ -1946,43 +1954,37 @@ impl Forge for GitHub {
     }
 
     fn bug_database_from_issue_url(&self, url: &Url) -> Option<Url> {
-        let path_elements = url
-            .path_segments()
-            .expect("path segments")
-            .collect::<Vec<_>>();
-        if path_elements.len() < 2 || path_elements[1] != "issues" {
+        let path_elements = url.path_segments()?.collect::<Vec<_>>();
+        if path_elements.len() < 4
+            || path_elements[2] != "issues"
+            || path_elements[3].parse::<u32>().is_err()
+        {
             return None;
         }
-        let mut url = url.clone();
-        url.set_scheme("https").unwrap();
+        let url = to_https_url(url)?;
         Some(with_path_segments(&url, &path_elements[0..3]).unwrap())
     }
 
     fn bug_database_url_from_repo_url(&self, url: &Url) -> Option<Url> {
-        let mut path = url
-            .path_segments()
-            .into_iter()
-            .take(2)
-            .flatten()
-            .collect::<Vec<&str>>();
-        path[1] = path[1].strip_suffix(".git").unwrap_or(path[1]);
-        path.push("issues");
+        let path = url.path_segments()?.take(2).collect::<Vec<&str>>();
+        if path.len() < 2 {
+            return None;
+        }
+        let repo = path[1].strip_suffix(".git").unwrap_or(path[1]);
 
-        let mut url = url.clone();
-        url.set_scheme("https").unwrap();
-        Some(with_path_segments(&url, path.as_slice()).unwrap())
+        let url = to_https_url(url)?;
+        Some(with_path_segments(&url, &[path[0], repo, "issues"]).unwrap())
     }
 
     fn repo_url_from_merge_request_url(&self, url: &Url) -> Option<Url> {
-        let path_elements = url
-            .path_segments()
-            .expect("path segments")
-            .collect::<Vec<_>>();
-        if path_elements.len() < 2 || path_elements[1] != "issues" {
+        let path_elements = url.path_segments()?.collect::<Vec<_>>();
+        if path_elements.len() < 4
+            || path_elements[2] != "pull"
+            || path_elements[3].parse::<u32>().is_err()
+        {
             return None;
         }
-        let mut url = url.clone();
-        url.set_scheme("https").expect("valid scheme");
+        let url = to_https_url(url)?;
         Some(with_path_segments(&url, &path_elements[0..2]).unwrap())
     }
 }
@@ -4386,6 +4388,77 @@ mod tests {
             extract_pecl_package_name("https://example.com/something"),
             None
         );
+    }
+
+    #[test]
+    fn test_github_bug_database_url_from_repo_url() {
+        let github = GitHub;
+
+        let url = Url::parse("https://github.com/dulwich/dulwich.git").unwrap();
+        assert_eq!(
+            github.bug_database_url_from_repo_url(&url).unwrap(),
+            Url::parse("https://github.com/dulwich/dulwich/issues").unwrap()
+        );
+
+        // Url::set_scheme cannot change ssh to https, so the URL has to be
+        // rebuilt; the userinfo is dropped in the process.
+        let url = Url::parse("ssh://git@github.com/dulwich/dulwich.git").unwrap();
+        assert_eq!(
+            github.bug_database_url_from_repo_url(&url).unwrap(),
+            Url::parse("https://github.com/dulwich/dulwich/issues").unwrap()
+        );
+
+        let url = Url::parse("git://github.com/dulwich/dulwich").unwrap();
+        assert_eq!(
+            github.bug_database_url_from_repo_url(&url).unwrap(),
+            Url::parse("https://github.com/dulwich/dulwich/issues").unwrap()
+        );
+
+        // Not a repository URL.
+        let url = Url::parse("https://github.com/dulwich").unwrap();
+        assert_eq!(github.bug_database_url_from_repo_url(&url), None);
+    }
+
+    #[test]
+    fn test_github_bug_database_from_issue_url() {
+        let github = GitHub;
+
+        let url = Url::parse("https://github.com/dulwich/dulwich/issues/123").unwrap();
+        assert_eq!(
+            github.bug_database_from_issue_url(&url).unwrap(),
+            Url::parse("https://github.com/dulwich/dulwich/issues").unwrap()
+        );
+
+        let url = Url::parse("ssh://git@github.com/dulwich/dulwich/issues/123").unwrap();
+        assert_eq!(
+            github.bug_database_from_issue_url(&url).unwrap(),
+            Url::parse("https://github.com/dulwich/dulwich/issues").unwrap()
+        );
+
+        // Not an issue URL.
+        let url = Url::parse("https://github.com/dulwich/dulwich").unwrap();
+        assert_eq!(github.bug_database_from_issue_url(&url), None);
+    }
+
+    #[test]
+    fn test_github_repo_url_from_merge_request_url() {
+        let github = GitHub;
+
+        let url = Url::parse("https://github.com/dulwich/dulwich/pull/123").unwrap();
+        assert_eq!(
+            github.repo_url_from_merge_request_url(&url).unwrap(),
+            Url::parse("https://github.com/dulwich/dulwich").unwrap()
+        );
+
+        let url = Url::parse("ssh://git@github.com/dulwich/dulwich/pull/123").unwrap();
+        assert_eq!(
+            github.repo_url_from_merge_request_url(&url).unwrap(),
+            Url::parse("https://github.com/dulwich/dulwich").unwrap()
+        );
+
+        // Not a merge request URL.
+        let url = Url::parse("https://github.com/dulwich/dulwich/issues/123").unwrap();
+        assert_eq!(github.repo_url_from_merge_request_url(&url), None);
     }
 
     #[test]
