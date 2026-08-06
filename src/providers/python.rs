@@ -176,6 +176,15 @@ pub fn guess_from_pyproject_toml(
             });
         }
 
+        // PEP 621 defines description as a short summary, not the long form.
+        if let Some(description) = inner_project.description {
+            ret.push(UpstreamDatumWithMetadata {
+                datum: UpstreamDatum::Summary(description),
+                certainty: Some(Certainty::Certain),
+                origin: Some(path.into()),
+            });
+        }
+
         if let Some(pyproject_toml::License::Spdx(license)) = inner_project.license.as_ref() {
             ret.push(UpstreamDatumWithMetadata {
                 datum: UpstreamDatum::License(license.clone()),
@@ -1394,6 +1403,37 @@ pub async fn remote_pypi_metadata(name: &str) -> Result<UpstreamMetadata, Provid
     match pypi {
         Some(pypi) => pypi.try_into(),
         None => Ok(UpstreamMetadata::default()),
+    }
+}
+
+#[cfg(test)]
+mod pyproject_toml_tests {
+    use super::*;
+
+    #[test]
+    fn test_pep621_description_is_a_summary() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pyproject.toml");
+        std::fs::write(
+            &path,
+            r#"[project]
+name = "markupsafe"
+version = "3.0.3"
+description = "Safely add untrusted strings to HTML/XML markup."
+"#,
+        )
+        .unwrap();
+
+        let results = guess_from_pyproject_toml(&path, &GuesserSettings::default()).unwrap();
+
+        let summary = results.iter().find_map(|r| match &r.datum {
+            UpstreamDatum::Summary(s) => Some(s.as_str()),
+            _ => None,
+        });
+        assert_eq!(
+            summary,
+            Some("Safely add untrusted strings to HTML/XML markup.")
+        );
     }
 }
 
