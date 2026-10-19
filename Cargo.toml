@@ -40,10 +40,7 @@ debbugs = { version = ">=0.1.1, <0.2", default-features = false, features = [
 	"tokio",
 	"mailparse",
 ] }
-clap = { version = ">=4.5, <5", features = [
-	"derive",
-	"env",
-], optional = true }
+clap = { version = ">=4.5, <5", features = ["derive", "env"], optional = true }
 maplit = ">=1.0.2, <2"
 env_logger = { version = ">=0.11, <0.12", optional = true }
 makefile-lossless = { version = ">=0.2, <0.4", optional = true }
@@ -112,7 +109,7 @@ tempfile = ">=3.24, <4"
 quote = ">=1.0.41, <2"
 
 [dependencies.pyo3]
-version = ">=0.27.0, <0.30"
+version = ">=0.27.0, <0.31"
 optional = true
 
 [dependencies.reqwest]
