@@ -1406,7 +1406,7 @@ pub async fn remote_pypi_metadata(name: &str) -> Result<UpstreamMetadata, Provid
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "pyproject-toml"))]
 mod pyproject_toml_tests {
     use super::*;
 
@@ -1451,7 +1451,7 @@ mod pypi_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "setup-cfg"))]
 mod setup_cfg_tests {
     use super::*;
 
