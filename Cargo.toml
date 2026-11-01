@@ -130,7 +130,7 @@ version = ">=0.1.1, <0.2"
 optional = true
 
 [dependencies.gix-config]
-version = ">=0.54.0, <0.62"
+version = ">=0.54.0, <0.63"
 features = ["sha1"]
 optional = true
 
