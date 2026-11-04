@@ -865,6 +865,31 @@ mod control_tests {
 }
 
 #[cfg(test)]
+#[cfg(feature = "debian")]
+mod copyright_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_source_free_text() {
+        let td = tempfile::tempdir().unwrap();
+        let path = td.path().join("copyright");
+        std::fs::write(
+            &path,
+            r#"Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Source: the first packager said: "I took the program off a CD-ROM".
+"#,
+        )
+        .unwrap();
+        assert_eq!(
+            guess_from_debian_copyright(&path, &GuesserSettings::default())
+                .await
+                .unwrap(),
+            vec![]
+        );
+    }
+}
+
+#[cfg(test)]
 mod watch_tests {
     use super::*;
 
