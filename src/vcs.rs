@@ -401,7 +401,7 @@ pub async fn probe_gitlab_host(hostname: &str) -> bool {
 /// Guess a repository URL from a URL
 pub async fn guess_repo_from_url(url: &url::Url, net_access: Option<bool>) -> Option<String> {
     let net_access = net_access.unwrap_or(false);
-    let path_segments = url.path_segments().unwrap().collect::<Vec<_>>();
+    let path_segments = url.path_segments()?.collect::<Vec<_>>();
     match url.host_str()? {
         "github.com" => {
             if path_segments.len() < 2 {
@@ -669,6 +669,11 @@ async fn test_guess_repo_url() {
     assert_eq!(
         None,
         guess_repo_from_url(&"https://www.jelmer.uk/".parse().unwrap(), Some(false)).await
+    );
+
+    assert_eq!(
+        None,
+        guess_repo_from_url(&"said:".parse().unwrap(), Some(false)).await
     );
 
     assert_eq!(
