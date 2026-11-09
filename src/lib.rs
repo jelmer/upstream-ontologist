@@ -3080,7 +3080,7 @@ const OLD_STATIC_GUESSERS: &[(&str, OldAsyncGuesser)] = &[
     }),
 ];
 
-fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
+fn find_guessers(path: &std::path::Path, settings: &GuesserSettings) -> Vec<Box<dyn Guesser>> {
     let mut candidates: Vec<Box<dyn Guesser>> = Vec::new();
 
     let path = path.canonicalize().unwrap();
@@ -3112,7 +3112,7 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
         }
     }
 
-    #[cfg(any(feature = "python-pkginfo", feature = "pyo3"))]
+    #[cfg_attr(not(feature = "python-pkginfo"), allow(unused_mut))]
     let mut found_pkg_info = path.join("PKG-INFO").exists();
     #[cfg(feature = "python-pkginfo")]
     for entry in std::fs::read_dir(&path).unwrap() {
@@ -3143,8 +3143,10 @@ fn find_guessers(path: &std::path::Path) -> Vec<Box<dyn Guesser>> {
         }
     }
 
-    #[cfg(feature = "pyo3")]
-    if !found_pkg_info && path.join("setup.py").exists() {
+    if !found_pkg_info
+        && (cfg!(feature = "pyo3") || settings.trust_package)
+        && path.join("setup.py").exists()
+    {
         candidates.push(Box::new(PathGuesser {
             name: "setup.py".to_string(),
             subpath: path.join("setup.py"),
@@ -3500,9 +3502,10 @@ pub fn upstream_metadata_stream(
 ) -> impl Stream<Item = Result<UpstreamDatumWithMetadata, ProviderError>> {
     let trust_package = trust_package.unwrap_or(false);
 
-    let guessers = find_guessers(path);
+    let settings = GuesserSettings { trust_package };
+    let guessers = find_guessers(path, &settings);
 
-    stream(path, &GuesserSettings { trust_package }, guessers)
+    stream(path, &settings, guessers)
 }
 
 /// Extends upstream metadata with additional information from external sources

@@ -630,168 +630,193 @@ pub async fn guess_from_setup_cfg(
     Ok(ret)
 }
 
-#[cfg(feature = "pyo3")]
+/// Python script that runs a setup.py up to the configuration stage and
+/// prints the resulting metadata as JSON.
+///
+/// This runs in a separate process: importing setuptools in-process can
+/// deadlock against imports in other threads, since setuptools'
+/// _distutils_hack imports modules from within a meta path finder while
+/// holding the global import lock. It also avoids changing the working
+/// directory of the current process.
+const RUN_SETUP_PY_SCRIPT: &str = r#"
+import json
+import sys
+
+# Import setuptools, just in case it replaces distutils
+try:
+    import setuptools  # noqa: F401
+except ImportError:
+    pass
+
+from distutils.core import run_setup
+
+out = sys.stdout
+# Keep anything setup.py prints out of the JSON output.
+sys.stdout = sys.stderr
+result = run_setup(sys.argv[1], stop_after="config")
+metadata = getattr(result, "metadata", None)
+json.dump({
+    "name": result.get_name(),
+    "version": result.get_version(),
+    "url": result.get_url(),
+    "download_url": result.get_download_url(),
+    "license": result.get_license(),
+    "contact": result.get_contact(),
+    "contact_email": result.get_contact_email(),
+    "description": result.get_description(),
+    "long_description": result.get_long_description(),
+    "long_description_content_type": getattr(
+        result, "long_description_content_type", None),
+    "project_urls": getattr(metadata, "project_urls", None),
+}, out)
+"#;
+
+#[derive(Deserialize)]
+struct SetupPyResult {
+    name: Option<String>,
+    version: Option<String>,
+    url: Option<String>,
+    download_url: Option<String>,
+    license: Option<String>,
+    contact: Option<String>,
+    contact_email: Option<String>,
+    description: Option<String>,
+    long_description: Option<String>,
+    long_description_content_type: Option<String>,
+    project_urls: Option<HashMap<String, String>>,
+}
+
+/// Run setup.py with the interpreter from the `PYTHON` environment variable,
+/// falling back to `python3`.
 async fn guess_from_setup_py_executed(
     path: &Path,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
-    // Ensure only one thread can run this function at a time
-    static SETUP_PY_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
-    let _guard = SETUP_PY_LOCK.lock().await;
+    let path = std::path::absolute(path)?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| ProviderError::Other(format!("{} has no parent", path.display())))?;
+    let python = std::env::var_os("PYTHON")
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| "python3".into());
+    let output = tokio::process::Command::new(&python)
+        .arg("-c")
+        .arg(RUN_SETUP_PY_SCRIPT)
+        .arg(&path)
+        .current_dir(parent)
+        .stdin(std::process::Stdio::null())
+        .output()
+        .await
+        .map_err(|e| {
+            ProviderError::Other(format!(
+                "Failed to run {} (set PYTHON to override): {}",
+                python.to_string_lossy(),
+                e
+            ))
+        })?;
+    if !output.status.success() {
+        return Err(ProviderError::Other(format!(
+            "Failed to run setup.py ({}): {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr)
+        )));
+    }
+    let result: SetupPyResult = serde_json::from_slice(&output.stdout)
+        .map_err(|e| ProviderError::Other(format!("Failed to parse setup.py metadata: {}", e)))?;
+
+    let origin = Origin::Path(path.clone());
     let mut ret = Vec::new();
-    // Import setuptools, just in case it replaces distutils
-    //
-    use pyo3::types::PyDict;
-    Python::initialize();
-    let mut long_description = None;
-    let mut urls: Vec<String> = vec![];
-    Python::attach(|py| {
-        let _ = py.import("setuptools");
 
-        let run_setup = py.import("distutils.core")?.getattr("run_setup")?;
+    if let Some(name) = result.name {
+        ret.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Name(name),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+    }
 
-        let os = py.import("os")?;
+    if let Some(version) = result.version {
+        ret.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Version(version),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+    }
 
-        let orig = match os.getattr("getcwd")?.call0() {
-            Ok(orig) => Some(orig.extract::<String>()?),
-            Err(e) => {
-                debug!("Failed to get current directory: {}", e);
-                None
-            }
+    if let Some(download_url) = result.download_url {
+        ret.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Download(download_url),
+            certainty: Some(Certainty::Certain),
+            origin: None,
+        });
+    }
+
+    if let Some(license) = result.license {
+        ret.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::License(license),
+            certainty: Some(Certainty::Likely),
+            origin: Some(origin.clone()),
+        });
+    }
+
+    if let Some(contact) = result.contact {
+        let contact = match result.contact_email {
+            Some(email) => format!("{} <{}>", contact, email),
+            None => contact,
         };
+        ret.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Contact(contact),
+            certainty: Some(Certainty::Certain),
+            origin: Some(origin.clone()),
+        });
+    }
 
-        let parent = path.parent().unwrap();
+    if let Some(description) = result.description {
+        ret.push(UpstreamDatumWithMetadata {
+            datum: UpstreamDatum::Summary(description),
+            certainty: Some(Certainty::Certain),
+            origin: Some(origin.clone()),
+        });
+    }
 
-        os.getattr("chdir")?.call1((parent,))?;
+    if let Some(project_urls) = result.project_urls {
+        ret.extend(parse_python_project_urls(project_urls.into_iter(), &origin));
+    }
 
-        let result = || -> PyResult<_> {
-            let kwargs = PyDict::new(py);
-            kwargs.set_item("stop_after", "config")?;
-
-            run_setup.call((path,), Some(&kwargs))
-        }();
-
-        if let Some(orig) = orig {
-            os.getattr("chdir")?.call1((orig,))?;
-        }
-
-        let result = result?;
-
-        if let Some(name) = result.call_method0("get_name")?.extract()? {
-            ret.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Name(name),
-                certainty: Some(Certainty::Certain),
-                origin: None,
-            });
-        }
-
-        if let Some(version) = result.call_method0("get_version")?.extract()? {
-            ret.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Version(version),
-                certainty: Some(Certainty::Certain),
-                origin: None,
-            });
-        }
-
-        if let Some(url) = result
-            .call_method0("get_url")?
-            .extract::<Option<String>>()?
-        {
-            urls.push(url);
-        }
-
-        if let Some(download_url) = result.call_method0("get_download_url")?.extract()? {
-            ret.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Download(download_url),
-                certainty: Some(Certainty::Certain),
-                origin: None,
-            });
-        }
-
-        if let Some(license) = result.call_method0("get_license")?.extract()? {
-            ret.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::License(license),
-                certainty: Some(Certainty::Likely),
-                origin: Some(Origin::Path(path.to_path_buf())),
-            });
-        }
-
-        if let Some(contact) = result.call_method0("get_contact")?.extract()? {
-            let contact: String = match result
-                .call_method0("get_contact_email")?
-                .extract::<Option<String>>()?
-            {
-                Some(email) => format!("{} <{}>", contact, email),
-                None => contact,
-            };
-            ret.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Contact(contact),
-                certainty: Some(Certainty::Certain),
-                origin: Some(Origin::Path(path.to_path_buf())),
-            });
-        }
-
-        if let Some(description) = result.call_method0("get_description")?.extract()? {
-            ret.push(UpstreamDatumWithMetadata {
-                datum: UpstreamDatum::Summary(description),
-                certainty: Some(Certainty::Certain),
-                origin: Some(Origin::Path(path.to_path_buf())),
-            });
-        }
-
-        if let Some(description) = result
-            .call_method0("get_long_description")?
-            .extract::<Option<String>>()?
-        {
-            let content_type = match result.getattr("long_description_content_type") {
-                Ok(content_type) => content_type.extract::<Option<String>>(),
-                Err(e) if e.is_instance_of::<pyo3::exceptions::PyAttributeError>(py) => Ok(None),
-                Err(e) => return Err(e),
-            }?;
-            long_description = Some((description, content_type));
-        }
-
-        if let Ok(metadata) = result.getattr("metadata") {
-            if let Ok(project_urls) = metadata.getattr("project_urls") {
-                ret.extend(parse_python_project_urls(
-                    project_urls
-                        .extract::<HashMap<String, String>>()?
-                        .into_iter(),
-                    &Origin::Path(path.to_path_buf()),
-                ));
-            }
-        }
-        Ok::<(), PyErr>(())
-    })
-    .map_err(|e| {
-        warn!("Failed to run setup.py: {}", e);
-        ProviderError::Other(e.to_string())
-    })?;
-
-    if let Some((long_description, long_description_content_type)) = long_description {
+    if let Some(long_description) = result.long_description {
         ret.extend(parse_python_long_description(
             long_description.as_str(),
-            long_description_content_type.as_deref(),
-            &Origin::Path(path.to_path_buf()),
+            result.long_description_content_type.as_deref(),
+            &origin,
         )?);
     }
 
-    for url in urls {
+    if let Some(url) = result.url {
         ret.extend(parse_python_url(&url).await);
     }
 
     Ok(ret)
 }
 
-#[cfg(feature = "pyo3")]
 /// Extracts upstream metadata from Python setup.py file
+///
+/// Without the pyo3 feature, setup.py can only be handled when
+/// `trust_package` is set, since parsing it requires pyo3.
 pub async fn guess_from_setup_py(
     path: &Path,
     trust_package: bool,
 ) -> std::result::Result<Vec<UpstreamDatumWithMetadata>, ProviderError> {
     if trust_package {
-        guess_from_setup_py_executed(path).await
-    } else {
+        return guess_from_setup_py_executed(path).await;
+    }
+    #[cfg(feature = "pyo3")]
+    {
         guess_from_setup_py_parsed(path).await
+    }
+    #[cfg(not(feature = "pyo3"))]
+    {
+        Err(ProviderError::Other(
+            "parsing setup.py without executing it requires the pyo3 feature".to_string(),
+        ))
     }
 }
 
@@ -1492,10 +1517,11 @@ mod setup_cfg_tests {
     }
 }
 
-#[cfg(all(test, feature = "pyo3"))]
+#[cfg(test)]
 mod setup_py_tests {
     use super::*;
 
+    #[cfg(feature = "pyo3")]
     #[tokio::test]
     async fn test_setup_py_parsed_basic() {
         let dir = tempfile::tempdir().unwrap();
@@ -1522,5 +1548,43 @@ mod setup_py_tests {
             _ => None,
         });
         assert_eq!(version, Some("1.2.3".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_setup_py_executed_prints_to_stdout() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("setup.py");
+        std::fs::write(
+            &path,
+            "from setuptools import setup\n\
+             print('noise')\n\
+             setup(\n\
+             \x20   name='mypackage',\n\
+             \x20   version='1.2.3',\n\
+             \x20   description='A test package',\n\
+             )\n",
+        )
+        .unwrap();
+        let results = guess_from_setup_py(&path, true).await.unwrap();
+        let data: Vec<_> = results.into_iter().map(|r| r.datum).collect();
+        assert_eq!(
+            data,
+            vec![
+                UpstreamDatum::Name("mypackage".to_string()),
+                UpstreamDatum::Version("1.2.3".to_string()),
+                UpstreamDatum::Summary("A test package".to_string()),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_setup_py_executed_failure() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("setup.py");
+        std::fs::write(&path, "raise RuntimeError('broken')\n").unwrap();
+        assert!(matches!(
+            guess_from_setup_py(&path, true).await,
+            Err(ProviderError::Other(_))
+        ));
     }
 }
