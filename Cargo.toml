@@ -155,7 +155,7 @@ version = ">=0.13.3, <0.14"
 optional = true
 
 [dependencies.python-pkginfo]
-version = ">=0.6, <0.7"
+version = ">=0.6, <0.8"
 optional = true
 
 [[bin]]
