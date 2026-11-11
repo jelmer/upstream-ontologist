@@ -1,5 +1,0 @@
-# See https://github.com/jelmer/disperse
-name = "upstream-ontologist"
-release-timeout = 5
-tag-name = "v$VERSION"
-update_manpages = ["man/*.1"]
